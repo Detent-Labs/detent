@@ -170,9 +170,8 @@ condition and an unresolved migration mapping. Each of the four SHALL read the
 advisory role.
 
 A warning callout sets refusal text beside a 3px rule, next to the value it
-warns about. This requirement exempts three refusal rules, which
-`docs/decisions.md` records as open: the step page's 2px warning, the checks
-rail's held-back group and the timers panel's refusal.
+warns about. This requirement exempts one refusal rule, which
+`docs/decisions.md` records as open: the timers panel's refusal.
 
 No component style in `packages/web` or `packages/form-ui` SHALL read the
 accent ramp's light step. The role SHALL draw a rule or a border alone. A
@@ -195,7 +194,7 @@ stamp keeps its five tones, and none of them reads this role.
 #### Scenario: A warning callout's rule reads the role
 
 - **WHEN** a studio screen sets refusal text beside a 3px rule, outside the
-  checks rail and the timers panel
+  timers panel
 - **THEN** the rule computes the advisory role's color, in both color schemes
 
 #### Scenario: An incomplete condition's dashed box reads the role

@@ -480,7 +480,9 @@ mono face and the stamp, never from the control itself.
 - **Primary:** accent fill, paper text. One per screen. Hover `#dd2b0f`,
   active `#ae1800`.
 - **Secondary:** transparent, ink text, divider border. Hover washes ink at
-  7%, active at 14%.
+  7%, active at 14%. A check row's Fix is the one secondary button in a studio
+  row. It is that row's one act, so it reads as a button and not as a row of
+  commands.
 - **Ghost:** transparent, accent text, 4px inline padding. Hover washes the
   accent at 10%, active at 18%.
 - **Destructive:** outlined in the accent, never filled and never red. It
@@ -533,6 +535,8 @@ the Legend style. A done one carries a check icon named Done.
   weight 600, tabular figures, no uppercase.
 - **Tones:** refusal for a blocker, slate for an advisory result.
 - It prints only when the count is above zero.
+- A check row on the checks rail names its severity with a kicker instead.
+  See Rails.
 
 ### The Register Row
 
@@ -647,8 +651,19 @@ own.
   opacity, with a `boxShadow` line marking the drop gap. Alt+ArrowUp and
   Alt+ArrowDown on the grip move the row by keyboard.
 - **Entity rail:** a child field indents 24px.
-- **Checks rail:** a 1px hairline box with 12px padding. A 1px hairline
-  separates its groups, and all clear prints in a 2px ink box.
+- **Checks rail:** no box and no visible heading. The tab row names the tab, and
+  the `aside` keeps its name for a screen reader. It stays a scroll box with
+  12px of padding. One column holds the rows, capped at 52rem and flush left.
+  Each subject takes an `h2` in the Title style, and a 1px hairline separates
+  the subjects.
+- **Check row:** a Legend-style kicker leads, Must fix in Refusal and Worth a
+  look in Slate. The sentence follows in body text at 0.9rem. Fix stands beside
+  it as a secondary button, on its first line. A closed Developer view stands
+  under both. Below 40rem of the row's own width, Fix wraps under the
+  sentence, flush left. A 1px hairline separates the rows, with 12px of block
+  padding. The word carries the severity, so the color never rests alone.
+- **All clear:** a 2px ink box above the subjects. A line under Before
+  publishing says what the studio could not check, in slate at 0.85rem.
 
 ### The Form Card
 
@@ -730,6 +745,14 @@ strokes, at 1, 1.5, 2 and 3px.
 - Refusal text beside a 3px rule in Advisory, with 8px of padding before the
   text.
 - It sits in place, next to the value it warns about.
+- The step page's warnings follow it: the missing-translation notes under the
+  name and description, and the missing-assignment note.
+- A check's sentence takes it at every placement. Those are the step page, the
+  field card, a way-out row, the source editor and the header bar. The list
+  draws no marker, and a placement's own style sets margins alone.
+- An advisory check keeps the rule and prints in Slate.
+- A Fix that opens the JSON surface prints the check's sentence this way above
+  the input.
 
 ### Screen Furniture
 

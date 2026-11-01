@@ -998,8 +998,8 @@ system that resulted; this file explains why it took that shape.
   the page foot. Change 12 (`studio-checks-by-subject`) owns the Checks label.
 
   Resolved by `studio-step-accordion`, except the Checks label: the walk's
-  Previous and Next read `stepText`. The Checks narrowing label stays open as
-  ACCORDION-4 in `docs/decisions.md`.
+  Previous and Next read `stepText`. The Checks narrowing label became
+  ACCORDION-4, resolved at the end of this file.
 - **"Show on the canvas" names the Map tab's surface.** The field catalog's
   "Used in" rows read "Show on the canvas" (`fieldCatalog.showOnCanvas`),
   and the spec names the control by that string. The tab reads Map since
@@ -1187,3 +1187,103 @@ system that resulted; this file explains why it took that shape.
   lines of the same names.
 
   Resolved by `studio-field-card` on 2026-11-01: both scope notes went; the Asked on rows name the steps.
+- **ACCORDION-4: the Checks narrowing label still falls back to a step key.**
+  It lives in `EditScreen.tsx`. SELECTS-2's second half, now archived, said so.
+  Risk (Low): an unnamed step reads its key there. Change 12 (`studio-checks-by-subject`)
+  owns it.
+
+  Resolved by `studio-checks-by-subject`: the label reads `stepTextMap`, so an
+  unnamed step reads its number and never its key.
+- **ACCORDION-6: a way out whose target step is gone heads its row "(no step
+  yet)".** Its Leads to select still displays the first step, and picking
+  that step writes nothing. The code lives in `panels/PathsPanel.tsx` and is
+  older than this change. Risk (Medium): the select shows a target the draft
+  lacks.
+
+  Resolved by `studio-checks-by-subject`: `wayOutHeading` and the Leads to
+  select read "(step removed)" when `path.to` names no step. The select holds
+  that as a disabled option, and picking any step writes.
+- **ACCORDION-9: a step-level check prints the validator's own text under a
+  "ZOD" label.** A just-added step's name check lands on the masthead rather
+  than under Name. Focus stays in the steps rail after "Add a step". Change 12
+  owns the sentences. Risk (Medium): the first check a new step meets reads as
+  machine output.
+
+  Resolved by `studio-checks-by-subject`: a step's name check stands under
+  Name as a sentence, and Add a step moves focus to the new step's Name input.
+- **ACCORDION-12: the no-assignment warning draws a 2px rule in the refusal
+  role.** The warning callout in `DESIGN.md` names a 3px rule in Advisory. The
+  site is the `warning` style in `StepPage.tsx`, older than this change. Risk
+  (Low): the warning reads as a refusal.
+
+  Resolved by `studio-checks-by-subject`: the `warning` style in
+  `StepPage.tsx` takes a 3px rule in `colors.advisory`. The exemption in
+  `web-styling` narrows to the timers panel.
+- **ACCORDION-14: two unnamed steps both read "(unnamed step)".** That holds in
+  the steps rail, the walk and the removal dialog, while the selects number
+  them. Risk (Low): an author cannot tell the two apart there.
+
+  Resolved by `studio-checks-by-subject`: the walk and the removal dialog read
+  `stepTextMap`, so two unnamed steps read their numbers. The rail keeps
+  "(unnamed step)" beside its own number, which tells two apart.
+- **MAPLABELS-5: the step page's guard heading reads "Only when".** The canvas
+  reads "Only if", and so does the vocabulary table's row for a guard. The
+  heading is `condition.onlyWhenHeading`. Risk (Low): one rule reads two ways
+  on two tabs.
+
+  Resolved by `studio-checks-by-subject`: `condition.onlyWhenHeading` reads
+  "Only if", and the key name stays.
+- **FIELDS-12: the Checks tab opens the Fields tab without the field.** A
+  check row calls `openTabFromRow(tabForIssue(issue.entityType))`
+  (`screens/EditScreen.tsx:1166`). That function takes a tab alone (`:891`),
+  and `FieldsTab` accepts no selected field (`:1104`). The spec
+  `studio-process-tabs` asks for that field to open selected
+  (`openspec/specs/studio-process-tabs/spec.md:263-264`). Risk (Medium): the
+  author lands on the Fields tab and must find the field in the entity rail.
+
+  Resolved by `studio-checks-by-subject`: a check row's Fix selects the field
+  on Fields, Catalog, and opens More where the check's zone asks. `fixCheck`
+  carries the field through `fixRequest`.
+- **FIELDS-8: check messages speak the engine's layers.** Measured 2026-09-13,
+  the Fields tab showed `ZOD missing baseLocale ('en') entry` and
+  `field key must match /^[a-z_][a-z0-9_]*$/ to be a valid CEL identifier`.
+  A view entry naming an id no field carries — the shape an unfixed field
+  removal left then, and a JSON-view edit can still write today — showed
+  `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
+  longer look up. Adding an empty field raises the banner at
+  `screens/EditScreen.tsx:967` before the author types. The banner reads
+  `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`
+  (the banner now reads "Open Checks and fix this draft's structure, so every check can run."),
+  and it pushes the page down 35px at 1400px and 99px at 900px. The messages
+  come from `src/schema/definition.ts:1014`, `src/schema/compile.ts:612` and
+  `src/schema/definition.ts:1095`, and the "ZOD" label from
+  `panels/shared/IssueList.tsx:44`. Risk (Medium): an author reads Zod, CEL
+  grammar and raw ids where a plain sentence belongs.
+
+  Since `studio-fresh-draft-starts-clean` the process-name message reads a
+  sentence, and the field-label part stays open. Since
+  `studio-checks-by-subject` every such message reads a sentence at the spot
+  and on the Checks tab. The "ZOD" label and the raw text stand in the row's
+  Developer view alone.
+
+  Resolved by `studio-checks-by-subject`: every such message reads a sentence
+  at the spot and on the Checks tab, and the raw text stands in a Developer view.
+  CHECKS-20 keeps the banner's push on the page.
+- **CHECKS-1: a Fix on a JSON-surface sentence leaves the author on the JSON
+  surface with no way back but the menu.** Several sentences end "Correct it
+  in the JSON surface", and their Fix opens that surface and focuses its
+  input. The surface replaces the six tab bodies. Risk (Medium): an author
+  who has corrected the entry must find the `⋮` menu to return to the tabs.
+
+  Upgrade entry: add a return control to `panels/JsonView.tsx`, or let
+  `fixCheck` in `screens/EditScreen.tsx` remember the tab it left.
+
+  Resolved by `studio-checks-by-subject`: a press on any tab leaves the JSON
+  surface for that tab, and the check's sentence clears with it.
+- **CHECKS-7: no test covers two refusal cases.** When a located issue gets a
+  tier 4 answer, `describePublishRefusal` swaps in the refusal fallback. A
+  contract sentence must also stay as it is. Risk (Low): a rewrite of either
+  rule passes the suite.
+
+  Resolved by `studio-checks-by-subject`: `studio-publishErrors.test.ts` covers
+  the swap on a step and on the contract, with `checks.fallback.contract` behind it.

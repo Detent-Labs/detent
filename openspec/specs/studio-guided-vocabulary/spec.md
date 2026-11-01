@@ -188,6 +188,18 @@ heading or a property word either.
 - **THEN** both print "Only if" for the guard and "How it is taken" for the
   trigger
 
+#### Scenario: The guard heading reads Only if on every tab
+
+- **WHEN** an author opens a way out on the step page and on the canvas
+- **THEN** both name its guard "Only if"
+- **AND** no heading reads "Only when"
+
+#### Scenario: The Checks tab states severity in words
+
+- **WHEN** an author reads the Checks tab
+- **THEN** a row reads Must fix or Worth a look
+- **AND** no row reads blocker, advisory or a validator's name
+
 ### Requirement: The vocabulary table words a step's own concepts
 
 The rows below are the vocabulary for what a step declares.

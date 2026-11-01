@@ -14,8 +14,8 @@ import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
  * filter itself.
  */
 
-function issue(entityId: string, message: string): EditorIssue {
-  return { entityType: "step", entityId, message, source: "cel", loc: `workflow.steps[0].guard` };
+function issue(entityId: string, sentence: string): EditorIssue {
+  return { entityType: "step", entityId, message: `raw ${entityId}`, sentence, source: "cel", loc: `workflow.steps[0].guard` };
 }
 
 const validation: ValidationResult = {
@@ -62,6 +62,22 @@ describe("A narrowed checks rail", () => {
     const html = renderToStaticMarkup(<ChecksRail validation={oneStep} canPublish={true} narrowedTo={NARROWED} />);
 
     expect(html).not.toContain("ready to publish");
+  });
+
+  it("keeps Before publishing and its line while narrowed", () => {
+    const html = renderToStaticMarkup(<ChecksRail validation={validation} canPublish={true} narrowedTo={NARROWED} />);
+
+    expect(html).toContain("Before publishing");
+    expect(html).toContain("Publishing also checks a few things this list cannot");
+  });
+
+  it("reads the held-back state off the whole draft, not the rows shown", () => {
+    const structural: EditorIssue = { entityType: "step", entityId: "step_b", message: "raw", sentence: "x", source: "structural", loc: "" };
+    const held = { ...validation, issues: [structural, issue("step_a", "the intake guard does not parse")] };
+    const html = renderToStaticMarkup(<ChecksRail validation={held} canPublish={true} narrowedTo={NARROWED} />);
+
+    // The structural row belongs to step_b and stays out, yet it still holds the CEL and registry checks back.
+    expect(html).toContain("More checks run once you fix the rows above.");
   });
 
   it("shows every issue again once the narrowing goes", () => {

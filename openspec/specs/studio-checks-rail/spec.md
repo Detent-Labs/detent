@@ -2,218 +2,364 @@
 
 ## Purpose
 
-The Checks tab's full, source-grouped view over every open validation
+The Checks tab's full view, by subject, over every open validation
 issue in the loaded draft. It is the one place an author sees everything
 holding a publish back.
 
 ## Requirements
-### Requirement: The rail lists every open issue, grouped by source
+### Requirement: The Checks tab lists every open issue by subject
 
-The Checks tab SHALL carry the full grouped rail, per the
-`studio-process-tabs` capability's tab-row requirement. The rail SHALL list
-every entry in the loaded draft's `validation.issues[]`. The rail SHALL group
-entries by `source`: zod, structural, CEL, registry, duration, and view.
+The Checks tab SHALL carry the full list. It SHALL hold one row per open issue.
+Three subjects SHALL hold the rows, in this order. They read Steps, Fields and
+Before publishing.
 
-A draft with no step yet holds one Zod issue that is not an entry: the
-missing first step. This capability's start-state requirement covers that
-draft.
+Steps and Fields SHALL draw nothing with no row. Before publishing SHALL draw
+while it holds a row or the line. A narrowed list SHALL keep it too. The start
+state alone SHALL draw neither. No source name SHALL print outside a
+Developer view.
 
-The first five sources are engine validators. The studio runs each one
-unmodified, and reports what it returns. The sixth holds the studio's own
-findings, over a draft the engine would publish. It needs its own name for
-that reason.
+#### Scenario: Issues from two sources share a subject
 
-The Checks tab is the one place the full grouped rail stands. It stands there
-whatever the author has selected. No column beside another tab stands it. A
-row in the rail opens the tab that owns its subject, per the
-`studio-process-tabs` capability.
+- **WHEN** one step carries a structural issue and a CEL issue
+- **THEN** the Checks tab prints both rows under Steps
+- **AND** no heading names a source
 
-#### Scenario: A structural issue appears in its group
+#### Scenario: A subject with no row draws nothing
+
+- **WHEN** no open issue belongs to Fields
+- **THEN** the Checks tab prints no Fields heading
+
+#### Scenario: A clear draft draws Before publishing with the line alone
+
+- **WHEN** the loaded draft passes every check
+- **THEN** Before publishing stands with the line and no row
+
+### Requirement: Each subject holds the issues of its kind
+
+Steps SHALL hold an issue on a step, a way out, a time limit or an action. It
+SHALL also hold a process-level issue located under `workflow`. Fields SHALL
+hold an issue on a field or a data source. It SHALL also hold a process-level
+issue located under `fields` or `dataSources`. Before publishing SHALL hold
+every other issue. Inside Steps, rows SHALL follow the draft's step order.
+
+#### Scenario: A step's issue stands under Steps
 
 - **WHEN** the loaded draft has a structural issue on some step
-- **THEN** the Checks tab prints that issue under a structural group
+- **THEN** the Checks tab prints its row under Steps
 
-<!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
-<!-- antislop: allow synonym-rotation -->
-#### Scenario: Issues across sources each show in their own group
+#### Scenario: A field's issue stands under Fields
 
-- **WHEN** the loaded draft has a structural issue and a CEL issue
-- **THEN** the Checks tab prints one group for each source, each holding its
-  own issue
+- **WHEN** a field and a data source each carry an issue
+- **THEN** the Checks tab prints both rows under Fields
 
-#### Scenario: A Zod-invalid draft's issues show in their own group
+#### Scenario: A contract's issue stands under Before publishing
 
-- **WHEN** the loaded draft fails Zod validation (`zodValid` is false)
-- **AND** it holds at least one step
-- **THEN** the Checks tab prints those issues under a `zod` group
-<!-- antislop: allow trailing-negation -->
-<!-- Copied from the live spec; held back and empty are the two states the scenario contrasts. -->
-- **AND** the structural, CEL, registry, duration, and view groups read held
-  back, not empty
+- **WHEN** the contract carries an issue
+- **THEN** the Checks tab prints its row under Before publishing
 
-### Requirement: The rail reflects the held-back state of a structurally invalid draft
+#### Scenario: Rows follow the step order
 
-<!-- antislop: allow sentence-length -->
-<!-- Copied from the live spec; a sentence opening on a code span merges with its neighbour in the count. -->
-`validateStructure` (`src/validate.ts`) reports the duration and structural
-dimensions as not run when the Zod parse fails and the compile pass raised
-no duration or structural issue. CEL and registry checks do not run until the
-draft compiles. The field `dimensions.structural` reads `"ran"`
-both when the structural checks pass cleanly and when they run and
-raise a structural issue. That field alone cannot tell the two states
-apart.
+- **WHEN** the second and the first step each carry an issue
+- **THEN** the first step's row stands above the second step's
 
-This requirement governs a draft that holds at least one step. It also
-governs a draft with no step that carries some other open issue. A draft
-with no step and no other open issue shows the start state alone. This
-capability's start-state requirement covers it.
+### Requirement: A row states its severity in a word
 
-The checks rail SHALL show the CEL and registry groups as held back
-whenever the structural dimension did not run. It SHALL also show them
-held back whenever the structural group's own issue list is non-empty.
-It SHALL show the duration group as held back whenever
-`validation.zodValid` is false. It SHALL NOT show a held-back group as
-empty or passing.
+Each row SHALL print one severity word above its sentence. An issue from the
+studio's own `view` findings SHALL read Worth a look, in slate. Every other
+issue SHALL read Must fix, in the refusal tone. The word SHALL follow the same
+rule as the Checks count's blocker state.
 
-The registry group covers three checks. Those checks read the action
-types, the assignment strategy types and the data source types a body names.
-Each check splits into a type-resolution half and a config-validation half.
+#### Scenario: An engine issue reads Must fix
 
-The studio holds the registry type names once `useRegistry` has resolved
-them. It reads them from the same registry response the plugin-config form
-already reads. The registry group's type-resolution half SHALL therefore run
-whenever the draft compiles and that response has resolved. It SHALL NOT
-hold back for want of a registry once the response has resolved.
+- **WHEN** a row holds an issue from an engine validator
+- **THEN** the row reads Must fix
 
-While `useRegistry` has not resolved a registry description for this
-session, the type-resolution half SHALL read as held back. That covers both
-states `useRegistry` collapses into one `undefined` result: still loading,
-and resolved to nothing after a failed fetch. That held-back state is
-distinct from the config-validation half's own held-back state below. It
-clears once the fetch resolves for the session. The config-validation
-half's held-back state does not clear.
+#### Scenario: A view finding reads Worth a look
 
-The studio has no live registry schema, so it cannot validate a plugin
-config. The registry group SHALL report its config-validation half as held
-back in every draft state the studio can reach. A held-back config-validation
-half is not itself an issue. That check still runs at publish time on the
-server, and still blocks a publish there.
+- **WHEN** a row holds a view-flag finding
+- **THEN** the row reads Worth a look
 
-The CEL group covers process chaining targets alongside subprocess child
-references. Both need a loaded target body. A chaining site whose target body
-the studio has not loaded reads the same way an unloaded subprocess child
-reads. The rail SHALL report it as not checked, per site, and never as
-passing.
+### Requirement: Every engine message reads as one sentence
 
-`ValidationResult` SHALL carry that per-site state in a dedicated field,
-`chainingSiteStatus`. It carries that field the same way it already carries
-`subprocessStepStatus` for the analogous subprocess case. A visible control
-next to the `process.start` action itself SHALL show that state. That is the
-same way the subprocess step's own fieldset already shows an unloaded child.
+Every open issue SHALL read as one sentence for a person, from one module. The
+sentence for a step's issue SHALL name the step, and the section where one owns
+the issue. The sentence for a field or a data source SHALL name that field or
+source. It SHALL say what to do.
 
-The structural group's own held-back state does not follow from
-`zodValid` alone. `compileProcessBody` (`src/schema/compile.ts`) runs
-duration validation before the structural checks, and raises on the
-first duration issue without ever reaching them. A Zod-valid draft that
-fails duration validation therefore never runs its structural checks
-for that load, whatever `validation.zodValid` reports.
+It SHALL print no key's or id's value, no CEL, no validator name and no JSON
+property. A data source's key counts as its name. Each issue SHALL keep the raw
+message beside its sentence.
 
-The checks rail SHALL show the structural group as held back whenever
-structural checks did not run. The rail holds that group back when the
-structural checks did not run, and runs it when they did. This holds even when
-the draft is Zod-valid and the duration group shows its own, real issues.
+#### Scenario: A way out with no name reads a sentence
 
-The view group SHALL hold back whenever `validation.zodValid` is false,
-and on nothing else. Its three rules read the Zod-parsed body directly,
-which is the placement the duration group already takes. None of the
-three needs a compiled body.
+- **WHEN** a way out's label is empty on the step "Review"
+- **THEN** the row says a way out of "Review" has no name, and names Ways out
+- **AND** no text reads "Invalid input"
 
-#### Scenario: A Zod-invalid draft shows every group held back
+#### Scenario: A step with no name reads a sentence
+
+- **WHEN** a step's label has no base-locale entry
+- **THEN** the sentence says the step needs a name
+- **AND** no text reads "missing baseLocale"
+
+#### Scenario: A guard the parser rejects reads a sentence
+
+- **WHEN** a guard fails to parse
+- **THEN** the sentence names the way out, the step and Ways out
+- **AND** no text repeats the parser's message
+
+#### Scenario: Two unnamed steps read their numbers
+
+- **WHEN** two unnamed steps each carry an issue
+- **THEN** one sentence reads "Step 2" and the other "Step 3"
+
+### Requirement: A message no rule knows still names its place
+
+A message no rule knows SHALL read as a sentence naming its place. That sentence
+SHALL send the reader to the check's Developer view. A sentence SHALL NOT name a
+section the step's kind leaves out.
+
+#### Scenario: An unknown message on a step names the section
+
+- **WHEN** a location on a step carries a message no rule knows
+- **THEN** the sentence names that step and that section
+- **AND** it sends the reader to the check's Developer view on the Checks tab
+
+#### Scenario: A section the kind leaves out is not named
+
+- **WHEN** an end step carries a check on a time limit
+- **THEN** the sentence names the step
+- **AND** it names no section
+
+### Requirement: A scan keeps the sentences complete
+
+Each message literal of the body's validators SHALL meet a rule of its own. A
+test SHALL scan those literals in `src/schema/definition.ts`,
+`src/schema/compile.ts` and `src/engine/registry-check.ts`.
+
+#### Scenario: A new engine literal without a rule fails the suite
+
+- **WHEN** a validator gains a message literal no rule meets
+- **THEN** the scan test fails, naming that literal
+
+### Requirement: A row's Developer view holds the check kind
+
+Each row SHALL carry a closed Developer view. It SHALL hold the issue's source,
+its raw message and its location, in the mono face. Nothing else on the Checks
+tab SHALL print them.
+
+#### Scenario: The kind waits behind the Developer view
+
+- **WHEN** an author reads a row with its Developer view closed
+- **THEN** no source name or raw message shows
+- **AND** the open Developer view holds the source, the raw message and the
+  location
+
+### Requirement: What has not run reads as one line under Before publishing
+
+The rail SHALL say what has not run in one line under Before publishing. While
+any check holds back, the line SHALL say that more checks run once the author
+fixes the rows above. It SHALL also say what publishing checks on its own. It
+SHALL say that second part alone when nothing holds back. A closed Developer
+view on the line SHALL list the held-back kinds.
+
+#### Scenario: A Zod-invalid draft holds its other checks back
 
 - **WHEN** the loaded draft is not Zod-valid
 - **AND** it holds at least one step
-- **AND** the compile pass raised no structural issue
-- **THEN** the checks rail shows the structural, CEL, registry, duration
-  and view groups as held back
-- **AND** it shows none of them as empty or passing
+- **THEN** the line says more checks run after the rows above
+- **AND** the line's Developer view names structural, CEL, registry, duration
+  and view
+- **AND** the rail does not state all clear
 
-#### Scenario: A Zod-invalid draft with a structural issue shows that issue
+#### Scenario: A clear draft shows the second part alone
 
-- **WHEN** the loaded draft is not Zod-valid
-- **AND** the compile pass raised a structural issue
-- **THEN** the checks rail shows the structural group's actual issues
-- **AND** it shows the CEL, registry, duration and view groups as held back
+- **WHEN** the loaded draft passes every check
+- **THEN** the rail states all clear
+- **AND** the line says what publishing checks, and no more
 
-#### Scenario: A Zod-valid draft with a duration issue holds the structural group back too
+### Requirement: The held-back reading follows what ran
 
-- **WHEN** the loaded draft passes Zod validation but fails duration
-  validation, so `compileProcessBody` raises before structural checks
-  run
-- **THEN** the checks rail shows the duration group's actual issues
-- **AND** the checks rail shows the structural, CEL, and registry groups
-  as held back
-- **AND** it shows none of those three as empty or passing
-- **AND** the view group runs, since it does not need a compiled body
+The source `zod` SHALL never hold back.
 
-#### Scenario: A Zod-valid, uncompilable draft holds back CEL and registry only
+The source `structural` SHALL hold back when the structural checks did not run.
 
-- **WHEN** the loaded draft passes Zod and duration validation but fails
-  to compile
-- **AND** that means a structural issue
-- **THEN** the checks rail shows the CEL and registry groups as held back
-- **AND** it shows the structural, duration, and view groups' actual
-  issues
+The sources `cel` and `registry` SHALL hold back when those checks did not run
+or raised an issue. The source `registry` SHALL also hold back until
+`useRegistry` resolves a description.
 
-#### Scenario: A compiling draft resolves plugin types in all three registries
+The sources `duration` and `view` SHALL hold back when `validation.zodValid` is
+false, and on nothing else.
 
-- **WHEN** the loaded draft compiles
-- **AND** it names an action type, an assignment strategy type and a data
-  source type
-- **AND** the registry response holds none of those three
-- **THEN** the checks rail shows one registry issue for each of the three
-- **AND** the registry group does not show as held back for type resolution
+#### Scenario: A duration issue holds structural back and leaves view running
 
-#### Scenario: The type-resolution half holds back while the registry description has not resolved
+- **WHEN** the loaded draft passes Zod validation but fails duration validation
+- **THEN** the line's Developer view names structural, CEL and registry
+- **AND** it does not name view
+
+#### Scenario: A structural issue holds CEL and registry back
+
+- **WHEN** the loaded draft passes Zod and duration validation but fails to
+  compile
+- **THEN** the line's Developer view names CEL and registry
+
+#### Scenario: An unresolved registry holds the type check back
 
 - **WHEN** the loaded draft compiles
-- **AND** `useRegistry` has not yet resolved a registry description for this
-  session, whether still loading or after a failed fetch
-- **THEN** the checks rail shows the registry group's type-resolution half as
-  held back
-- **AND** that state reads independently of `registryConfigHeldBack`, which
-  stays `true` regardless
+- **AND** `useRegistry` has not resolved a registry description, whether still
+  loading or after a failed fetch
+- **THEN** the line's Developer view names registry
 
-#### Scenario: A fully valid draft runs every group
+#### Scenario: Unknown plugin types raise rows in all three registries
 
-- **WHEN** the loaded draft is Zod-valid and the structural dimension ran
-  with no issue
-- **THEN** the checks rail shows each of the zod, structural, CEL,
-  duration, registry and view groups' actual issues
-- **AND** any of those six groups with no issues shows a clear pass state
-  instead
-- **AND** the registry group still reports its config-validation half as
-  held back
-- **AND** the structural group still reports its unknown-key check as held
-  back
+- **WHEN** the loaded draft compiles
+- **AND** it names an action type, an assignment strategy type and a source
+  type
+- **AND** the registry response holds none of the three
+- **THEN** the rail shows one Must fix row for each of the three
 
-#### Scenario: A chaining site with no loaded target reads as not checked
+### Requirement: A chaining site with no loaded target reads as not checked
+
+A chaining site SHALL read as not checked while the studio lacks its target body.
+It SHALL read so per site, and never as passing. The type `ValidationResult`
+SHALL carry that state in `chainingSiteStatus`, beside `subprocessStepStatus`. A
+visible control beside the `process.start` action SHALL show that state.
+
+#### Scenario: An unloaded target shows at its action
 
 - **WHEN** the loaded draft compiles, and carries a `process.start` action
 - **AND** the studio has not loaded that action's target process body
 - **THEN** `chainingSiteStatus` reports that action's site as not checked
-- **AND** the CEL group's own issue list has no entry for that site
-- **AND** the group never presents that site as a clear pass
+- **AND** the list has no row for that site
 - **AND** a visible control beside that action shows the not-checked state
+
+### Requirement: Publishing keeps two checks the studio cannot run
+
+The studio has no live plugin schema, and it validates a body the Zod parse has
+stripped. Plugin config validation and the unknown-key check SHALL therefore
+read as what publishing checks. Neither SHALL read as a publish blocker. Neither
+SHALL stop the all-clear state. The server SHALL enforce both at publish time.
+
+#### Scenario: A held-back plugin check does not block publish
+
+- **WHEN** the rail shows its all-clear state
+- **THEN** the publish control stays available
+- **AND** the server's config and unknown-key checks stay the actual gate
+
+### Requirement: The all-clear state stands only with no open issue
+
+The rail's all-clear state SHALL stand under two conditions. No row stands, and
+no check holds back. A view-flag finding SHALL keep it hidden. A Worth a look row
+SHALL leave the draft publishable, so the publish control stays available. A Must
+fix row SHALL block a publish.
+
+#### Scenario: A fully clear draft shows no row
+
+- **WHEN** the loaded draft passes every check and has no view-flag finding
+- **THEN** the rail prints no row
+- **AND** the rail shows its all-clear state
+
+#### Scenario: A view finding alone leaves the draft publishable
+
+- **WHEN** the loaded draft passes every engine check, and carries one
+  view-flag finding
+- **THEN** the rail shows that row as Worth a look
+- **AND** the publish control stays available
+
+### Requirement: A clear rail predicts only the checks it runs
+
+A clear rail SHALL predict a clean publish only for registry type resolution and
+a `process.start` action's chaining-target field mapping. It SHALL predict
+nothing about a subprocess step's `inputMapping` or its child's resolvability,
+which `cross-process-validation` owns.
+
+#### Scenario: A clear rail predicts a clean publish
+
+- **WHEN** the rail shows its all-clear state
+- **AND** every `process.start` action reads `"checked"` in `chainingSiteStatus`
+- **AND** the draft names only registered plugin types, and maps its
+  `process.start` actions only into fields the target process declares
+- **THEN** publishing that draft reports no registry or chaining issue
+
+#### Scenario: A chaining issue reaches the rail
+
+- **WHEN** a `process.start` action maps into a field its loaded target process
+  does not declare
+- **THEN** the rail shows one Must fix row
+- **AND** its Fix control lands on the section holding that action
+
+### Requirement: A check prints its sentence at every placement
+
+Every placement SHALL print the issue's sentence with no source label and no
+list marker. That covers the step page, the field card, a way-out row and the
+source editor. Each SHALL take the warning callout's form. The sentence SHALL
+match the row on the Checks tab word for word.
+
+#### Scenario: One sentence at the spot and on the tab
+
+- **WHEN** one issue stands on a step page and on the Checks tab
+- **THEN** both print the same sentence
+- **AND** neither prints a source label outside a Developer view
+- **AND** the step page prints it with no list marker, beside a 3px rule
+
+### Requirement: A step's checks stand at their sections and keys at More
+
+The step page SHALL route each open issue naming a step to the section that
+owns it. An issue naming a way out, a time limit or an action under the step
+SHALL take the same route. A check on the step's key SHALL belong to More. The
+section's header SHALL carry the count. The body SHALL print a step-level issue
+above its controls. A row's own issue SHALL stay at that row.
+
+#### Scenario: A time limit's check counts on Time limit
+
+- **WHEN** a check names a step's time limit
+- **THEN** the Time limit header carries a badge reading 1
+- **AND** the sentence stands at that time limit's row inside the body
+- **AND** the Checks tab lists the same check
+
+#### Scenario: A step-level check stands above the controls
+
+- **WHEN** a structural check names a step's assignment
+- **THEN** the Who acts body prints the sentence above the assignment controls
+- **AND** no other section prints it
+
+#### Scenario: A key check stands in More
+
+- **WHEN** a check names a step's own key
+- **THEN** the More header counts it
+- **AND** More's body prints the sentence
+- **AND** the masthead does not print it
+
+### Requirement: A step's name check stands under Name
+
+A check on the step's name SHALL stand directly under Name. A check on its
+description SHALL stand directly under Description. The masthead's end SHALL
+keep any other issue no section owns. The Checks tab SHALL keep listing every
+one of them.
+
+#### Scenario: A name check stands under Name
+
+- **WHEN** a check names a step's own name
+- **THEN** the sentence stands directly under the Name input
+- **AND** no section header counts it
+
+#### Scenario: A kind check stays on the masthead
+
+- **WHEN** a check names a step's own type
+- **THEN** the sentence stands at the masthead's end
+- **AND** the Checks tab lists the same check
+
+
 
 ### Requirement: A draft with no step yet shows a start state
 
 A draft whose step list is empty SHALL read as a start state. Its missing
 first step SHALL NOT count as an open issue. The Checks count then reads 0.
 
-With no other open issue, the rail SHALL show one sentence and no group.
+With no other open issue, the rail SHALL show one sentence and no subject.
 That sentence names where to add the first step. The all-clear state SHALL
 stay hidden. With some other open issue, the sentence SHALL stand first and
-the groups SHALL follow.
+the subjects SHALL follow.
 
 #### Scenario: A fresh empty draft shows the start sentence alone
 
@@ -222,7 +368,7 @@ the groups SHALL follow.
 - **THEN** the rail shows one sentence
 - **AND** that sentence names the Canvas and the Steps tab as the places to
   add the first step
-- **AND** it shows no group, held back or clear
+- **AND** it shows no subject and no line
 - **AND** it does not show its all-clear state
 - **AND** the Checks tab's count reads 0 in its ordinary color and weight
 
@@ -230,7 +376,7 @@ the groups SHALL follow.
 
 - **WHEN** an author adds the first step to a draft in the start state
 - **THEN** the start sentence leaves the rail
-- **AND** the rail shows its groups under its other requirements
+- **AND** the rail shows its rows under its other requirements
 
 #### Scenario: Removing the last step returns the start state
 
@@ -242,8 +388,8 @@ the groups SHALL follow.
 - **WHEN** a draft with no step also carries an open Zod issue of another
   kind
 - **THEN** the start sentence stands first
-- **AND** that issue shows under the `zod` group, and the other groups read
-  held back
+- **AND** that issue's row stands under its subject
+- **AND** the held-back line stands under Before publishing
 
 #### Scenario: No line names the validator in the start state
 
@@ -256,7 +402,7 @@ A draft that holds a step but no base-locale name SHALL report that gap as
 one open issue. The issue SHALL read as one sentence: the process needs a
 name. The sentence SHALL name the field at the top of the page. It SHALL
 stand in the header bar beside the name. There it SHALL print no source label. It
-SHALL count as a blocker, and the rail SHALL list it in the `zod` group.
+SHALL count as a blocker, and the rail SHALL list it under Before publishing.
 
 #### Scenario: A stepped, unnamed draft shows the name sentence
 
@@ -271,114 +417,12 @@ SHALL count as a blocker, and the rail SHALL list it in the `zod` group.
 - **WHEN** a draft holds one named end step, and its own name is empty in
   the base locale
 - **THEN** the Checks tab's count reads 1 and carries the blocker color
-- **AND** the rail lists the same sentence in its `zod` group
+- **AND** the rail lists the same sentence under Before publishing
 
 #### Scenario: Typing a name clears the sentence
 
 - **WHEN** an author types a name into the header bar's name field
 - **THEN** the sentence leaves the header bar and the rail
-
-### Requirement: Every publish blocker is visible in the rail with all groups clear
-
-The rail organizes issues into six groups: zod, structural, CEL, registry,
-duration and view. The first five carry the engine's verdict; view is the
-studio's own, non-blocking finding. The checks rail SHALL show no
-unresolved issue in those six under two conditions. The draft passes every check publish requires. It carries neither view-flag stopping
-state. An author SHALL be able to tell from those six groups alone that a clear draft is
-publishable.
-
-Two checks stay outside what the rail can prove. The first is plugin config
-validation, which needs a live registry schema the browser does not hold. The
-second is the unknown-key check, which needs the raw authored body. The studio
-validates a body the Zod parse has already stripped. The rail SHALL show each
-of those two as held back rather than clear. A held-back check SHALL NOT
-read as a publish blocker, and SHALL NOT stop the "all clear" banner.
-
-The server enforces both of those checks at publish time. It does so
-regardless of the rail's own state.
-
-A third gap stays outside every group the rail shows, held-back or not.
-That gap is subprocess wiring. The check `checkSubprocessChildRefs`
-compares only a loaded subprocess child's automatic-path guards and
-`outputMapping` values against that child's declared outputs. It never
-checks `inputMapping` key validity against the child's declared inputs.
-
-It never checks whether a subprocess step's child reference resolves to
-a contracted child at all. Those checks belong to
-`cross-process-validation`, not to this rail. No rail group runs them,
-now or in an earlier version of this rail.
-
-A clear rail predicts a clean publish only for the checks it runs. Those
-are registry type resolution and a `process.start` action's
-chaining-target field mapping. It predicts nothing about a subprocess
-step's `inputMapping` or its child's resolvability.
-
-The rail's own "all clear" banner reads the same way, under the same two
-conditions. The zod, structural, CEL, registry, duration, and view groups carry
-no open issue. The draft carries neither view-flag stopping state. A
-separately-shown held-back check SHALL NOT decide whether the banner shows.
-
-The reverse does not hold, and the rail SHALL NOT claim it. The view
-group reports rather than blocks. Its three rules find a draft the engine
-publishes and an author did not mean. So an entry there leaves the draft
-publishable.
-
-The five engine groups keep their existing meaning. An entry in one of
-those blocks a publish.
-
-#### Scenario: A fully clear draft shows no open issues
-
-- **WHEN** the loaded draft passes every zod, structural, CEL, registry and
-  duration check
-- **AND** it carries neither view-flag stopping state
-- **THEN** the checks rail shows the zod, structural, CEL, registry, duration
-  and view groups clear
-- **AND** no entry remains in any of those six groups
-- **AND** the rail shows its "all clear" banner
-
-#### Scenario: A clear rail predicts a clean publish
-
-- **WHEN** the checks rail shows every group clear for a draft
-- **AND** every one of that draft's `process.start` actions has a
-  `chainingSiteStatus` of `"checked"`, so none reads not-checked
-- **AND** that draft names only registered plugin types, and maps its
-  `process.start` actions only into fields the target process declares
-- **THEN** publishing that draft reports no registry or chaining issue
-- **AND** this scenario claims nothing about a subprocess step's
-  `inputMapping` or its child's resolvability
-
-#### Scenario: A chaining issue reaches the rail
-
-- **WHEN** the loaded draft carries a `process.start` action that maps into a
-  field its target process does not declare
-- **AND** the studio has loaded that target process's body
-- **THEN** the checks rail shows one CEL group entry naming that field
-- **AND** the entry anchors on the action's own site
-
-#### Scenario: A held-back registry group does not block publish
-
-- **WHEN** the checks rail shows the registry group's config-validation half
-  held back
-- **AND** every group reads clear
-- **THEN** the publish control stays available
-- **AND** the server's own config validation at publish time stays the actual
-  gate on that dimension
-
-#### Scenario: A held-back structural group's unknown-key check does not block publish
-
-- **WHEN** the checks rail shows `CheckGroup.unknownKeysHeldBack` on the
-  structural group
-- **AND** every group reads clear
-- **THEN** the publish control stays available
-- **AND** the server's own unknown-key check at publish time stays the actual
-  gate on that dimension
-
-#### Scenario: A view entry alone leaves the draft publishable
-
-- **WHEN** the loaded draft passes every engine check, and carries one
-  view-flag stopping state
-- **THEN** the rail shows that entry under its `view` group
-- **AND** the publish control stays available
 
 ### Requirement: The rail reports two view-flag stopping states
 
@@ -386,7 +430,7 @@ Two combinations of view flags stop a step, and the rail SHALL report
 both. Each reads off `view.fields[]` alone. Each carries the `view`
 source, and each anchors on the step that holds the view entry.
 
-Both states SHALL read field entries alone. A note carries no `required`
+Both states SHALL read field entries alone. A note has no `required`
 and no `readonly`, so neither state can describe one. The rail SHALL skip
 a note rather than report it. Each state names the field it found, and a
 note names no field.
@@ -422,8 +466,7 @@ requirement exists there to drop or to strand.
 
 - **WHEN** a step's view entry carries `visible: false` and
   `required: true`
-- **THEN** the rail shows an entry under its `view` group, naming that
-  field
+- **THEN** the rail shows a Worth a look row naming that field
 
 #### Scenario: An unwritable required field reports
 
@@ -432,8 +475,7 @@ requirement exists there to drop or to strand.
 - **AND** no step's view makes that field editable
 - **AND** no action output, subprocess output mapping, column mapping or
   contract input field targets it
-- **THEN** the rail shows an entry under its `view` group, naming that
-  field
+- **THEN** the rail shows a Worth a look row naming that field
 
 #### Scenario: A writable field raises nothing
 
@@ -512,8 +554,7 @@ the publish-blocking half of this pair.
 - **WHEN** a field declares `technical: true`
 - **AND** no action output, subprocess output mapping, column mapping or
   contract input field targets it
-- **THEN** the rail shows an entry under its `view` group, naming that
-  field
+- **THEN** the rail shows a Worth a look row naming that field
 
 #### Scenario: A placed technical field still reports
 
@@ -521,16 +562,14 @@ the publish-blocking half of this pair.
   places it visibly
 - **AND** no action output, subprocess output mapping, column mapping or
   contract input field targets it
-- **THEN** the rail shows an entry under its `view` group, naming that
-  field
+- **THEN** the rail shows a Worth a look row naming that field
 
 #### Scenario: A default does not exempt an unwritten technical field
 
 - **WHEN** a field declares `technical: true` and a `default`
 - **AND** no action output, subprocess output mapping, column mapping or
   contract input field targets it
-- **THEN** the rail shows an entry under its `view` group, naming that
-  field
+- **THEN** the rail shows a Worth a look row naming that field
 
 #### Scenario: A structurally written technical field raises nothing
 
@@ -563,13 +602,13 @@ another section. Zones open none, so no check hides.
 #### Scenario: An issue shows in both its entity placement and the rail
 
 - **WHEN** a path guard carries a CEL issue
-- **THEN** that issue stands in the path's own `IssueList` placement and in
-  the Checks tab's CEL group
+- **THEN** that issue's sentence stands in the path's own `IssueList` placement
+  and on a Checks tab row
 
 #### Scenario: A field's check shows at its zone and in the rail
 
 - **WHEN** a field carries a validation issue
-- **THEN** the check stands in the definition half's "Validation" zone
+- **THEN** the check stands inside the field card's More, under Validation
 - **AND** the Checks tab's own count includes it
 
 #### Scenario: No zone hides a field's check
@@ -578,63 +617,7 @@ another section. Zones open none, so no check hides.
 - **THEN** both checks stand at once, and neither waits on the author opening
   anything
 
-### Requirement: A step's checks stand at their sections
 
-The step page SHALL route each open issue naming a step to the section that
-owns it. An issue naming a way out, a time limit or an action under the step
-SHALL take the same route. The section's header SHALL carry the count.
-
-The body SHALL print a step-level issue as a sentence above its controls. It
-SHALL leave a row's own issue at that row. The masthead SHALL keep only an
-issue no section owns. The Checks tab SHALL keep listing every one of them.
-
-#### Scenario: A time limit's check counts on Time limit
-
-- **WHEN** a check names a step's time limit
-- **THEN** the Time limit header carries a badge reading 1
-- **AND** the sentence stands at that time limit's row inside the body
-- **AND** the Checks tab lists the same check
-
-#### Scenario: A step-level check stands above the controls
-
-- **WHEN** a structural check names a step's assignment
-- **THEN** the Who acts body prints the sentence above the assignment controls
-- **AND** no other section prints it
-
-#### Scenario: An unowned check stays on the masthead
-
-- **WHEN** a check names a step's own key
-- **THEN** the masthead prints it
-- **AND** no section header counts it
-
-### Requirement: An issue's source prints as a label
-
-Where the checks rail or an issue list names an issue's source (`zod`,
-`cel`, `registry`, `duration`, `structural`, `view`), that name SHALL
-print as a small, mono-faced label, set apart from the message by its own
-visual treatment. It SHALL NOT print as a bracket-wrapped prefix inline in
-the message's own text.
-
-The source name itself stays the untranslated machine value this
-validation pipeline defines. This requirement asks for no plain-language
-translation of it. `design-language`'s own rule already reserves mono,
-untranslated text for exactly this kind of machine-defined category name.
-
-Every place an issue's source prints SHALL use the same label treatment.
-The full grouped list's per-group heading and a per-entity issue list's
-per-line source both qualify.
-
-#### Scenario: A per-entity issue's source prints as a label
-
-- **WHEN** a field's own issue list holds an issue whose source is `zod`
-- **THEN** the source prints as a small mono label reading "ZOD"
-- **AND** the message text beside it has no bracket-wrapped prefix
-
-#### Scenario: The full grouped list and a per-entity list agree
-
-- **WHEN** the same issue renders in the Checks tab's full grouped list and
-  in a field's own per-entity issue list
-- **THEN** both name the issue's source with the same label treatment
 
 ### Requirement: Chaining targets load from one process list per mount
 

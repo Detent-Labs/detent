@@ -1,53 +1,66 @@
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts } from "form-ui/tokens.stylex";
-import type { EditorIssue } from "../../draft/issues";
+import { colors, space } from "form-ui/tokens.stylex";
+import { issueText, type EditorIssue } from "../../draft/issues";
 import { useDraft } from "../../draft/store";
 
 const styles = stylex.create({
-  /** An issue's source, the machine-matched category the check came from:
-   * `zod`, `cel`, `registry`, `duration`, `structural` or `view`. Mono
-   * because the engine matches it exactly (`design-language.md`), and the
-   * catalog never translates such a value.
-   *
-   * The label's own visual identity, without a heading's block margins.
-   * `ChecksRail.tsx`'s `checksGroupHeading` composes its margins over this,
-   * so both call sites read one definition. */
-  issueSourceLabel: {
-    fontFamily: fonts.mono,
-    fontSize: "0.8rem",
-    // Stated, not inherited. The rail composes this onto an `<h3>`, whose
-    // user-agent default is bold: the same label measured 700 there and 400
-    // in the per-entity list, so one definition rendered two ways. 400 is
-    // what `design-language.md` gives a label, and it is what the list
-    // already read.
-    fontWeight: 400,
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
+  list: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+  },
+  // A warning callout: refusal text beside a 3px rule in the advisory role
+  // (`DESIGN.md`, Warning Callout).
+  item: {
+    color: colors.refusal,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.advisory,
+    paddingLeft: space.s2,
+  },
+  // A `view` finding never blocks a publish, so it prints in slate.
+  itemAdvisory: {
     color: colors.textMuted,
   },
 });
-
-export const issueSourceLabel = styles.issueSourceLabel;
 
 /** The rendered rows of an already-filtered issue set. The Fields view's
  * zones filter by `loc` before they render (`panels/fieldCheckZone.ts`), so
  * they hand this the checks one zone owns rather than an entity id.
  *
- * `style` is the caller's own compiled style for the list, composed after
- * the literal `issue-list` every other consumer still renders bare. */
-export function IssueItems({ issues, style }: { issues: EditorIssue[]; style?: stylex.StyleXStyles }) {
+ * Each row prints the issue's sentence alone, in the warning callout's form,
+ * with no list marker. The source and the raw message stand in the Checks tab's
+ * Developer view.
+ *
+ * `style` is the caller's own compiled style for the list. It sets margins alone,
+ * so every placement reads one form.
+ * `anchorId` sets the list's `id` and makes it focusable, so a Fix press can
+ * land on the sentence. */
+export function IssueItems({
+  issues,
+  style,
+  anchorId,
+}: {
+  issues: EditorIssue[];
+  style?: stylex.StyleXStyles;
+  anchorId?: string;
+}) {
   if (issues.length === 0) return null;
   return (
-    <ul className={["issue-list", stylex.props(style).className].filter(Boolean).join(" ")}>
+    <ul
+      id={anchorId}
+      tabIndex={anchorId === undefined ? undefined : -1}
+      className={["issue-list", stylex.props(styles.list, style).className].filter(Boolean).join(" ")}
+    >
       {issues.map((issue, i) => (
-        <li key={i} className={`issue issue-${issue.source}`}>
-          {issue.plain ? (
-            issue.message
-          ) : (
-            <>
-              <span {...stylex.props(styles.issueSourceLabel)}>{issue.source}</span> {issue.message}
-            </>
-          )}
+        <li
+          key={i}
+          className={[`issue issue-${issue.source}`, stylex.props(styles.item, issue.source === "view" && styles.itemAdvisory).className].filter(Boolean).join(" ")}
+        >
+          {issueText(issue)}
         </li>
       ))}
     </ul>
@@ -55,10 +68,10 @@ export function IssueItems({ issues, style }: { issues: EditorIssue[]; style?: s
 }
 
 /** Renders every `EditorIssue` for one entity — the same issue list every panel and the canvas read off. */
-export function IssueList({ entityId }: { entityId: string | undefined }) {
+export function IssueList({ entityId, anchorId }: { entityId: string | undefined; anchorId?: string }) {
   const { validation } = useDraft();
   if (!entityId) return null;
-  return <IssueItems issues={validation.issues.filter((i) => i.entityId === entityId)} />;
+  return <IssueItems issues={validation.issues.filter((i) => i.entityId === entityId)} anchorId={anchorId} />;
 }
 
 /** `text` is the whole sentence, from the catalog, so none joins from two parts. */

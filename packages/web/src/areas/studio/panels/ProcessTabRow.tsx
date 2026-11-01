@@ -167,8 +167,8 @@ interface Props {
   checksBlocked: boolean;
   onOpen: (tab: ProcessTab) => void;
   /** True while the JSON surface stands in place of the tab body. No tab
-   * reports itself selected while it is open — the header bar's `⋮` menu is
-   * what opens and leaves that surface; this row only reads the state. */
+   * reports itself selected while it is open. A press on a tab leaves that
+   * surface for the tab, through `onOpen`. */
   jsonOpen: boolean;
 }
 

@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Draft } from "../draft/types";
 import { t } from "../catalog.js";
+import { JSON_SURFACE_INPUT_ID } from "../draft/process-tabs";
 import { parseDraftText, formatDraftText } from "./draftJsonLogic";
 
 const styles = stylex.create({
@@ -30,11 +31,24 @@ const styles = stylex.create({
     color: colors.refusal,
     whiteSpace: "pre-line",
   },
+  // A warning callout: refusal text beside a 3px rule in the advisory role
+  // (`DESIGN.md`, Warning Callout).
+  note: {
+    color: colors.refusal,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.advisory,
+    paddingLeft: space.s2,
+    marginBlockStart: 0,
+    marginBlockEnd: space.s2,
+  },
 });
 
 interface JsonViewProps {
   draft: Draft;
   onApply: (draft: Draft) => void;
+  /** The sentence of the check whose Fix opened this surface, if one did. */
+  note?: string;
 }
 
 /**
@@ -44,7 +58,7 @@ interface JsonViewProps {
  * fresh from the current draft. Typing has no effect on the draft until
  * Apply succeeds.
  */
-export function JsonView({ draft, onApply }: JsonViewProps) {
+export function JsonView({ draft, onApply, note }: JsonViewProps) {
   const [text, setText] = useState(() => formatDraftText(draft));
   const [error, setError] = useState<string | null>(null);
 
@@ -60,9 +74,11 @@ export function JsonView({ draft, onApply }: JsonViewProps) {
 
   return (
     <div className="studio-json-view">
+      {note !== undefined && <p {...stylex.props(styles.note)}>{note}</p>}
       <label>
         {t("jsonView.label")}
         <textarea
+          id={JSON_SURFACE_INPUT_ID}
           {...stylex.props(styles.studioJsonEditor)}
           rows={24}
           value={text}

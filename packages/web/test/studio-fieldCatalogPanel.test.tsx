@@ -604,6 +604,13 @@ describe("More", () => {
     expect(technical(renderPanel(draft, "field_g"))).toContain('disabled=""');
   });
 
+  it("opens itself on a check naming the field's data source, where the select stands", () => {
+    const check: EditorIssue = { entityType: "field", entityId: "field_a", message: "field dataSource does not resolve: ds_x", source: "zod", loc: "fields.field_a.dataSource" };
+    const html = renderPanel(draftOf([fld("field_a", "a")]), "field_a", { issues: [check] });
+
+    expect(moreDetails(html)).toContain(" open");
+  });
+
   it("opens itself on FieldsTab's request in an effect, and clears the request", () => {
     const source = readFileSync(new URL("../src/areas/studio/panels/FieldCatalogPanel.tsx", import.meta.url).pathname, "utf8");
     const effect = source.slice(source.indexOf("useEffect(() => {\n    if (!openMore) return;"), source.indexOf("}, [openMore, onMoreOpened]);"));
@@ -1356,5 +1363,56 @@ describe("the Kind note over a Text field with choices", () => {
 
   it("keeps Text's own note with no choice", () => {
     expect(sectionOf(renderPanel(draftOf([fld("field_a", "a")]), "field_a"), "Kind")).toContain(">A line of text.<");
+  });
+});
+
+/**
+ * A Fix control's landing on the field card (`studio-process-tabs`: "Focus lands
+ * on a field's sentence"). Each zone's list carries the anchor the focus pass
+ * tries, and takes focus without entering the tab order.
+ */
+describe("the field card's check anchors", () => {
+  const check = (loc: string): EditorIssue => ({ entityType: "field", entityId: "field_a", message: `at ${loc}`, source: "zod", loc });
+  const anchorOf = (html: string, text: string) => {
+    const at = html.indexOf(text);
+    const open = html.lastIndexOf("<ul", at);
+    return html.slice(open, html.indexOf(">", open));
+  };
+  const DS = { id: "ds_1", key: "countries", type: "static", config: {} };
+
+  for (const [loc, anchor] of [
+    ["fields[0].label", "check-anchor-field-asks"],
+    ["fields[0].key", "check-anchor-field-asks"],
+    ["fields[0].somewhere", "check-anchor-field-asks"],
+    ["fields[0].type", "check-anchor-field-kind"],
+    ["fields[0].options[0].label", "check-anchor-field-values"],
+    ["fields[0].default", "check-anchor-field-default"],
+    ["fields[0].validation.pattern", "check-anchor-field-validation"],
+    ["fields[0].columnMapping.a", "check-anchor-field-columnMapping"],
+  ] as const) {
+    it(`anchors a check at ${loc} on ${anchor}`, () => {
+      const html = renderPanel(draftOf([fld("field_a", "a")]), "field_a", { issues: [check(loc)] });
+
+      expect(anchorOf(html, `at ${loc}`)).toContain(`id="${anchor}"`);
+      expect(anchorOf(html, `at ${loc}`)).toContain('tabindex="-1"');
+    });
+  }
+
+  it("anchors a mapping check where the mapping editor stands", () => {
+    const draft = { ...draftOf([fld("field_a", "a", { dataSource: "ds_1" })]), dataSources: [DS] } as unknown as Draft;
+    const html = renderPanel(draft, "field_a", { issues: [check("fields[0].columnMapping.a")] });
+
+    expect(anchorOf(html, "at fields[0].columnMapping.a")).toContain('id="check-anchor-field-columnMapping"');
+    expect(html.match(/id="check-anchor-field-columnMapping"/g)).toHaveLength(1);
+  });
+
+  it("stands a values check at the asks anchor on a card with no Choices", () => {
+    const html = renderPanel(draftOf([grp("field_a", "a", [])]), "field_a", { issues: [check("fields[0].options[0].label")] });
+
+    expect(anchorOf(html, "at fields[0].options[0].label")).toContain('id="check-anchor-field-asks"');
+  });
+
+  it("prints no anchor where a zone holds no check", () => {
+    expect(renderPanel(draftOf([fld("field_a", "a")]), "field_a")).not.toContain("check-anchor-field-");
   });
 });

@@ -1,5 +1,6 @@
 import type { Draft } from "./types";
 import type { ValidationResult } from "./validation";
+import type { ProcessTab } from "../routing";
 
 /** The two parts of a Zod issue the start-gap tests read. */
 interface ZodIssueShape {
@@ -32,4 +33,10 @@ export function isProcessNameGap(issue: ZodIssueShape): boolean {
 /** The structural banner stands for a Zod issue that is no plain sentence. */
 export function showsStructuralBanner(validation: Pick<ValidationResult, "issues">): boolean {
   return validation.issues.some((i) => i.source === "zod" && !i.plain);
+}
+
+/** The banner names Checks, so it stands everywhere the Checks list does not:
+ * on every other tab, and on the JSON surface over the Checks tab. */
+export function structuralBannerStands(validation: Pick<ValidationResult, "issues">, openTab: ProcessTab, jsonOpen: boolean): boolean {
+  return showsStructuralBanner(validation) && (openTab !== "checks" || jsonOpen);
 }

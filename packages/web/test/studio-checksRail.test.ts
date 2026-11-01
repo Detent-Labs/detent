@@ -1,10 +1,18 @@
 import { describe, expect, it } from "bun:test";
 import type { ActionId, ProcessBody } from "workflow-engine/schema";
 import type { RegistryDescription } from "workflow-engine/engine/registry";
-import { allChecksClear, checksDotState, groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
+import {
+  allChecksClear,
+  checksDotState,
+  groupChecksBySource,
+  groupChecksBySubject,
+  heldBackKinds,
+  issueSeverity,
+} from "../src/areas/studio/draft/checksRail.js";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
+import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 
 const DEFAULT_DIMENSIONS: ValidationResult["dimensions"] = {
   zod: "ran",
@@ -276,6 +284,28 @@ describe("6.12 an unwritten technical field reaches the view group even when str
   });
 });
 
+it("a clear rail predicts a clean publish for a chaining site whose target declares the field", () => {
+  const body = baseDraft();
+  (body.workflow!.steps![0] as unknown as { onEntry?: unknown[] }).onEntry = [
+    {
+      id: "action_chain",
+      type: "process.start",
+      config: { processId: "proc_target", inputMapping: { field_t: { lang: "cel", src: "data.amount" } } },
+    },
+  ];
+  const target = {
+    key: "target",
+    label: { en: "Target" },
+    baseLocale: "en",
+    fields: [{ id: "field_t", key: "amount", label: { en: "Amount" }, type: "number" }],
+    workflow: { initialStep: "step_t", steps: [{ id: "step_t", key: "t", label: { en: "T" }, type: "task", terminal: true }] },
+  } as unknown as ProcessBody;
+
+  const result = runValidation(body, undefined, {}, { ["action_chain" as ActionId]: target });
+  expect(result.chainingSiteStatus["action_chain" as ActionId]).toBe("checked");
+  expect(result.issues.filter((i) => i.source === "cel" || i.source === "registry")).toEqual([]);
+});
+
 it("6.14 a process.start action with no matching loadedChainingTargets entry reads not-checked, with no clear-pass CEL entry", () => {
   const body = baseDraft();
   (body.workflow!.steps![0] as unknown as { onEntry?: unknown[] }).onEntry = [
@@ -350,5 +380,115 @@ describe("checksDotState in the start state", () => {
     const issues = [{ entityType: "process", entityId: "process", message: "m", source: "zod", loc: "" }] as const;
     const v = validation({ ...stepless, issues: [...issues] });
     expect(checksDotState(groupChecksBySource(v), true)).toBe("blocker");
+  });
+});
+
+const at = (over: Partial<EditorIssue>): EditorIssue => ({
+  entityType: "step",
+  entityId: "step_a",
+  message: "m",
+  source: "structural",
+  loc: "",
+  ...over,
+});
+
+describe("groupChecksBySubject", () => {
+  const subjectOf = (issue: EditorIssue) => groupChecksBySubject({ issues: [issue] }).find((s) => s.issues.length > 0)?.subject;
+
+  it("returns the three subjects in order, even when empty", () => {
+    expect(groupChecksBySubject({ issues: [] }).map((s) => s.subject)).toEqual(["steps", "fields", "publishing"]);
+  });
+
+  it("puts a step, a path, a timer and an action issue under steps", () => {
+    for (const entityType of ["step", "path", "timer", "action"] as const) {
+      expect(subjectOf(at({ entityType }))).toBe("steps");
+    }
+  });
+
+  it("puts a field and a data source issue under fields", () => {
+    expect(subjectOf(at({ entityType: "field" }))).toBe("fields");
+    expect(subjectOf(at({ entityType: "dataSource" }))).toBe("fields");
+  });
+
+  it("puts a contract issue and an unplaced process issue under publishing", () => {
+    expect(subjectOf(at({ entityType: "contract" }))).toBe("publishing");
+    expect(subjectOf(at({ entityType: "process", loc: "key" }))).toBe("publishing");
+    expect(subjectOf(at({ entityType: "process", loc: "" }))).toBe("publishing");
+  });
+
+  it("sends a process issue located under workflow to steps", () => {
+    expect(subjectOf(at({ entityType: "process", loc: "workflow.initialStep" }))).toBe("steps");
+  });
+
+  it("sends the compile pass's own steps location to steps", () => {
+    expect(subjectOf(at({ entityType: "process", loc: "steps[0].view.fields[13].group" }))).toBe("steps");
+  });
+
+  it("sends a process issue located under fields or dataSources to fields", () => {
+    expect(subjectOf(at({ entityType: "process", loc: "fields" }))).toBe("fields");
+    expect(subjectOf(at({ entityType: "process", loc: "dataSources[1].key" }))).toBe("fields");
+  });
+
+  it("reads the head segment whole, so fieldsets or workflows are no match", () => {
+    expect(subjectOf(at({ entityType: "process", loc: "fieldsX.a" }))).toBe("publishing");
+  });
+
+  it("orders steps rows by the draft's step order and keeps ties stable", () => {
+    const second = at({ message: "second", loc: "workflow.steps[1].label" });
+    const firstA = at({ message: "first-a", loc: "workflow.steps[0].label" });
+    const firstB = at({ message: "first-b", loc: "workflow.steps[0].key" });
+    const steps = groupChecksBySubject({ issues: [second, firstA, firstB] })[0].issues.map((i) => i.message);
+
+    expect(steps).toEqual(["first-a", "first-b", "second"]);
+  });
+
+  it("stands a workflow-level issue above the step rows", () => {
+    const stepRow = at({ message: "row", loc: "workflow.steps[0].label" });
+    const initial = at({ entityType: "process", message: "initial", loc: "workflow.initialStep" });
+
+    expect(groupChecksBySubject({ issues: [stepRow, initial] })[0].issues.map((i) => i.message)).toEqual(["initial", "row"]);
+  });
+
+  it("holds every issue exactly once", () => {
+    const issues = [
+      at({ entityType: "step" }),
+      at({ entityType: "field" }),
+      at({ entityType: "contract" }),
+      at({ entityType: "process", loc: "key" }),
+      at({ entityType: "timer" }),
+    ];
+    const total = groupChecksBySubject({ issues }).reduce((n, s) => n + s.issues.length, 0);
+
+    expect(total).toBe(issues.length);
+  });
+});
+
+describe("heldBackKinds", () => {
+  const group = (source: EditorIssue["source"], heldBack: boolean) => ({ source, heldBack, issues: [] });
+
+  it("lists each held-back source with no row", () => {
+    expect(heldBackKinds([group("cel", true), group("registry", true), group("view", false)], [])).toEqual(["cel", "registry"]);
+  });
+
+  it("drops a source that printed a row of its own", () => {
+    expect(heldBackKinds([group("cel", true), group("registry", true)], [{ source: "cel" }])).toEqual(["registry"]);
+  });
+});
+
+describe("issueSeverity", () => {
+  it("reads advisory for a view finding and blocker for every other source", () => {
+    expect(issueSeverity({ source: "view" })).toBe("advisory");
+    for (const source of ["zod", "structural", "cel", "registry", "duration"] as const) {
+      expect(issueSeverity({ source })).toBe("blocker");
+    }
+  });
+
+  it("agrees with the Checks count's blocker state", () => {
+    for (const source of ["zod", "structural", "cel", "registry", "duration", "view"] as const) {
+      const v = validation({ issues: [at({ source })] });
+      const state = checksDotState(groupChecksBySource(v));
+      if (issueSeverity({ source }) === "advisory") expect(state).toBe("advisory");
+      else expect(state).toBe("blocker");
+    }
   });
 });

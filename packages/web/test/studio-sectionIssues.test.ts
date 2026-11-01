@@ -4,16 +4,15 @@
  * rendering.
  *
  * The load-bearing case is the one `studio-step-page` states outright: an
- * issue stands at exactly one section. The masthead filters its own issues in
- * `panels/StepPage.tsx`: those the step owns that no section claims. The cases
- * here assert the section map alone.
+ * issue stands at exactly one section. The masthead reads `mastheadIssues`: those the
+ * step owns that no section claims.
  */
 import { describe, expect, it } from "bun:test";
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "../src/areas/studio/draft/types.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import { sectionsFor } from "../src/areas/studio/panels/sectionsFor.js";
-import { issuesBySection, sectionOfIssue } from "../src/areas/studio/panels/sectionIssues.js";
+import { issuesBySection, mastheadIssues, namesStepKey, sectionOfIssue, sectionOfOutputTarget } from "../src/areas/studio/panels/sectionIssues.js";
 
 type DraftStep = DraftOf<Step>;
 
@@ -109,10 +108,14 @@ describe("sectionOfIssue routes a step-level issue by its loc", () => {
     expect(sectionOfIssue(step, issue("step", "step_a", "workflow.steps[0].collaboration.comments"), PARTICIPANT)).toBe("more");
   });
 
-  it("names no section for a step-level issue whose loc names none", () => {
-    const at = issue("step", "step_a", "workflow.steps[0].key");
+  it("stands a key issue at More", () => {
+    expect(sectionOfIssue(step, issue("step", "step_a", "workflow.steps[0].key"), PARTICIPANT)).toBe("more");
+  });
 
-    expect(sectionOfIssue(step, at, PARTICIPANT)).toBeUndefined();
+  it("names no section for a step-level issue whose loc names none", () => {
+    for (const property of ["label", "description", "type"]) {
+      expect(sectionOfIssue(step, issue("step", "step_a", `workflow.steps[0].${property}`), PARTICIPANT)).toBeUndefined();
+    }
   });
 
   it("names no section a step's own kind does not stand", () => {
@@ -122,6 +125,57 @@ describe("sectionOfIssue routes a step-level issue by its loc", () => {
     const at = issue("step", "step_a", "workflow.steps[0].timers[0].duration");
 
     expect(sectionOfIssue(ends, at, sectionsFor("terminal"))).toBeUndefined();
+  });
+});
+
+describe("the action an output-target message complains about", () => {
+  const message = "action output targets unknown field: field_x";
+  const output = { field_x: { lang: "cel", src: "result.a" } };
+  const located = (held: Record<string, unknown>) => ds({ id: "step_a", ...held });
+
+  it("reads the section from the action whose output holds the field, across the five positions", () => {
+    expect(sectionOfOutputTarget(located({ onEntry: [{ output }] }), message)).toBe("lifecycle");
+    expect(sectionOfOutputTarget(located({ onExit: [{ output }] }), message)).toBe("lifecycle");
+    expect(sectionOfOutputTarget(located({ onCancel: [{ output }] }), message)).toBe("lifecycle");
+    expect(sectionOfOutputTarget(located({ paths: [{ onPath: [{ output }] }] }), message)).toBe("paths");
+    expect(sectionOfOutputTarget(located({ timers: [{ onFire: { actions: [{ output }] } }] }), message)).toBe("timers");
+  });
+
+  it("answers no section for another message", () => {
+    expect(sectionOfOutputTarget(located({ onEntry: [{ output }] }), "no")).toBeUndefined();
+  });
+
+  it("routes the issue there, though its location names the step alone, so the header counts it", () => {
+    const body = located({ type: "task", paths: [{ id: "path_1", onPath: [{ output }] }] });
+    const at: EditorIssue = { entityType: "step", entityId: "step_a", message, source: "zod", loc: "workflow.steps[0]" };
+
+    expect(sectionOfIssue(body, at, PARTICIPANT)).toBe("paths");
+    expect(issuesBySection(body, [at], PARTICIPANT).get("paths")).toEqual([at]);
+  });
+});
+
+describe("the masthead's issues", () => {
+  const at = (loc: string) => issue("step", "step_a", loc);
+
+  it("keeps a name check, a description check and the rest apart", () => {
+    const name = at("workflow.steps[0].label.en");
+    const description = at("workflow.steps[0].description");
+    const kind = at("workflow.steps[0].type");
+    const held = mastheadIssues(step, [name, description, kind], PARTICIPANT);
+
+    expect(held).toEqual({ name: [name], description: [description], end: [kind] });
+  });
+
+  it("leaves out what a section owns and what another step names", () => {
+    const issues = [at("workflow.steps[0].key"), at("workflow.steps[0].assignment"), issue("step", "step_b", "workflow.steps[1].label")];
+
+    expect(mastheadIssues(step, issues, PARTICIPANT)).toEqual({ name: [], description: [], end: [] });
+  });
+
+  it("reads the step's own key off the location", () => {
+    expect(namesStepKey("workflow.steps[0].key")).toBe(true);
+    expect(namesStepKey("workflow.steps[0].paths[0].key")).toBe(false);
+    expect(namesStepKey("key")).toBe(false);
   });
 });
 

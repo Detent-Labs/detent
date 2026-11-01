@@ -22,7 +22,8 @@ never silently clobber a panel edit made while it was open, or vice versa.
 ### Requirement: The edit screen offers a JSON surface alongside Structure
 
 The process surface (`/processes/:id/edit`) SHALL offer a JSON surface. An
-author opens it from the header bar's `⋮` menu. No Structure control and no
+author opens it from the header bar's `⋮` menu, or through a check's Fix
+control. No Structure control and no
 JSON control SHALL stand beside the header bar any more. The JSON entry
 lives inside that menu, instead of as a separate toggle beside it.
 
@@ -72,6 +73,18 @@ prints every language at once and reads no content locale.
 - **WHEN** the JSON surface stands open
 - **THEN** Publish stands in the header bar, and Discard draft in its `⋮` menu
 - **AND** no content-locale control stands in the header bar
+
+#### Scenario: A Fix control opens the surface
+
+- **WHEN** an author presses Fix on a check whose sentence names the JSON surface
+- **THEN** the JSON surface stands open in place of the tab body
+- **AND** the check's sentence stands above the input
+- **AND** keyboard focus stands on its input
+
+#### Scenario: A tab press leaves the surface
+
+- **WHEN** an author presses a tab while the JSON surface stands open
+- **THEN** the JSON surface leaves and that tab's body stands open
 
 ### Requirement: Applying valid JSON replaces the draft body
 

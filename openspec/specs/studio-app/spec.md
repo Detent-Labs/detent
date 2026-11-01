@@ -868,17 +868,18 @@ saving, since a work-in-progress draft is normally invalid.
 
 <!-- antislop: allow trailing-negation -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
-The step page's masthead SHALL carry one issue count for the open step as a
-whole. That count SHALL cover the step's own issues, and the issues of its paths,
-timers and actions. Here `resolveLoc` returns the deepest entity it finds. A
-guard's issue therefore names the path, not the step. A count over the step's own
-id alone would read zero on such a step.
+The steps rail's row SHALL carry one issue count for the step as a whole. That
+count SHALL cover the step's own issues, and the issues of its paths, timers and
+actions. Here `resolveLoc` returns the deepest entity it finds. A guard's issue
+therefore names the path, not the step. A count over the step's own id alone
+would read zero on such a step.
 
 Each section heading on the step page SHALL carry its own count. It counts the
 issues `resolveLoc` resolves to an entity that section holds. A path's issue
-counts at the paths section, and a timer's at the time-limit section. An issue
-`resolveLoc` resolves to the step itself counts on the masthead alone. The
-`studio-step-page` capability states the section register those counts sit in.
+counts at the paths section, and a timer's at the time-limit section. A check on
+the step's key counts at More. A check on its name or description counts on no
+header, and stands at its own line. The `studio-step-page` capability states the
+section register those counts sit in.
 
 A tab SHALL carry one issue count for its own subject. Every count SHALL take the
 same visual tone. The rest of the studio area already takes that tone for issues.
@@ -929,8 +930,8 @@ the new version number. The Settings tab's Developer view SHALL hold its
 #### Scenario: A path's issue counts on the Paths head
 
 - **WHEN** a step's path carries a failing guard
-- **THEN** the step page's paths section reads a count of one, and the
-  masthead's count also reads one
+- **THEN** the step page's paths section reads a count of one
+- **AND** the steps rail row's count also reads one
 
 #### Scenario: Publishing with unsaved changes prompts a save first
 
@@ -944,6 +945,7 @@ the new version number. The Settings tab's Developer view SHALL hold its
 - **WHEN** `POST /drafts/:processId/publish` succeeds
 - **THEN** the header bar prints the returned version number
 - **AND** the Settings tab's Developer view prints the `definitionHash`
+
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 <!-- antislop: allow synonym-rotation -->
 

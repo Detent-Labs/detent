@@ -39,6 +39,8 @@ import {
 import { RemoveFieldDialog } from "./RemoveFieldDialog";
 import { RemoveDataSourceDialog } from "./RemoveDataSourceDialog";
 import { DataSourcesPanel } from "./DataSourcesPanel";
+import type { FixRequest } from "../draft/process-tabs";
+import { fieldFixAnchors, fixLandsNow, fixOpensMore, focusCheckAnchor, SOURCE_CHECK_ANCHOR_ID } from "./fixLanding";
 import {
   ADD_DATA_SOURCE_ID,
   dataSourceRailId,
@@ -53,6 +55,8 @@ type DraftDataSource = DraftOf<DataSourceDef>;
  * another. The rail holds its 20rem cap above the editor, and the view body
  * scrolls both (design.md D13), as the step page's tab body does. */
 const NARROW = "@media (max-width: 64rem)";
+
+const NOOP = () => {};
 
 const styles = stylex.create({
   // Below the breakpoint the rail and the editor fall under one another, in
@@ -363,6 +367,8 @@ export function FieldsTab({
   onShowStep,
   onOpenForm,
   onOpenPlace,
+  fixRequest,
+  onFixLanded = NOOP,
 }: {
   token: string;
   /** False while the Fields tab hides. Every tab body stays mounted and five
@@ -376,6 +382,10 @@ export function FieldsTab({
   /** A Read by row's "Open" for a place outside this tab: a way out, a step
    * or a form (design.md D4). The tab handles a field's own place itself. */
   onOpenPlace: (target: OutsidePlace) => void;
+  /** A Fix's field, until `onFixLanded` clears it, so a return to the tab pulls
+   * no focus. */
+  fixRequest?: FixRequest;
+  onFixLanded?: () => void;
 }) {
   const { draft, mutate, validation, contentLocale } = useDraft();
 
@@ -447,6 +457,24 @@ export function FieldsTab({
   useEffect(() => {
     editorRef.current?.scrollTo({ top: 0, behavior: "instant" });
   }, [selectedFieldId]);
+
+  // A Fix on a field (design.md D7). The first effect selects it and opens More
+  // where the check stands there. The second waits until the card reads that
+  // field, since the selection falls back to the first rail row, then focuses
+  // the sentence and clears the request. It stands after the scroll reset above,
+  // so the reset cannot undo the focus's own scroll.
+  const fixFieldId = fixRequest?.fieldId;
+  const fixZone = fixRequest?.zone;
+  useEffect(() => {
+    if (!visible || fixFieldId === undefined) return;
+    setSelectedFieldId(fixFieldId);
+    if (fixOpensMore(fixZone)) setOpenMoreFor(fixFieldId);
+  }, [visible, fixFieldId, fixZone]);
+  useEffect(() => {
+    if (!fixLandsNow(visible, fixFieldId, selectedFieldId)) return;
+    focusCheckAnchor(fieldFixAnchors(fixZone, railEntryId(fixFieldId!)));
+    onFixLanded();
+  }, [visible, fixFieldId, fixZone, selectedFieldId, onFixLanded]);
 
   // The effect runs after the commit, since a new field's label input exists
   // only then. It focuses that input after an add, and re-asserts focus on the
@@ -729,6 +757,8 @@ interface DataSourceRemoval {
 export function DataSourcesTab({
   token,
   visible,
+  fixRequest,
+  onFixLanded = NOOP,
 }: {
   token: string;
   /** False while the Fields tab's Where values come from view hides. Every
@@ -736,6 +766,9 @@ export function DataSourcesTab({
    * while its removal dialog stands open. A hide declines that removal, the
    * way `FieldsTab` does. */
   visible: boolean;
+  /** A Fix's source, until `onFixLanded` clears it. */
+  fixRequest?: FixRequest;
+  onFixLanded?: () => void;
 }) {
   const { draft, mutate, validation } = useDraft();
   const dataSources = draft.dataSources ?? [];
@@ -759,6 +792,18 @@ export function DataSourcesTab({
     selectedDataSourceIdState !== undefined && dataSourceIds.includes(selectedDataSourceIdState)
       ? selectedDataSourceIdState
       : dataSourceIds[0];
+
+  // A Fix on a source, in the two passes `FieldsTab` runs: select it, then focus
+  // its sentence once the editor reads it.
+  const fixSourceId = fixRequest?.dataSourceId;
+  useEffect(() => {
+    if (visible && fixSourceId !== undefined) setSelectedDataSourceId(fixSourceId);
+  }, [visible, fixSourceId]);
+  useEffect(() => {
+    if (!fixLandsNow(visible, fixSourceId, selectedDataSourceId)) return;
+    focusCheckAnchor([SOURCE_CHECK_ANCHOR_ID, dataSourceRailId(fixSourceId!)]);
+    onFixLanded();
+  }, [visible, fixSourceId, selectedDataSourceId, onFixLanded]);
 
   const addDataSource = () => {
     const dataSource: DraftDataSource = { id: mintId("dataSource"), key: "", type: "", config: {} };

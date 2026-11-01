@@ -1,6 +1,9 @@
 import type { ClientError } from "./api/types.js";
 import { StudioClientError } from "./api/client.js";
 import { t } from "./catalog.js";
+import type { Draft } from "./draft/types.js";
+import { resolveLoc } from "./draft/issues.js";
+import { checkAnswer } from "./draft/checkSentence.js";
 
 /**
  * Maps a client error to developer-facing text, keyed on `error.type`. Never
@@ -63,6 +66,39 @@ export function describeError(error: ClientError): string {
       // it reads as a generic failure rather than falling off the switch.
       return "Something went wrong.";
   }
+}
+
+/** A refused publish read for the author. `text` is for the alert. `detail` is
+ * the server's own text, for a closed Developer view beside it. */
+export interface PublishRefusal {
+  text: string;
+  detail: string;
+}
+
+/**
+ * Reads a refused publish as sentences. A located issue prints as the sentence
+ * `checkSentence` states for it, one per line after the first text. A dialog has
+ * no row to point at, so an answer that fell to the entity fallback reads the
+ * process-wide fallback text instead. The server's lines go in `detail`.
+ * Returns `undefined` for any other error: the caller keeps `describeError`.
+ */
+export function describePublishRefusal(error: ClientError, draft: Draft): PublishRefusal | undefined {
+  if (error.type === "cross-process-validation") {
+    return { text: t("checks.publishRefusedCrossProcess"), detail: error.message };
+  }
+  if (error.type !== "publish-validation") return undefined;
+
+  const detail = [error.kind, ...error.issues.map((i) => (i.loc === "" ? i.message : `${i.loc}: ${i.message}`))].join("\n");
+  const sentences: string[] = [];
+  for (const issue of error.issues) {
+    // The schema validator joins its path with dots, as in `workflow.steps.0.paths`.
+    const loc = issue.loc.replace(/\.(\d+)(?=\.|$)/g, "[$1]");
+    const answer = checkAnswer(draft, { loc, message: issue.message, ...resolveLoc(draft, loc) });
+    const sentence = answer.key.startsWith("checks.fallback.") ? t("checks.publishRefusedFallback") : answer.sentence;
+    if (!sentences.includes(sentence)) sentences.push(sentence);
+  }
+  if (sentences.length === 0) return { text: t("checks.publishRefusedFallback"), detail };
+  return { text: [t("checks.publishRefused"), ...sentences].join("\n"), detail };
 }
 
 /**

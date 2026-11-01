@@ -258,8 +258,8 @@ function readerLabel(field: DraftField | undefined, ref: string): string {
  * expression resolves only against an instance, which the studio holds none
  * of — and both skip a view entry naming a group-container field, since the
  * engine forces `required`/`readonly` to false there (see design.md decision
- * 5a). Neither rule blocks a publish; see `studio-checks-rail`'s "Every
- * publish blocker is visible" requirement.
+ * 5a). Neither rule blocks a publish; see `studio-checks-rail`'s "The all-clear
+ * state stands only with no open issue" requirement.
  */
 export function checkViewFlags(body: Draft): EditorIssue[] {
   const issues: EditorIssue[] = [];

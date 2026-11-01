@@ -1,3 +1,5 @@
+import { tailAfterField, tokenize } from "../draft/issues.js";
+
 /**
  * Which section of the field card a check on the selected field belongs to,
  * read off the check's own `loc` (`EditorIssue.loc`). The card maps the six
@@ -40,8 +42,9 @@ const ZONE_BY_KEY: Record<string, FieldCheckZone> = {
  * .label` is a check on an option, not on a label, and reading from the far
  * end would call it one.
  *
- * `lastIndexOf` finds the anchor, so a check inside a group's child resolves
- * against the child. The anchor is also what keeps an unrelated `loc` out:
+ * The walk follows the `fields` chain, so a check inside a group's child
+ * resolves against the child, and a column key `fields` stays a column key. The
+ * chain is also what keeps an unrelated `loc` out:
  * `workflow.steps[0].onEntry[0].config.x` carries no `fields` token, so
  * nothing is scanned and the answer is `undefined`.
  */
@@ -71,14 +74,16 @@ export function namesFieldTechnical(loc: string): boolean {
   return segmentsAfterAnchor(loc)[0] === "technical";
 }
 
-/** The `loc` segments after its last `fields` token, index suffixes dropped,
- * or none for a `loc` with no such token. */
-function segmentsAfterAnchor(loc: string): string[] {
-  const segments = loc
-    .split(".")
-    .map((s) => s.replace(/\[\d+\]$/, ""))
-    .filter((s) => s.length > 0);
+/**
+ * Whether a check's `loc` names the field's own data source. A removed source's
+ * check opens More, where the field's source select stands.
+ */
+export function namesFieldSource(loc: string): boolean {
+  return segmentsAfterAnchor(loc)[0] === "dataSource";
+}
 
-  const anchor = segments.lastIndexOf("fields");
-  return anchor === -1 ? [] : segments.slice(anchor + 1);
+/** The `loc` segments past the field it names, index suffixes dropped, or none
+ * for a `loc` with no `fields` token. */
+function segmentsAfterAnchor(loc: string): string[] {
+  return tailAfterField(tokenize(loc));
 }

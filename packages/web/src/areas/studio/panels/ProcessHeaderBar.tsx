@@ -7,6 +7,7 @@ import { useDraft } from "../draft/store.js";
 import { collectUsedLocales, missingTranslationWarning, nameInputPlaceholder, resolveDraftLocalizedText } from "../draft/localized-text";
 import { deriveKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput.js";
+import { PROCESS_HEADER_NAME_ID } from "../draft/process-tabs.js";
 import { IssueList } from "./shared/IssueList.js";
 import { useConfirmDialog } from "./shared/confirmDialog.js";
 import { localeOptionLabel } from "./shared/ContentLocaleSwitcher.js";
@@ -227,6 +228,14 @@ const styles = stylex.create({
     color: colors.refusal,
     whiteSpace: "pre-line",
   },
+  // The server's own text for a refusal, kept as it came, line breaks and all.
+  refusalDetail: {
+    fontFamily: fonts.mono,
+    fontSize: "0.9rem",
+    marginBlock: space.s2,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
+  },
   controls: {
     display: "flex",
     flexWrap: "wrap",
@@ -322,6 +331,7 @@ const styles = stylex.create({
   errorBannerMessage: {
     flex: 1,
     color: colors.text,
+    whiteSpace: "pre-line",
   },
 });
 
@@ -432,6 +442,16 @@ export function PublishReasonLine({
   );
 }
 
+/** The server's text for a refused request, in a closed Developer view. */
+function RefusalDetail({ detail }: { detail: string }) {
+  return (
+    <details {...stylex.props(styles.dialogDeveloper)}>
+      <summary {...stylex.props(styles.dialogDeveloperSummary)}>{t("draftToolbar.dialogDeveloperView")}</summary>
+      <p {...stylex.props(styles.refusalDetail)}>{detail}</p>
+    </details>
+  );
+}
+
 interface ConfirmDialogProps {
   processLabel: string;
   revision: number;
@@ -441,6 +461,9 @@ interface ConfirmDialogProps {
    * behind it out of reach, so a banner on the screen reports nothing here
    * (spa-error-reporting). */
   error: string | null;
+  /** The server's text for the refusal, in a closed Developer view beside the
+   * alert. It stands outside the alert, so a live region does not read it. */
+  errorDetail: string | null;
   busy: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -469,6 +492,7 @@ function PublishConfirmDialog({
   openIssues,
   blocked,
   error,
+  errorDetail,
   busy,
   triggerRef,
   onCancel,
@@ -551,6 +575,7 @@ function PublishConfirmDialog({
           {error}
         </p>
       )}
+      {error !== null && errorDetail !== null && <RefusalDetail detail={errorDetail} />}
       <div {...stylex.props(styles.controls)}>
         <button type="button" className="btn btn-primary" onClick={onConfirm} disabled={busy}>
           {busy ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
@@ -580,6 +605,7 @@ function DiscardConfirmDialog({
   revision,
   lastSavedAt,
   error,
+  errorDetail,
   busy,
   triggerRef,
   onCancel,
@@ -615,6 +641,7 @@ function DiscardConfirmDialog({
           {error}
         </p>
       )}
+      {error !== null && errorDetail !== null && <RefusalDetail detail={errorDetail} />}
       <div {...stylex.props(styles.controls)}>
         <button type="button" className="btn btn-secondary btn-destructive" onClick={onConfirm} disabled={busy}>
           {t("draftToolbar.discard")}
@@ -894,6 +921,7 @@ export function ProcessHeaderBar({
             it satisfies "not reachable" while still showing the current value. */}
         <h1 {...stylex.props(styles.headerBarName)}>
           <LocalizedTextInput
+            id={PROCESS_HEADER_NAME_ID}
             value={draft.label}
             ariaLabel={t("headerBar.nameLabel")}
             placeholder={nameInputPlaceholder(draft.label, draft.baseLocale, t("headerBar.unnamedProcess"))}
@@ -1057,6 +1085,7 @@ export function ProcessHeaderBar({
           blocked={blocked}
           triggerRef={publishTriggerRef}
           error={actions.error}
+          errorDetail={actions.errorDetail}
           busy={actions.saving || actions.publishing}
           onCancel={() => actions.resolveDialog(false)}
           onConfirm={() => actions.resolveDialog(true)}
@@ -1069,6 +1098,7 @@ export function ProcessHeaderBar({
           lastSavedAt={lastSavedAt}
           triggerRef={triggerRef}
           error={actions.error}
+          errorDetail={actions.errorDetail}
           busy={false}
           onCancel={() => actions.resolveDialog(false)}
           onConfirm={() => actions.resolveDialog(true)}
@@ -1107,10 +1137,13 @@ export function ProcessHeaderBar({
           failure inside itself, and two alert regions for one failure announce
           it twice (spa-error-reporting). */}
       {!dialogOpen && actions.error && (
-        <div {...stylex.props(styles.errorBanner)} role="alert">
-          <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
-          <span {...stylex.props(styles.errorBannerMessage)}>{actions.error}</span>
-        </div>
+        <>
+          <div {...stylex.props(styles.errorBanner)} role="alert">
+            <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+            <span {...stylex.props(styles.errorBannerMessage)}>{actions.error}</span>
+          </div>
+          {actions.errorDetail !== null && <RefusalDetail detail={actions.errorDetail} />}
+        </>
       )}
       {!dialogOpen && conflict && (
         <div {...stylex.props(styles.errorBanner)} role="alert">

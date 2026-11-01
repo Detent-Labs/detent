@@ -7,6 +7,7 @@ import { resolveLoc, type EditorIssue, type IssueSource } from "./issues";
 import { t } from "../catalog.js";
 import { hasNoSteps, isProcessNameGap, isStartGap } from "./startGaps";
 import { checkViewFlags, checkUnwrittenTechnicalFields } from "./view-flags";
+import { checkSentence } from "./checkSentence";
 
 function pushIssues(
   issues: EditorIssue[],
@@ -181,6 +182,8 @@ export function runValidation(
       subprocessStepStatus[step.id] = loadedChildren[step.id] ? "checked" : "not-checked";
     });
   }
+
+  for (const issue of issues) issue.sentence = checkSentence(draft, issue);
 
   return {
     zodValid,

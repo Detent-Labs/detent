@@ -749,7 +749,7 @@ A manual path waits for a person. The example gives `review` three of them:
 
 A manual path can carry a guard too. The participant sees its button only
 while the guard holds. A manual path with an empty guard always shows its
-button. The step page offers the "Only when" editor for both kinds of path.
+button. The step page offers the "Only if" editor for both kinds of path.
 
 An automatic path fires by itself when its guard matches, except on a
 subprocess step. A guard is a CEL expression. Two or more automatic paths on
@@ -1084,6 +1084,12 @@ Checks reads as a plain count, like any other tab, until something blocks a
 publish. Then the count itself turns red. Open the tab to see what Studio
 found.
 
+The tab lists each open check under Steps, Fields or Before publishing. A row
+opens with Must fix or Worth a look. One sentence follows, naming the step or
+field and what to do. The **Fix** control opens the place the sentence
+names. A closed Developer view under the sentence holds the check's raw
+message. A line under Before publishing says what Studio has not checked yet.
+
 The `⋮` menu holds three entries under Views. The **JSON** entry prints the
 same draft as raw text. That helps when you want to read the whole body at
 once. The **Versions** and **Player** entries open their own screens.
@@ -1340,6 +1346,9 @@ that breaks a rule. Four examples:
 - an outcome no end step binds
 - an unknown action type
 - a step with no exit
+
+If the server refuses, the dialog stays open and lists one sentence per
+reason. The server's own text stands in a closed Developer view.
 
 The publish dialog counts the changes since the base version and lists each
 one on request. A publication is immutable. Read the next chapter before you press it.

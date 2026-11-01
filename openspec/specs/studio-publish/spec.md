@@ -353,7 +353,8 @@ translation gap count.
 <!-- antislop: allow synonym-rotation -->
 The open issue count SHALL read the same `validation.issues[]` the area nav's
 Checks control reads. One of those issues may block a publish. The dialog
-SHALL then say the engine refuses the publish until somebody fixes it.
+SHALL then say the author cannot publish the draft yet, and that Checks marks
+what to fix. It SHALL NOT say "the engine" or "somebody".
 
 The stated version is the version the client expects. The engine assigns the
 number, and the screen already reports the assigned version after a
@@ -369,6 +370,8 @@ and unpublished.
 A publish that the engine refuses SHALL render its reason inside the open
 dialog, and SHALL leave the dialog open. A modal dialog puts everything
 behind it out of reach, so the developer cannot read a message back there.
+Each located reason SHALL print as the sentence `studio-checks-rail` states for
+it. The server's own text SHALL stand in a closed Developer view.
 
 <!-- antislop: allow negation-habit -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
@@ -421,6 +424,8 @@ restarts their traversal from the top of the screen.
 
 - **WHEN** the publish request fails
 - **THEN** the dialog stays open and renders the reason inside itself
+- **AND** a located reason reads as a sentence with no field path
+- **AND** the server's text stands in a closed Developer view
 
 #### Scenario: The dialog opens with the declining control focused
 
@@ -438,8 +443,8 @@ restarts their traversal from the top of the screen.
 
 - **WHEN** the developer chooses Publish on a draft carrying one blocking issue
 - **THEN** the dialog reads one open issue
-- **AND** the dialog says the engine refuses the publish until somebody fixes
-  it
+- **AND** the dialog says the author cannot publish the draft yet
+- **AND** no text in it reads "the engine" or "somebody"
 
 #### Scenario: Machine values wait behind the Developer view
 

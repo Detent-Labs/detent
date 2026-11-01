@@ -7,8 +7,9 @@ import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import { DraftContext, type DraftContextValue, type Mutate } from "../src/areas/studio/draft/store.js";
+import { parseChildProcessJson } from "../src/areas/studio/draft/io.js";
 import { updateInDraftArray } from "../src/areas/studio/draft/draft-array-crud.js";
-import { StepPage } from "../src/areas/studio/panels/StepPage.js";
+import { ChildLoadError, StepPage } from "../src/areas/studio/panels/StepPage.js";
 import { RemoveStepDialog } from "../src/areas/studio/panels/RemoveStepDialog.js";
 import type { StepRemovalReach } from "../src/areas/studio/draft/stepRemoval.js";
 
@@ -610,14 +611,95 @@ describe("A step page section's own open issues", () => {
     expect(source).toMatch(/badgeAdvisory: \{\s*color: colors\.textMuted,\s*\}/);
   });
 
-  it("keeps a step-level issue no section claims on the masthead, and no header counts it", () => {
+  it("keeps a step-level issue no section claims at the masthead's end, and no header counts it", () => {
+    const issues: EditorIssue[] = [
+      { entityType: "step", entityId: "step_a", message: "kind is unknown", source: "zod", loc: "workflow.steps[0].type" },
+    ];
+    const html = render({ issues });
+
+    expect(html.match(/kind is unknown/g)).toHaveLength(1);
+    expect(html.indexOf("kind is unknown")).toBeGreaterThan(html.indexOf("Set as"));
+    expect(html.indexOf("kind is unknown")).toBeLessThan(html.indexOf("<section"));
+    expect(html).not.toContain("open issue");
+  });
+
+  it("stands a name check directly under Name, and no header counts it", () => {
+    const issues: EditorIssue[] = [
+      { entityType: "step", entityId: "step_a", message: "name is missing", sentence: "This step needs a name.", source: "zod", loc: "workflow.steps[0].label" },
+    ];
+    const html = render({ issues });
+    const nameInput = html.indexOf('id="step-page-name"');
+    const sentence = html.indexOf("This step needs a name.");
+
+    expect(nameInput).toBeGreaterThan(-1);
+    expect(sentence).toBeGreaterThan(nameInput);
+    // Only the close of the name's own label stands between them.
+    expect(html.slice(nameInput, sentence)).not.toContain("<input");
+    expect(html.slice(nameInput, sentence)).not.toContain(">Description<");
+    expect(html.match(/This step needs a name\./g)).toHaveLength(1);
+    expect(html).not.toContain("name is missing");
+    expect(html).not.toContain("open issue");
+  });
+
+  it("stands a description check directly under Description", () => {
+    const issues: EditorIssue[] = [
+      { entityType: "step", entityId: "step_a", message: "no text", source: "zod", loc: "workflow.steps[0].description" },
+    ];
+    const html = render({ issues });
+    const caption = html.indexOf(">Description<");
+    const sentence = html.indexOf("no text");
+
+    expect(sentence).toBeGreaterThan(caption);
+    expect(html.slice(caption, sentence).match(/<input/g)).toHaveLength(1);
+    expect(sentence).toBeLessThan(html.indexOf("<fieldset"));
+  });
+
+  it("stands a key check in More, where the header counts it and the masthead does not print it", () => {
     const issues: EditorIssue[] = [
       { entityType: "step", entityId: "step_a", message: "key is not a slug", source: "zod", loc: "workflow.steps[0].key" },
     ];
     const html = render({ issues });
+    const more = section(html, "More");
 
     expect(html.match(/key is not a slug/g)).toHaveLength(1);
-    expect(html).not.toContain("open issue");
+    expect(more.body).toContain("key is not a slug");
+    expect(more.header).toContain('aria-label="1 open issue"');
+    expect(html.slice(0, html.indexOf("<section"))).not.toContain("key is not a slug");
+  });
+
+  it("counts an output-target check on the section of the action it complains about", () => {
+    const step = {
+      ...TASK_STEP,
+      paths: [{ id: "path_1", to: "step_b", label: "Go", onPath: [{ id: "act_1", output: { field_x: { lang: "cel", src: "result.a" } } }] }],
+    } as unknown as DraftStep;
+    const issues: EditorIssue[] = [
+      { entityType: "step", entityId: "step_a", message: "action output targets unknown field: field_x", source: "zod", loc: "workflow.steps[0]" },
+    ];
+    const html = render({ step, issues });
+
+    expect(section(html, "Ways out").header).toContain('aria-label="1 open issue"');
+    expect(section(html, "Ways out").body).toContain("action output targets unknown field");
+    expect(html.slice(0, html.indexOf("<section"))).not.toContain("action output targets unknown field");
+  });
+
+  it("gives the page a name input a landing can find", () => {
+    expect(render()).toContain('id="step-page-name"');
+  });
+
+  it("opens the Developer view by itself while a key check stands, and leaves it a native toggle", () => {
+    const keyCheck: EditorIssue = { entityType: "step", entityId: "step_a", message: "key is not a slug", source: "zod", loc: "workflow.steps[0].key" };
+    const details = (html: string) => {
+      const at = section(html, "More").body.lastIndexOf("<details");
+      return section(html, "More").body.slice(at, section(html, "More").body.indexOf(">", at));
+    };
+    const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
+
+    expect(details(render({ issues: [keyCheck] }))).toContain("open");
+    expect(details(render())).not.toContain("open");
+    // The native summary closes it under the check, and an unchanged prop leaves
+    // that close standing until the check clears.
+    expect(source).toContain("open={developerOpen || keyChecked}");
+    expect(source).toContain("onToggle={(e) => setDeveloperOpen(e.currentTarget.open)}");
   });
 
   it("leaves a path's own issue to the row that names it, and counts it on Ways out once", () => {
@@ -837,5 +919,48 @@ describe("The removal dialog", () => {
     expect(html).toContain('aria-labelledby="remove-step-confirm-heading"');
     expect(html).toContain('id="remove-step-confirm-heading"');
     expect(html).toContain('aria-describedby="remove-step-confirm-facts remove-step-confirm-notes"');
+  });
+});
+
+describe("the warning callout", () => {
+  const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
+  const block = /\n  warning: \{([^}]*)\}/.exec(source)?.[1] ?? "";
+
+  it("draws a 3px rule in the advisory role beside refusal text", () => {
+    expect(block).toContain("borderLeftWidth: 3");
+    expect(block).toContain("borderLeftColor: colors.advisory");
+    expect(block).toMatch(/\n    color: colors\.refusal,/);
+  });
+
+  it("is the style both missing-translation warnings read", () => {
+    expect(source.match(/<p \{\.\.\.stylex\.props\(styles\.warning\)\}>\{missingTranslationWarning/g)).toHaveLength(2);
+  });
+});
+
+describe("a failed child file load", () => {
+  it("prints the message of a file with no process definition in it, as an alert", () => {
+    let message = "";
+    try {
+      parseChildProcessJson("{}");
+    } catch (e) {
+      message = e instanceof Error ? e.message : "";
+    }
+    expect(message).not.toBe("");
+
+    const html = renderToStaticMarkup(<ChildLoadError message={message} />);
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("<p");
+  });
+
+  it("is the element the page prints for its load error", () => {
+    const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
+    expect(source).toContain("{childLoadError && <ChildLoadError message={childLoadError} />}");
+  });
+});
+
+describe("the removal dialog's step name", () => {
+  it("reads the shared step text map, so steps sharing a label read apart", () => {
+    const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
+    expect(source).toContain("stepTextMap(draft.workflow?.steps ?? [], contentLocale, baseLocale).get(step.id)");
   });
 });

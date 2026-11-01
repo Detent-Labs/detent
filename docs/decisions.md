@@ -479,11 +479,12 @@ word. `ROADMAP.md` carries stage-by-stage status.
   which then fails with "No draft exists for this process." The process list
   change left the Versions screen as it was. The old row's Versions button
   reached the same screen.
-- **The 22 failure renders outside the studio edit screen.**
+- **The 21 failure renders outside the studio edit screen.**
   `packages/web/src` rendered 27 failure states with no alert role.
   `studio-publish-gate-and-report` fixed five, all in the edit screen's own
   chrome, and narrowed the `spa-error-reporting` requirement to that screen to
-  match. The remaining 22 sit in the app, admin and reporting areas, on the
+  match. `studio-checks-by-subject` fixed one more, the step page's child load
+  error. The remaining 21 sit in the app, admin and reporting areas, on the
   studio's other screens, and in the panels the edit screen itself mounts. A
   later change sweeps them into the same `studio-error-banner` shape and widens
   that requirement back out. Deferred 2026-09-02: the sweep touches four areas
@@ -968,7 +969,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
 - **STEP-1: at 1280px a condition row runs under the next section.** The
   critique of `authoring-command-ink-advisory-role` measured it on
   2026-09-14. The IT Offboarding draft's first path had a condition row.
-  - The "Only when" fieldset keeps the default `min-inline-size: min-content`
+  - The "Only if" fieldset keeps the default `min-inline-size: min-content`
     (`panels/PathsPanel.tsx:332`). The row's field select takes its longest
     option's width, 647px (`panels/shared/ConditionBuilder.tsx:209`). The
     fieldset then ends at x=1028, past the Path to section's edge at x=863.
@@ -1017,7 +1018,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:90`).
   Measured 2026-09-13: the editor pane stands 105px tall at 900x720, and 18px
   at 420x720 with its heading cut off. Measured 2026-09-26 at 400x800, "+ Add
-  field" raises the FIELDS-8 banner, and the pane shrinks to 8px. The new
+  field" raises the structural banner (CHECKS-20), and the pane shrinks to 8px. The new
   label input and its ring, 42px, then clip at both edges. No 2px rule
   separates the two scroll regions: the rail drops its right-hand border
   there (`:87`). Risk (Medium): the rail keeps its 20rem and the editor gets
@@ -1053,24 +1054,6 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 
   Since `forms-card-legend`, the Forms tab's card labels stand at `h2` under
   the header bar's `h1`. The repair matches that level or moves them with it.
-- **FIELDS-8: check messages speak the engine's layers.** Measured 2026-09-13,
-  the Fields tab showed `ZOD missing baseLocale ('en') entry` and
-  `field key must match /^[a-z_][a-z0-9_]*$/ to be a valid CEL identifier`.
-  A view entry naming an id no field carries — the shape an unfixed field
-  removal left then, and a JSON-view edit can still write today — showed
-  `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
-  longer look up. Adding an empty field raises the banner at
-  `screens/EditScreen.tsx:967` before the author types. The banner reads
-  `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`
-  (the banner now reads "Open Checks and fix this draft's structure, so every check can run."),
-  and it pushes the page down 35px at 1400px and 99px at 900px. The messages
-  come from `src/schema/definition.ts:1014`, `src/schema/compile.ts:612` and
-  `src/schema/definition.ts:1095`, and the "ZOD" label from
-  `panels/shared/IssueList.tsx:44`. Risk (Medium): an author reads Zod, CEL
-  grammar and raw ids where a plain sentence belongs.
-
-  Since `studio-fresh-draft-starts-clean` the process-name message reads a
-  sentence, and the field-label part stays open.
 - **FIELDS-9: a group's editor leads with zones a group cannot use.** Its
   definition half shows "Where values come from"
   (`panels/FieldCatalogPanel.tsx:882`). It also shows a disabled "Default
@@ -1116,13 +1099,6 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   checks write that chain through `walkFieldsIndexed`
   (`src/schema/compile.ts:223`). Risk (Low): the check shows on an unrelated
   field or on the process. The fix touches `src/`.
-- **FIELDS-12: the Checks tab opens the Fields tab without the field.** A
-  check row calls `openTabFromRow(tabForIssue(issue.entityType))`
-  (`screens/EditScreen.tsx:1166`). That function takes a tab alone (`:891`),
-  and `FieldsTab` accepts no selected field (`:1104`). The spec
-  `studio-process-tabs` asks for that field to open selected
-  (`openspec/specs/studio-process-tabs/spec.md:263-264`). Risk (Medium): the
-  author lands on the Fields tab and must find the field in the entity rail.
 - **FIELDS-13 (narrowed): two `docs/browser-checks.md` passages still walk
   a Values tab.** `.claude/rules/ui-glossary.md` already dropped the "field
   tabs" row this finding once named, since the field editor now has two
@@ -1449,18 +1425,14 @@ and this section records what that review found outside the change. The TONE
 tags are local to this section. Paths under `panels/` and `screens/` start at
 `packages/web/src/areas/studio/`.
 
-- **TONE-1: the missing-translation message takes two looks.** The step page
-  draws `missingTranslationWarning` beside a 2px refusal rule, its `warning`
-  block (`panels/StepPage.tsx:149`). Three other sites draw the same message
-  beside the 3px advisory rule. Those are the header bar's `warning` block
-  (`panels/ProcessHeaderBar.tsx:88`) and the field catalog's `studioWarning`
-  (`panels/FieldCatalogPanel.tsx:334`). The form editor's `studioWarning`
-  (`screens/FormEditorScreen.tsx:122`) is the third.
-  - Two more 3px rules mix refusal at 55%. The checks rail draws one in
-    `checksGroupHeldBack` (`panels/ChecksRail.tsx:52`). The timers panel draws
-    the other in `refusal` (`panels/TimersPanel.tsx:56`).
-  - Risk (Low): an author meets one message in two tones on one process
-    surface, so the tone stops telling a warning from a refusal.
+- **TONE-1 (narrowed): the timers panel draws a 3px rule that mixes
+  refusal at 55%.** The `refusal` style (`panels/TimersPanel.tsx:56`) is the
+  one rule left. `studio-checks-by-subject` brought the step page's `warning`
+  block to the 3px advisory rule, as the header bar, the field catalog and the
+  form editor draw it. It also removed the checks rail's `checksGroupHeldBack`
+  rule.
+  - Risk (Low): the timers panel's warning reads in a tone no other warning
+    uses, so the tone stops telling a warning from a refusal there.
 - **TONE-2: the advisory role sits close to two neighbours.** The change's
   critique measured it on 2026-09-14, on the Fields tab with `de` added.
   - In light, a field's callout rule (`#e25a40`) reads 1.39:1 against the
@@ -1955,62 +1927,50 @@ tag is local to this section.
 - **ACCORDION-3: the badge style and the blocker rule live in two places.**
   `StepsRail.tsx` with `stepRailRow.ts`, and `StepPage.tsx`, each keep a copy.
   Risk (Low): a fix to one copy leaves the other behind.
-- **ACCORDION-4: the Checks narrowing label still falls back to a step key.**
-  It lives in `EditScreen.tsx`. SELECTS-2's second half, now archived, said so.
-  Risk (Low): an unnamed step reads its key there. Change 12 (`studio-checks-by-subject`)
-  owns it.
 - **ACCORDION-5: a kind switch can bring back a hidden open section.** The page
   stores the open section across the switch. Risk (Low): the section shows
   again when the author switches back.
-- **ACCORDION-6: a way out whose target step is gone heads its row "(no step
-  yet)".** Its Leads to select still displays the first step, and picking
-  that step writes nothing. The code lives in `panels/PathsPanel.tsx` and is
-  older than this change. Risk (Medium): the select shows a target the draft
-  lacks.
 - **ACCORDION-7: the header's hover wash runs flush to the text.** The header
   sets `paddingInline: 0`. Risk (Low): the wash reads as clipped at the text's
-  edge.
+  edge. `studio-checks-by-subject` leaves it: a visual detail with no bearing
+  on checks.
 - **ACCORDION-8: the Who acts body is the inline form of
   `PluginEnvelopeEditor`.** It prints schema-key labels, "Edit as JSON" and a
   "Settings (JSON)" box outside a Developer view. This needs its own change.
   Risk (Medium): an author meets machine words where the guided vocabulary
-  promises plain ones.
-- **ACCORDION-9: a step-level check prints the validator's own text under a
-  "ZOD" label.** A just-added step's name check lands on the masthead rather
-  than under Name. Focus stays in the steps rail after "Add a step". Change 12
-  owns the sentences. Risk (Medium): the first check a new step meets reads as
-  machine output.
+  promises plain ones. `studio-checks-by-subject` leaves it: the plugin
+  envelope editor needs its own change.
 - **ACCORDION-10: the masthead stands about 300px tall before the first
   header at 1440x900.** "Set as the process's first step" shows on every step
   but the first, end steps included. Change 14 owns the header rows. Risk
   (Low): the sections start a third of the way down the window.
-- **ACCORDION-11: below 64rem the capped steps rail never scrolls to the
-  current row.** Its `overscroll-behavior: contain` also keeps a wheel over it
-  from reaching the page at its end. The rule comes from `DESIGN.md`. Risk
-  (Medium): the current row can sit out of view, and the page stops scrolling
-  under the pointer.
-- **ACCORDION-12: the no-assignment warning draws a 2px rule in the refusal
-  role.** The warning callout in `DESIGN.md` names a 3px rule in Advisory. The
-  site is the `warning` style in `StepPage.tsx`, older than this change. Risk
-  (Low): the warning reads as a refusal.
+  `studio-checks-by-subject` leaves it: the masthead's height and the
+  first-step control's place need their own look.
+- **ACCORDION-11 (narrowed): the capped steps rail keeps its overscroll
+  rule.** Its `overscroll-behavior: contain` keeps a wheel over the rail from
+  reaching the page at its end. The rule comes from `DESIGN.md`.
+  `studio-checks-by-subject` fixed the other half: the rail scrolls the
+  current row into view with `block: "nearest"`. Risk (Medium): the page
+  stops scrolling under the pointer.
 - **ACCORDION-13: Ways out opens every way out at once.** Whether its rows fold
   one at a time is an owner question. Risk (Low): a step with many ways out
-  stands long when open.
-- **ACCORDION-14: two unnamed steps both read "(unnamed step)".** That holds in
-  the steps rail, the walk and the removal dialog, while the selects number
-  them. Risk (Low): an author cannot tell the two apart there.
+  stands long when open. `studio-checks-by-subject` leaves it: whether Ways out
+  folds its rows needs a design pass.
 - **ACCORDION-15: the steps rail reorders only by drag or Alt+Arrow.** No
   press-to-move control stands in for the drag (WCAG 2.5.7), and the grip
   measures 26px. Both are older than this change. Risk (Medium): a pointer
-  user who cannot drag has no way to reorder.
+  user who cannot drag has no way to reorder. `studio-checks-by-subject`
+  leaves it: a press-to-move control needs its own change.
 - **ACCORDION-16: at 1366x768 and 1100x800 the Steps tab nests three scroll
   boxes.** The cause is the `minHeight: 36rem` that `stepsTab` keeps, older
   than this change. Risk (Low): a wheel scrolls the wrong box first.
+  `studio-checks-by-subject` leaves it: `docs/studio-ui-concept.md` section 8
+  left it out, as M14.
 - **ACCORDION-17: the removal dialog's heading uppercases the step's name.**
   The global `h2` style does it. Its counts print outside mono, and labels and
   values share no baseline. The two dialogs it copies share all three. Change
   13 owns the one dialog. Risk (Low): the dialog reads unlike the register it
-  confirms.
+  confirms. `studio-checks-by-subject` leaves it: change 13 owns the dialog.
 
 ## Open from studio-map-labels (needs its own OpenSpec change)
 
@@ -2034,10 +1994,6 @@ MAPLABELS tag is local to this section.
   awkwardly.** It reads "Only if Amount is greater than 1,000 and a
   hand-written rule", the builder's own phrase. Risk (Low): the sentence is
   exact and stiff.
-- **MAPLABELS-5: the step page's guard heading reads "Only when".** The canvas
-  reads "Only if", and so does the vocabulary table's row for a guard. The
-  heading is `condition.onlyWhenHeading`. Risk (Low): one rule reads two ways
-  on two tabs.
 - **MAPLABELS-8: the stamp's compiled style repeats four sizes as literals.**
   StyleX cannot read a constant imported from `canvas/mapWords.ts` at build
   time. The `stamp` style in `CanvasView.tsx` writes the rule, both paddings
@@ -2116,14 +2072,13 @@ HEADER tag is local to this section.
 
   Upgrade entry: drop `aria-haspopup`, or build the menu role with arrow-key
   navigation. The trigger is in `panels/ProcessHeaderBar.tsx`.
-- **HEADER-7: the dialogs print engine words and raw messages.** The Publish
-  dialog's blocked sentence says "the engine" and "somebody". A refused publish
-  can print a raw message such as "label: missing baseLocale". Change 12 maps
-  engine messages. The discard dialog prints the revision, and change 13 owns
-  that dialog. Risk (Medium): an author reads an engine word and a field path.
+- **HEADER-7 (narrowed): the discard dialog prints the revision.**
+  `studio-checks-by-subject` replaced the Publish dialog's blocked sentence
+  and a refused publish's message with sentences. The server's text stands in
+  a closed Developer view. Change 13 owns the discard dialog. Risk (Low): an
+  author reads a revision number, a machine value.
 
-  Upgrade entry: change 12 maps the message, and change 13 drops the revision.
-  The strings are `draftToolbar.publishDialogBlocked` and its neighbours in
+  Upgrade entry: change 13 drops the revision. The string is in
   `i18n/catalogs/studio.ts`.
 - **HEADER-8: the Developer view's version and hash survive only while the
   process surface stays mounted.** After a publish in this session, the Process
@@ -2331,6 +2286,72 @@ come from those two reports.
   scenarios, name the retired halves of the field editor. The sync of
   `studio-field-card` rewrites only the requirements its delta names. A spec
   sweep wants its own OpenSpec change.
+
+## Open from studio-checks-by-subject (needs its own OpenSpec change)
+
+The change grouped the Checks tab by subject and printed one sentence at
+every placement. Its task reviews left the points below. The CHECKS tag is
+local to this section. Paths under `panels/`, `draft/` and `screens/` start at
+`packages/web/src/areas/studio/`.
+
+- **CHECKS-2: the same-output sentence on an end step reads the step form.**
+  An end step draws no When left list, so `draft/checkSentence.ts` names no
+  section for `checks.action.sameOutput` there. Risk (Low): the sentence says
+  to look at the step and names no list.
+- **CHECKS-3: two functions walk the step's action positions.**
+  `sectionOfOutputTarget` repeats the walk that `sectionByEntityId` makes, in
+  `panels/sectionIssues.ts`. Risk (Low): a new action position needs two
+  edits, and a missed one parts the sentence from its landing.
+- **CHECKS-4: the `line` flag in `panels/ChecksRail.tsx` means the Before
+  publishing subject.** The name says nothing of that. Risk (Low): a reader
+  takes the flag for the held-back state.
+- **CHECKS-5: the subject heading reads `fonts.heading`, and the field card's
+  Title heading resets to `fonts.body`.** Both take the Title style from
+  `DESIGN.md`. Risk (Low): the two Title headings read different font roles.
+- **CHECKS-6: the 3px exclusion in `studio-guidedSurfaceStyle.test.ts` strips
+  the whole `warning` block.** The test reads `StepPage.tsx` with that block
+  cut out. Risk (Low): a second weight inside the block passes the test.
+- **CHECKS-8: no test shows `errorDetail` clearing with the error.**
+  `panels/DraftToolbar.tsx` and `panels/ProcessHeaderBar.tsx` hold both.
+  Risk (Low): the server's old text could stand under a new refusal.
+- **CHECKS-9: the held-back line says "the rows above" with no row above.** A
+  narrowed list with no row on its step reaches it while another step holds
+  checks back. So does a compiling draft whose registry has not loaded.
+  Risk (Low): the spec's sentence reads false there, and a third key would repair
+  it.
+- **CHECKS-10: a sentence at the spot gives directions to where the author
+  stands.** One key serves the row and the placement, so a step page reads "Under
+  Who acts" inside Who acts. Risk (Low): the words read as a misplaced pointer.
+- **CHECKS-11: the blocked Publish stays filled, and one label covers several
+  issues.** Publish keeps its accent fill on a blocked draft. Its reason reads
+  "Blocked by an open issue" over several. Risk (Medium): the primary action
+  invites a press that cannot succeed.
+- **CHECKS-12: the Time limit section prints a raw unreadable length.** A length
+  the panel cannot read lands there, and the row shows the stored text. Risk
+  (Medium): the author reads a machine value where a sentence belongs.
+- **CHECKS-13: a key check offers no one-press repair.** The Fix focuses the key
+  input, and the author types a new value. Risk (Low): a reserved or empty key
+  could take a suggestion from the step's name.
+- **CHECKS-14: below 64rem the checks rail is a small scroll box.** The rail
+  caps with the tab body, so a long list scrolls in a short box. Risk (Medium):
+  two scrollbars compete on a narrow window.
+- **CHECKS-15: labels drift on Time limit and the field card.** A section's name
+  and a label on its body can differ from a sentence's word. Risk (Low): a
+  sentence points at a word the place does not print.
+- **CHECKS-16: the step page's Developer summary stands 17px tall.** An audit
+  measured it under the 24px target size. The row's summary stands clear of
+  other targets. Risk (Low): a pointer user has a narrow target on More.
+- **CHECKS-17: no "next check" walk.** After a Fix, the author returns to the
+  Checks tab for the next row. Risk (Low): a long list costs two presses a row.
+- **CHECKS-18: a JSON landing does not select the location.** Focus stands in
+  the input with the caret at the start, and the sentence names no line. Risk
+  (Medium): the author searches a long body by eye.
+- **CHECKS-19: a row's ZOD label and its two location forms.** The Developer view
+  prints the source in capitals, and a location reads `steps[0]` or
+  `workflow.steps[0]`. Risk (Low): a developer reads one place as two.
+- **CHECKS-20: the structural banner pushes the page down.** Measured 2026-09-13,
+  it adds 35px at 1400px and 99px at 900px, on every tab but Checks. Risk
+  (Low): the tab row jumps as a check opens or clears.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
