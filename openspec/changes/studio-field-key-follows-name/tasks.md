@@ -74,17 +74,17 @@
 
 ## 8. Verification
 
-- [ ] 8.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
-- [ ] 8.2 Run `bun run build` in the devcontainer. Expect exit code 0.
-- [ ] 8.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`.
-- [ ] 8.4 Read the pass, skip and fail counts off that run. Compare the pass count with `scripts/gates/pass-floor.txt`.
-- [ ] 8.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
-- [ ] 8.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
-- [ ] 8.7 On the production bundle, rename an unpublished field a guard reads. The guard follows, and the rewrite line counts it.
-- [ ] 8.8 Commit a key in a published field's Developer view. The guard follows; the Publish dialog lists both rows.
-- [ ] 8.9 Read the "Read by" zone of a field with several readers. No CEL or key shows.
-- [ ] 8.10 Run `/impeccable critique` and `/impeccable audit` on the Fields tab. Run `impeccable detect --json`, since the CSP blocks the overlay.
-- [ ] 8.11 Run `sh scripts/dev-exec.sh bun run e2e` in the devcontainer. Expect every flow to pass.
+- [x] 8.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
+- [x] 8.2 Run `bun run build` in the devcontainer. Expect exit code 0.
+- [x] 8.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`.
+- [x] 8.4 Read the pass, skip and fail counts off that run. Compare the pass count with `scripts/gates/pass-floor.txt`.
+- [x] 8.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
+- [x] 8.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
+- [x] 8.7 On the production bundle, rename an unpublished field a guard reads. The guard follows, and the rewrite line counts it.
+- [x] 8.8 Commit a key in a published field's Developer view. The guard follows; the Publish dialog lists both rows.
+- [x] 8.9 Read the "Read by" zone of a field with several readers. No CEL or key shows.
+- [x] 8.10 Run `/impeccable critique` and `/impeccable audit` on the Fields tab. Run `impeccable detect --json`, since the CSP blocks the overlay.
+- [x] 8.11 Run `sh scripts/dev-exec.sh bun run e2e` in the devcontainer. Expect every flow to pass.
 
 ## Workflow follow-up
 
