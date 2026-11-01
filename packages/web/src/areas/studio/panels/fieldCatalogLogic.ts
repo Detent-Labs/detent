@@ -120,9 +120,13 @@ export function labelChangePatch(
   published: ReadonlySet<string> | undefined,
 ): Partial<DraftField> {
   const current = field.key ?? "";
+  // A locked non-empty key never moves (`nextFieldKey`'s first check), so the
+  // two draft walks below would decide nothing.
+  const locked = isFieldKeyLocked(field, published);
+  if (locked && current !== "") return { label };
   const read = countKeyReaders(draft, current) > 0;
   const taken = takenFieldKeys(draft, field.id, false);
-  const derivedKey = nextFieldKey(current, field.label, label, baseLocale, taken, isFieldKeyLocked(field, published), read);
+  const derivedKey = nextFieldKey(current, field.label, label, baseLocale, taken, locked, read);
   if (derivedKey === undefined || (derivedKey === "" && read)) return { label };
   return { label, key: derivedKey };
 }
@@ -148,8 +152,25 @@ export function keyCommitProblem(
   if (typed === "") return "empty";
   if (!FIELD_KEY_GRAMMAR.test(typed)) return "grammar";
   if (CEL_LITERAL_KEYS.has(typed)) return "literal";
-  if (draftFields(draft).some((f) => f.id !== field.id && f.key === typed)) return "taken";
+  if (keyHolder(draft, field, typed) !== undefined) return "taken";
   return undefined;
+}
+
+/** The field other than `field` that carries `key`, at any depth, or `undefined`. */
+export function keyHolder(draft: Draft, field: DraftField, key: string): DraftField | undefined {
+  return draftFields(draft).find((f) => f.id !== field.id && f.key === key);
+}
+
+/**
+ * The name the taken refusal gives the field that carries `key`: its label at
+ * `contentLocale`, else at the base locale, else "(unnamed field)". The empty
+ * string when no other field carries `key`.
+ */
+export function keyHolderName(draft: Draft, field: DraftField, key: string, contentLocale: string): string {
+  const holder = keyHolder(draft, field, key);
+  if (holder === undefined) return "";
+  const baseLocale = draft.baseLocale ?? "en";
+  return resolveDraftLocalizedText(holder.label, contentLocale, baseLocale)?.trim() || t("panelsScreen.unnamedField");
 }
 
 /**
@@ -201,8 +222,11 @@ const KEY_REFUSAL: Record<KeyCommitProblem, CatalogKey> = {
   taken: "fieldCatalog.keyTaken",
 };
 
-/** The sentence a refused key commit shows under the key input. */
-export const keyRefusalFor = (problem: KeyCommitProblem): string => t(KEY_REFUSAL[problem]);
+/** The sentence a refused key commit shows under the key input. `holder`
+ * names the field that carries the key, for the taken refusal
+ * (`keyHolderName`). */
+export const keyRefusalFor = (problem: KeyCommitProblem, holder = ""): string =>
+  t(KEY_REFUSAL[problem]).replace("{field}", () => holder);
 
 /**
  * The sentence in a field's Developer view on where its key comes from, or
@@ -226,6 +250,24 @@ export function rewriteLineFor(count: number | undefined): string {
   if (count === undefined || count < 1) return "";
   if (count === 1) return t("fieldCatalog.rewroteOne");
   return t("fieldCatalog.rewroteMany").replace("{count}", () => String(count));
+}
+
+/** The rewrite line's state: the count `rewriteLineFor` reads, and how many
+ * writes rewrote an expression. The line's text node is keyed on `write`. */
+export interface RewriteLineState {
+  count: number | undefined;
+  write: number;
+}
+
+/**
+ * The rewrite line after a write that rewrote `rewrote` expressions. A write
+ * that rewrote none leaves the state as it was. Any other write takes a new
+ * `write`, so the line's text node is replaced and a screen reader announces
+ * a second write with the same count too.
+ */
+export function nextRewriteLine(state: RewriteLineState, rewrote: number): RewriteLineState {
+  if (rewrote < 1) return state;
+  return { count: rewrote, write: state.write + 1 };
 }
 
 /** The id a field's key notice takes, so its key input names it in `aria-describedby`. */

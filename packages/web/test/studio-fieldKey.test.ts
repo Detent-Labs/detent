@@ -9,6 +9,8 @@ import {
   isFieldKeyLocked,
   keyCommitProblem,
   keyFollowsLabel,
+  keyHolderName,
+  keyRefusalFor,
   labelChangePatch,
   takenFieldKeys,
 } from "../src/areas/studio/panels/fieldCatalogLogic.js";
@@ -359,6 +361,72 @@ describe("keyCommitProblem", () => {
   it("answers undefined for a free key, and for the field's own key", () => {
     expect(keyCommitProblem(d, amount(), "total_due")).toBeUndefined();
     expect(keyCommitProblem(d, amount(), "amount")).toBeUndefined();
+  });
+});
+
+describe("The taken refusal names the field that holds the key", () => {
+  const holderDraft = (label: Record<string, string>) =>
+    draftOf([amountField(), { id: "field_status", key: "status", type: "string", label }]);
+
+  it("names it by its label at the content locale", () => {
+    const d = holderDraft({ en: "Status", de: "Stand" });
+    expect(keyRefusalFor("taken", keyHolderName(d, fieldIn(d, "field_amount"), "status", "de"))).toBe("Stand already uses this key.");
+  });
+
+  it("falls back to the base locale, then to (unnamed field)", () => {
+    const d = holderDraft({ en: "Status" });
+    expect(keyHolderName(d, fieldIn(d, "field_amount"), "status", "de")).toBe("Status");
+    const unnamed = holderDraft({ en: "" });
+    expect(keyRefusalFor("taken", keyHolderName(unnamed, fieldIn(unnamed, "field_amount"), "status", "en"))).toBe(
+      "(unnamed field) already uses this key.",
+    );
+  });
+
+  it("finds a holder nested in a group, and none for a free key", () => {
+    const d = draftOf([
+      amountField(),
+      { id: "field_group", key: "items", type: "group", label: { en: "Items" }, fields: [{ id: "field_qty", key: "qty", type: "number", label: { en: "Quantity" } }] },
+    ]);
+    expect(keyHolderName(d, fieldIn(d, "field_amount"), "qty", "en")).toBe("Quantity");
+    expect(keyHolderName(d, fieldIn(d, "field_amount"), "free", "en")).toBe("");
+  });
+});
+
+// The guarantee a label typed one keystroke at a time rests on: the key steps
+// past a key only an expression reads and past a CEL literal word, so no
+// keystroke captures another expression, and the field's own guard follows
+// every keystroke.
+describe("Typing a label one keystroke at a time captures no expression", () => {
+  const dangling = (d: Draft) => (d.workflow as unknown as { steps: { view: { fields: { visible: Guard }[] } }[] }).steps[0]!.view.fields[0]!.visible.src;
+
+  const typeAndWatch = (label: string, danglingSrc: string) => {
+    const d = draftOf([amountField()], "data.amount > 1000.0", [{ ref: "field_amount", visible: cel(danglingSrc) }]);
+    const keys: string[] = [];
+    for (let n = 1; n <= label.length; n++) {
+      writeFieldLabel(d, "field_amount", { en: label.slice(0, n) }, "en", new Set());
+      const key = fieldIn(d, "field_amount").key!;
+      keys.push(key);
+      expect(guardOf(d)).toBe(`data.${key} > 1000.0`);
+      expect(dangling(d)).toBe(danglingSrc);
+    }
+    return keys;
+  };
+
+  it("passes a key only an expression reads, keystroke by keystroke", () => {
+    const keys = typeAndWatch("Total amount", "data.total > 5.0");
+
+    expect(keys).not.toContain("total");
+    expect(keys).toContain("total_2");
+    expect(keys.at(-1)).toBe("total_amount");
+  });
+
+  it("passes a CEL literal word, keystroke by keystroke", () => {
+    const keys = typeAndWatch("Inbound", "data.inb > 5.0");
+
+    expect(keys).not.toContain("in");
+    expect(keys).toContain("in_2");
+    expect(keys).not.toContain("inb");
+    expect(keys.at(-1)).toBe("inbound");
   });
 });
 

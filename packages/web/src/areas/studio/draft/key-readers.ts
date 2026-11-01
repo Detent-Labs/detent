@@ -65,10 +65,11 @@ export function keyReader(keys: readonly string[]): (src: string) => boolean {
  * decides which reads count, as in `keyReader`. Only the name's own characters
  * change, the last `from.length` of the member node's range, so spacing and
  * parentheses stay as written. A range whose slice is not `from` stays.
- * Source that fails to parse changes by the text match `keyReader` uses.
+ * Source that fails to parse changes by the text match `keyReader` uses. An
+ * empty `from` or `to`, or a `to` equal to `from`, answers `src` as it is.
  */
 export function rewriteFieldRead(src: string, from: string, to: string): string {
-  if (from === "" || from === to) return src;
+  if (from === "" || to === "" || from === to) return src;
   const ast = parseAst(src);
   if (!ast || !isCelNode(ast)) {
     return src.replace(new RegExp(textReadSource(from), "g"), () => `data.${to}`);
@@ -132,10 +133,10 @@ export function countKeyReaders(draft: Draft, key: string): number {
 }
 
 /** The expressions a move of `fieldId`'s key from `from` to `to` rewrites,
- * each with its new source. Empty under `rewriteKeyReaders`'s three refusals. */
+ * each with its new source. Empty under `rewriteKeyReaders`'s refusals. */
 function rewritePlan(draft: Draft, fieldId: string, from: string, to: string): { site: KeyReaderSite; next: string }[] {
   if (from === "" || to === "" || from === to) return [];
-  if (draftFields(draft).some((field) => field.id !== fieldId && field.key === from)) return [];
+  if (draftFields(draft).some((field) => field.id !== fieldId && (field.key === from || field.key === to))) return [];
   return keyReaderSites(draft, from)
     .map((site) => ({ site, next: rewriteFieldRead(site.src, from, to) }))
     .filter(({ site, next }) => next !== site.src);
@@ -145,7 +146,9 @@ function rewritePlan(draft: Draft, fieldId: string, from: string, to: string): {
  * Moves every expression in `draft` that reads `data.<from>` onto
  * `data.<to>`, in place, and answers how many changed. While a field other
  * than `fieldId` carries `from`, the readers may be that field's, so nothing
- * changes and the answer is 0. An empty `from` or `to` changes nothing.
+ * changes and the answer is 0. While a field other than `fieldId` carries
+ * `to`, the move would merge two fields' readers, so nothing changes either.
+ * An empty `from` or `to` changes nothing.
  */
 export function rewriteKeyReaders(draft: Draft, fieldId: string, from: string, to: string): number {
   const plan = rewritePlan(draft, fieldId, from, to);

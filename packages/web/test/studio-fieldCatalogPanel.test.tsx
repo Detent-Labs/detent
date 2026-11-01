@@ -17,9 +17,11 @@ import {
   fieldKeyNoticeId,
   fieldLabelInputId,
   isFieldKeyLocked,
+  keyHolderName,
   keyInputStep,
   keyNoticeFor,
   keyRefusalFor,
+  nextRewriteLine,
   type KeyCommitProblem,
   type KeyInputEvent,
   labelChangePatch,
@@ -583,13 +585,13 @@ describe("a key commit in the field catalog", () => {
 
   const refused: [string, string, string][] = [
     ["true", "literal", "Conditions read this word as a value. Pick another key."],
-    ["Total Amount", "grammar", "A key starts with a letter or _ and holds only lower-case letters, digits and _."],
-    ["status", "taken", "Another field already uses this key."],
+    ["Total Amount", "grammar", "A key starts with a letter or an underscore and holds only lower-case letters, digits and underscores."],
+    ["status", "taken", "Status already uses this key."],
     ["", "empty", "Type a key, or press Escape to keep the current one."],
   ];
   for (const [typed, problem, sentence] of refused) {
     it(`refuses ${JSON.stringify(typed)}, keeps the typed text and leaves the draft as it was`, () => {
-      const draft = stepDraft([amount(), fld("field_status", "status")], "data.amount > 1000.0");
+      const draft = stepDraft([amount(), fld("field_status", "status", { label: { en: "Status" } })], "data.amount > 1000.0");
       const before = structuredClone(draft);
       const { mutate, calls } = applyingMutate(draft);
       const result = commitKeyInput(draft, mutate, fieldOf(draft, "field_amount"), typed);
@@ -597,7 +599,7 @@ describe("a key commit in the field catalog", () => {
       expect(result).toEqual({ typed, problem: problem as KeyCommitProblem, wrote: false, rewrote: 0 });
       expect(calls()).toBe(0);
       expect(draft).toEqual(before);
-      expect(keyRefusalFor(result.problem!)).toBe(sentence);
+      expect(keyRefusalFor(result.problem!, keyHolderName(draft, fieldOf(draft, "field_amount"), typed, "en"))).toBe(sentence);
     });
   }
 
@@ -638,8 +640,53 @@ describe("rewriteLineFor", () => {
   });
 
   it("keeps the line when a write rewrote nothing", () => {
-    const keep = source.slice(source.indexOf("const noteRewrites = "), source.indexOf("};", source.indexOf("const noteRewrites = ")));
-    expect(keep).toContain("if (rewrote > 0) setRewritten(rewrote);");
+    const shown = nextRewriteLine({ count: undefined, write: 0 }, 2);
+    expect(nextRewriteLine(shown, 0)).toBe(shown);
+    expect(source).toContain("const noteRewrites = (rewrote: number) => setRewriteLine((state) => nextRewriteLine(state, rewrote));");
+  });
+
+  // A screen reader announces a live region's change. The same count twice
+  // changes no text, so the text node is keyed on the write and replaced.
+  it("takes a new write for a second rewrite with the same count, and keys the line's text on it", () => {
+    const first = nextRewriteLine({ count: undefined, write: 0 }, 1);
+    const second = nextRewriteLine(first, 1);
+
+    expect(first).toEqual({ count: 1, write: 1 });
+    expect(second).toEqual({ count: 1, write: 2 });
+    expect(source).toContain("<span key={rewriteLine.write}>{rewriteLineFor(rewriteLine.count)}</span>");
+  });
+});
+
+/** One compiled style's body in `FieldCatalogPanel.tsx`, from its name to its close. */
+const panelRule = (name: string) => {
+  const start = source.indexOf(`  ${name}: {`);
+  expect(start).toBeGreaterThan(-1);
+  return source.slice(start, source.indexOf("\n  },", start));
+};
+
+describe("the key's notes and refusal", () => {
+  const keyInputSource = () => source.slice(source.indexOf("function FieldKeyInput("), source.indexOf("/**\n * Applies a kind switch"));
+
+  it("announces a refusal as an alert, in the warning callout", () => {
+    expect(keyInputSource()).toContain('<p id={refusalId} role="alert" {...stylex.props(styles.studioWarning, styles.studioRefusalAtInput)}>');
+  });
+
+  it("prints the key notice as a plain muted note, with no advisory rule", () => {
+    expect(keyInputSource()).toContain("<p id={noticeId} {...stylex.props(styles.studioNote)}>");
+    expect(panelRule("studioNote")).not.toContain("borderLeft");
+  });
+
+  it("puts space under the rewrite line, so it reads with the label above", () => {
+    expect(panelRule("rewriteLineShown")).toContain("marginBlockEnd: space.s2");
+  });
+
+  it("gives the field editor's Developer views the condition input's summary look", () => {
+    const summary = panelRule("studioDevviewSummary");
+    expect(summary).toContain("fontSize: 11");
+    expect(summary).toContain('textTransform: "uppercase"');
+    expect(summary).toContain('letterSpacing: "0.1em"');
+    expect(summary).not.toContain("fonts.mono");
+    expect(panelRule("studioDevview")).toContain("borderTopWidth: 1");
   });
 });
 
@@ -817,10 +864,10 @@ describe("the field editor's Developer view and key input", () => {
   it("points the input at a refusal and the notice, and marks it invalid while a refusal shows", () => {
     const commit = source.slice(source.indexOf("function FieldKeyInput("), source.indexOf("/**\n * Applies a kind switch"));
 
-    expect(commit).toContain("aria-invalid={problem !== undefined ? true : undefined}");
+    expect(commit).toContain("aria-invalid={refusal !== undefined ? true : undefined}");
     expect(commit).toContain("const describedBy = [refusalId, noticeId]");
     const typing = commit.slice(commit.indexOf("onChange={(e) =>"), commit.indexOf("onBlur={commit}"));
-    expect(typing).toContain("setProblem(undefined);");
+    expect(typing).toContain("setRefusal(undefined);");
     expect(commit).toContain('{ kind: "escape" }');
   });
 
@@ -994,7 +1041,7 @@ describe("the field editor's \"Read by\" zone", () => {
     const html = zone(render(draftOf([amount()], ["data.amount > 1000.0"])));
 
     expect(html).toContain("<li");
-    expect(html).toContain(">Way out Approve → Book<");
+    expect(html).toContain(">On Review: way out Approve → Book<");
     expect(html).toContain(">Amount is greater than 1,000.<");
   });
 

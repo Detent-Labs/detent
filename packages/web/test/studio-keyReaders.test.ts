@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { FieldId } from "workflow-engine/schema";
-import { countKeyReaders, keyReaderSites, readKeys, rewriteFieldRead, rewriteKeyReaders } from "../src/areas/studio/draft/key-readers";
+import { countKeyReaders, countKeyRewrites, keyReaderSites, readKeys, rewriteFieldRead, rewriteKeyReaders } from "../src/areas/studio/draft/key-readers";
 import type { Draft } from "../src/areas/studio/draft/types";
 
 // The expressions that read `data.<key>`, anywhere in the draft. One
@@ -155,6 +155,12 @@ describe("rewriteFieldRead", () => {
     );
   });
 
+  it("answers the source as it is for an empty new key or the same key", () => {
+    expect(rewriteFieldRead("data.amount > 1.0", "amount", "")).toBe("data.amount > 1.0");
+    expect(rewriteFieldRead("data.amount >", "amount", "")).toBe("data.amount >");
+    expect(rewriteFieldRead("data.amount > 1.0", "amount", "amount")).toBe("data.amount > 1.0");
+  });
+
   it("changes a key into a longer and a shorter one alike", () => {
     expect(rewriteFieldRead("data.a > 1.0 && data.a < 9.0", "a", "amount_total")).toBe("data.amount_total > 1.0 && data.amount_total < 9.0");
     expect(rewriteFieldRead("data.amount_total > 1.0 && data.amount_total < 9.0", "amount_total", "a")).toBe("data.a > 1.0 && data.a < 9.0");
@@ -221,6 +227,16 @@ describe("rewriteKeyReaders", () => {
     const before = JSON.stringify(draft);
 
     expect(rewriteKeyReaders(draft, "fld_amount", "amount", "total")).toBe(0);
+    expect(JSON.stringify(draft)).toBe(before);
+  });
+
+  it("writes nothing and answers 0 while another field carries the new key", () => {
+    const draft = everyReader();
+    (draft as unknown as { fields: unknown[] }).fields.push({ id: "fld_total", key: "total", label: { en: "Total" }, type: "number" });
+    const before = JSON.stringify(draft);
+
+    expect(rewriteKeyReaders(draft, "fld_amount", "amount", "total")).toBe(0);
+    expect(countKeyRewrites(draft, "fld_amount", "amount", "total")).toBe(0);
     expect(JSON.stringify(draft)).toBe(before);
   });
 

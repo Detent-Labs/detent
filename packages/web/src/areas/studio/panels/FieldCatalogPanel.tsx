@@ -39,15 +39,18 @@ import {
   fieldLabelInputId,
   keyCommitProblem,
   keyFollowsLabel,
+  keyHolderName,
   keyInputStep,
   keyNoticeFor,
   keyRefusalFor,
   labelChangePatch,
   moveControlId,
   moveTargetsFor,
+  nextRewriteLine,
   removeControlId,
   rewriteLineFor,
   type KeyCommitProblem,
+  type RewriteLineState,
 } from "./fieldCatalogLogic.js";
 import { fieldCheckZone, namesFieldKey, type FieldCheckZone } from "./fieldCheckZone.js";
 import { fieldKindLabel } from "../draft/field-type-labels";
@@ -364,18 +367,6 @@ const styles = stylex.create({
     borderLeftColor: colors.advisory,
     paddingLeft: space.s2,
   },
-  // The key notice says where the key comes from: an advisory, not a
-  // refusal. It keeps the advisory rule, reads in muted ink and sits close
-  // under the Key input.
-  studioNotice: {
-    color: colors.textMuted,
-    borderLeftWidth: 3,
-    borderLeftStyle: "solid",
-    borderLeftColor: colors.advisory,
-    paddingLeft: space.s2,
-    marginBlockStart: space.s1,
-    marginBlockEnd: 0,
-  },
   // A refused key commit's sentence, close under the Key input.
   studioRefusalAtInput: {
     marginBlockStart: space.s1,
@@ -388,6 +379,7 @@ const styles = stylex.create({
   },
   rewriteLineShown: {
     marginBlockStart: space.s1,
+    marginBlockEnd: space.s2,
   },
   // The stale-column warning takes the whole line under the row instead of
   // squeezing beside three controls.
@@ -402,20 +394,22 @@ const styles = stylex.create({
     marginBlockStart: 0,
     marginInline: 0,
   },
+  // The condition input's Developer view (`shared/ConditionInput.tsx`),
+  // duplicated: an area's component never reads another component's style
+  // object. One look for every Developer view in the field editor.
   studioDevview: {
+    paddingBlock: space.s2,
     marginBlock: space.s2,
-    marginInline: 0,
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: colors.border,
-    paddingBlock: space.s1,
-    paddingInline: space.s2,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
   },
   studioDevviewSummary: {
     cursor: "pointer",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
     color: colors.textMuted,
-    fontFamily: fonts.mono,
-    fontSize: "0.85rem",
   },
 });
 
@@ -476,7 +470,8 @@ export function writeLabelFromCatalog(
   const fieldId = field.id;
   if (fieldId === undefined) return 0;
   const key = field.type === "group" ? undefined : labelChangePatch(draft, field, label, baseLocale, published).key;
-  const rewrote = key === undefined ? 0 : countKeyRewrites(draft, fieldId, field.key ?? "", key);
+  const current = field.key ?? "";
+  const rewrote = key === undefined || key === current ? 0 : countKeyRewrites(draft, fieldId, current, key);
   mutate((d) => writeFieldLabel(d, fieldId, label, baseLocale, published));
   return rewrote;
 }
@@ -501,18 +496,24 @@ interface FieldKeyInputProps {
  * input names both in `aria-describedby`.
  */
 function FieldKeyInput({ field, notice, onCommitted }: FieldKeyInputProps) {
-  const { draft, mutate } = useDraft();
+  const { draft, mutate, contentLocale } = useDraft();
   const [typed, setTyped] = useState<string | undefined>(undefined);
-  const [problem, setProblem] = useState<KeyCommitProblem | undefined>(undefined);
+  // The refused commit's sentence, fixed at the commit, so the field it names
+  // stays the one that held the key then.
+  const [refusal, setRefusal] = useState<string | undefined>(undefined);
   const currentKey = field.key ?? "";
   const fieldId = field.id;
   const commit = () => {
     const result = commitKeyInput(draft, mutate, field, typed);
     setTyped(result.typed);
-    setProblem(result.problem);
+    setRefusal(
+      result.problem === undefined
+        ? undefined
+        : keyRefusalFor(result.problem, keyHolderName(draft, field, result.typed ?? "", contentLocale)),
+    );
     if (result.wrote) onCommitted(result.rewrote);
   };
-  const refusalId = problem !== undefined && fieldId !== undefined ? fieldKeyRefusalId(fieldId) : undefined;
+  const refusalId = refusal !== undefined && fieldId !== undefined ? fieldKeyRefusalId(fieldId) : undefined;
   const noticeId = notice !== undefined && fieldId !== undefined ? fieldKeyNoticeId(fieldId) : undefined;
   const describedBy = [refusalId, noticeId].filter((id) => id !== undefined).join(" ");
   return (
@@ -526,29 +527,31 @@ function FieldKeyInput({ field, notice, onCommitted }: FieldKeyInputProps) {
           translate="no"
           {...stylex.props(styles.studioMono)}
           value={typed ?? currentKey}
-          aria-invalid={problem !== undefined ? true : undefined}
+          aria-invalid={refusal !== undefined ? true : undefined}
           aria-describedby={describedBy === "" ? undefined : describedBy}
           onChange={(e) => {
-            setProblem(undefined);
+            setRefusal(undefined);
             setTyped(keyInputStep(typed, { kind: "type", text: e.target.value }, currentKey).typed);
           }}
           onBlur={commit}
           onKeyDown={(e) => {
             if (e.key === "Enter") commit();
             if (e.key === "Escape") {
-              setProblem(undefined);
+              setRefusal(undefined);
               setTyped(keyInputStep(typed, { kind: "escape" }, currentKey).typed);
             }
           }}
         />
       </label>
-      {problem !== undefined && (
-        <p id={refusalId} {...stylex.props(styles.studioWarning, styles.studioRefusalAtInput)}>
-          {keyRefusalFor(problem)}
+      {/* `role="alert"`: a refusal shows on Enter or on a blur commit, after
+          focus may have left the input, so it announces itself. */}
+      {refusal !== undefined && (
+        <p id={refusalId} role="alert" {...stylex.props(styles.studioWarning, styles.studioRefusalAtInput)}>
+          {refusal}
         </p>
       )}
       {notice !== undefined && (
-        <p id={noticeId} {...stylex.props(styles.studioNotice)}>
+        <p id={noticeId} {...stylex.props(styles.studioNote)}>
           {notice}
         </p>
       )}
@@ -774,13 +777,12 @@ function FieldEditor({
   const { draft, mutate, contentLocale, validation } = useDraft();
   const published = usePublishedFieldIds();
 
-  // How many expressions the last key change rewrote, while one rewrote any.
+  // How many expressions the last key change rewrote, while one rewrote any,
+  // and how many writes rewrote one (`nextRewriteLine`).
   // `FieldCatalogPanel` mounts this editor once per field id, so another
   // field opens with none.
-  const [rewritten, setRewritten] = useState<number | undefined>(undefined);
-  const noteRewrites = (rewrote: number) => {
-    if (rewrote > 0) setRewritten(rewrote);
-  };
+  const [rewriteLine, setRewriteLine] = useState<RewriteLineState>({ count: undefined, write: 0 });
+  const noteRewrites = (rewrote: number) => setRewriteLine((state) => nextRewriteLine(state, rewrote));
 
   // How many times the definition half has been written since this field was
   // selected. It rides in the usage rows' React key, so each write remounts
@@ -946,8 +948,11 @@ function FieldEditor({
                     : t("fieldCatalog.translationGap").replace("{count}", String(fieldLocaleGaps(field, contentLocale, baseLocale)))}
               </span>
             </div>
-            <p role="status" aria-live="polite" {...stylex.props(styles.rewriteLine, rewritten !== undefined && styles.rewriteLineShown)}>
-              {rewriteLineFor(rewritten)}
+            {/* The region always stands; its text sits in a child keyed on the
+                write, so each rewrite replaces the text node and announces,
+                the same count again included. */}
+            <p role="status" aria-live="polite" {...stylex.props(styles.rewriteLine, rewriteLine.count !== undefined && styles.rewriteLineShown)}>
+              {rewriteLine.count !== undefined && <span key={rewriteLine.write}>{rewriteLineFor(rewriteLine.count)}</span>}
             </p>
             {missingTranslationWarning(field.label, contentLocale, draft.baseLocale) && (
               <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>

@@ -45,8 +45,8 @@ function endsAs(path: Path, at: number, tail: readonly (string | number)[]): boo
 /**
  * Turns every expression in `draft` that reads `data.<key>` into a row. A
  * step reads `stepText`, a way out reads `wayOutHeading` over the maps the
- * step page builds, and a field reads its label at `contentLocale`, else the
- * base locale, else "(unnamed field)".
+ * step page builds, after the step it leaves, and a field reads its label at
+ * `contentLocale`, else the base locale, else "(unnamed field)".
  */
 export function readByRows(draft: Draft, key: string, contentLocale: string): ReadByRow[] {
   const sites = keyReaderSites(draft, key);
@@ -69,7 +69,7 @@ export function readByRows(draft: Draft, key: string, contentLocale: string): Re
     if (section === "paths" && typeof index === "number" && endsAs(rest, 2, ["guard"])) {
       const path = step.paths?.[index];
       const wayOut = path ? wayOutHeading(path, stepTexts, plainTexts) : t("paths.unnamedPath");
-      return { key: "readBy.wayOut", slots: { wayOut }, condition: true };
+      return { key: "readBy.wayOut", slots: { ...onStep, wayOut }, condition: true };
     }
 
     if (section === "view" && index === "fields" && typeof rest[2] === "number") {

@@ -92,7 +92,7 @@ describe("readByRows", () => {
       "When Review shows a note",
       "Another rule on Review",
       "The time limit on Review",
-      "Way out Approve → Book",
+      "On Review: way out Approve → Book",
       "Values passed to the called process on Check credit",
       "Values copied back from the called process on Check credit",
       "Another rule in this process",
@@ -111,13 +111,36 @@ describe("readByRows", () => {
       "When Note is read-only on Review",
       "The rule for Note on Review",
       "When Review shows a note",
-      "Way out Approve → Book",
+      "On Review: way out Approve → Book",
     ]);
   });
 
   it("reads a guard as its way out and its sentence", () => {
-    const row = readByRows(everyPlace(), "amount", "en").find((r) => r.place.startsWith("Way out"));
-    expect(row).toEqual({ place: "Way out Approve → Book", sentence: "Amount is greater than 1,000." });
+    const row = readByRows(everyPlace(), "amount", "en").find((r) => r.place.startsWith("On Review: way out"));
+    expect(row).toEqual({ place: "On Review: way out Approve → Book", sentence: "Amount is greater than 1,000." });
+  });
+
+  it("names the step a way out leaves, so two steps' like-named way outs read apart", () => {
+    const leave = (id: string, label: string) => ({
+      id,
+      key: id,
+      label: { en: label },
+      type: "task",
+      paths: [{ id: `path_${id}`, key: "p", label: "Approve", to: "step_done", trigger: "automatic", priority: 0, guard: cel("data.amount > 1.0") }],
+    });
+    const draft = {
+      baseLocale: "en",
+      fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+      workflow: {
+        initialStep: "step_a",
+        steps: [leave("step_a", "Review"), leave("step_b", "Audit"), { id: "step_done", key: "done", label: { en: "Done" }, type: "task" }],
+      },
+    } as unknown as Draft;
+
+    expect(readByRows(draft, "amount", "en").map((r) => r.place)).toEqual([
+      "On Review: way out Approve → Done",
+      "On Audit: way out Approve → Done",
+    ]);
   });
 
   it("names the step and the field of a form condition", () => {
@@ -140,7 +163,7 @@ describe("readByRows", () => {
   it("reads source that does not parse as a hand-written rule", () => {
     const draft = everyPlace();
     (draft.workflow!.steps![0]!.paths![0]!.guard as { src: string }).src = "data.amount >";
-    const row = readByRows(draft, "amount", "en").find((r) => r.place.startsWith("Way out"));
+    const row = readByRows(draft, "amount", "en").find((r) => r.place.startsWith("On Review: way out"));
     expect(row?.sentence).toBe("A hand-written rule.");
   });
 
