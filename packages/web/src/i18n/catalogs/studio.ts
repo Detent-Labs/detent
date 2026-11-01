@@ -265,6 +265,7 @@ export const en = {
   "instanceQuery.duplicateColumnKey": "An earlier row already uses this column key, so this row is not saved.",
 
   "steps.unnamedStep": "(unnamed step)",
+  "options.repeatedLabel": "{label} ({n})",
   "steps.crossProcessLegend": "cross-process check (checkSubprocessChildRefs)",
   "steps.crossProcessChecked": "checked against loaded child —",
   "steps.unload": "unload",
@@ -468,7 +469,6 @@ export const en = {
   "condition.celCaption": "CEL",
   // The operand picker's entries and headings.
   "condition.unnamedField": "(unnamed field)",
-  "condition.duplicateLabel": "{label} ({n})",
   "condition.operand.caseStatus": "The case's status",
   "condition.operand.personRoles": "The person's roles",
   "condition.operand.childOutcome": "How the called process ended",
