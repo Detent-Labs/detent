@@ -286,9 +286,20 @@ const styles = stylex.create({
   },
   // The open header takes the current mark the steps rail's current row
   // draws (`DESIGN.md`'s Shapes). Picked in code from the same flag that
-  // sets `aria-expanded`.
+  // sets `aria-expanded`. The header's text stands flush left, so the mark
+  // stands in the page's inline padding instead of over the name: `left`
+  // mirrors the `page` style's `paddingInline`, and the header's own
+  // `position: relative` anchors it.
   sectionHeaderOpen: {
-    boxShadow: `inset 3px 0 0 ${colors.accent}`,
+    "::before": {
+      content: '""',
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: `calc(-1 * max(${space.s3}, ${focus.reach}))`,
+      width: 3,
+      backgroundColor: colors.accent,
+    },
   },
   // The Legend style (`DESIGN.md`'s Typography).
   sectionName: {

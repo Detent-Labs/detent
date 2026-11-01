@@ -322,10 +322,14 @@ describe("The open section header", () => {
     expect(all.filter((s) => s.button.includes("sectionHeaderOpen"))).toHaveLength(1);
   });
 
-  it("draws the current mark as the steps rail's 3px accent rule", () => {
+  it("draws the current mark as a 3px accent rule in the page's inline padding", () => {
     const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
+    const open = /sectionHeaderOpen: \{\s*"::before": \{([\s\S]*?)\n {4}\},/.exec(source);
 
-    expect(source).toMatch(/sectionHeaderOpen: \{\s*boxShadow: `inset 3px 0 0 \$\{colors\.accent\}`,\s*\}/);
+    expect(open).not.toBeNull();
+    expect(open![1]).toContain("width: 3,");
+    expect(open![1]).toContain("backgroundColor: colors.accent,");
+    expect(open![1]).toContain("left: `calc(-1 * max(${space.s3}, ${focus.reach}))`,");
     expect(source).toMatch(/sectionNameOpen: \{\s*color: colors\.text,\s*\}/);
   });
 });
