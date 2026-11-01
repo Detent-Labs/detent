@@ -96,7 +96,7 @@ The module exports `checkPlace(body, issue)`, and D7's landing reads it first. A
 
 **The field slot on a form issue.** On a view entry, the field slot reads the entry's `ref`. A note's check answers `checks.form.general`.
 
-**One rule reads its section from the draft.** "Action output targets unknown field" names no action in its location. An exported helper in `panels/sectionIssues.ts` reads the field id from the message. It finds the action whose `output` holds that id, across the step's five positions, and answers that action's section. `sectionOfIssue` and `checkPlace` both call it. The sentence, the header's count and the landing therefore agree.
+**One rule reads its section from the draft.** "Action output targets unknown field" names no action in its location. An exported helper in `panels/sectionIssues.ts` reads the field id from the message. It finds the action whose `output` holds that id, across the step's five positions. It answers that action's section. `sectionOfIssue` and `checkPlace` both call it. The sentence, the header's count and the landing therefore agree.
 
 A rule names the section it expects. Where the step's kind lacks that section, the sentence falls to tier 4's step form, which prints no section.
 
@@ -279,11 +279,17 @@ The rail's frame keeps its box. Inside, a column caps at 52rem. A group's headin
 
 **Mechanics.** `EditScreen` holds `sectionRequest`, `{ stepId, section }`, passed to `StepPage`. An effect in `StepPage` opens that section when the ids match, then calls `onSectionOpened`, which clears the request. This is the shape `openMoreFor` already has.
 
-`openTabFromRow` keeps its Read by callers and their focus on the tab. A new `fixCheck(target)` adds the landing. `pendingFocus`, `{ tab, elementId? }`, replaces `pendingTabFocus`, and its three writers move with it. The effect keys on `[openTab, pendingFocus]`. It acts only while `pendingFocus.tab === openTab`. It focuses the element when one exists, else the tab button, then clears. `fixCheck` sets `jsonOpen` and `pendingFocus` in one batch. A Fix on an open tab and Add a step therefore land too. A target with a `fieldId` or `dataSourceId` sets no `pendingFocus`, since `fixRequest` owns that focus.
+`openTabFromRow` keeps its Read by callers and their focus on the tab. A new `fixCheck(target)` adds the landing. `pendingFocus`, `{ tab, elementId? }`, replaces `pendingTabFocus`, and its three writers move with it.
 
-`EntityTabs` selects a Fields target through a `fixRequest` prop, because selection lives there. `FieldsTabViews` passes it down. Its effect waits for `visible`, selects, and opens More. A second pass focuses the anchor once the card reads the selected field, then calls `onFixLanded`, which clears the request. A return to the tab therefore pulls no focus.
+The effect keys on `[openTab, pendingFocus]`. It acts only while `pendingFocus.tab === openTab`. It focuses the element when one exists, else the tab button, then clears. `fixCheck` sets `jsonOpen` and `pendingFocus` in one batch. A Fix on an open tab and Add a step therefore land too. A target with a `fieldId` or `dataSourceId` sets no `pendingFocus`, since `fixRequest` owns that focus.
 
-`IssueItems` gains `anchorId`, which sets `id` and `tabIndex={-1}` on the list, and `IssueList` forwards it. Anchors read `check-anchor-field-<zone>` and `check-anchor-source`. The unplaced checks share the `asks` anchor. A new `namesFieldSource(loc)` joins `moreChecked`. A removed source's check therefore opens More, where its select stands. The focus pass tries the zone's anchor, then the `asks` anchor. A `values` check on a card with no Choices stands there.
+`EntityTabs` selects a Fields target through a `fixRequest` prop, because selection lives there. `FieldsTabViews` passes it down.
+
+Its effect waits for `visible`, selects, and opens More. A second pass focuses the anchor once the card reads the selected field, then calls `onFixLanded`, which clears the request. A return to the tab therefore pulls no focus.
+
+`IssueItems` gains `anchorId`, which sets `id` and `tabIndex={-1}` on the list, and `IssueList` forwards it. Anchors read `check-anchor-field-<zone>` and `check-anchor-source`. The unplaced checks share the `asks` anchor.
+
+A new `namesFieldSource(loc)` joins `moreChecked`. A removed source's check therefore opens More, where its select stands. The focus pass tries the zone's anchor, then the `asks` anchor. A `values` check on a card with no Choices stands there.
 
 The ids `step-page-name`, `process-header-name` and `json-surface-input` are new, each set on the existing input.
 
