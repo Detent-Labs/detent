@@ -947,3 +947,89 @@ describe("the effect half's route to a step's form", () => {
     expect(html).not.toContain(ROUTE);
   });
 });
+
+// `studio-app`: "The field editor lists what reads the field" and "Read by
+// stands second in the effect half".
+describe("the field editor's \"Read by\" zone", () => {
+  const amount = (extra: object = {}) => fld("field_amount", "amount", { label: { en: "Amount" }, type: "number", ...extra });
+  const reviewStep = (guards: string[]) => ({
+    id: "step_review",
+    key: "review",
+    label: { en: "Review" },
+    type: "task",
+    paths: guards.map((src, i) => ({ id: `path_${i}`, key: `p${i}`, label: "Approve", to: "step_book", trigger: "automatic", priority: i, guard: cel(src) })),
+  });
+  const draftOf = (fields: DraftField[], guards: string[]): Draft =>
+    ({
+      baseLocale: "en",
+      fields,
+      workflow: {
+        initialStep: "step_review",
+        steps: [reviewStep(guards), { id: "step_book", key: "book", label: { en: "Book" }, type: "task" }],
+      },
+    }) as unknown as Draft;
+  const render = (draft: Draft, selectedId = "field_amount") =>
+    renderToStaticMarkup(
+      <DraftContext.Provider value={contextValue(draft)}>
+        <FieldCatalogPanel
+          token="test-token"
+          selectedId={selectedId}
+          onAdd={NOOP}
+          onRemove={NOOP}
+          onShowStep={NOOP}
+          onOpenForm={NOOP}
+          onMoveField={NOOP}
+        />
+      </DraftContext.Provider>,
+    );
+  /** The zone's markup, from its heading to the next zone's heading. */
+  const zone = (html: string): string => {
+    const at = html.indexOf(">Read by<");
+    expect(at).toBeGreaterThan(-1);
+    return html.slice(at, html.indexOf("<h4", at));
+  };
+  const effectHalf = (html: string) => html.slice(html.indexOf('aria-label="Where it acts in the process"'));
+
+  it("reads a guard as its way out and its sentence", () => {
+    const html = zone(render(draftOf([amount()], ["data.amount > 1000.0"])));
+
+    expect(html).toContain("<li");
+    expect(html).toContain(">Way out Approve → Book<");
+    expect(html).toContain(">Amount is greater than 1,000.<");
+  });
+
+  it("says so where nothing reads the field", () => {
+    const html = zone(render(draftOf([amount()], [])));
+
+    expect(html).toContain(">No condition reads this field.<");
+    expect(html).not.toContain("<li");
+  });
+
+  it("prints no CEL and no key over three readers", () => {
+    const html = zone(render(draftOf([amount()], ["data.amount > 1000.0", "data.amount < 5.0", "data.amount == 7.0"])));
+
+    expect(html.match(/<li/g)?.length).toBe(3);
+    expect(html).not.toContain("data.");
+    expect(html).not.toContain("amount");
+    expect(html).not.toContain("field_amount");
+  });
+
+  it("stands second in the effect half, after \"Used in\"", () => {
+    const half = effectHalf(render(draftOf([amount()], [])));
+    const headings = [...half.matchAll(/<h4[^>]*>([^<]*)<\/h4>/g)].map((m) => m[1]);
+
+    expect(headings.slice(0, 4)).toEqual(["Used in", "Read by", "Only ask this when", "Ask for this"]);
+  });
+
+  it("stands nowhere in a group's effect half", () => {
+    const html = render(draftOf([grp("field_g", "g", [amount()])], ["data.g == 1.0"]), "field_g");
+
+    expect(html).toContain(">Used in<");
+    expect(html).not.toContain(">Read by<");
+  });
+
+  it("memoizes its rows on the draft, the key and the locale", () => {
+    expect(source).toContain("readByRows(draft, fieldKey, contentLocale)");
+    expect(source).toContain("[draft, fieldKey, contentLocale, isGroup]");
+  });
+});

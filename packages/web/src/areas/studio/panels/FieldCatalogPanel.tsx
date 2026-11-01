@@ -1,4 +1,4 @@
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import {
   FIELD_KINDS,
@@ -66,6 +66,7 @@ import {
 } from "../draft/field-usage";
 import { previewViewFields } from "../draft/field-preview";
 import { ConditionInput } from "./shared/ConditionInput";
+import { readByRows } from "./readByRows";
 import type { EditorIssue } from "../draft/issues";
 
 type DraftField = DraftOf<FieldDef>;
@@ -179,6 +180,23 @@ const styles = stylex.create({
     flex: "1 1 8rem",
     minWidth: 0,
     overflowWrap: "anywhere",
+  },
+  // A "Read by" entry: the place, then the sentence under it. The same
+  // hairline and inline flush as a usage row, stacked in two lines.
+  readByItem: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s1,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    paddingBlock: space.s1,
+    paddingInline: 0,
+    overflowWrap: "anywhere",
+  },
+  readBySentence: {
+    color: colors.textMuted,
   },
   // The preview is a native `<details>`: the browser tracks open/closed as
   // DOM state, so no component state exists for it. Closed by default via
@@ -845,6 +863,12 @@ function FieldEditor({
           keyFollowsLabel(draft, field),
         );
   const usage = fieldId ? fieldUsage(draft, fieldId, contentLocale, baseLocale) : [];
+  const isGroup = field.type === "group";
+  const fieldKey = field.key ?? "";
+  const readBy = useMemo(
+    () => (isGroup ? [] : readByRows(draft, fieldKey, contentLocale)),
+    [draft, fieldKey, contentLocale, isGroup],
+  );
   const visibleState = fieldId ? fieldVisibleOverrides(draft, fieldId) : ({ kind: "none" } as const);
   const requiredState = fieldId ? fieldRequiredOverrides(draft, fieldId) : ({ kind: "none" } as const);
   const clearSteps = visibleClearSteps(visibleState);
@@ -864,7 +888,6 @@ function FieldEditor({
     mutate((d) => applyVisibleOverride(d, fieldId, next));
   };
 
-  const isGroup = field.type === "group";
   const technicalChecked = field.technical === true;
   const toggleTechnical = (next: boolean) => {
     if (fieldId === undefined) return;
@@ -1121,6 +1144,26 @@ function FieldEditor({
               </ul>
             )}
           </Zone>
+
+          {/* Every expression that reads the key, placed in the author's
+              words. A group holds no value of its own, so it has none. */}
+          {!isGroup && (
+            <Zone heading={t("fieldCatalog.readByHeading")} issues={[]} bordered>
+              {readBy.length === 0 ? (
+                <p {...stylex.props(styles.studioEmpty)}>{t("fieldCatalog.readByEmpty")}</p>
+              ) : (
+                <ul {...stylex.props(styles.usageList)}>
+                  {readBy.map((row, i) => (
+                    // Rows carry no identity of their own; draft order is theirs.
+                    <li key={i} {...stylex.props(styles.readByItem)}>
+                      <span>{row.place}</span>
+                      {row.sentence !== undefined && <span {...stylex.props(styles.readBySentence)}>{row.sentence}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Zone>
+          )}
 
           <Zone heading={t("fieldCatalog.onlyAskWhenHeading")} issues={[]} bordered>
             {visibleState.kind === "none" ? (
