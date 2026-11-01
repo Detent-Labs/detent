@@ -38,6 +38,8 @@ test("a refused publish shows its reason inside the dialog", async ({ page }) =>
   // A refusal with no location reads the fallback sentence; the server's text waits in a closed Developer view.
   await expect(dialog.getByRole("alert")).toContainText(FALLBACK);
   await expect(dialog.getByRole("alert")).not.toContainText(REFUSAL);
+  // Both controls disabled while the request ran, so the frame hands the focus back to Cancel.
+  await expect(dialog.getByRole("button", { name: "Cancel", exact: true })).toBeFocused();
   const detail = dialog.locator("details").filter({ hasText: REFUSAL });
   await expect(detail).not.toHaveAttribute("open", "");
   await detail.getByText("Developer view").click();

@@ -53,18 +53,18 @@
 
 ## 5. A real browser, and the docs (spa-accessibility)
 
-- [ ] 5.1 Add `e2e/dialog.e2e.ts`. On a dirty draft's Publish dialog, Tab repeatedly: `document.activeElement` stays inside the dialog. Click a fact's text and press Tab: it stays inside. Press the backdrop: the dialog stays. Press Escape: the Publish control holds the focus.
-- [ ] 5.1a In that file, press the back control on the dirty draft. "Leave this draft?" opens, Cancel keeps the draft, and the confirm leaves.
-- [ ] 5.1b In `e2e/publish.e2e.ts`'s refused flow, expect Cancel to hold the focus after the refusal.
-- [ ] 5.2 Run `sh scripts/dev-exec.sh bun run e2e` in the devcontainer. Install Chromium once if the pod lacks it. Expect every flow to pass.
-- [ ] 5.3 Rewrite the "Dialogs" entry in `DESIGN.md`, and its `design-language.md` mention, per D1 and D2. Its Hierarchy line says a dialog heading takes Headline as an `h2`.
-- [ ] 5.3a Add a `dialog` row to `.claude/rules/ui-glossary.md`, and add the import preview to its Developer view row. Narrow its sentence on a refused publish's Developer view to the Publish dialog and the banner.
-- [ ] 5.4 Update `docs/browser-checks.md`: the Tab and focus entries, and each hit of the pattern `native prompt|browser's confirm|accept the confirm|dialog-accept`. Admin's entries stay.
-- [ ] 5.4a Add an entry "One dialog form" there. It names what stays manual: the 420px gutter, the sticky footer at 1024 by 600, and the account menu's focus return.
-- [ ] 5.5 Move the closed entries of `docs/decisions.md` word for word to `docs/decisions-archive.md`. They are the keyboard hold, the presentation gaps, the six prompts, ACCORDION-17, HEADER-7, FIELDCARD-25, FIELDS-21, FIELDS-22 and NAMES-6.
-- [ ] 5.5a Narrow three entries to what stays. They are "The process list's literal strings", the `.btn-ghost` entry citing a dialog's Cancel, and HEADER-4. Record that `StepPage.tsx`'s two dialogs can still stand modal in a hidden tab body.
-- [ ] 5.6 Rewrite the comments that name the old hook or the native prompt: `git grep -n -E "useConfirmDialog|native prompt|browser's own confirm|counts each kind of reach" -- packages/web/src packages/web/test` prints nothing that states a stale fact.
-- [ ] 5.7 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
+- [x] 5.1 Add `e2e/dialog.e2e.ts`. On a dirty draft's Publish dialog, Tab repeatedly: `document.activeElement` stays inside the dialog. Click a fact's text and press Tab: it stays inside. Press the backdrop: the dialog stays. Press Escape: the Publish control holds the focus.
+- [x] 5.1a In that file, press the back control on the dirty draft. "Leave this draft?" opens, Cancel keeps the draft, and the confirm leaves.
+- [x] 5.1b In `e2e/publish.e2e.ts`'s refused flow, expect Cancel to hold the focus after the refusal.
+- [x] 5.2 Run `sh scripts/dev-exec.sh bun run e2e` in the devcontainer. Install Chromium once if the pod lacks it. Expect every flow to pass.
+- [x] 5.3 Rewrite the "Dialogs" entry in `DESIGN.md`, and its `design-language.md` mention, per D1 and D2. Its Hierarchy line says a dialog heading takes Headline as an `h2`.
+- [x] 5.3a Add a `dialog` row to `.claude/rules/ui-glossary.md`, and add the import preview to its Developer view row. Narrow its sentence on a refused publish's Developer view to the Publish dialog and the banner.
+- [x] 5.4 Update `docs/browser-checks.md`: the Tab and focus entries, and each hit of the pattern `native prompt|browser's confirm|accept the confirm|dialog-accept`. Admin's entries stay.
+- [x] 5.4a Add an entry "One dialog form" there. It names what stays manual: the 420px gutter, the sticky footer at 1024 by 600, and the account menu's focus return.
+- [x] 5.5 Move the closed entries of `docs/decisions.md` word for word to `docs/decisions-archive.md`. They are the keyboard hold, the presentation gaps, the six prompts, ACCORDION-17, HEADER-7, FIELDCARD-25, FIELDS-21, FIELDS-22 and NAMES-6.
+- [x] 5.5a Narrow three entries to what stays. They are "The process list's literal strings", the `.btn-ghost` entry citing a dialog's Cancel, and HEADER-4. Record that `StepPage.tsx`'s two dialogs can still stand modal in a hidden tab body.
+- [x] 5.6 Rewrite the comments that name the old hook or the native prompt: `git grep -n -E "useConfirmDialog|native prompt|browser's own confirm|counts each kind of reach" -- packages/web/src packages/web/test` prints nothing that states a stale fact.
+- [x] 5.7 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
 
 ## 6. Verification
 

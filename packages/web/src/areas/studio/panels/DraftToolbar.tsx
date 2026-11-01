@@ -93,12 +93,10 @@ export interface DraftToolbarActions {
  * menu today) never reimplements the logic itself.
  *
  * It raises no native browser prompt. Publish and discard each open the
- * application's own modal dialog instead: `publish()` and `discard()` only set
+ * studio's own dialog (`StudioDialog`): `publish()` and `discard()` only set
  * `pendingDialog`, and `resolveDialog(true)` runs the act the dialog named.
- * The native prompt carried neither the version a publish mints nor the rule
- * that a published version never changes, and it bypassed the design language
- * entirely. `packages/web/test/studio-no-confirm.test.ts` guards the
- * regression that would put it back.
+ * `packages/web/test/studio-no-confirm.test.ts` guards the studio area against
+ * a native `confirm()` call.
  */
 export function useDraftToolbarActions({
   processId,

@@ -329,7 +329,8 @@ them, and nothing else needs to.
 
 ### Hierarchy
 
-- **Headline** (800, 1.25rem, -0.015em): the `h1`. One per screen.
+- **Headline** (800, 1.25rem, -0.015em): the `h1`. One per screen. A dialog
+  heading takes it as an `h2`.
 - **Title** (800, 0.85rem, uppercase, 0.08em, slate): the `h2` section
   heading.
 - **Body** (400, 15px, 1.5): prose and control text. The reading column stays
@@ -581,9 +582,16 @@ the Legend style. A done one carries a check icon named Done.
 ### Dialogs
 
 - A native `<dialog>`: a 2px divider box on paper, 16px padding, at most 34rem
-  wide.
+  wide. At 420px a 16px gutter of page stays on each side.
 - It takes `shadow-lg` over a backdrop of black at 45%.
-- Its facts sit in a two-column grid, term then value.
+- The heading takes the Headline style as an `h2`, in the capitals the author
+  typed.
+- Facts sit in a two-column grid on one baseline, term then value. Below 30rem
+  they stack.
+- Notes follow the facts, in slate at 0.9rem.
+- The controls stand in a sticky footer under a 1px hairline. The confirm comes
+  first. Cancel comes last, outlined in ink, and takes the opening focus.
+- A long body scrolls under the footer, so the controls stay in view.
 
 ### Inputs / Fields
 
