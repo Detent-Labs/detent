@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { applyChoiceName, nextChoiceValue } from "../src/areas/studio/draft/choiceValue.js";
+import { applyChoiceName, applyChoiceValue, nextChoiceValue } from "../src/areas/studio/draft/choiceValue.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import { collectOptionValues } from "../src/areas/studio/draft/publishedFields.js";
 
@@ -134,6 +134,43 @@ describe("applyChoiceName", () => {
     applyChoiceName(f, 0, { en: "Under review" }, "en", false);
     expect(f.options![0]).toEqual({ value: "rv", label: { en: "Under review" } });
     expect(f.default).toBe("rv");
+  });
+});
+
+// A hand edit of a stored value in Choices' Developer view.
+describe("applyChoiceValue", () => {
+  it("writes the value and carries the field's default along", () => {
+    const f = field([{ value: "in_review", label: "In review" }], { default: "in_review" });
+    applyChoiceValue(f, 0, "reviewing");
+    expect(f.options?.[0]?.value).toBe("reviewing");
+    expect(f.default).toBe("reviewing");
+  });
+
+  it("rewrites the matching member of a list default", () => {
+    const f = field(
+      [
+        { value: "a", label: "A" },
+        { value: "b", label: "B" },
+      ],
+      { type: "list", default: ["a", "b"] } as Partial<DraftField>,
+    );
+    applyChoiceValue(f, 1, "bee");
+    expect(f.default).toEqual(["a", "bee"]);
+  });
+
+  it("leaves a default naming another choice, and an emptied value moves no default", () => {
+    const f = field(
+      [
+        { value: "open", label: "Open" },
+        { value: "closed", label: "Closed" },
+      ],
+      { default: "open" },
+    );
+    applyChoiceValue(f, 1, "shut");
+    expect(f.default).toBe("open");
+    applyChoiceValue(f, 0, "");
+    expect(f.options?.[0]?.value).toBe("");
+    expect(f.default).toBe("open");
   });
 });
 

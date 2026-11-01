@@ -49,13 +49,14 @@ export function assignmentStrategyLabel(type: AssignmentStrategyName): { name: s
 }
 
 /**
- * What the data source kind picker prints for one registered type. `db.list`
- * and `instance.query` take a plain name. A type the table misses prints its
+ * What the data source kind picker prints for one registered type. `db.list`,
+ * `instance.query` and `static` take a plain name. A type the table misses prints its
  * registry type, the fallback `assignmentWord` makes too.
  */
 export function dataSourceKindLabel(type: string): string {
   if (type === "db.list") return t("dataSourceKind.db.list");
   if (type === "instance.query") return t("dataSourceKind.instance.query");
+  if (type === "static") return t("dataSourceKind.static");
   return type;
 }
 

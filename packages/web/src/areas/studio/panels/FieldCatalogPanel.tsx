@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import {
   FIELD_KINDS,
@@ -14,7 +14,7 @@ import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Draft, DraftOf } from "../draft/types";
 import { useDraft, type Mutate } from "../draft/store";
 import { t, type CatalogKey } from "../catalog.js";
-import { removeAt, updateAt } from "../draft/list-ops";
+import { removeAt } from "../draft/list-ops";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { useDataLists } from "./shared/useDataLists.js";
@@ -28,7 +28,7 @@ import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, 
 import { flattenDraftFields } from "../draft/fields";
 import { firstWorkedStepId } from "../draft/performedBy.js";
 import { usePublishedFieldIds, usePublishedOptionValues } from "../draft/publishedFields.js";
-import { applyChoiceName } from "../draft/choiceValue.js";
+import { applyChoiceName, applyChoiceValue } from "../draft/choiceValue.js";
 import { countKeyRewrites } from "../draft/key-readers.js";
 import { writeFieldKey } from "../draft/fieldKey.js";
 import { writeFieldLabel } from "../draft/fieldLabel.js";
@@ -435,6 +435,14 @@ const styles = stylex.create({
     marginBlockStart: 0,
     marginInline: 0,
   },
+  // A standalone note (`DESIGN.md` Inputs / Fields): no box, a 2px hairline
+  // rule on its left, 12px from the text, in slate.
+  studioNoteRuled: {
+    paddingLeft: space.s3,
+    borderLeftWidth: 2,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.border,
+  },
   // The condition input's Developer view (`shared/ConditionInput.tsx`),
   // duplicated: an area's component never reads another component's style
   // object. One look for every Developer view on the card.
@@ -659,6 +667,10 @@ function KindPicker({ field, onChange }: { field: DraftField; onChange: (patch: 
   const kind = custom ? undefined : fieldKindOf(field);
   const unnamed = !custom && kind === undefined;
   const rawTriple = [field.type, field.format, field.control].filter((m) => typeof m === "string").join(" / ");
+  // A Text field with choices asks for one of them, not a free line.
+  const withChoices = (field.options?.length ?? 0) > 0 || field.dataSource !== undefined;
+  const kindNote =
+    kind === undefined ? undefined : kind === "text" && withChoices ? t("fieldCard.kindNoteWithChoices") : fieldKindLabel(kind).note;
   return (
     <>
       <label {...stylex.props(styles.fieldRowLabel)}>
@@ -680,7 +692,7 @@ function KindPicker({ field, onChange }: { field: DraftField; onChange: (patch: 
           <option value={CUSTOM_KIND}>{t("fieldCatalog.customTypeOption")}</option>
         </select>
       </label>
-      {kind !== undefined && <p {...stylex.props(styles.studioNote)}>{fieldKindLabel(kind).note}</p>}
+      {kind !== undefined && <p {...stylex.props(styles.studioNote)}>{kindNote}</p>}
     </>
   );
 }
@@ -906,7 +918,15 @@ function FieldEditor({
     });
   };
   const addChoice = () => setOptions([...options, { value: "", label: seedLocalizedText(contentLocale) }]);
-  const updateChoiceValue = (index: number, value: string) => setOptions(updateAt(options, index, { value }));
+  /** A hand edit of a stored value carries the field's own default along,
+   * as the name-driven move does (`applyChoiceValue`). */
+  const updateChoiceValue = (index: number, value: string) => {
+    if (fieldId === undefined) return;
+    mutate((d) => {
+      const target = flattenDraftFields(d.fields).find((f) => f.id === fieldId);
+      if (target) applyChoiceValue(target, index, value);
+    });
+  };
   const removeChoice = (index: number) => setOptions(removeAt(options, index));
 
   const mappingRows = columnMappingRows(field, dataSources, lists);
@@ -1027,6 +1047,12 @@ function FieldEditor({
   }, [openMore, onMoreOpened]);
 
   const requiredDisabled = technicalChecked || requiredState.kind === "none";
+  // The box shows neither checked nor clear while the steps disagree.
+  const requiredBox = useRef<HTMLInputElement>(null);
+  const requiredMixed = requiredState.kind === "divergent";
+  useEffect(() => {
+    if (requiredBox.current) requiredBox.current.indeterminate = requiredMixed;
+  }, [requiredMixed, isGroup, asked.length]);
   const nameFailed = unplaced.length + zoned("asks").length > 0;
   const label = resolveDraftLocalizedText(field.label, contentLocale, baseLocale) || t("panelsScreen.unnamedField");
   const nameLineId = useId();
@@ -1186,30 +1212,32 @@ function FieldEditor({
 
             {/* The catalog declares no `required` key of its own, so this
                 writes the view and never the field. A technical field is
-                written by the process, so it disables the checkbox. */}
-            {requiredState.kind !== "none" && (
-              <p {...stylex.props(styles.studioNote)}>{t("fieldCatalog.requiredScopeNote").replace("{steps}", stepLabels(requiredState.stepIds))}</p>
-            )}
-            {requiredState.kind === "divergent" && (
-              <p {...stylex.props(styles.studioWarning)}>
+                written by the process, so it disables the checkbox. A group
+                holds no value, so it takes neither the box nor a condition.
+                A disagreement between the steps is a fact, not a conflict:
+                the box writes one value to all of them. */}
+            {!isGroup && requiredState.kind === "divergent" && (
+              <p {...stylex.props(styles.studioNote, styles.studioNoteRuled)}>
                 {t("fieldCatalog.requiredDivergentNote").replace("{steps}", stepLabels(requiredState.differingStepIds))}
               </p>
             )}
-            <label {...stylex.props(styles.fieldRowLabel, styles.checkboxLabel)}>
-              <input
-                type="checkbox"
-                checked={requiredState.kind === "uniform" && requiredState.value}
-                disabled={requiredDisabled}
-                onChange={(e) => writeRequired(e.target.checked)}
-              />
-              {t("fieldCard.requiredEverywhere")}
-            </label>
-            {technicalChecked && <p {...stylex.props(styles.studioNote)}>{t("fieldCatalog.requiredTechnicalNote")}</p>}
+            {!isGroup && (
+              <label {...stylex.props(styles.fieldRowLabel, styles.checkboxLabel)}>
+                <input
+                  ref={requiredBox}
+                  type="checkbox"
+                  checked={requiredState.kind === "uniform" && requiredState.value}
+                  disabled={requiredDisabled}
+                  onChange={(e) => writeRequired(e.target.checked)}
+                />
+                {t("fieldCard.requiredEverywhere")}
+              </label>
+            )}
+            {!isGroup && technicalChecked && <p {...stylex.props(styles.studioNote)}>{t("fieldCatalog.requiredTechnicalNote")}</p>}
 
-            {visibleState.kind !== "none" && (
+            {!isGroup && visibleState.kind !== "none" && (
               <div {...stylex.props(styles.morePart)}>
                 <h5 {...stylex.props(styles.subHeading)}>{t("fieldCatalog.onlyAskWhenHeading")}</h5>
-                <p {...stylex.props(styles.studioNote)}>{t("fieldCatalog.conditionScopeNote").replace("{steps}", stepLabels(visibleState.stepIds))}</p>
                 {visibleState.kind === "divergent" && (
                   <p {...stylex.props(styles.studioWarning)}>
                     {t("fieldCatalog.conditionDivergentNote").replace("{steps}", stepLabels(visibleState.stepIds))}

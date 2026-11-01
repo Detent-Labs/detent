@@ -1581,8 +1581,9 @@ The row's operand picker SHALL withhold `child.*`. No `visible` override
 admits `child`: the runtime resolves the flag with no child in scope.
 
 Updating the condition SHALL write the same override to every
-referencing view, and SHALL name the write before it happens. Where a
-referencing view holds a literal, the notice SHALL name that step.
+referencing view. The Asked on rows above it name every step the write
+reaches before it happens. Where a referencing view holds a literal, the
+notice SHALL name that step.
 
 An unfinished row SHALL write nothing. Each referencing view's `visible`
 key SHALL stand as it did until the row is complete. That holds when the
@@ -1606,10 +1607,15 @@ writes the view and never the field. That is the definition contract's own
 rule, and this control does not bend it.
 
 When those views disagree, the checkbox's note SHALL state that plainly and
-name the differing step. Updating SHALL name the write before it happens,
-on the same terms the condition row takes. A technical field SHALL show
-the checkbox disabled, since `technical` already forces `required: false`
-on every step. A field no step view references SHALL show no checkbox.
+name the differing step. The checkbox SHALL show indeterminate then.
+Updating SHALL name the write before it happens, on the same terms the
+condition row takes. A technical field SHALL show the checkbox disabled,
+since `technical` already forces `required: false` on every step. A field
+no step view references SHALL show no checkbox.
+
+A group field's Asked on section SHALL keep its rows and their commands.
+It SHALL show neither the checkbox nor "Only ask this when", since a group
+has no value.
 
 #### Scenario: A mappable field shows Column mapping in the effect half
 
@@ -1636,8 +1642,8 @@ on every step. A field no step view references SHALL show no checkbox.
 
 - **WHEN** the developer sets "Only ask this when" on a field that
   two step views reference
-- **THEN** both views carry the same `visible` override, and the row
-  named both steps before the write
+- **THEN** both views carry the same `visible` override, and the Asked on
+  rows named both steps before the write
 
 #### Scenario: Clearing the condition names its scope
 
@@ -1692,8 +1698,8 @@ on every step. A field no step view references SHALL show no checkbox.
 
 - **WHEN** the developer checks "Required on every step that asks for it"
   on a field that two step views reference
-- **THEN** both views carry `required: true`, and the row named both
-  steps before the write
+- **THEN** both views carry `required: true`, and the Asked on rows named
+  both steps before the write
 
 #### Scenario: Ask for this names disagreeing views
 
@@ -1709,6 +1715,13 @@ on every step. A field no step view references SHALL show no checkbox.
 - **WHEN** the developer selects a field carrying `technical: true`
 - **THEN** the requiredness checkbox shows disabled, and the draft's view
   entries keep no `required` key
+
+#### Scenario: A group's card offers neither requiredness nor a condition
+
+- **WHEN** the developer selects a group field that two step views reference
+- **THEN** Asked on lists both steps, each with "Open the form" and "Show on
+  the map"
+- **AND** it shows no requiredness checkbox and no "Only ask this when"
 
 ### Requirement: A Read by row names each kind of place
 

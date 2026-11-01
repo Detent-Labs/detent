@@ -283,6 +283,11 @@ describe("ruleSentence", () => {
     expect(ruleSentence(c, ops, undefined)).toBe("This answer is at most Budget.");
   });
 
+  it("prints (unnamed field) for a field value no operand names, never its path", () => {
+    const c: RuleCondition = { rows: [cmp("<=", { kind: "field", path: "data.gone" })] };
+    expect(ruleSentence(c, ops, undefined)).toBe("This answer is at most (unnamed field).");
+  });
+
   it("prints the counted label of a repeated field", () => {
     const c: RuleCondition = { rows: [cmp("<=", { kind: "field", path: "data.limit" })] };
     expect(ruleSentence(c, ops, undefined)).toBe("This answer is at most Budget (2).");

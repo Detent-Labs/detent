@@ -74,6 +74,12 @@ describe("the rule input's sentence", () => {
     expect(sentence(render(undefined))).toBe("No rule yet: every answer passes.");
   });
 
+  it("prints the empty sentence once, under the add control", () => {
+    const html = render(undefined);
+    expect(html.split("No rule yet: every answer passes.").length - 1).toBe(1);
+    expect(html.indexOf("condition-add")).toBeLessThan(html.indexOf("No rule yet"));
+  });
+
   it("prints no Writes readout and no CEL outside the Developer view", () => {
     const html = render(cel("data.amount >= 1000.0"));
     // The printed text alone: an option's `value` attribute carries the

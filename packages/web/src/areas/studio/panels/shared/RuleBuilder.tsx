@@ -12,11 +12,6 @@ import {
 } from "./ruleLogic";
 
 const styles = stylex.create({
-  conditionEmpty: {
-    margin: 0,
-    color: colors.textMuted,
-    fontSize: "0.9rem",
-  },
   conditionRows: {
     listStyle: "none",
     margin: 0,
@@ -204,10 +199,11 @@ export function RuleBuilder({ condition, operands, onChange }: Props) {
   const removeRow = (index: number) => setRows(condition.rows.filter((_, i) => i !== index));
   const addRow = () => setRows([...condition.rows, newRuleRow(operands)]);
 
+  // No row: the add control alone. `RuleInput`'s sentence under the builder
+  // already says that every answer passes.
   if (!condition.rows.length) {
     return (
       <div className="rule-builder">
-        <p {...stylex.props(styles.conditionEmpty)}>{t("ruleBuilder.empty")}</p>
         <button type="button" className="btn btn-ghost condition-add" onClick={addRow} disabled={!operands.length}>
           {t("condition.addRow")}
         </button>

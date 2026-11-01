@@ -1287,3 +1287,74 @@ describe("the Read by section", () => {
     expect(source).toContain("[draft, fieldKey, contentLocale, isGroup]");
   });
 });
+
+// The fix wave after the browser check: Asked on prints no "Writes to:" line,
+// reads a requiredness disagreement as a note over an indeterminate box, and a
+// group's card holds neither the box nor a condition.
+describe("Asked on's notes and a group's card", () => {
+  const twoSteps = (a: object, b: object, field: DraftField = fld("field_a", "a")): Draft =>
+    draftOf([field], [step("step_a", "A", [{ ref: field.id, ...a }]), step("step_b", "B", [{ ref: field.id, ...b }])]);
+
+  it("prints no Writes to line under the rows or under Only ask this when", () => {
+    const html = renderPanel(twoSteps({ required: true }, { visible: cel('data.a == "x"') }), "field_a");
+
+    expect(sectionOf(html, "Asked on")).not.toContain("Writes to");
+  });
+
+  it("reads a requiredness disagreement as a ruled note, not a warning", () => {
+    const asked = sectionOf(renderPanel(twoSteps({ required: true }, {}), "field_a"), "Asked on");
+    const at = asked.indexOf("These steps currently disagree");
+    const tag = asked.slice(asked.lastIndexOf("<p", at), at);
+
+    expect(at).toBeGreaterThan(-1);
+    expect(tag).toContain("studioNoteRuled");
+    expect(tag).not.toContain("studioWarning");
+  });
+
+  it("keeps the condition disagreement in the warning tone", () => {
+    const asked = sectionOf(renderPanel(twoSteps({ visible: cel('data.a == "x"') }, { visible: cel('data.a == "y"') }), "field_a"), "Asked on");
+    const at = asked.indexOf("These steps currently disagree");
+    const tag = asked.slice(asked.lastIndexOf("<p", at), at);
+
+    expect(tag).toContain("studioWarning");
+  });
+
+  it("sets the box indeterminate while the steps disagree", () => {
+    expect(source).toContain("requiredBox.current.indeterminate = requiredMixed");
+    expect(source).toContain('const requiredMixed = requiredState.kind === "divergent"');
+    expect(source).toContain("ref={requiredBox}");
+  });
+
+  it("keeps a group's rows and commands, and draws neither the box nor Only ask this when", () => {
+    const group = grp("field_g", "g", [fld("field_c", "c")]);
+    const html = renderPanel(twoSteps({}, {}, group), "field_g");
+    const asked = sectionOf(html, "Asked on");
+
+    expect(asked).toContain(">A<");
+    expect(asked).toContain(">Open the form</button>");
+    expect(asked).toContain(">Show on the map</button>");
+    expect(asked).not.toContain("Required on every step that asks for it");
+    expect(asked).not.toContain('type="checkbox"');
+    expect(asked).not.toContain("Only ask this when");
+  });
+});
+
+describe("the Kind note over a Text field with choices", () => {
+  it("says one pick from the choices for a Text field with options", () => {
+    const html = renderPanel(draftOf([fld("field_a", "a", { options: [{ value: "x", label: { en: "X" } }] })]), "field_a");
+    const kind = sectionOf(html, "Kind");
+
+    expect(kind).toContain(">One pick from the choices below.<");
+    expect(kind).not.toContain(">A line of text.<");
+  });
+
+  it("says the same for a Text field bound to a data source", () => {
+    const html = renderPanel(draftOf([fld("field_a", "a", { dataSource: "ds_a" })], [], { dataSources: [{ id: "ds_a", key: "src", type: "db.list", config: {} }] }), "field_a");
+
+    expect(sectionOf(html, "Kind")).toContain(">One pick from the choices below.<");
+  });
+
+  it("keeps Text's own note with no choice", () => {
+    expect(sectionOf(renderPanel(draftOf([fld("field_a", "a")]), "field_a"), "Kind")).toContain(">A line of text.<");
+  });
+});

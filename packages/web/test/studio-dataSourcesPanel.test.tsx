@@ -132,6 +132,10 @@ describe("the kind picker's names", () => {
     expect(html).toContain('value="instance.query"');
   });
 
+  it("names the static kind in the author's words", () => {
+    expect(dataSourceKindLabel("static")).toBe("A list typed into this process");
+  });
+
   it("prints a type the table does not name as its registry type", () => {
     expect(dataSourceKindLabel("acme.sheet")).toBe("acme.sheet");
     expect(row(["db.list", "acme.sheet"], "db.list")).toMatch(/<option[^>]*>acme\.sheet<\/option>/);

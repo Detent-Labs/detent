@@ -81,3 +81,18 @@ export function applyChoiceName(
   option.value = next;
   if (prior !== "") rewriteDefaultValue(field, prior, next);
 }
+
+/**
+ * The hand edit of a stored value, a `mutate` recipe body: writes `value`
+ * onto `field.options[index]` and carries the field's own `default` along,
+ * as `applyChoiceName` does for a value that follows its name. An empty
+ * prior value names no default, and an empty value names no choice, so
+ * nothing else moves then. A field with no option at `index` is left alone.
+ */
+export function applyChoiceValue(field: DraftField, index: number, value: string): void {
+  const option = field.options?.[index];
+  if (option === undefined) return;
+  const prior = option.value ?? "";
+  option.value = value;
+  if (prior !== "" && value !== "" && prior !== value) rewriteDefaultValue(field, prior, value);
+}

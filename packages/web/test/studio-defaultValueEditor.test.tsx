@@ -135,4 +135,36 @@ describe("the default value's choice picker", () => {
     expect(html).not.toMatch(/>open</);
     expect(html).not.toMatch(/>closed</);
   });
+
+  it("numbers a repeated choice name, in the select and beside the checkboxes", () => {
+    const twins = [
+      { value: "open", label: { en: "Open" } },
+      { value: "open_2", label: { en: "Open" } },
+    ];
+    const select = render(field({ options: twins }));
+    const texts = [...select.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/g)].map((m) => [m[1], m[2]]);
+    expect(texts).toEqual([
+      ["", "(none)"],
+      ["open", "Open"],
+      ["open_2", "Open (2)"],
+    ]);
+
+    const boxes = render(field({ type: "list", options: twins }));
+    expect(boxes).toContain('type="checkbox"/>Open</label>');
+    expect(boxes).toContain('type="checkbox"/>Open (2)</label>');
+  });
+
+  it("skips a choice whose value is still empty, so it never collides with None", () => {
+    const fresh = [
+      { value: "open", label: { en: "Open" } },
+      { value: "", label: { en: "Draft choice" } },
+    ];
+    const select = render(field({ options: fresh }));
+    const values = [...select.matchAll(/<option value="([^"]*)"/g)].map((m) => m[1]);
+    expect(values).toEqual(["", "open"]);
+    expect(select).not.toContain("Draft choice");
+
+    const boxes = render(field({ type: "list", options: fresh }));
+    expect(boxes).not.toContain("Draft choice");
+  });
 });

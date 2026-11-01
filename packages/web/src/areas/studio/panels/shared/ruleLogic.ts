@@ -202,7 +202,7 @@ function ruleClause(row: RuleRow, byPath: Map<string, RuleOperand>): string {
   const operand = byPath.get(row.operand);
   const value =
     row.value.kind === "field"
-      ? (byPath.get(row.value.path)?.label ?? row.value.path)
+      ? (byPath.get(row.value.path)?.label ?? t("condition.unnamedField"))
       : summarizeValue({ kind: "cmp", operand: row.operand, op: row.op, value: row.value.value }, operand);
   return fill(t(`condition.clause.${OP_NAMES[row.op]}`), { field: operand?.clauseLabel ?? operand?.label ?? row.operand, value });
 }

@@ -6,15 +6,16 @@
 
 A registered data source type SHALL print a plain name in the kind picker.
 The type `db.list` reads "A data list an operator keeps". The type
-`instance.query` reads "Cases of another process". A type the curated table does not name SHALL
+`instance.query` reads "Cases of another process". The type `static` reads
+"A list typed into this process". A type the curated table does not name SHALL
 fall back to its registry type.
 
 #### Scenario: A registered kind prints its name
 
 - **WHEN** an author opens the kind picker on a data source
-- **THEN** it offers "A data list an operator keeps" and "Cases of another
-  process"
-- **AND** no entry reads `db.list` or `instance.query`
+- **THEN** it offers "A data list an operator keeps", "Cases of another
+  process" and "A list typed into this process"
+- **AND** no entry reads `db.list`, `instance.query` or `static`
 
 #### Scenario: An unnamed kind falls back to its type
 
@@ -49,7 +50,7 @@ SHALL carry the same rows.
 | required / readonly / visible | Required / Read-only / Asked |
 | contract | what this process takes in and gives back |
 | options / option value | choices / a choice's stored value |
-| `db.list` / `instance.query` | a data list an operator keeps / cases of another process |
+| `db.list` / `instance.query` / `static` | a data list an operator keeps / cases of another process / a list typed into this process |
 
 #### Scenario: The contract reads as what the process takes in and gives back
 

@@ -5,6 +5,7 @@ import type { DraftField } from "../../draft/fields";
 import { useDraft } from "../../draft/store";
 import { resolveDraftLocalizedText } from "../../draft/localized-text";
 import { t } from "../../catalog.js";
+import { numberRepeats } from "./optionText";
 import { asExpression, defaultValueDisabledReason, literalControlKind, parseCelDefault, toggleMultiselectValue } from "./defaultValueLogic";
 
 type DraftDefault = DraftField["default"];
@@ -210,6 +211,15 @@ interface LiteralProps {
   baseLocale: string;
 }
 
+/** The choices a default can name, each with its printed name. A choice whose
+ * value is still `""` stays out: it would collide with the None option. A
+ * repeated name takes its count, as the other pickers number one. */
+function pickableChoices(field: DraftField, contentLocale: string, baseLocale: string): { value: string; name: string }[] {
+  const named = (field.options ?? []).filter((opt) => (opt.value ?? "") !== "");
+  const names = numberRepeats(named, (opt) => choiceName(opt.label, contentLocale, baseLocale));
+  return named.map((opt, i) => ({ value: opt.value ?? "", name: names[i] ?? "" }));
+}
+
 function LiteralDefaultInput({ field, value, onChange, contentLocale, baseLocale }: LiteralProps) {
   const kind = literalControlKind(field);
 
@@ -261,9 +271,9 @@ function LiteralDefaultInput({ field, value, onChange, contentLocale, baseLocale
         {t("defaultValue.literalLabel")}
         <select value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)}>
           <option value="">{t("fieldCatalog.noneOption")}</option>
-          {(field.options ?? []).map((opt, i) => (
-            <option key={i} value={opt.value ?? ""}>
-              {choiceName(opt.label, contentLocale, baseLocale)}
+          {pickableChoices(field, contentLocale, baseLocale).map((choice, i) => (
+            <option key={i} value={choice.value}>
+              {choice.name}
             </option>
           ))}
         </select>
@@ -275,14 +285,14 @@ function LiteralDefaultInput({ field, value, onChange, contentLocale, baseLocale
     return (
       <fieldset {...stylex.props(styles.defaultValueOptions)}>
         <legend>{t("defaultValue.literalLabel")}</legend>
-        {(field.options ?? []).map((opt, i) => (
+        {pickableChoices(field, contentLocale, baseLocale).map((choice, i) => (
           <label key={i} {...stylex.props(styles.pluginFieldOption)}>
             <input
               type="checkbox"
-              checked={selected.includes(opt.value ?? "")}
-              onChange={(e) => onChange(toggleMultiselectValue(value, opt.value ?? "", e.target.checked) as DraftDefault)}
+              checked={selected.includes(choice.value)}
+              onChange={(e) => onChange(toggleMultiselectValue(value, choice.value, e.target.checked) as DraftDefault)}
             />
-            {choiceName(opt.label, contentLocale, baseLocale)}
+            {choice.name}
           </label>
         ))}
       </fieldset>

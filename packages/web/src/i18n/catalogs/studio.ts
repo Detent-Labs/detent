@@ -120,7 +120,6 @@ export const en = {
   "fieldCatalog.readByHeading": "Read by",
   "fieldCatalog.readByEmpty": "No condition reads this field.",
   "fieldCatalog.onlyAskWhenHeading": "Only ask this when",
-  "fieldCatalog.conditionScopeNote": "Writes to: {steps}.",
   "fieldCatalog.conditionClear": "Clear on {steps}",
   "fieldCatalog.conditionDivergentNote": "These steps currently disagree: {steps}.",
   "fieldCatalog.conditionLiteralNote": "This replaces a literal condition on: {steps}.",
@@ -147,7 +146,6 @@ export const en = {
   "fieldCatalog.dataSourceLabel": "Values come from",
   "fieldCatalog.requiredTechnicalNote":
     "The process writes this field itself, so no step view may ask a participant for it.",
-  "fieldCatalog.requiredScopeNote": "Writes to: {steps}.",
   "fieldCatalog.requiredDivergentNote": "These steps currently disagree: {steps}.",
   "fieldCatalog.effectEmptyRoute": "Put this field on a step",
   "fieldCatalog.startHeading": "This process collects nothing yet",
@@ -223,6 +221,7 @@ export const en = {
   // The kind picker's names. A type this table misses prints its registry type.
   "dataSourceKind.db.list": "A data list an operator keeps",
   "dataSourceKind.instance.query": "Cases of another process",
+  "dataSourceKind.static": "A list typed into this process",
   // `{list}` is the data list key the draft names.
   "dataSources.unknownListWarning":
     "The server has no data list '{list}'. Publishing still works. The field's options stay empty until an operator creates the list.",
@@ -1277,6 +1276,7 @@ export const en = {
   "fieldCard.requiredEverywhere": "Required on every step that asks for it",
   "fieldCard.noSourceOption": "Nowhere: this field lists its own choices",
   "fieldCard.technicalLabel": "Technical: the process fills this in by itself",
+  "fieldCard.kindNoteWithChoices": "One pick from the choices below.",
   "fieldMatrix.markCondition": "Condition",
   "fieldMatrix.rowKindLabel": "Kind",
   "defaultValue.computedNote": "A rule computes this default.",

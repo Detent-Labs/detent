@@ -212,6 +212,7 @@ describe("data source and contract vocabulary", () => {
       ["dataSources.kindLegend", "What kind of source"],
       ["dataSourceKind.db.list", "A data list an operator keeps"],
       ["dataSourceKind.instance.query", "Cases of another process"],
+      ["dataSourceKind.static", "A list typed into this process"],
       ["panelsScreen.unnamedDataSource", "(unnamed source)"],
     ]);
   });
