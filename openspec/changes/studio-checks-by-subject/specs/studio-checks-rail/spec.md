@@ -106,7 +106,7 @@ message beside its sentence.
 #### Scenario: Two unnamed steps read their numbers
 
 - **WHEN** two unnamed steps each carry an issue
-- **THEN** one sentence reads "(unnamed step 2)" and the other "(unnamed step 3)"
+- **THEN** one sentence reads "Step 2" and the other "Step 3"
 
 ### Requirement: A message no rule knows still names its place
 
@@ -285,15 +285,17 @@ which `cross-process-validation` owns.
 
 ### Requirement: A check prints its sentence at every placement
 
-Every placement SHALL print the issue's sentence with no source label. That
-covers the step page, the field card, a way-out row and the source editor. The
-sentence SHALL match the row on the Checks tab word for word.
+Every placement SHALL print the issue's sentence with no source label and no
+list marker. That covers the step page, the field card, a way-out row and the
+source editor. Each SHALL take the warning callout's form. The sentence SHALL
+match the row on the Checks tab word for word.
 
 #### Scenario: One sentence at the spot and on the tab
 
 - **WHEN** one issue stands on a step page and on the Checks tab
 - **THEN** both print the same sentence
 - **AND** neither prints a source label outside a Developer view
+- **AND** the step page prints it with no list marker, beside a 3px rule
 
 ### Requirement: A step's checks stand at their sections and keys at More
 

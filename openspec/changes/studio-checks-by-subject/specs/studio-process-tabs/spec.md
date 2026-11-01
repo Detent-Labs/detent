@@ -85,6 +85,12 @@ SHALL take focus where no finer place exists, and it SHALL carry
 - **WHEN** a keyboard user presses Fix on a check about a step's assignment
 - **THEN** keyboard focus stands on the Who acts header
 
+#### Scenario: Focus lands on the key input
+
+- **WHEN** a keyboard user presses Fix on a check about a step's key
+- **THEN** More and its Developer view stand open
+- **AND** keyboard focus stands in the key input
+
 #### Scenario: Focus lands on the Name input
 
 - **WHEN** a keyboard user presses Fix on a step's name check
@@ -113,6 +119,81 @@ SHALL take focus where no finer place exists, and it SHALL carry
 - **THEN** keyboard focus stands on the Settings tab in the tab row
 
 ## MODIFIED Requirements
+
+### Requirement: A structurally invalid draft's banner carries the refusal color
+
+Where the loaded draft fails structural validation, its warning banner
+SHALL take `colors.refusal`. That is the color the Checks tab's blocked
+count already carries. Plain, uncolored text left that state reading no
+differently from routine copy.
+
+Two gaps SHALL NOT raise the banner on their own. One is the missing first
+step of a draft with no step, the start state `studio-checks-rail` defines.
+The other is the missing base-locale name of a draft that holds a step.
+That gap reads as a sentence at the name. The banner SHALL stand only when the
+draft carries some other Zod issue.
+
+<!-- antislop: allow sentence-length -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
+The banner SHALL stand below the header bar. It SHALL read one sentence that
+says what to do and prints no engine word: no "Zod", no "CEL", no "registry". It
+SHALL NOT stand while the Checks tab is open, where it only repeats the list.
+
+This banner SHALL NOT take the bordered, rotated stamp treatment. This
+screen already reserves that treatment for a load or a request that comes
+back wrong. That treatment marks a fixed, five-tone case vocabulary a
+design decision alone extends. A structurally invalid draft joins the
+plain-text signal family instead.
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Copied from the live spec; "failure" names a failed request, the case this paragraph sets apart from a Zod issue. -->
+`spa-error-reporting` binds this screen's failure states to one banner
+shape. That capability's own Purpose scopes it to a request that fails.
+This banner reports a validation state of the draft body rather than a
+failed request. So that one-shape rule does not reach it.
+
+#### Scenario: A structurally invalid draft's banner carries the refusal color
+
+- **WHEN** the loaded draft fails structural validation on a Zod issue
+  other than the two start gaps
+- **THEN** its banner takes `colors.refusal`
+- **AND** it does not take the bordered stamp treatment
+- **AND** it stands below the header bar
+- **AND** it names no check kind
+
+#### Scenario: A structurally valid draft shows no such banner
+
+- **WHEN** the loaded draft passes structural validation
+- **THEN** no such banner stands
+
+#### Scenario: A fresh empty draft shows no banner
+
+- **WHEN** an author opens a draft the empty choice just seeded
+- **THEN** no banner stands
+
+#### Scenario: An unnamed draft with a step shows no banner
+
+- **WHEN** the loaded draft holds one named end step, and its only Zod
+  issue is the missing base-locale name
+- **THEN** no banner stands
+- **AND** the name sentence stands beside the name in the header bar
+
+#### Scenario: Another Zod issue keeps the banner on a draft with no step
+
+- **WHEN** a draft with no step also carries a Zod issue of another kind
+- **THEN** the banner stands
+
+#### Scenario: A new task step with no name or way out keeps the banner
+
+- **WHEN** an author adds a first task step that has no name and no way out
+- **THEN** the banner stands, since those two gaps lie outside the start
+  gaps
+
+#### Scenario: The banner leaves the Checks tab
+
+- **WHEN** a structurally invalid draft stands on the Checks tab
+- **THEN** no such banner stands
+- **AND** it stands again on the Steps tab
 
 ### Requirement: A focused tab rests whole in the tab row's view
 

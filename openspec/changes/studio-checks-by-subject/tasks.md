@@ -59,24 +59,36 @@
 - [ ] 5.5 In `ROADMAP.md` stage 64, append "Shipped 2026-11-01." to item 12 and set the status line to "CHANGES 1 TO 12 AND 14 DONE, REST NOT STARTED".
 - [ ] 5.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host over the touched Markdown. Read its exit code.
 
-## 6. Verification
+## 6. The review wave
 
-- [ ] 6.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
-- [ ] 6.2 Run `bun run build` in the devcontainer. Expect exit code 0.
-- [ ] 6.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test` with `DATABASE_URL` set by the pod.
-- [ ] 6.4 Read the pass, skip and fail counts off that run. Name any failing test. Compare the pass count with `scripts/gates/pass-floor.txt`.
-- [ ] 6.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
-- [ ] 6.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
-- [ ] 6.7 On the production bundle, break a `purchase_requisition` draft. Give it a step with no way out, a field with no name and no process name.
-- [ ] 6.7a Open Checks at 1440px. It reads Steps, Fields and Before publishing, with a word and one sentence per row. No ZOD or CEL prints outside a Developer view.
-- [ ] 6.8 Press Fix on each row kind in D7's table. Read the landing and `document.activeElement` for each.
-- [ ] 6.9 Add a step. Focus stands in Name. Its name check stands under Name, and Checks lists it. Type `cancel_sink` as a step's key; the check stands in More with the Developer view open.
-- [ ] 6.10 Clear the draft. The ink box and the publish line stand. On a blocked draft, read the Publish dialog's sentence.
-- [ ] 6.10a Add an unknown key inside a step in the JSON view. Publish, and read the refusal's sentences and the closed Developer view.
-- [ ] 6.11 Open a Forms badge's narrowed Checks on an unnamed step. The label names no key. At 1024px and 420px, nothing scrolls sideways.
-- [ ] 6.11a At 900px wide, press Fix on the last step's row. Its rail row stands whole in view.
-- [ ] 6.12 Run `/impeccable critique` and `/impeccable audit` on `/studio/processes/<id>/edit/checks`. Run `impeccable detect --json` on the changed files, since the app's CSP blocks the overlay.
-- [ ] 6.13 Run `sh scripts/dev-exec.sh bun run e2e` in the devcontainer. Expect every flow to pass.
+- [ ] 6.1 Land a time limit's unreadable length on Time limit per the D3 text, and add `checks.fallback.contract` for the contract's tier 4.
+- [ ] 6.2 Give the sentences the D3 texts: internal name, the unlisted ending, the line. An unnamed step reads its rail number per D2.
+- [ ] 6.3 Rework the row per D6: no box, no visible heading, subject `h2`, Fix as `.btn-secondary` on the sentence's first line.
+- [ ] 6.4 Give `IssueItems` the warning callout's form per D8. Hide the banner on the Checks tab, and set its text.
+- [ ] 6.5 Land a key check on `step-page-key`, and scroll a section header to the top, per D7.
+- [ ] 6.5a Print the check's sentence over the JSON input. A tab press leaves that view, per D7.
+- [ ] 6.6 Normalize a refusal's dotted location before the sentence, with a test over real Zod paths.
+- [ ] 6.7 Close the final review's M-1 to M-10, per `.superpowers/sdd/tasks/wave-brief.md`.
+- [ ] 6.8 Run the full gated suite in the foreground. Read its verdict off the named tests.
+
+## 7. Verification
+
+- [ ] 7.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
+- [ ] 7.2 Run `bun run build` in the devcontainer. Expect exit code 0.
+- [ ] 7.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test` with `DATABASE_URL` set by the pod.
+- [ ] 7.4 Read the pass, skip and fail counts off that run. Name any failing test. Compare the pass count with `scripts/gates/pass-floor.txt`.
+- [ ] 7.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
+- [ ] 7.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
+- [ ] 7.7 On the production bundle, break a `purchase_requisition` draft. Give it a step with no way out, a field with no name and no process name.
+- [ ] 7.7a Open Checks at 1440px. It reads Steps, Fields and Before publishing, with a word and one sentence per row. No ZOD or CEL prints outside a Developer view.
+- [ ] 7.8 Press Fix on each row kind in D7's table. Read the landing and `document.activeElement` for each.
+- [ ] 7.9 Add a step. Focus stands in Name. Its name check stands under Name, and Checks lists it. Type `cancel_sink` as a step's key; the check stands in More with the Developer view open.
+- [ ] 7.10 Clear the draft. The ink box and the publish line stand. On a blocked draft, read the Publish dialog's sentence.
+- [ ] 7.10a Add an unknown key inside a step in the JSON view. Publish, and read the refusal's sentences and the closed Developer view.
+- [ ] 7.11 Open a Forms badge's narrowed Checks on an unnamed step. The label names no key. At 1024px and 420px, nothing scrolls sideways.
+- [ ] 7.11a At 900px wide, press Fix on the last step's row. Its rail row stands whole in view.
+- [ ] 7.12 Run `/impeccable critique` and `/impeccable audit` on `/studio/processes/<id>/edit/checks`. Run `impeccable detect --json` on the changed files, since the app's CSP blocks the overlay.
+- [ ] 7.13 Run `sh scripts/dev-exec.sh bun run e2e` in the devcontainer. Expect every flow to pass.
 
 ## Workflow follow-up
 

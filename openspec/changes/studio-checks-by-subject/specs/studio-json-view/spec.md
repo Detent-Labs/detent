@@ -62,4 +62,10 @@ prints every language at once and reads no content locale.
 
 - **WHEN** an author presses Fix on a check whose sentence names the JSON surface
 - **THEN** the JSON surface stands open in place of the tab body
+- **AND** the check's sentence stands above the input
 - **AND** keyboard focus stands on its input
+
+#### Scenario: A tab press leaves the surface
+
+- **WHEN** an author presses a tab while the JSON surface stands open
+- **THEN** the JSON surface leaves and that tab's body stands open

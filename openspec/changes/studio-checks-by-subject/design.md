@@ -68,7 +68,7 @@ Names in a sentence read the base locale. `runValidation` takes no content local
 
 The slots read `{step}`, `{way}`, `{field}`, `{source}`, `{section}` and `{value}`.
 
-- The step slot comes from `stepTextMap`, so two unnamed steps read their numbers.
+- The step slot comes from `stepTextMap`. An unnamed step reads its rail number, such as "Step 14". A repeated label keeps its number too.
 - The way slot prints the label, else "(unnamed way out)".
 - The field slot prints the base-locale label, else `panelsScreen.unnamedField`.
 - The source slot prints the key, else `panelsScreen.unnamedDataSource`.
@@ -109,17 +109,17 @@ The catalog keys and their texts:
 ```text
 checks.process.firstStep        No step is set as the first one. On the Steps tab, open a step and choose “Set as the process's first step”.
 checks.process.description      The process description has no text in the base language. Correct it in the JSON surface.
-checks.process.key              The process needs a key. On Settings, set it in the Developer view.
+checks.process.key              The process needs an internal name. On Settings, set it in the Developer view.
 checks.process.baseLocale       The process has no base language. On Settings, type one.
 checks.process.duplicateId      Two parts of this process share one internal id. Correct it in the JSON surface.
 checks.process.badId            An internal id in this process has the wrong form. Correct it in the JSON surface.
-checks.process.duplicateFieldKey Two fields share one key. On the Fields tab, change one in its Developer view.
+checks.process.duplicateFieldKey Two fields share one internal name. On the Fields tab, change one in its Developer view.
 checks.process.duplicateSourceKey Two places values come from share one name. On the Fields tab, under Where values come from, rename one.
 checks.process.cancelSink       The step kept for cancelled cases was changed by hand. Remove it in the JSON surface, and publishing adds it back.
 checks.process.unknownEntry     The definition holds an entry the studio does not know. Remove it in the JSON surface.
 checks.step.name                “{step}” needs a name. Type it in the Name box at the top of its page.
 checks.step.description         The description of “{step}” has no text in the base language. Type it at the top of its page.
-checks.step.key                 The key of “{step}” cannot be used. Under {section}, change it in the Developer view.
+checks.step.key                 The internal name of “{step}” cannot be used. Under {section}, change it in the Developer view.
 checks.step.kind                “{step}” has no kind. Choose one at the top of its page.
 checks.step.noWayOut            “{step}” has no way out yet. Under {section}, add one, or make this step an end.
 checks.step.endHasWayOut        “{step}” is an end but still has ways out. Choose another kind at the top of its page.
@@ -127,7 +127,7 @@ checks.step.outcomeNotEnd       “{step}” says how the case ends but is not a
 checks.step.noProcess           “{step}” calls no process yet. Under {section}, choose one.
 checks.step.strayCall           “{step}” holds a call to another process but is another kind of step. Choose its kind at the top of its page.
 checks.step.callNeedsAutomatic  “{step}” waits for another process, so each way out must happen by itself. Under {section}, change the ones a person chooses.
-checks.step.reservedKey         “{step}” uses a key kept for cancelled cases. Under {section}, change it in the Developer view.
+checks.step.reservedKey         “{step}” uses an internal name kept for cancelled cases. Under {section}, change it in the Developer view.
 checks.step.reservedId          “{step}” uses an internal id kept for cancelled cases. Correct it in the JSON surface.
 checks.paths.mixed              The ways out of “{step}” mix a person's choice with ones that happen by themselves. Under {section}, make them all one kind.
 checks.paths.noOrder            The ways out of “{step}” that happen by themselves need an order. Under {section}, give each a number.
@@ -135,13 +135,13 @@ checks.paths.sameOrder          Two ways out of “{step}” share one place in 
 checks.paths.twoDefaults        More than one way out of “{step}” has no “Only if”. Under {section}, give all but one a condition.
 checks.paths.defaultNotLast     The way out of “{step}” with no “Only if” must be tried last. Under {section}, give it the highest number.
 checks.way.name                 A way out of “{step}” has no name. Under {section}, type one.
-checks.way.key                  The way out “{way}” of “{step}” has no key. Under {section}, type one in its Developer view.
+checks.way.key                  The way out “{way}” of “{step}” has no internal name. Under {section}, type one in its Developer view.
 checks.way.noTarget             The way out “{way}” of “{step}” leads nowhere yet. Under {section}, choose a step.
 checks.way.targetGone           The way out “{way}” of “{step}” leads to a step that was removed. Under {section}, choose another.
 checks.way.trigger              The way out “{way}” of “{step}” does not say how it is taken. Under {section}, choose one.
 checks.way.guard                The “Only if” on the way out “{way}” of “{step}” cannot be read. Under {section}, correct it.
 checks.timer.durationOrDeadline A time limit on “{step}” needs a length or a date, and only one. Under {section}, choose one.
-checks.timer.duration           The length of a time limit on “{step}” cannot be read. Correct it in the JSON surface.
+checks.timer.duration           The length of a time limit on “{step}” cannot be read. Under {section}, remove it and add a new one.
 checks.timer.tooLong            A time limit on “{step}” is too long. Under {section}, shorten it.
 checks.timer.deadline           The date of a time limit on “{step}” cannot be read. Under {section}, correct it.
 checks.timer.wayGone            A time limit on “{step}” takes a way out that was removed. Under {section}, choose another.
@@ -168,12 +168,12 @@ checks.call.mapping             A value “{step}” passes to or takes from the
 checks.call.general             The call on “{step}” is not complete. Under {section}, finish it.
 checks.end.noOutcome            “{step}” does not say how the case ends. Under {section}, choose an ending.
 checks.end.noEndings            The process lists no endings yet. On Settings, add one under What it takes in and gives back.
-checks.end.unknownOutcome       “{step}” uses an ending the process does not list. Under {section}, choose another.
+checks.end.unknownOutcome       “{step}” ends with “{value}”, which the process does not list. On Settings, add it under How it can end, or choose another under {section}.
 checks.end.reservedOutcome      “{step}” uses an ending kept for cancelled cases. Under {section}, choose another.
 checks.form.fieldGone           The form on “{step}” holds a field that was removed. Under {section}, open the form and take it out.
 checks.form.tabs                A field on the form of “{step}” does not fit its tabs. Under {section}, open the form and move it.
 checks.form.tabsDeclared        A field on the form of “{step}” declares a tab it may not. Correct it in the JSON surface.
-checks.form.tabDuplicate        Two tabs on the form of “{step}” share one key. Correct it in the JSON surface.
+checks.form.tabDuplicate        Two tabs on the form of “{step}” share one internal name. Correct it in the JSON surface.
 checks.form.tabName             A tab on the form of “{step}” has no name. Under {section}, open the form and type one.
 checks.form.noteText            A note on the form of “{step}” has no text. Under {section}, open the form and type it.
 checks.form.group               A field on the form of “{step}” sits in the wrong group. Correct it in the JSON surface.
@@ -189,7 +189,7 @@ checks.form.general             The form on “{step}” has an entry that does 
 checks.field.name               “{field}” needs a name. Type it under Name on its card.
 checks.field.description        The description of “{field}” has no text in the base language. Type it under Description on its card.
 checks.field.choiceName         A choice of “{field}” has no name. Under Choices, type one.
-checks.field.key                The key of “{field}” cannot be used. Under More, change it in the Developer view.
+checks.field.key                The internal name of “{field}” cannot be used. Under More, change it in the Developer view.
 checks.field.kind               The kind of “{field}” does not fit its settings. Under Kind, choose one again.
 checks.field.optionsAndSource   “{field}” has typed choices and a place its values come from. Correct it in the JSON surface.
 checks.field.sourceGone         “{field}” reads from a place that was removed. Under More, in Where values come from, choose another.
@@ -215,6 +215,7 @@ checks.fallback.step            Something on “{step}” does not pass a check.
 checks.fallback.field           Something on “{field}” does not pass a check. On the Checks tab, this check's Developer view names it.
 checks.fallback.source          Something on “{source}” does not pass a check. On the Checks tab, this check's Developer view names it.
 checks.fallback.process         Something in this process does not pass a check. On the Checks tab, this check's Developer view names it.
+checks.fallback.contract        Something in what this process takes in or gives back does not pass a check. On the Checks tab, this check's Developer view names it.
 ```
 
 The process's name keeps `issues.processNeedsName`.
@@ -236,11 +237,11 @@ Severity reads the source. `view` reads Worth a look, and every other source rea
 Under Before publishing, one `<p>` reads one of two keys:
 
 ```text
-checksRail.heldBackLine  More checks run once you fix the rows above. Publishing also checks each plugin's settings and any entry the studio cannot see.
-checksRail.publishLine   Publishing also checks each plugin's settings and any entry the studio cannot see.
+checksRail.heldBackLine  More checks run once you fix the rows above. Publishing also checks a few things this list cannot, and tells you if one fails.
+checksRail.publishLine   Publishing also checks a few things this list cannot, and tells you if one fails.
 ```
 
-The first stands when any source holds back. The line's Developer view lists the held-back source names in mono, then the two existing sentences `checksRail.configHeldBack` and `checksRail.unknownKeysHeldBack`.
+The first stands when any source holds back. A source that printed a row of its own leaves the list. The line's Developer view lists the held-back source names in mono, then the two existing sentences `checksRail.configHeldBack` and `checksRail.unknownKeysHeldBack`.
 
 Before publishing draws while it holds a row or the line. It holds the line on the whole list and on a narrowed one. The start state alone draws neither.
 
@@ -252,7 +253,9 @@ Before publishing draws while it holds a row or the line. It holds the line on t
 
 A rail mounted with no `onFix` prints no button. `onFix` replaces the prop `onOpenIssue`.
 
-The rail's frame keeps its box. Inside, a column caps at 52rem. A group's heading takes the Title style. Rows take 12px block padding and a hairline between. `checksRail.fix` reads "Fix", in the authoring command style.
+The rail draws no box and no visible "Checks" heading. The `aside` keeps its name, and the tab row already says it. One column caps at 52rem, flush left, as the field card does. A subject's heading is an `h2` in the Title style. Rows take 12px block padding and a hairline between.
+
+`checksRail.fix` reads "Fix" as `.btn-secondary`, aligned to the sentence's first line. It is the row's one act, so it takes a button, unlike a row of secondary commands. The kicker stands above the sentence. Three columns would read as the dense rows the owner dislikes.
 
 ### D7. The landing
 
@@ -261,9 +264,10 @@ The rail's frame keeps its box. Inside, a column caps at 52rem. A group's headin
 | Issue | Tab and place | Focus lands on |
 |---|---|---|
 | Step, a section owns it | Steps, the step, that section open | the section's header |
+| Step, its key | Steps, the step, More open, its Developer view open | the key input |
 | Step, name, description or kind | Steps, the step | the Name input |
 | Way out | Steps, the step, Ways out open, the row marked | Ways out's header |
-| Timer | Steps, the step, Time limit open | its header |
+| Timer | Steps, the step, Time limit open, except a date no builder holds | its header |
 | Action | Steps, the step, the owning section open | its header |
 | Process, `workflow.initialStep` | Steps | the Steps tab |
 | Field | Fields, Catalog, the field selected, More open where the zone asks | the sentence at the zone |
@@ -281,7 +285,7 @@ The rail's frame keeps its box. Inside, a column caps at 52rem. A group's headin
 
 `openTabFromRow` keeps its Read by callers and their focus on the tab. A new `fixCheck(target)` adds the landing. `pendingFocus`, `{ tab, elementId? }`, replaces `pendingTabFocus`, and its three writers move with it.
 
-The effect keys on `[openTab, pendingFocus]`. It acts only while `pendingFocus.tab === openTab`. It focuses the element when one exists, else the tab button, then clears. `fixCheck` sets `jsonOpen` and `pendingFocus` in one batch. A Fix on an open tab and Add a step therefore land too. A target with a `fieldId` or `dataSourceId` sets no `pendingFocus`, since `fixRequest` owns that focus.
+A section header's landing scrolls it to the box's top, so its body stands in view. The effect keys on `[openTab, pendingFocus]`. It acts only while `pendingFocus.tab === openTab`. It focuses the element when one exists, else the tab button, then clears. `fixCheck` sets `jsonOpen` and `pendingFocus` in one batch. A Fix on an open tab and Add a step therefore land too. A target with a `fieldId` or `dataSourceId` sets no `pendingFocus`, since `fixRequest` owns that focus.
 
 `EntityTabs` selects a Fields target through a `fixRequest` prop, because selection lives there. `FieldsTabViews` passes it down.
 
@@ -291,11 +295,15 @@ Its effect waits for `visible`, selects, and opens More. A second pass focuses t
 
 A new `namesFieldSource(loc)` joins `moreChecked`. A removed source's check therefore opens More, where its select stands. The focus pass tries the zone's anchor, then the `asks` anchor. A `values` check on a card with no Choices stands there.
 
-The ids `step-page-name`, `process-header-name` and `json-surface-input` are new, each set on the existing input.
+The ids `step-page-name`, `step-page-key`, `process-header-name` and `json-surface-input` are new, each set on the existing input.
+
+A JSON landing prints the check's sentence above the input as a warning callout, through a `note` prop on `JsonView`. A press on any tab leaves that view and opens the tab. Fix now brings authors here who never chose it.
 
 ### D8. At the spot
 
-`IssueItems` prints `issueText(issue)` with no source label. `issueSourceLabel` moves to `ChecksRail.tsx`, into the row's Developer view.
+`IssueItems` prints `issueText(issue)` with no source label and no list marker. It takes the warning callout's form: refusal text beside a 3px Advisory rule. An advisory check prints in slate. Every placement reads one form, and its own style sets margins alone. `issueSourceLabel` moves to `ChecksRail.tsx`, into the row's Developer view.
+
+The structural banner reads `app.draftIncomplete`, "Some checks cannot run yet. Open Checks and fix what it lists." It stands on every tab but Checks, where it would only repeat the list.
 
 The step's name check stands directly under Name. The description check stands under Description. The masthead's end keeps the rest. The banner test `showsStructuralBanner` keeps its meaning. The name gap keeps `plain`.
 
