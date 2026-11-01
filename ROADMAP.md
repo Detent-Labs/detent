@@ -269,7 +269,7 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
 
     Specs: `definition-contract`, `runtime-api`, `cel-expressions`.
 
-64. **Studio UI overhaul: CHANGES 1 TO 12 AND 14 DONE, REST NOT STARTED.** Decided 2026-10-30 in a design
+64. **Studio UI overhaul: CHANGES 1 TO 14 DONE, REST NOT STARTED.** Decided 2026-10-30 in a design
     session with the owner. The concept reworks how an author handles steps
     and fields in the studio. The owner weights that authoring loop above
     canvas gestures, navigation chrome and safety prompts. The canvas is the
