@@ -26,7 +26,7 @@ tab with no card SHALL have no legend.
 
 - **WHEN** an author opens the Forms tab of a draft holding one form
 - **THEN** one legend stands above the first card
-- **AND** it names field, required, required if a condition holds, section,
+- **AND** it names field, required, required if a condition holds, group,
   and taller asks for more
 
 #### Scenario: A screen reader reads the legend's words alone
