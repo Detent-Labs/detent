@@ -136,10 +136,13 @@ describe("what the surface no longer carries", () => {
 
   it("sizes the process name to its text, up to the cap", () => {
     const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
+    const name = code.slice(code.indexOf("headerBarName: {"), code.indexOf("headerBarNameInput: {"));
     const input = code.slice(code.indexOf("headerBarNameInput: {"), code.indexOf("warning: {"));
 
+    expect(name).toContain('maxWidth: "min(40ch, 100%)"');
+    expect(name).toContain("minWidth: 0");
     expect(input).toContain('fieldSizing: "content"');
-    expect(input).toContain('maxWidth: "min(40ch, 100%)"');
+    expect(input).toContain('maxWidth: "100%"');
   });
 });
 

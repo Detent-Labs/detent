@@ -267,6 +267,23 @@ describe("The publish dialog", () => {
     expect(list).toContain("<li>en</li>");
   });
 
+  // Mono marks a value the engine matches exactly. "de \u2014 1 missing" is
+  // prose around a code, so the list takes the body face. Compiled classes are
+  // atomic, so the class the machine-value rows add over a plain row is the
+  // mono face (plus nothing else), and the list must not carry it.
+  it("prints the Languages fact in the body face, not mono", () => {
+    const draft = { label: { en: "Expense approval", de: "Spesen" }, description: { en: "a" }, baseLocale: "en", key: "expense_approval_key" };
+    const html = renderHeader({ actions: { pendingDialog: "publish" }, draft });
+    const classesOf = (tag: string) => new Set(/class="([^"]*)"/.exec(tag)?.[1]?.split(" ") ?? []);
+    const monoRow = classesOf(html.slice(html.indexOf("</dt>", html.indexOf(">Process id</dt>")) + 5));
+    const plainRow = classesOf(html.slice(html.indexOf("</dt>", html.indexOf(">Open issues</dt>")) + 5));
+    const monoOnly = [...monoRow].filter((c) => !plainRow.has(c));
+    const list = classesOf(html.slice(html.indexOf("<ul", html.indexOf(">Languages</dt>"))));
+
+    expect(monoOnly.length).toBeGreaterThan(0);
+    for (const c of monoOnly) expect(list.has(c)).toBe(false);
+  });
+
   it("names no open issue and no refusal on a clean draft", () => {
     const html = renderHeader({ actions: { pendingDialog: "publish" } });
 

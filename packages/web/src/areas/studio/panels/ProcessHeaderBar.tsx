@@ -34,22 +34,27 @@ const styles = stylex.create({
   // Back, name, warning, issue sentence, state, Save, the note and the Versions
   // offer. It takes the row's free space from a zero basis and wraps inside
   // itself, so a control appearing here moves nothing in the trailing cluster.
+  // The minimum basis keeps the name readable: where the row cannot give the
+  // group that much beside the cluster, the cluster wraps under it.
   leading: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "baseline",
     gap: space.s3,
     flex: "1 1 0",
-    minWidth: 0,
+    minWidth: "min(24rem, 100%)",
   },
   backControl: {
     paddingLeft: 0,
     whiteSpace: "nowrap",
   },
+  // The cap sits here, on the shrink-to-fit parent, so a long name leaves no
+  // empty width between the input and the state line. The input inherits the
+  // font, so `ch` reads the same on both.
   headerBarName: {
     margin: 0,
     minWidth: 0,
-    maxWidth: "100%",
+    maxWidth: "min(40ch, 100%)",
     fontFamily: fonts.heading,
     fontWeight: fonts.headingWeight,
     fontSize: "1rem",
@@ -75,10 +80,10 @@ const styles = stylex.create({
     color: "inherit",
     width: "auto",
     minWidth: "8ch",
-    // Sizes to its text up to the cap. A browser with no `field-sizing` keeps
-    // the input's default width.
+    // Sizes to its text up to the `h1`'s cap. A browser with no `field-sizing`
+    // keeps the input's default width.
     fieldSizing: "content",
-    maxWidth: "min(40ch, 100%)",
+    maxWidth: "100%",
   },
   warning: {
     color: colors.refusal,
@@ -193,7 +198,6 @@ const styles = stylex.create({
     listStyle: "none",
     margin: 0,
     padding: 0,
-    fontFamily: fonts.mono,
   },
   // The machine values stand in a closed disclosure under the facts, in the
   // shape the Settings tab's Developer view takes.
@@ -209,7 +213,6 @@ const styles = stylex.create({
   },
   dialogMono: {
     fontFamily: fonts.mono,
-    fontSize: "0.8rem",
   },
   dialogNote: {
     color: colors.textMuted,
