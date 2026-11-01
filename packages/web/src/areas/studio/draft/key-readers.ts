@@ -131,6 +131,16 @@ export function countKeyReaders(draft: Draft, key: string): number {
   return keyReaderSites(draft, key).length;
 }
 
+/** The expressions a move of `fieldId`'s key from `from` to `to` rewrites,
+ * each with its new source. Empty under `rewriteKeyReaders`'s three refusals. */
+function rewritePlan(draft: Draft, fieldId: string, from: string, to: string): { site: KeyReaderSite; next: string }[] {
+  if (from === "" || to === "" || from === to) return [];
+  if (draftFields(draft).some((field) => field.id !== fieldId && field.key === from)) return [];
+  return keyReaderSites(draft, from)
+    .map((site) => ({ site, next: rewriteFieldRead(site.src, from, to) }))
+    .filter(({ site, next }) => next !== site.src);
+}
+
 /**
  * Moves every expression in `draft` that reads `data.<from>` onto
  * `data.<to>`, in place, and answers how many changed. While a field other
@@ -138,19 +148,23 @@ export function countKeyReaders(draft: Draft, key: string): number {
  * changes and the answer is 0. An empty `from` or `to` changes nothing.
  */
 export function rewriteKeyReaders(draft: Draft, fieldId: string, from: string, to: string): number {
-  if (from === "" || to === "" || from === to) return 0;
-  if (draftFields(draft).some((field) => field.id !== fieldId && field.key === from)) return 0;
-  let count = 0;
-  for (const site of keyReaderSites(draft, from)) {
+  const plan = rewritePlan(draft, fieldId, from, to);
+  for (const { site, next } of plan) {
     const expression = site.path.reduce<unknown>((node, step) => (node as Record<string | number, unknown>)[step], draft) as {
       src: string;
     };
-    const next = rewriteFieldRead(site.src, from, to);
-    if (next === site.src) continue;
     expression.src = next;
-    count++;
   }
-  return count;
+  return plan.length;
+}
+
+/**
+ * The answer `rewriteKeyReaders` would give for the same arguments, read
+ * without a write. A `mutate` recipe's return never reaches its caller, so a
+ * count the UI shows comes from the draft before the write.
+ */
+export function countKeyRewrites(draft: Draft, fieldId: string, from: string, to: string): number {
+  return rewritePlan(draft, fieldId, from, to).length;
 }
 
 const TEXT_READ = /(?<![\w.])data\.([A-Za-z_]\w*)/g;

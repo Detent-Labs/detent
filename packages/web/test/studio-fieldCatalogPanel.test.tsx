@@ -20,6 +20,7 @@ import {
 } from "../src/areas/studio/panels/fieldCatalogLogic.js";
 import { PublishedFieldIdsContext } from "../src/areas/studio/draft/publishedFields.js";
 import { writeGroupLabel } from "../src/areas/studio/draft/view-group-sync.js";
+import { writeFieldLabel } from "../src/areas/studio/draft/fieldLabel.js";
 
 const NOOP = () => {};
 
@@ -432,11 +433,16 @@ describe("a label change in the field catalog", () => {
 
   const fieldOf = (draft: Draft, id: string): DraftField => (draft.fields as unknown as DraftField[]).find((f) => f.id === id)!;
 
-  it("leaves a key that a guard reads when the label changes", () => {
+  it("lets a key that a guard reads follow the label, and the write takes the guard along", () => {
     const draft = guardedDraft();
     const patch = labelChangePatch(draft, fieldOf(draft, "field_amount"), totalLabel, "en", new Set());
 
-    expect(patch).toEqual({ label: totalLabel });
+    expect(patch).toEqual({ label: totalLabel, key: "total_amount" });
+
+    writeFieldLabel(draft, "field_amount", totalLabel, "en", new Set());
+    const guard = (draft.workflow as unknown as { steps: { paths: { guard: { src: string } }[] }[] }).steps[0]!.paths[0]!.guard;
+    expect(fieldOf(draft, "field_amount").key).toBe("total_amount");
+    expect(guard.src).toBe("data.total_amount > 1000.0");
   });
 
   it("leaves a published field's key when the label changes", () => {

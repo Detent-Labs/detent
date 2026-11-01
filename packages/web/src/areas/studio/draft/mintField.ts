@@ -35,7 +35,7 @@ export function baseTypeForPaletteKind(kind: FieldKindName): (typeof FIELD_KINDS
  * name (`fieldKindLabel(kind).name`), and every other entry stays as given.
  *
  * The key derives from the base-locale label and dedupes against `taken`,
- * every key the catalog already holds at any depth, so a second Date mints
+ * the caller's `fieldCatalogLogic.ts::takenFieldKeys`, so a second Date mints
  * `date_2`. A later label edit compares the key with that same deduped
  * derivation (`nextFieldKey`), so the key keeps following the label.
  */

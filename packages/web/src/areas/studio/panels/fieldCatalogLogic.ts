@@ -3,7 +3,7 @@ import { t } from "../catalog.js";
 import { deriveKey, dedupeKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { draftFields, flattenDraftFields, type DraftField } from "../draft/fields.js";
 import { resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text.js";
-import { countKeyReaders } from "../draft/key-readers.js";
+import { countKeyReaders, readKeys } from "../draft/key-readers.js";
 import { flattenRailFields } from "../draft/panel-rail.js";
 import type { Draft } from "../draft/types.js";
 
@@ -12,12 +12,12 @@ import type { Draft } from "../draft/types.js";
  * field-key decision"), the same shape as `stepsPanelLogic.ts::nextStepKey`
  * and for the same reason — base-locale resolution, the lock check against
  * the prior derivation, and catalog-wide dedup all compose in one function.
- * Called from `FieldEditor`'s own label writer, for the selected field at
- * any nesting depth, since `FieldDef.key` is one flat CEL namespace
- * regardless of depth.
+ * Called from `labelChangePatch` and `view-group-sync.ts::writeGroupLabel`,
+ * for a field at any nesting depth, since `FieldDef.key` is one flat CEL
+ * namespace regardless of depth.
  *
- * `taken` is the caller's own `draftFields(draft)`-derived set (design.md:
- * "do not hand-roll a second flatten"), excluding the field being edited.
+ * `taken` is the set the key must step past, excluding the field being
+ * edited: `takenFieldKeys` for a field that is not a `group`.
  *
  * The prior derivation is deduped against `taken` too, so a key that took a
  * `_2` suffix beside another field's key still reads as derived and keeps
@@ -25,10 +25,15 @@ import type { Draft } from "../draft/types.js";
  * the field that forced the suffix may have taken another key since.
  * (`deriveKey` yields `[a-z0-9_]` only, so the pattern needs no escaping.)
  *
- * `locked` is the caller's verdict that a CEL expression reads the key or a
- * published version holds the field (`isFieldKeyLocked`). It stops auto-fill
- * for a non-empty key, even while the key equals the prior derivation. An
- * empty key has neither reader nor publication, so it derives regardless.
+ * `locked` is the caller's verdict that a published version holds the field
+ * (`isFieldKeyLocked`). It stops auto-fill for a non-empty key, even while
+ * the key equals the prior derivation. An empty key has no publication, so it
+ * derives regardless.
+ *
+ * `currentKeyRead` says a CEL expression reads `currentKey`. A prior label
+ * that derives no key then counts the current key as derived, while the new
+ * base label derives a non-empty key: `labelChangePatch` kept that key
+ * through the empty label for its readers, and it follows again here.
  *
  * Returns the derived-and-deduped key when the lock check says auto-fill is
  * still live, or `undefined` when it says to leave `key` untouched.
@@ -40,37 +45,71 @@ export function nextFieldKey(
   baseLocale: string,
   taken: ReadonlySet<string>,
   locked = false,
+  currentKeyRead = false,
 ): string | undefined {
   if (locked && currentKey !== "") return undefined;
   const priorBase = deriveKey(resolveDraftLocalizedText(priorLabel, baseLocale, baseLocale) ?? "");
-  const priorSuffixed = priorBase !== "" && new RegExp(`^${priorBase}_[0-9]+$`).test(currentKey);
-  if (!shouldAutoDeriveKey(currentKey, dedupeKey(priorBase, taken)) && !priorSuffixed) return undefined;
-
   const newDerived = deriveKey(resolveDraftLocalizedText(newLabel, baseLocale, baseLocale) ?? "");
+  const priorSuffixed = priorBase !== "" && new RegExp(`^${priorBase}_[0-9]+$`).test(currentKey);
+  const priorEmptyHeld = currentKeyRead && priorBase === "" && newDerived !== "";
+  if (!shouldAutoDeriveKey(currentKey, dedupeKey(priorBase, taken)) && !priorSuffixed && !priorEmptyHeld) return undefined;
+
   return dedupeKey(newDerived, taken);
 }
 
 /**
- * Whether a label change may no longer set `field`'s key: a CEL expression
- * anywhere in the draft reads `data.<key>`, or the draft's base version holds
- * a field with the same `id`. `published` is `usePublishedFieldIds()`'s
- * value, and `undefined` (the base version not read yet, or its read failed)
- * counts every field that has an `id` as published, the safe side. A field
- * with no `id` is not published. A `group` field sits outside the lock and
- * never reaches this function.
+ * Whether a label change may no longer set `field`'s key: the draft's base
+ * version holds a field with the same `id`. A CEL expression that reads the
+ * key does not lock it, since a key change rewrites its readers. `published`
+ * is `usePublishedFieldIds()`'s value, and `undefined` (the base version not
+ * read yet, or its read failed) counts every field that has an `id` as
+ * published, the safe side. A field with no `id` is not published. A `group`
+ * field sits outside the lock.
  */
-export function isFieldKeyLocked(draft: Draft, field: DraftField, published: ReadonlySet<string> | undefined): boolean {
-  if (field.id !== undefined && (published === undefined || published.has(field.id))) return true;
-  return countKeyReaders(draft, field.key ?? "") > 0;
+export function isFieldKeyLocked(field: DraftField, published: ReadonlySet<string> | undefined): boolean {
+  if (field.type === "group" || field.id === undefined) return false;
+  return published === undefined || published.has(field.id);
+}
+
+/** The words CEL reads as a literal, so `data.<word>` cannot name a field. */
+export const CEL_LITERAL_KEYS: ReadonlySet<string> = new Set(["in", "true", "false", "null"]);
+
+/**
+ * The keys a derived key steps past, for the field carrying `exceptId` or a
+ * field about to be minted (`exceptId` `undefined`). Three parts:
+ *
+ * - every other field's non-empty key, at any depth;
+ * - each key an expression reads (`readKeys`) that no field carries, so a
+ *   label typed through it cannot capture its readers;
+ * - the CEL literal words, `CEL_LITERAL_KEYS`.
+ *
+ * The last two parts apply to a field that is not a `group`. `group` names
+ * whether the field is one; it defaults to the type of the field carrying
+ * `exceptId`. The comparison is by id, so with `exceptId` `undefined` a field
+ * with no id counts as the field itself. A key-less field adds nothing, so a
+ * label beside one does not derive `_2`.
+ */
+export function takenFieldKeys(draft: Draft, exceptId?: string, group?: boolean): Set<string> {
+  const fields = draftFields(draft);
+  const taken = new Set(fields.filter((f) => f.id !== exceptId).map((f) => f.key ?? "").filter((key) => key !== ""));
+  if (group ?? fields.find((f) => f.id === exceptId)?.type === "group") return taken;
+  const carried = new Set(fields.map((f) => f.key ?? ""));
+  for (const key of readKeys(draft)) if (!carried.has(key)) taken.add(key);
+  for (const word of CEL_LITERAL_KEYS) taken.add(word);
+  return taken;
 }
 
 /**
  * The patch a label change writes to a field that is not a `group`: the new
- * label, plus the key `nextFieldKey` derives while the lock leaves
- * auto-fill live. `taken` leaves out the empty key a minted field carries, so
- * a label beside any key-less field does not derive `_2`. A group's label
- * goes through `view-group-sync.ts::writeGroupLabel` instead, which rewrites
- * the view entries naming its key.
+ * label, plus the key `nextFieldKey` derives while the lock leaves auto-fill
+ * live, against `takenFieldKeys`. A label that derives an empty key keeps the
+ * current key while an expression reads it, since its readers would otherwise
+ * read `data.` with no name. A key nothing reads follows to empty.
+ *
+ * The patch moves the key and nothing else. `draft/fieldLabel.ts::writeFieldLabel`
+ * also rewrites the readers of the old key. A group's label goes through
+ * `view-group-sync.ts::writeGroupLabel` instead, which rewrites the view
+ * entries naming its key.
  */
 export function labelChangePatch(
   draft: Draft,
@@ -79,9 +118,54 @@ export function labelChangePatch(
   baseLocale: string,
   published: ReadonlySet<string> | undefined,
 ): Partial<DraftField> {
-  const taken = new Set(draftFields(draft).filter((f) => f.id !== field.id).map((f) => f.key ?? "").filter((key) => key !== ""));
-  const derivedKey = nextFieldKey(field.key ?? "", field.label, label, baseLocale, taken, isFieldKeyLocked(draft, field, published));
-  return derivedKey === undefined ? { label } : { label, key: derivedKey };
+  const current = field.key ?? "";
+  const read = countKeyReaders(draft, current) > 0;
+  const taken = takenFieldKeys(draft, field.id, false);
+  const derivedKey = nextFieldKey(current, field.label, label, baseLocale, taken, isFieldKeyLocked(field, published), read);
+  if (derivedKey === undefined || (derivedKey === "" && read)) return { label };
+  return { label, key: derivedKey };
+}
+
+/** The grammar a published `FieldDef.key` takes (`compile.ts::checkFieldKeyFormat`). */
+const FIELD_KEY_GRAMMAR = /^[a-z_][a-z0-9_]*$/;
+
+/**
+ * Why a key commit of `typed` onto `field` cannot work, or `undefined` when it
+ * can. Checked in order: `"empty"` for no text, `"grammar"` for text outside
+ * `FIELD_KEY_GRAMMAR`, `"literal"` for a word CEL reads as a literal, and
+ * `"taken"` for a key another field carries. A key only an expression reads
+ * is not taken here: the commit binds those readers to the field on purpose,
+ * which repairs a dangling guard. A `group` answers `undefined` always, since
+ * its key keeps the group rule (`view-group-sync.ts::writeGroupKey`).
+ */
+export function keyCommitProblem(
+  draft: Draft,
+  field: DraftField,
+  typed: string,
+): "empty" | "grammar" | "literal" | "taken" | undefined {
+  if (field.type === "group") return undefined;
+  if (typed === "") return "empty";
+  if (!FIELD_KEY_GRAMMAR.test(typed)) return "grammar";
+  if (CEL_LITERAL_KEYS.has(typed)) return "literal";
+  if (draftFields(draft).some((f) => f.id !== field.id && f.key === typed)) return "taken";
+  return undefined;
+}
+
+/**
+ * Whether `field`'s key still follows its label: the key is empty, or reads
+ * as the base-locale label's derivation, plain or with the `_<n>` suffix a
+ * dedupe adds. Under a label that derives no key, the key follows while an
+ * expression reads it, since `labelChangePatch` held that key for its readers
+ * and the next label moves it. The answer ignores the lock; the caller reads
+ * `isFieldKeyLocked` first.
+ */
+export function keyFollowsLabel(draft: Draft, field: DraftField): boolean {
+  const key = field.key ?? "";
+  if (key === "") return true;
+  const baseLocale = draft.baseLocale ?? "en";
+  const base = deriveKey(resolveDraftLocalizedText(field.label, baseLocale, baseLocale) ?? "");
+  if (base === "") return field.type !== "group" && countKeyReaders(draft, key) > 0;
+  return key === base || new RegExp(`^${base}_[0-9]+$`).test(key);
 }
 
 /** What happens to a key input: the author types, or blur or Enter commits. */
