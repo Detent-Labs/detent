@@ -7185,9 +7185,9 @@ Process view opens.
 header prints the step's label alone. A row header prints the field's label
 with its kind word. No header prints a key.
 
-Pass: each bulk badge prints Asked, Required or Read-only. The three badges
-share one width. A conditional flag prints the stamp Condition. The legend
-prints no "CEL".
+Pass: each bulk badge prints Asked, Required or Read-only on one line, at its
+word's width, so Read-only stands widest. A conditional flag prints the stamp
+Condition. The legend prints no "CEL".
 
 Open the Forms tab. Pass: the legend reads Group for a form's group.
 
