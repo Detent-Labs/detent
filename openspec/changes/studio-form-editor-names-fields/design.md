@@ -235,8 +235,13 @@ carries the warning. `boundaries.test.ts` pins the `LocalizedTextInput` site
 count at 7. The two new sites move it to 9, with its comment's site list.
 
 `mintCatalogField` seeds the label with the kind's name in the base
-locale, and the focused input selects it. The first keystroke replaces the
-name. A field with an empty base-locale label fails the Zod schema's
+locale, and the focused input selects it. The key derives from that seed at
+mint, deduped across the catalog. A first Date gets `date`, a second
+`date_2`. The first keystroke replaces the name. A key with the old
+label's key plus a `_<n>` suffix still counts as derived. A deduped key thus
+keeps following its label.
+
+A field with an empty base-locale label fails the Zod schema's
 localization refinement. That blanks every later check and raises the
 structural banner. The browser check showed that on every mint, so the seed
 keeps a fresh field clean. Focusing the input also sets `naming`, so a
@@ -260,7 +265,7 @@ It calls the same two functions, so the key rule cannot drift.
 
 `labelChangePatch` drops `""` from its taken set, as `writeGroupLabel`
 already does. Without it a label beside any key-less field derives `_2`.
-Minting makes key-less fields routine. `docs/decisions.md` records that
+The Fields tab's own add still creates key-less fields. `docs/decisions.md` records that
 fault; it moves to the archive.
 
 ### D5. The palette lists every curated kind
