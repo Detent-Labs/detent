@@ -1965,7 +1965,8 @@ local to this section.
 
 The change let a field key follow its label until the first publish. It also
 rewrote every reader on a key change and added the "Read by" zone. It left
-seven points to later changes.
+eleven points to later changes. The critique and the audit of 2026-11-01
+raised the last four.
 
 - **KEYFOLLOW-1: the key input shows no pending hint while the typed text differs
   from the key.** The typed text commits on blur or Enter. Until then nothing
@@ -2019,6 +2020,33 @@ seven points to later changes.
 
   Upgrade entry: bind `priorEmptyHeld` in
   `panels/fieldCatalogLogic.ts::nextFieldKey` to `keyFollowsLabel` as well.
+- **KEYFOLLOW-8: the rewrite line counts the conditions and names none.** It
+  reads "Updated 1 condition." under the label. The rewritten rows stand in
+  the "Read by" zone, in the other half of the editor. Risk (Low): an author
+  must search for what moved.
+
+  Upgrade entry: name up to three places in the line, and tint the rewritten
+  rows in `panels/FieldCatalogPanel.tsx` with the usage tint.
+- **KEYFOLLOW-9: a "Read by" row offers no way to its condition.** The "Used
+  in" rows carry "Show on the canvas", and a "Read by" row has no control.
+  Risk (Low): an author opens the Steps tab and finds the way out by hand.
+
+  Upgrade entry: change 11 (`studio-field-card`) gives each row a control that
+  opens the section holding the condition.
+- **KEYFOLLOW-10: a condition on a field no step asks for can never match.** The
+  "Read by" zone lists it like any other. Nothing says the field stays empty.
+  Risk (Medium): a way out that waits on such a field never opens.
+
+  Upgrade entry: compare `panels/readByRows.ts`'s rows with the "Used in"
+  rows and add a sentence when no step asks for the field.
+- **KEYFOLLOW-11: at 1024px the field editor scrolls in a short band.** Below
+  64rem the entity rail stacks above the editor. Measured on 2026-11-01 at
+  1024x800, the editor scrolls inside a 225px box. The label and the "Read by"
+  zone then stand about 1,060px apart. Risk (Low): the rewrite line and the
+  conditions it counts never stand on screen together.
+
+  Upgrade entry: changes 10 and 11 own the stacked layout, as `RAIL-7` records
+  for the Steps tab.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
