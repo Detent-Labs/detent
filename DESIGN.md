@@ -533,6 +533,8 @@ the Legend style. A done one carries a check icon named Done.
   weight 600, tabular figures, no uppercase.
 - **Tones:** refusal for a blocker, slate for an advisory result.
 - It prints only when the count is above zero.
+- A check row on the checks rail names its severity with a kicker instead.
+  See Rails.
 
 ### The Register Row
 
@@ -647,8 +649,17 @@ own.
   opacity, with a `boxShadow` line marking the drop gap. Alt+ArrowUp and
   Alt+ArrowDown on the grip move the row by keyboard.
 - **Entity rail:** a child field indents 24px.
-- **Checks rail:** a 1px hairline box with 12px padding. A 1px hairline
-  separates its groups, and all clear prints in a 2px ink box.
+- **Checks rail:** a 1px hairline box with 12px padding. One column holds the
+  rows, capped at 52rem and flush left. Each subject takes a Title-style
+  heading, and a 1px hairline separates the subjects.
+- **Check row:** a Legend-style kicker leads, Must fix in Refusal and Worth a
+  look in Slate. The sentence follows in body text at 0.9rem. Fix stands at the
+  trailing edge as an authoring command. A closed Developer view stands under
+  the sentence, and Fix wraps below it where the row runs short. A 1px
+  hairline separates the rows, with 12px of block padding. The word carries
+  the severity, so the color never rests alone.
+- **All clear:** a 2px ink box above the subjects. A line under Before
+  publishing says what the studio could not check, in slate at 0.85rem.
 
 ### The Form Card
 
@@ -730,6 +741,8 @@ strokes, at 1, 1.5, 2 and 3px.
 - Refusal text beside a 3px rule in Advisory, with 8px of padding before the
   text.
 - It sits in place, next to the value it warns about.
+- The step page's warnings follow it: the missing-translation notes under the
+  name and description, and the missing-assignment note.
 
 ### Screen Furniture
 

@@ -184,10 +184,9 @@ added:
   Paths), each showing its own count.
 - **Checks rail, collapsed in the ribbon bar** (`studio-step-bench`): the
   one-line summary. It carries three states: a count, "no count" when
-  clear, the held-back indicator. Expand it in place. The grouped list
-  beneath shows each source group (zod, structural, cel, registry,
-  duration). Check the held-back state there too (a later group waiting on
-  an earlier one), and the all-clear state.
+  clear, the held-back indicator. Expand it in place. The list beneath
+  stands grouped by subject (Steps, Fields, Before publishing). Check the
+  held-back line there too, and the all-clear state.
 - **Configuration pane**: a selected step's masthead, including the "View
   raw JSON" toggle (expanded and collapsed). Its section register too, with
   heads open and closed. A selected path's own pane too, including its
@@ -1279,25 +1278,24 @@ unticked. Open the JSON surface. Pass: this field's view entry carries no
 Tick Required, without touching Asked. Open the JSON surface. Pass: the
 entry carries `required: true` alone. Untick Required. Pass: the key goes.
 
-Open the checks rail. Pass: a `view` group sits after `duration`, reading
-clear.
+Open the checks rail. Pass: no row names the step's form.
 
 The strip itself cannot author `visible: false` beside `required: true`
-anymore: unticking Asked clears Required in the same write. Reach the
-hidden-required state through the JSON surface instead. Give a view entry
-`visible: false` and `required: true` there. Pass: the checks rail's `view`
-group shows one entry, naming the step and the field: hidden but required.
-Set `visible` back to `true` (or delete the key). Pass: the entry clears.
+anymore: unticking Asked clears Required in the same write. Reach that state
+through the JSON surface, where a view entry takes `visible: false` and
+`required: true`. Pass: the Steps subject lists one Worth a look row, and its
+sentence names the field. Set `visible` back to `true` (or delete the key).
+Pass: the row clears.
 
 Give a field `readonly: true` and `required: true` through the JSON surface.
-Pick a step no other step's view lists that field editable on. Pass: the
-`view` group shows a second kind of entry, naming that step and field. It
-reads required and read-only, with nothing writing it. Add that field to
-`Action.output` on any action. Pass: the entry clears.
+Pick a step no other step's view lists that field editable on. Pass: a
+second row names that step and field. Its sentence says nothing fills a
+required, read-only field. Add that field to `Action.output` on
+any action. Pass: the row clears.
 
 Repeat the walk in German. Pass: the Asked, Required and Read-only labels
-and the checks rail heading translate. The two new rail messages stay in
-English, the same as every other engine-validator message the rail shows.
+and the checks rail heading translate. The two new rail sentences stay in
+English, the same as every other sentence the rail shows.
 
 ### The note card in the form editor (`field-model-view-note`)
 
@@ -1373,7 +1371,7 @@ box keeps its own members, and `discrepancy_note` sits in the renamed box.
 
 On a form holding a note, place the note inside a group with its strip's
 group control. Clear that group's key and press Enter. Pass: the checks rail
-reports the note's group, which still names the old key. Type the key back
+lists a row saying the note sits in a group the form lacks. Type the key back
 and press Enter. Pass: the note draws inside the box again.
 
 The last walk needs a tabbed form and the seeded layout. Discard the draft,
@@ -1522,9 +1520,8 @@ technical field's view entry now declares neither `required` nor
 
 Return to the field catalog and remove `check`'s `subprocess.outputMapping`
 entry for `result` (through the JSON surface). Pass: the checks rail
-reports `result` as an unwritten technical field, under the Fields view's
-own badge — not the field matrix's, since the finding anchors on the
-field rather than any one cell.
+lists a row under Fields saying `result` is technical and nothing fills it.
+The row belongs to the field itself.
 
 ### Automatic canvas layout (`studio-canvas-auto-layout`)
 
@@ -1578,7 +1575,7 @@ Step entry onto the canvas. Pass: a new step lands at the drop point.
 Reload. Pass: the ribbon shows its band again. Expand it, save the draft,
 then read the saved `layout` blob. Pass: it carries no key naming the ribbon.
 
-Choose the checks summary. Pass: its grouped list opens in place and pushes
+Choose the checks summary. Pass: its list, grouped by subject, opens in place and pushes
 the bench down. It casts no shadow, and it states the publish verdict.
 
 Choose a row in the steps register. Pass: the configuration pane opens that
@@ -1660,27 +1657,26 @@ Reload the screen. With playwright-cli's `route` command, mock `GET
 Choose Diff selected again. Pass: one waiting line stands, then the error
 banner takes its place.
 
-### Keyboard focus hand-off from a Checks row (`changes-tab-entity-change-list`)
+### Keyboard focus hand-off from a Fix control (`changes-tab-entity-change-list`, `studio-checks-by-subject`)
 
 Source: `changes-tab-entity-change-list` task 6.1; `studio-narrow-widths` task
-5.32.
+5.32. `studio-checks-by-subject` moved the press from the row to its Fix
+control. The entry "Checks by subject" walks every landing.
 
-Open a draft whose Checks tab lists a step-level issue and a process-level
-issue. Reach the Checks tab by keyboard and press Enter on the step-level
-row. Pass: focus lands on the Steps tab's own button in the tab row, and Steps
-stands open.
+Open a draft with a check on a step's Ways out and a check on the process
+key. Reach the Checks tab by keyboard and press Enter on the
+Fix control of the Ways out row. Pass: Steps stands open on the owning step,
+Ways out stands open, and focus lands on the Ways out header.
 
-Return to the Checks tab and press Enter on the process-level row. Pass:
-focus stays on the Checks tab's own button. A process-level issue names no
-tab. Arrow to the Settings button and press Enter. Pass: focus moves to
-Settings, and Settings stands open.
+Return to the Checks tab and press Enter on the Fix control of the process
+key row. Pass: Settings stands open on the Process view, and focus stands on
+the Settings tab's own button.
 
-Give the draft a data source with no key, so the Checks tab lists a data
-source row. Open Checks in a window 400px wide and scroll the tab row to its
-start. Reach the data source row by keyboard and press Enter. Pass: focus
-lands on the Settings tab's own button, and Settings stands open on Where
-values come from. Under `playwright-cli`, this `run-code` function reads the
-Settings tab against the row.
+Open Checks in a window 400px wide and scroll the tab row to its start. Reach
+the process key row's Fix control by keyboard and press Enter. Pass: focus
+lands on the Settings tab's own button, and Settings stands open. Under
+`playwright-cli`, this `run-code` function reads the Settings tab against the
+row.
 
 ```js
 async (page) => {
@@ -2205,19 +2201,19 @@ rule. The UA's `none` now stays in force for an inactive tab.
 Source: `validation-sequence-module` task 7.3.
 
 Open a draft naming an action type the server does not register. Open the
-checks rail. Pass: the registry group shows a real issue naming the
-unregistered type, not a held-back state. It still shows
-`registryConfigHeldBack`'s own note below that issue, since the
-config-validation half stays held back regardless.
+checks rail. Pass: a row names the unregistered type. The line under Before
+publishing still says publishing checks each plugin's settings. Its Developer
+view holds the config note, since the config-validation half waits for the
+publish regardless.
 
 Add a `process.start` action mapped into a field its target process does not
-declare. Pass: the checks rail's CEL group names that field. `ActionListEditor`'s
-row for that action carries no "chaining target" badge, since the target
-loaded successfully.
+declare. Pass: a checks rail row names that field in its sentence.
+`ActionListEditor`'s row for that action has no "chaining target" badge,
+since the target loaded successfully.
 
 Add a second `process.start` action targeting a process that is not
 published. Pass: that action's own row carries the "chaining target" badge.
-The CEL group shows no entry for that site. A not-checked site never reads
+The checks rail lists no row for that site. A not-checked site never reads
 as a clear pass.
 
 With a draft already holding a resolved chaining target, edit an unrelated
@@ -3827,8 +3823,8 @@ that names it." They add "CEL expressions and plugin settings keep their
 text." and "Check each one before you publish."
 
 Click its own "Remove field" to confirm. Pass: the live region reads
-"Booking Status removed." Open the Checks tab. Pass: it reports two new
-issues, one per guard.
+"Booking Status removed." Open the Checks tab. Pass: it lists two new
+rows under Steps, one per guard.
 
 The guard on the path from Book to Booked still reads `data.booking_status
 == 'booked'`. The guard on the path from Book to Booking Error still reads
@@ -3942,8 +3938,7 @@ Fix the issue. Pass: the count returns to the ordinary color, with no
 reload. Introduce an advisory-only issue (a view-flag finding) instead.
 Pass: the count stays in the ordinary color. Only a blocker recolors it.
 
-Click the Checks tab. Pass: the full grouped list opens exactly as it did
-before this change.
+Click the Checks tab. Pass: the full list opens, grouped by subject.
 
 ### The Checks count's weight and its announcement (`studio-checks-signal-reach`)
 
@@ -4034,19 +4029,15 @@ the dark scheme. Pass: the color still reads against the screen's ground.
 
 ### An issue's source as a label (`studio-checks-signal-reach`)
 
-An issue's source renders as a mono label now, in place of a bracket prefix
-inline in the message. The checks rail's group heading reads the same style.
-Whether the label separates from the message at a glance is a visual
-judgment.
+`studio-checks-by-subject` moved the source out of the rows. It now stands in
+each check row's Developer view as a mono label, with no brackets. A step
+page and a field card print the sentence alone. The entry "Checks by subject"
+walks the rows.
 
-Open the Checks tab on a draft holding issues from two sources. Pass: each
-row prints its source as a small uppercase mono label, with no brackets. The
-group headings above them read in that same treatment. Open a step page
-carrying its own issues. Pass: the per-entity list reads the same way.
-
-Compare the two weights. Pass: the rail's headings and the list's sources
-both read at weight 400. The rail composes the label onto an `<h3>`, whose
-user-agent default is bold, so the shared style states the weight itself.
+Open the Checks tab on a draft holding checks from two sources. Open one
+row's Developer view. Pass: the first line prints the source as a small
+uppercase mono label at weight 400. The raw message and the location follow
+it in mono.
 
 ### Canvas node label (`canvas-node-label-clamp`)
 
@@ -6220,7 +6211,8 @@ Pick "Credit Check" in the process select.
 Pass: the binding select appears and reads "Always this exact version". The
 version field shows the newest version of `credit_check`.
 
-Pass: the Checks tab lists no Zod "Required" issue for the step's spec.
+Pass: the Checks tab lists no row for the step's spec. No row's Developer
+view reads a Zod "Required" message.
 
 Press "+ Add input mapping" under `inputMapping`.
 
@@ -6231,7 +6223,7 @@ Pass: "+ Add input mapping" stays disabled once a row holds `amount`.
 
 Give the row the CEL text `data.requested_amount`.
 
-Pass: the Checks tab shows no issue for the step's spec.
+Pass: the Checks tab lists no row for the step's spec.
 
 Add an end step. Add a path from the subprocess step to it. Publish the draft.
 
@@ -6312,8 +6304,8 @@ it.
 Pass: keyboard focus stands on the "A step someone works" option that opened
 the dialog.
 
-Pass: the Checks tab shows no issue "only a subprocess step may declare a
-subprocess spec".
+Pass: the Checks tab lists no row whose Developer view reads "only a
+subprocess step may declare a subprocess spec".
 
 Select the `submit` step, a task step with one path. Press the "An end" option.
 
@@ -6405,7 +6397,7 @@ the focus again.
 Press "Remove data source" again and confirm.
 
 Pass: the rail row of the next data source holds the focus. The Checks tab
-reports no unresolved `dataSource`. On the JSON surface none of the three
+lists no row whose Developer view reads an unresolved `dataSource`. On the JSON surface none of the three
 fields holds `dataSource` and the one `columnMapping` is gone.
 
 On the Steps tab, press "Remove this step" on step 2. In the dialog, press
@@ -6521,7 +6513,8 @@ position and the look of the sentences. Use the production bundle.
 
 **1. An empty process opens clean.** On `/studio`, press **+ New process**
 and choose **Empty process**. Pass: no banner stands above the tabs. No text
-on the page reads "zod". The Checks tab's count reads 0.
+on the page reads "zod". A row's Developer view stands closed. The Checks
+tab's count reads 0.
 
 The reason line beside Publish states "Publish needs a first step". The Checks
 tab body shows "No step yet. Add the first
@@ -6702,11 +6695,11 @@ Repeat with `/edit/panels/paths`, `/edit/panels/matrix`,
 `/edit/panels/changes`. Pass: each one lands where its `/edit/` twin lands.
 
 **7. A check about a path.** On the Steps tab, open a step's Ways out section.
-Clear one way out's key in its Developer view. Open Checks. Reach the row
-that names that way out by keyboard.
+Clear one way out's key in its Developer view. Open Checks. Reach the Fix
+control of the row that names that way out by keyboard.
 
-Press Enter. Pass: Steps opens on the owning step, with that way out
-selected. Pass: focus stands on the Steps tab's own button in the tab row.
+Press Enter. Pass: Steps opens on the owning step, with Ways out open and that
+way out marked. Pass: focus stands on the Ways out header.
 
 **8. The publish dialog's Changes row.** Restore the way out's key. Rename one
 field's label on the Catalog view, then press Publish. Pass: the dialog's
@@ -7196,6 +7189,118 @@ stands above the card, and the Fields view body scrolls the whole card. In
 devtools the card's container reads `overflow-y: visible`.
 
 Resize to 420px. Pass: nothing scrolls sideways.
+
+Discard the draft from the process list and accept the browser's confirm.
+Under `playwright-cli`, `dialog-accept` answers it.
+
+### Checks by subject (`studio-checks-by-subject`)
+
+Source: `studio-checks-by-subject` tasks 4.3 and 5.3. The `development-toolchain`
+split leaves a check off this list when a `bun:test` assertion pins it. The
+suite pins every catalog sentence, the scan that finds a message with no rule,
+and each landing's target. It also pins a row's subject and severity, the row
+order, the Fix label and the refusal text. This walk covers focus, a wrapped
+row, a color and a scroll box.
+
+See this file's "Before you start" section. Use the production build on this
+checkout's own engine port. Seed the database and sign in as
+`demo-superuser@example.test`, password `seed-demo-password`. Create a draft
+of any seeded process. Under `playwright-cli`, pass
+`-s=studio-checks-by-subject` on every call. Every step below runs at
+1440x900 unless it names another width.
+
+**1. Break the draft.** Empty one step's key in its Developer view. Clear
+another step's name, and clear a way out's target. On the Fields tab, clear a
+field's name, and add a data source with no name. On Settings, empty the
+process key. Open the Checks tab.
+
+**2. Three subjects.** Pass: the rail prints Steps, Fields and Before
+publishing, each as a heading over a hairline. Pass: the first two list rows,
+and the third holds the line. Pass: a subject with no row prints no heading.
+Before publishing is the one exception, since it holds the line. Pass: the
+steps follow the draft's own order.
+
+**3. The words.** Pass: each row opens with the word Must fix in the refusal
+color. Add a view flag finding through the JSON surface, for example a field
+required and not asked. Pass: its row opens with Worth a look in slate. Pass:
+the words read the same in a grayscale screenshot, so color never carries the
+severity alone.
+
+**4. The sentences.** Pass: each row prints one sentence that names the step
+or field and the place to go. Pass: no row prints a path such as `steps[1]`, a
+validator's name or "Invalid input". Two unnamed steps read by their numbers.
+Pass: a long name wraps inside the column.
+
+**5. Fix lands, one row at a time.** Press Fix on each row below and read the
+focus ring. Return to Checks between rows.
+
+- A step's key: Steps opens on the step with More open and its Developer view
+  open. Focus stands on More's header.
+- A step's name: Steps opens on the step. Focus stands on the Name input.
+- The way out's target: Steps opens with Ways out open and the way out marked.
+  Focus stands on the Ways out header.
+- The field's name: Fields opens on Catalog with the field selected. Focus
+  stands on the sentence under Name.
+- The data source: Fields opens on Where values come from with the source
+  selected. Focus stands on the sentence in its editor.
+- The process key: Settings opens on the Process view. Focus stands on the
+  Settings tab's own button.
+- The process name, once cleared: the tab stays. Focus stands on the name
+  input in the header bar.
+
+Pass: each ring is the 2px accent ring, whole on every side. Pass: the ring on
+a sentence list is not clipped. Return to the Checks tab, then to the field.
+Pass: the field takes no focus on a second visit.
+
+**6. A mouse press and the keyboard.** Press Fix with the mouse on a Fields
+row. Pass: the same landing, with the focus ring showing. Reach the Fix control
+by Tab. Pass: it carries a ring, and a screen reader reads the sentence as its
+description.
+
+**7. The Developer view.** Open a row's Developer view. Pass: it opens from
+closed. Pass: the source prints as a mono label, then the raw message, then the
+location.
+
+Close a step key's More, then press Fix on its row. Pass: More and its
+Developer view open again. Close the Developer view by hand. Pass: it stays
+closed until the check clears.
+
+**8. The line.** While a source holds back, the line under Before publishing
+starts "More checks run once you fix". Open the line's Developer view. Pass: it
+lists the held-back sources in mono, then the two held-back notes.
+
+Fix every row. Pass: the line drops its first sentence. It keeps the sentence
+that says publishing checks each plugin's settings.
+
+**9. The all clear.** With no row open, a 2px ink box reads "No open issues."
+and the publish sentence. Pass: Before publishing keeps the line.
+
+Press the Forms tab's check badge on a step. Pass: the rail narrows to that
+step and prints "Showing the checks on" with its name. Pass: the line stands in
+the narrowed list too. Press "Show every check".
+
+**10. The blocked Publish dialog.** Break the draft again and press Publish.
+Pass: the dialog reads "This draft cannot go out yet. Open Checks and fix what
+it marks Must fix." Pass: no text in it reads "the engine".
+
+**11. A refusal.** Give the draft a plugin action whose settings pass the
+studio and fail the server. Press Publish and confirm. Pass: the dialog stays
+open. It prints "Publishing stopped. Fix these, then publish again:" and one
+sentence per located issue.
+
+Pass: the server's own text stands in a closed Developer view under them.
+Close the dialog. Pass: the banner holds the same sentences.
+
+**12. A new step takes the name.** Press Add a step on the Steps tab. Pass:
+focus stands on the new step's Name input.
+
+**13. The rail at 900px.** Resize to 900x800 with thirty rows open. Scroll the
+rail partway. Pass: the ring on a row's Fix control stays whole at the top and
+the bottom of the scroll. Pass: Fix wraps under the sentence once the row is
+narrow, with its ring whole.
+
+Below 64rem, select the last step on the steps rail. Pass: the rail scrolls
+that row into view.
 
 Discard the draft from the process list and accept the browser's confirm.
 Under `playwright-cli`, `dialog-accept` answers it.

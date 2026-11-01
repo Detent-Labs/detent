@@ -95,10 +95,10 @@ Every other term below belongs to one tab.
 | steps rail | the Steps tab's left column: one numbered row per step, in the draft's own order | `panels/StepsRail.tsx` |
 | grip | the steps rail's own drag control, trailing each row | `panels/StepsRail.tsx` (`GripVertical`) |
 | step page | the Steps tab's wide right column, open on the one selected step | `panels/StepPage.tsx` |
-| masthead | the step page's top zone. It holds the step number, the kind phrase, the name, the description, and the issues no section claims | `panels/StepPage.tsx` |
+| masthead | the step page's top zone. It holds the step number, the kind phrase, the name and the description. It also holds a name check under Name and any issue no section claims | `panels/StepPage.tsx` |
 | section | one subject group on the step page, one of six, open one at a time | `panels/sectionsFor.ts` |
 | section header | the button that opens and closes one section. It carries the section's name, a one-line summary and a mark | `panels/StepPage.tsx` |
-| Developer view | a disclosure over raw JSON, CEL or machine values. The step page's, in More, holds the step's key and JSON, and each way-out row's holds that way out's key. The change-list row, each process list row, the form editor and a condition or rule input hold one. The field card holds four: More's, Choices', the default value's and the validation rule's. The Settings tab's Process view and the Publish dialog hold the key, the process id and the revision. Every Developer view stands closed on open, bar three that the paragraph under this table lists. | `panels/StepPage.tsx`, `panels/PathsPanel.tsx`, `panels/ChangeList.tsx`, `panels/ProcessSettingsPanel.tsx`, `panels/ProcessHeaderBar.tsx`, `screens/ProcessesScreen.tsx`, `panels/FieldCatalogPanel.tsx`, `screens/FormEditorScreen.tsx`, `panels/shared/ConditionInput.tsx`, `panels/shared/RuleInput.tsx`, `panels/shared/DefaultValueEditor.tsx` |
+| Developer view | a disclosure over raw JSON, CEL or machine values. The step page's, in More, holds the step's key and JSON, and each way-out row's holds that way out's key. The change-list row, each process list row, the form editor and a condition or rule input hold one. A check row and the checks rail's line hold one each. The field card holds four: More's, Choices', the default value's and the validation rule's. The Settings tab's Process view and the Publish dialog hold the key, the process id and the revision. | `panels/StepPage.tsx`, `panels/PathsPanel.tsx`, `panels/ChecksRail.tsx`, `panels/ChangeList.tsx`, `panels/ProcessSettingsPanel.tsx`, `panels/ProcessHeaderBar.tsx`, `screens/ProcessesScreen.tsx`, `panels/FieldCatalogPanel.tsx`, `screens/FormEditorScreen.tsx`, `panels/shared/ConditionInput.tsx`, `panels/shared/RuleInput.tsx`, `panels/shared/DefaultValueEditor.tsx` |
 | sentence | the line that reads a condition in words. It stands under a condition input's rows and under a Read by row's place. On the canvas, a way out's sentence sits on its line, as "Otherwise" does | `panels/shared/ConditionInput.tsx`, `panels/shared/conditionLogic.ts::readerSentence`, `canvas/mapWords.ts` |
 | Read by section | the field card's section that lists each expression reading the field, by place and sentence. Each row with a place carries an Open command | `panels/FieldCatalogPanel.tsx`, rows from `panels/readByRows.ts` |
 | rewrite line | the line under a field's label that says how many conditions a key change updated | `panels/FieldCatalogPanel.tsx` |
@@ -119,13 +119,17 @@ Every other term below belongs to one tab.
 | form canvas | the drop target where an author arranges a step's view entries into groups and tabs. Bare *canvas* names only the graph surface above | `screens/FormEditorScreen.tsx` |
 | form preview | the form editor's trailing pane, under the canvas at 80rem and below, mounting the renderer a participant meets | `panels/FormPreview.tsx` |
 | form tab strip | the row of a step form's own tabs, above the form canvas | `panels/FormTabStrip.tsx` |
-| checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
+| checks rail | the validation issue list, grouped by subject | `panels/ChecksRail.tsx` |
+| check row | a row on the checks rail: the severity word, the sentence, Fix and its Developer view | `panels/ChecksRail.tsx` (`CheckRow`) |
+| severity word | the check row's kicker: Must fix or Worth a look | `panels/ChecksRail.tsx` |
+| Fix | the check row's command, landing on the place that owns the check | `panels/ChecksRail.tsx` |
 | Access view | the Settings tab's view over the process's Developer, Owner and Reader access lists | `panels/AccessPanel.tsx` inside `panels/SettingsTab.tsx` |
 
 On the field card, More's Developer view holds the key input and the plugin
-envelope. Choices' holds the stored values. Three Developer views open by
-themselves. A condition or rule input's opens over unparseable source. The
-default value's opens over an expression default. More's opens on a key check.
+envelope. Choices' holds the stored values. Four Developer views open by
+themselves, and every other stands closed on open. A condition or rule input's opens over unparseable source. The
+default value's opens over an expression default. The field card's More and a
+step's own More open on a key check.
 
 The Forms tab's legend and the form editor's palette both say *Group* for a
 form's group. The *section* row names the step page's subject group. A *card
