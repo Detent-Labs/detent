@@ -104,7 +104,7 @@ A new module, `panels/shared/optionText.ts`, holds three pure functions:
   "Review (2)". Draft ids are optional and an operand has none. So the
   result is a list, and the caller zips it with its items. The count reads the catalog key `options.repeatedLabel`,
   "{label} ({n})".
-- `wayOutHeading(path, stepTexts)`: the way out's label, else "(unnamed
+- `wayOutHeading(path, stepTexts, plainTexts)`: the way out's label, else "(unnamed
   way out)". An arrow follows, then the target's numbered step text, else
   "(no step yet)". `paths.rowHeading` stays its template.
 
@@ -188,7 +188,7 @@ from step id to text. A label that one step alone carries stays plain. Steps sha
 placeholder read `steps.unnamedStepNumbered`, "(unnamed step {n})". A single
 unnamed step keeps "(unnamed step)".
 
-`PathsPanel.tsx` and `TimersPanel.tsx` both call `stepTextMap`, so the two
+`plainStepTextMap` gives the unnumbered texts D8 compares against. The module also exports `fill`, which `conditionLogic.ts` imports. `PathsPanel.tsx` and `TimersPanel.tsx` both call `stepTextMap`, so the two
 copies of the map builder go. Ways out, fields and operands keep
 `numberRepeats` and its "{label} ({n})": no numbered list stands beside
 them.

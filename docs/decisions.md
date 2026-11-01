@@ -1965,6 +1965,13 @@ local to this section.
   reads umlauts. The rule covers process, step and way-out keys too. The Path
   section does not repeat it. A later guide edit moves the note to a shared
   place.
+- **SELECTS-17: no test covers the add-way-out target reset.** The
+  `studio-canvas` scenarios say "+ Add a way out" stays disabled with no target
+  chosen, and the target select resets after an add. `PathsPanel.tsx` does
+  both. No test pins either.
+- **SELECTS-18: the operand picker counts repeats on untrimmed labels.** The
+  field-map selects trim a label before they count it. A label with a trailing
+  space then counts apart in the picker alone.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

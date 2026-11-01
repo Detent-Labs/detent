@@ -22,8 +22,8 @@ section 8). It builds on change 2, which shipped on 2026-10-31.
 
 - Two selects list steps: the way out's "Leads to" and "Where the new way
   out leads". Each lists a step by its label in the content locale. An unnamed
-  step reads "(unnamed step)". A second and later step sharing a label
-  adds a count, "Review (2)", the condition builder's rule for fields.
+  step reads "(unnamed step)". Steps sharing a label add their
+  steps-rail number, "Review (step 6)".
 - The time limit's way-out select lists each way out by its row heading,
   "Approve → Done". Two ways out with one
   heading stay apart by the same count.
@@ -31,7 +31,9 @@ section 8). It builds on change 2, which shipped on 2026-10-31.
   an action's output mapping and a called process's two mappings. A
   child field reads its label in the child's own words.
 - A way out's heading names an unnamed target step "(unnamed step)". It
-  no longer falls back to the step's key or id.
+  no longer falls back to the step's key or id. It names its target once.
+- The time limit's select takes the shared studio select and spans its
+  column. Each field-map row's controls carry an accessible name.
 - A new path's default label names an unnamed side "(unnamed step)" in
   place of its key.
 - Key derivation transliterates before it slugs. "ä", "ö" and "ü" become
