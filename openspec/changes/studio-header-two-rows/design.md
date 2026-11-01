@@ -216,7 +216,7 @@ rest stay with the changes that own them, and `docs/decisions.md` records them.
 
 - The name's missing translation warning moves below the bar. It stands only
   while an author translates, and in the row it grew the bar to three lines.
-- While the name has no entry in the edited language, its placeholder reads the
+- With no entry in the edited language, the name's placeholder reads the
   base-language name, in place of "(untitled process)".
 - The name input takes an accessible name, "Process name".
 - The Process view's language controls take the author's words. The select's
