@@ -113,6 +113,9 @@ describe("the Fields tab holds two scroll boxes below the breakpoint", () => {
     expect(block).toMatch(/gridTemplateRows: \{ default: "none", \[NARROW\]: "auto auto" \}/);
     expect(block).toMatch(/height: \{ default: "100%", \[NARROW\]: "auto" \}/);
     expect(block).toMatch(/overflow: \{ default: "hidden", \[NARROW\]: "visible" \}/);
+    // A zero flex basis pins the grid to the view's height, whatever its
+    // own `height` says; under NARROW it takes its content's height instead.
+    expect(block).toMatch(/flex: \{ default: "1 1 0", \[NARROW\]: "0 0 auto" \}/);
   });
 
   it("gives the editor no scroll box of its own under NARROW, and keeps its ring room", () => {

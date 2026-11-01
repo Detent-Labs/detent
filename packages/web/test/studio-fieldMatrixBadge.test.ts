@@ -183,8 +183,18 @@ describe("the bulk badge grid", () => {
     expect(grid).toContain('gridTemplateColumns: "repeat(3, 1.75rem)"');
   });
 
-  it("lets a long word wrap instead of clipping", () => {
-    expect(block("matrixFlagBadge")).not.toContain("nowrap");
+  it("keeps each word on one line, and never clips it", () => {
+    // "Read-only" wrapped onto two lines at 1440. The `1fr` tracks widen to
+    // the widest word instead.
+    expect(block("matrixFlagBadge")).toContain('whiteSpace: "nowrap"');
     expect(block("matrixFlagBadge")).not.toContain("overflow");
+  });
+
+  it("prints the No form column note at 11px, the tracked-label floor", () => {
+    expect(block("matrixColNote")).toContain('fontSize: "11px"');
+  });
+
+  it("gives the scroll wrapper a region role beside its name", () => {
+    expect(grid).toMatch(/matrixScroll\)\}\s*role="region"\s*tabIndex=\{0\}\s*aria-label=\{t\("fieldMatrix\.scrollRegionLabel"\)\}/);
   });
 });

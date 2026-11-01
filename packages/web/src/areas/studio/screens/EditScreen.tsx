@@ -25,7 +25,7 @@ import { useFetchOnce } from "../panels/shared/useFetchOnce.js";
 import { stepText } from "../panels/shared/optionText.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
 import { DEFAULT_TAB, FIELDS_VIEWS, SETTINGS_VIEWS, type ProcessTab, type Route, type TabView } from "../routing.js";
-import { checkTarget, formEditorReturnTab, processTabCounts, surfaceTab, type CheckTarget } from "../draft/process-tabs.js";
+import { checkTarget, formEditorReturnTab, placeAction, processTabCounts, surfaceTab, type CheckTarget } from "../draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { showsStructuralBanner } from "../draft/startGaps.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
@@ -1209,15 +1209,11 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
               visible={!jsonOpen && openTab === "fields"}
               onShowStep={(target) => navigate({ name: "edit", processId, stepId: target })}
               onOpenForm={(target) => openFormEditor(target, "steps")}
-              onOpenPlace={(place) =>
-                place.kind === "form"
-                  ? openFormEditor(place.stepId, "steps")
-                  : openTabFromRow(
-                      place.kind === "wayOut"
-                        ? { tab: "steps", stepId: place.stepId, pathId: place.pathId }
-                        : { tab: "steps", stepId: place.stepId },
-                    )
-              }
+              onOpenPlace={(place) => {
+                const action = placeAction(place);
+                if (action.kind === "form") openFormEditor(action.stepId, "steps");
+                else openTabFromRow(action.target);
+              }}
             />,
           )}
           {/* The Forms tab: one plate per step that declares a view

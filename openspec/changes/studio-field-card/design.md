@@ -192,11 +192,16 @@ its `step.key` fallback. The row type `FieldUsageRow` keeps its shape.
 Under the rows, in order:
 
 - the checkbox "Required on every step that asks for it". It writes through
-  `applyRequiredOverride`, as today's "Ask for this" does, with its scope
-  note and divergence note;
+  `applyRequiredOverride`, as today's "Ask for this" does, with its
+  divergence note. That note takes the note style, and the box shows
+  indeterminate while the steps disagree;
 - the sub-heading "Only ask this when" and the `ConditionInput`, wired as
   today, with the divergence notes. SENTENCE-6 closes because each row
   above already reads its own condition as a sentence.
+
+The rows name every step a write reaches, so no "Writes to:" line stands
+under them. A group field keeps its rows and commands. It shows neither the
+checkbox nor the condition, since a group has no value.
 
 With no row the section reads "No step asks for this field yet." It offers
 "Put this field on a step", as today's empty state does. The checkbox and
@@ -226,6 +231,8 @@ receives `onOpenPlace(target)`:
   stepId, pathId })`. The step page then opens on that step with the way out
   marked.
 - `form` calls `openFormEditor(stepId, "steps")`.
+- The pure `placeAction(place)` in `draft/process-tabs.ts` decides these
+  three, and `EditScreen` runs its answer.
 - `field` selects that field in the rail and opens its More fold. `FieldsTab`
   holds `openMoreFor: string | undefined`. The card reacts to it in an
   effect, since a field's own rule targets the already-mounted card. Then
@@ -389,6 +396,7 @@ Added:
 | `fieldCard.requiredEverywhere` | Required on every step that asks for it |
 | `fieldCard.noSourceOption` | Nowhere: this field lists its own choices |
 | `fieldCard.technicalLabel` | Technical: the process fills this in by itself |
+| `fieldCard.kindNoteWithChoices` | One pick from the choices below. |
 | `fieldMatrix.markCondition` | Condition |
 | `fieldMatrix.rowKindLabel` | Kind |
 | `fieldsViews.sources` | Where values come from |
@@ -396,6 +404,7 @@ Added:
 | `dataSources.kindLegend` | What kind of source |
 | `dataSourceKind.db.list` | A data list an operator keeps |
 | `dataSourceKind.instance.query` | Cases of another process |
+| `dataSourceKind.static` | A list typed into this process |
 | `defaultValue.computedNote` | A rule computes this default. |
 | `defaultValue.developerView` | Developer view |
 | `formsTab.legendGroup` | Group |
@@ -449,13 +458,17 @@ Removed: `fieldCatalog.whatAsksHeading`, `fieldCatalog.whatKindHeading`,
 `formEditor.markCel`, `condition.celReadout`, `condition.celEmpty`,
 `defaultValue.editAsCel`, `defaultValue.useValue`, `contract.heading`,
 `dataSources.keyCaption`, `dataSources.pluginLegend`, `settings.sources`,
-`formsTab.legendSection`. The ones marked "stays" keep their text.
+`formsTab.legendSection`, `fieldCatalog.requiredScopeNote`,
+`fieldCatalog.conditionScopeNote`. The ones marked "stays" keep their text.
 
 ### D13. The stacked layout below 64rem
 
 `EntityTabs.tsx`'s `layout` reads, under `NARROW`, `height: "auto"`,
 `overflow: "visible"` and rows `"auto auto"`; `editor` reads `overflowY:
 "visible"` there and keeps its padding. The rail keeps its 20rem cap.
+
+The `layout` also reads `flex: "0 0 auto"` under `NARROW`, as the Steps
+tab's grid does. A zero flex basis would hold the grid at the view's height.
 `FieldsTabViews.tsx`'s `view` style gains `overflowY: "auto"`,
 `overscrollBehavior: "contain"`, `padding: focus.reach` and `scrollPadding:
 focus.reach`, the four keys `SettingsTab.tsx`'s `view` carries, which

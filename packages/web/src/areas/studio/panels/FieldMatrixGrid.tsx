@@ -105,10 +105,11 @@ const styles = stylex.create({
     letterSpacing: "0.06em",
     color: colors.textMuted,
   },
+  // A tracked label stays at 11px or above (`design-language.md`).
   matrixColNote: {
     display: "block",
     fontFamily: fonts.mono,
-    fontSize: "10px",
+    fontSize: "11px",
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     color: colors.textMuted,
@@ -260,9 +261,12 @@ const styles = stylex.create({
     justifyItems: "stretch",
     marginTop: space.s2,
   },
+  // One line per word: the `1fr` tracks widen to the widest flag word
+  // rather than wrap it.
   matrixFlagBadge: {
     fontSize: "11px",
     lineHeight: 1.6,
+    whiteSpace: "nowrap",
     width: "100%",
     textAlign: "center",
     color: colors.textMuted,
@@ -677,6 +681,7 @@ export const FieldMatrixGrid = memo(function FieldMatrixGrid({
       {(
     <div
       {...stylex.props(styles.matrixScroll)}
+      role="region"
       tabIndex={0}
       aria-label={t("fieldMatrix.scrollRegionLabel")}
     >

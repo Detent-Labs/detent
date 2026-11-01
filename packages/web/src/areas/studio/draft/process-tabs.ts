@@ -3,6 +3,7 @@ import type { DraftViewEntry } from "./view-layout";
 import type { EditorIssue } from "./issues";
 import { flattenRailFields } from "./panel-rail";
 import type { ProcessTab, TabTarget } from "../routing";
+import type { OutsidePlace } from "../panels/readByRows";
 
 /** An action as the Checks hand-off reads it: its id alone. */
 interface TabCountAction {
@@ -138,4 +139,25 @@ export function formEditorReturnTab(openedFrom: ProcessTab | undefined): Process
  */
 export function surfaceTab(routeTab: ProcessTab, formStepId: string | undefined, formOrigin: ProcessTab | undefined): ProcessTab {
   return formStepId !== undefined ? formEditorReturnTab(formOrigin) : routeTab;
+}
+
+/** What a Read by row's "Open" on a place outside the Fields tab does: open
+ * a step's form in the form editor, or open a tab on a target. */
+export type PlaceAction = { kind: "form"; stepId: string } | { kind: "tab"; target: CheckTarget };
+
+/**
+ * The dispatch behind a Read by row's "Open" (design.md D4). A form opens the
+ * form editor on its step. A way out opens the Steps tab on its step with that
+ * way out marked, and a step opens the Steps tab on that step. A `field`
+ * target never reaches here: the Fields tab selects it itself.
+ */
+export function placeAction(place: OutsidePlace): PlaceAction {
+  switch (place.kind) {
+    case "form":
+      return { kind: "form", stepId: place.stepId };
+    case "wayOut":
+      return { kind: "tab", target: { tab: "steps", stepId: place.stepId, pathId: place.pathId } };
+    case "step":
+      return { kind: "tab", target: { tab: "steps", stepId: place.stepId } };
+  }
 }

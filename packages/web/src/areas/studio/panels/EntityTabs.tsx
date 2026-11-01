@@ -56,12 +56,14 @@ const NARROW = "@media (max-width: 64rem)";
 
 const styles = stylex.create({
   // Below the breakpoint the rail and the editor fall under one another, in
-  // source order: list, then the editor. The grid then takes its content's
-  // height, and the view body around it scrolls, so the tab holds two scroll
-  // boxes, the rail and the view body, and no third.
+  // source order: list, then the editor. The grid then neither grows nor
+  // shrinks: a zero flex basis would pin it to the view's height, so it
+  // takes its content's height instead, as the Steps tab's grid does
+  // (`EditScreen.tsx`'s `stepsTab`). The view body around it scrolls, so the
+  // tab holds two scroll boxes, the rail and the view body, and no third.
   layout: {
     display: "grid",
-    flex: "1 1 0",
+    flex: { default: "1 1 0", [NARROW]: "0 0 auto" },
     gridTemplateColumns: { default: "20rem minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
     gridTemplateRows: { default: "none", [NARROW]: "auto auto" },
     gap: space.s3,
