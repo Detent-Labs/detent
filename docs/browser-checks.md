@@ -6873,11 +6873,11 @@ entered or left and More. Pass: its More holds the cancelling control and the
 Developer view, and no Comment or Attachments control.
 
 **4. A fresh task step.** Press "Add a step" at the foot of the steps rail.
-Pass: Who acts stands open. Its summary reads "Nobody in particular" in slate,
-and its header shows no Done mark. Pass: the Ways out header reads "No way out
-yet", with a check badge reading 1.
+Pass: Ways out stands open. Its header reads "No way out yet" and carries a
+check badge reading 1. Who acts reads "Nobody in particular" in slate and
+has no Done mark.
 
-Pick a strategy under Who acts. Pass: the header shows the Done mark, a check
+Open Who acts and pick a strategy. Pass: the header shows the Done mark, a check
 icon named "Done". Pass: the summary reads the strategy's name in ink.
 
 **5. The removal dialog.** Choose "Finance Review", a step two ways out lead
@@ -6907,7 +6907,7 @@ tab body are the two scroll boxes. Under `playwright-cli`, read the style with
 **7. The condition row at 1024px.** Resize the window to 1024x800. Choose
 "Route by Amount" and open Ways out. Read the condition of "Needs finance
 approval". Pass: the condition builder's row wraps inside the page column.
-Pass: no control clips, and none runs under the steps rail.
+Pass: no control clips.
 
 Discard the draft from the process list and accept the browser's confirm.
 Under `playwright-cli`, `dialog-accept` answers it.
