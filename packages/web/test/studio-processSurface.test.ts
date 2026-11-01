@@ -197,11 +197,36 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
 
     expect(handler).toContain("onSelectStep(h.stepId)");
     expect(handler).toContain("onOpenStepPage?.(h.stepId)");
-    // The sentences need no room for a handle: it draws above them.
-    expect(code).not.toContain("handleObstacle");
+    // A handle blocks no sentence, since it draws above them all; only the
+    // placement's fallback weighs it (`studio-sentencePlacement.test.ts`).
+    expect(code).toContain("handleObstacle(at)");
     expect(code.indexOf("{connectHandles.map(")).toBeGreaterThan(code.indexOf("{edgeLabels.map("));
     expect(code.indexOf("{connectHandles.map(")).toBeGreaterThan(code.indexOf("{waypointHandles.map("));
     expect(code.indexOf("{disclosures.map(")).toBeGreaterThan(code.indexOf("{connectHandles.map("));
+  });
+
+  it("writes nothing from a click on the connect handle, only from a drag past the threshold", () => {
+    const code = stripComments(read(CANVAS));
+    const down = code.slice(code.indexOf("const onHandlePointerDown"), code.indexOf("const onHandlePointerMove"));
+    const up = code.slice(code.indexOf("const onHandlePointerUp"), code.indexOf("setConnectDrag(null);\n  };"));
+    const guard = "if (!exceedsClickThreshold(dragDelta(connectDrag.start, point))) {";
+
+    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, start: p, current: p })");
+    expect(up).toContain(guard);
+    // The guard returns before any write: a way out, a new step or a toast.
+    const afterGuard = up.indexOf("return;", up.indexOf(guard));
+    for (const write of ["resolveDropGesture(", "updateInDraftArray(", "mutate(", "showRejection("]) {
+      expect(up.indexOf(write)).toBeGreaterThan(afterGuard);
+    }
+  });
+
+  it("hands the canvas memoized waypoints and groups, so a selection click places nothing again", () => {
+    const code = stripComments(read(SURFACE));
+
+    expect(code).toMatch(/const waypoints = useMemo\(\(\) => \{[\s\S]*?\}, \[storedWaypoints\]\);/);
+    expect(code).toMatch(/const groups = useMemo\(\(\) => \{[\s\S]*?\}, \[storedGroups, steps\]\);/);
+    expect(code).toContain("waypoints={waypoints}");
+    expect(code).toContain("groups={groups}");
   });
 
   it("places no sentence while the Map tab is hidden, and places them when it shows", () => {

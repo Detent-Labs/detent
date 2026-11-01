@@ -7016,6 +7016,11 @@ mark.
 "Manager Approval". Pass: the Steps tab opens on "Manager Approval". The
 handle belongs to the node, so its double-click opens the step.
 
+Back on Map, count the steps and the ways out of "Manager Approval". Click its
+connect handle once without moving, then double-click it. Return to Map.
+Pass: the counts stay the same. A click and a double-click on the handle add
+no way out and no step.
+
 Press the sentence of "Under threshold", then press Enter. Pass: the Steps tab
 opens on "Route by Amount". The press moved the keyboard's stop to that way
 out, as a press on its line does.

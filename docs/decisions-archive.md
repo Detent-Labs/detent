@@ -1040,8 +1040,14 @@ system that resulted; this file explains why it took that shape.
   Upgrade entry: stop the double-click's propagation on the hit circle in
   `canvas/CanvasView.tsx`, if the browser check shows the step page opening.
 
-  Ruled by `studio-map-labels`, with no code change: the handle belongs to
-  the node. Its double-click opens the step, as the node's own does.
+  Ruled by `studio-map-labels`: the handle belongs to the node. Its
+  double-click opens the step, as the node's own does.
+
+  Correction: the entry missed a write. Each press ran a full connect
+  gesture, so a plain click wrote a way out to the step itself or added a
+  new step. A double-click wrote two before the Steps tab opened. The risk
+  was higher than Low. Fixed by `studio-map-labels`: a release under the
+  click threshold writes nothing, the rule the waypoint handle follows.
 - **MAPLABELS-7: a press on a way out's sentence leaves the roving stop
   behind.** A press on the line moves it, and a press on the sentence only
   selects. Enter after a sentence press then acts on the older stop. Risk

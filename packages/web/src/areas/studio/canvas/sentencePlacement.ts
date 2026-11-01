@@ -5,8 +5,9 @@
  *
  * Arrange leaves a 60-unit gap between columns and between rows. A sentence
  * centred on its route's midpoint at a comfortable width covers both
- * neighbours' labels and stamps there, so each sentence first narrows and
- * takes more lines, then slides along its own route.
+ * neighbours' labels and stamps there. So each sentence first slides along
+ * its own route and shifts across it at the widest width, and only then
+ * narrows and takes more lines.
  */
 
 import { NODE_HEIGHT, NODE_WIDTH, type Point } from "./geometry";
@@ -130,6 +131,67 @@ export function labelObstacle(at: Point): Obstacle {
     height: NODE_HEIGHT,
     weight: COVER_WEIGHT - 1,
     blocks: false,
+  };
+}
+
+/** The arrowhead's box at a route's end, each side. */
+export const ARROWHEAD_BOX = 12;
+/** The connect handle's dot as the fallback weighs it: 14 across, grown by
+ * `NODE_CLEARANCE` each side. */
+export const HANDLE_BOX = 18;
+/** The start arrow's run left of the initial step, and its box's height. */
+export const START_ARROW_LENGTH = 24;
+export const START_ARROW_BOX_HEIGHT = 10;
+/** An expanded group's name: inset from the box's left edge, its baseline
+ * above the box's top edge, and the 12px body face's ascent and line. */
+export const GROUP_NAME_INSET = 8;
+export const GROUP_NAME_BASELINE = 6;
+export const GROUP_NAME_ASCENT = 12;
+export const GROUP_NAME_LINE = 16;
+
+/** The arrowhead at the end of `route`: a blocking box, weighed as content. */
+export function arrowheadObstacle(route: Point[]): Obstacle {
+  const end = route[route.length - 1];
+  const half = ARROWHEAD_BOX / 2;
+  return { x: end.x - half, y: end.y - half, width: ARROWHEAD_BOX, height: ARROWHEAD_BOX, weight: COVER_WEIGHT };
+}
+
+/** A node's connect handle. It blocks nothing: the handle draws above every
+ * sentence, and a blocking handle forced a gap's sentences into the fallback.
+ * There it counts as content, so a box that must overlap keeps to a node's
+ * border band rather than the dot. */
+export function handleObstacle(at: Point): Obstacle {
+  const half = HANDLE_BOX / 2;
+  return {
+    x: at.x + NODE_WIDTH - half,
+    y: at.y + NODE_HEIGHT / 2 - half,
+    width: HANDLE_BOX,
+    height: HANDLE_BOX,
+    weight: COVER_WEIGHT,
+    blocks: false,
+  };
+}
+
+/** The start arrow left of the initial step, at its mid-height: blocking. */
+export function startArrowObstacle(at: Point): Obstacle {
+  return {
+    x: at.x - START_ARROW_LENGTH,
+    y: at.y + NODE_HEIGHT / 2 - START_ARROW_BOX_HEIGHT / 2,
+    width: START_ARROW_LENGTH,
+    height: START_ARROW_BOX_HEIGHT,
+    weight: COVER_WEIGHT,
+  };
+}
+
+/** An expanded group's name over its box's top edge: blocking, with the
+ * width the body face's estimate gives `name`. */
+export function groupNameObstacle(box: Point, name: string): Obstacle {
+  return {
+    x: box.x + GROUP_NAME_INSET,
+    y: box.y - GROUP_NAME_BASELINE - GROUP_NAME_ASCENT,
+    width: name.length * SENTENCE_CHAR_WIDTH,
+    height: GROUP_NAME_LINE,
+    weight: COVER_WEIGHT,
   };
 }
 

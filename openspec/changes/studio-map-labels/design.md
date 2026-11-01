@@ -194,8 +194,7 @@ A pure function, `placeSentences` in `canvas/sentencePlacement.ts`, places
 every sentence the canvas draws at once. It reads geometry and nothing else:
 
 - Its input is each sentence's text, its route points and its midpoint. It
-  also takes the node rectangles, each node's label host and the stamp
-  rectangles.
+  also takes the obstacles in the table below.
 - It estimates a block at 6.5 units per character and 16 units per line.
   The text runs inside 4 units of padding a side, the padding the block
   draws, over at most six lines.
@@ -209,21 +208,38 @@ every sentence the canvas draws at once. It reads geometry and nothing else:
   the box sideways across the segment there, 8 units at a time, nearest
   first. The place stays inside the box, at least 4 units from its edge, so
   the box still sits on its line.
-- It keeps the first box that meets no node, no stamp and no sentence it
-  already placed. Node rectangles grow by 2 units a side.
+- It keeps the first box that meets no blocking obstacle.
 - Where no box is clear, the sentence takes the box it tried with the least
-  weighted overlap. A unit of area over a node's label host counts 10. So
-  does a unit over a stamp or an earlier sentence. A unit over the rest of
-  a node counts 1. The label host spans the node's full height. It runs
-  from 10 units inside the left edge to 26 inside the right.
+  weighted overlap. Each obstacle counts its shared area times its weight.
 - A tie goes to the wider box, then to the box nearer the midpoint.
+
+| Obstacle | Box | Blocks | Weight |
+|---|---|---|---|
+| Node | the node, grown by 2 units a side | yes | 1 |
+| Label host | 10 units in from the left edge to 26 in from the right, full height | inside the node | 10 |
+| Stamp | the stamp's host | yes | 10 |
+| Sentence placed earlier | its box | yes | 10 |
+| Arrowhead | 12 by 12 at each route's end | yes | 10 |
+| Group name | the expanded group's name line over its box | yes | 10 |
+| Start arrow | 24 by 10 left of the initial step, at mid-height | yes | 10 |
+| Connect handle | 18 by 18 around the dot | no | 10 |
+
+A collapsed group's box counts as a node with its label host. The connect
+handle blocks nothing, since it draws above every sentence. A blocking
+handle pushed every straight way out across a 60-unit gap into the
+fallback. The fallback still weighs it, so a box that must overlap keeps to
+a node's border band over the dot. The label host's weight sits on top of
+the node's own 1.
 
 The host `<foreignObject>` is the chosen width wide and 96 units high, six
 lines. It centres on the chosen place, and a flex box centres the text block
-inside it. A short estimate then never clips a line. The canvas memoizes the
-placement on its inputs, so a pointer move does not re-run it. A hidden Map
-tab places nothing. Opening the tab places every sentence before its first
-paint.
+inside it. The lines inside the block sit flush left, as rule 1 of the design
+language asks.
+
+Since the host is six lines high, a short estimate never clips a line. The
+canvas memoizes the placement on its inputs, so a pointer move does not
+re-run it. A hidden Map tab places nothing. Opening the tab places every
+sentence before its first paint.
 
 The host takes no pointer events. The text block takes them, so the empty
 host corners never swallow a press meant for a node. The text block carries

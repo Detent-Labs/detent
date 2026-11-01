@@ -1,12 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import { NODE_HEIGHT, NODE_WIDTH, type Point } from "../src/areas/studio/canvas/geometry.js";
-import * as placement from "../src/areas/studio/canvas/sentencePlacement.js";
 import {
+  arrowheadObstacle,
   COVER_WEIGHT,
+  groupNameObstacle,
+  handleObstacle,
   labelObstacle,
   nodeObstacle,
   placeSentences,
   sentenceFloor,
+  startArrowObstacle,
   sentenceLines,
   stampObstacles,
   SENTENCE_LINE_KEEP,
@@ -148,9 +151,73 @@ describe("placeSentences", () => {
     expect(sentenceFloor("First, only if Booking Status is Booked")).toBe(SENTENCE_MIN_WIDTH);
   });
 
-  it("weighs no connect handle: the handles draw above every sentence", () => {
-    expect("handleObstacle" in placement).toBe(false);
-    expect("HANDLE_BOX" in placement).toBe(false);
+  it("keeps a sentence off its own arrowhead", () => {
+    // A short open route: a 200-wide box anywhere on it covers the end.
+    const route = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const input = [{ key: "p1", text: "Otherwise", route, midpoint: { x: 50, y: 0 } }];
+    const arrowhead = arrowheadObstacle(route);
+    expect(arrowhead).toEqual({ x: 94, y: -6, width: 12, height: 12, weight: COVER_WEIGHT });
+
+    const box = placeSentences(input, [arrowhead]).get("p1");
+    const unaware = placeSentences(input, []).get("p1");
+
+    expect(box && unaware).toBeDefined();
+    if (!box || !unaware) return;
+    // The positive control: with no arrowhead obstacle the box covers it.
+    expect(areaOver(unaware, [arrowhead])).toBeGreaterThan(0);
+    expect(areaOver(box, [arrowhead])).toBe(0);
+  });
+
+  it("lets a box stand over a connect handle where it is otherwise clear", () => {
+    const handle = handleObstacle(LEFT);
+    expect(handle).toEqual({ x: 171, y: 21, width: 18, height: 18, weight: COVER_WEIGHT, blocks: false });
+
+    const box = placeSentences(
+      [{ key: "p1", text: "Otherwise", route: [{ x: 100, y: 30 }, { x: 300, y: 30 }], midpoint: { x: 200, y: 30 } }],
+      [handle],
+    ).get("p1");
+
+    expect(box).toBeDefined();
+    if (!box) return;
+    // First fit: the handle blocks nothing, so the widest box stays centred.
+    expect(box.width).toBe(SENTENCE_MAX_WIDTH);
+    expect(centre(box)).toEqual({ x: 200, y: 30 });
+    expect(areaOver(box, [handle])).toBeGreaterThan(0);
+  });
+
+  it("prefers a node's border band over its connect handle where no box is clear", () => {
+    // The route runs down beside the node's right edge, inside the handle's
+    // columns. Walls close the right side and the rows above and below the
+    // node. Unweighted, the box nearest the midpoint sits over the handle.
+    // Weighted, the handle costs ten times a unit of node.
+    const node = { x: 0, y: 0 };
+    const walls = [
+      { x: 230, y: -400, width: 400, height: 1000 },
+      { x: -400, y: -400, width: 1100, height: 398 },
+      { x: -400, y: 62, width: 1100, height: 400 },
+    ];
+    const handle = handleObstacle(node);
+    const input = [{ key: "p1", text: "Otherwise", route: [{ x: 186, y: 0 }, { x: 186, y: 60 }], midpoint: { x: 186, y: 30 } }];
+
+    const weighted = placeSentences(input, [nodeObstacle(node), handle, ...walls]).get("p1");
+    const unaware = placeSentences(input, [nodeObstacle(node), ...walls]).get("p1");
+
+    expect(weighted && unaware).toBeDefined();
+    if (!weighted || !unaware) return;
+    expect(areaOver(unaware, [handle])).toBeGreaterThan(0);
+    expect(areaOver(weighted, [handle])).toBe(0);
+  });
+
+  it("frames the start arrow and an expanded group's name as blocking boxes", () => {
+    expect(startArrowObstacle({ x: 100, y: 200 })).toEqual({ x: 76, y: 225, width: 24, height: 10, weight: COVER_WEIGHT });
+    // The name's baseline stands 6 above the box, its 12px line above that.
+    expect(groupNameObstacle({ x: 100, y: 200 }, "Intake")).toEqual({
+      x: 108,
+      y: 182,
+      width: 6 * 6.5,
+      height: 16,
+      weight: COVER_WEIGHT,
+    });
   });
 
   it("prefers a node's border band over its label area where no box is clear", () => {

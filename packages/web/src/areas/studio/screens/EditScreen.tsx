@@ -525,27 +525,36 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // waypoints rather than failing the render, the rule `canvasEdgeStyle`
   // already follows: a draft saved by a later version must still draw.
   // `isPoint` is that same guard, and `canvas/layout.ts` is its one home.
-  const waypoints: Record<string, Point[]> = {};
+  // Memoized on the stored value, as `groups` below is: the canvas places its
+  // sentences on both, and a fresh object per render would re-run that
+  // placement on every selection click.
   const storedWaypoints = saveState.layout.waypoints;
-  if (storedWaypoints && typeof storedWaypoints === "object") {
-    for (const [pathId, list] of Object.entries(storedWaypoints as Record<string, unknown>)) {
-      if (Array.isArray(list) && list.every(isPoint)) waypoints[pathId] = list;
+  const waypoints = useMemo(() => {
+    const out: Record<string, Point[]> = {};
+    if (storedWaypoints && typeof storedWaypoints === "object") {
+      for (const [pathId, list] of Object.entries(storedWaypoints as Record<string, unknown>)) {
+        if (Array.isArray(list) && list.every(isPoint)) out[pathId] = list;
+      }
     }
-  }
+    return out;
+  }, [storedWaypoints]);
 
   // The third reserved key in that blob. An entry that does not parse drops,
   // and so does a member the draft no longer holds: a step delete is an
   // ordinary edit, and it must not strand a box or fail the render.
-  const groups: StepGroup[] = [];
   const storedGroups = saveState.layout.groups;
-  if (Array.isArray(storedGroups)) {
-    for (const entry of storedGroups as unknown[]) {
-      const g = entry as Partial<StepGroup>;
-      if (!g || typeof g.id !== "string" || typeof g.name !== "string" || !Array.isArray(g.stepIds)) continue;
-      const stepIds = g.stepIds.filter((id): id is string => typeof id === "string" && steps.some((s) => s.id === id));
-      groups.push({ id: g.id, name: g.name, stepIds, collapsed: g.collapsed === true });
+  const groups = useMemo(() => {
+    const out: StepGroup[] = [];
+    if (Array.isArray(storedGroups)) {
+      for (const entry of storedGroups as unknown[]) {
+        const g = entry as Partial<StepGroup>;
+        if (!g || typeof g.id !== "string" || typeof g.name !== "string" || !Array.isArray(g.stepIds)) continue;
+        const stepIds = g.stepIds.filter((id): id is string => typeof id === "string" && steps.some((s) => s.id === id));
+        out.push({ id: g.id, name: g.name, stepIds, collapsed: g.collapsed === true });
+      }
     }
-  }
+    return out;
+  }, [storedGroups, steps]);
 
   // One writer for every group edit: create, rename, collapse, expand and
   // ungroup all rewrite the same list, the way `onWaypointsChange` rewrites

@@ -41,7 +41,16 @@ import {
   STAMP_INSET,
   STAMP_LINE_HEIGHT,
 } from "./mapWords";
-import { labelObstacle, nodeObstacle, placeSentences, stampObstacles, type Obstacle, type SentenceBox, type SentenceInput } from "./sentencePlacement";
+import {
+  arrowheadObstacle,
+  groupNameObstacle,
+  handleObstacle,
+  labelObstacle,
+  nodeObstacle,
+  placeSentences,
+  stampObstacles,
+  startArrowObstacle,
+  type Obstacle, type SentenceBox, type SentenceInput } from "./sentencePlacement";
 import { nextFocus, entryFocus, type ArrowKey, type Focus } from "./traversal";
 import { stepTextMap } from "../panels/shared/optionText";
 import { buildOperands } from "../panels/shared/conditionLogic";
@@ -400,7 +409,7 @@ const styles = stylex.create({
     fontFamily: fonts.body,
     fontSize: 12,
     lineHeight: "16px",
-    textAlign: "center",
+    textAlign: "start",
     color: colors.textMuted,
     backgroundColor: colors.surface,
     // `SENTENCE_PADDING` in `sentencePlacement.ts`; StyleX cannot read an
@@ -908,9 +917,10 @@ export function CanvasView({
   }, [steps, draft.fields, contentLocale, baseLocale, loadedChildren, waypoints, groups, positionsById, hidden]);
 
   // Where each sentence stands (design.md D5): clear of every drawn node, its
-  // label and its stamps, every collapsed group's box and the sentences placed
-  // before it. The connect handles need no room: they draw above every
-  // sentence. A hidden Map tab places nothing and draws no
+  // label and its stamps, the start arrow, every arrowhead, every group's
+  // name or collapsed box, and the sentences placed before it. A connect
+  // handle blocks nothing, since it draws above every sentence, but the
+  // fallback weighs it as content. A hidden Map tab places nothing and draws no
   // sentence; the render that shows the tab places them all before it paints.
   const sentenceBoxes = useMemo(() => {
     if (!visible) return new Map<string, SentenceBox>();
@@ -919,11 +929,19 @@ export function CanvasView({
       if (!step.id || hidden.has(step.id)) continue;
       const at = positionsById[step.id];
       if (!at) continue;
-      obstacles.push(nodeObstacle(at), labelObstacle(at), ...stampObstacles(stampWords(step, initialStepId), at));
+      obstacles.push(
+        nodeObstacle(at),
+        labelObstacle(at),
+        handleObstacle(at),
+        ...stampObstacles(stampWords(step, initialStepId), at),
+      );
+      if (step.id === initialStepId) obstacles.push(startArrowObstacle(at));
     }
     for (const { group, box } of groupBoxes) {
-      if (group.collapsed && box) obstacles.push(nodeObstacle(box), labelObstacle(box));
+      if (!box) continue;
+      obstacles.push(...(group.collapsed ? [nodeObstacle(box), labelObstacle(box)] : [groupNameObstacle(box, group.name)]));
     }
+    for (const drawnPath of drawnPaths) obstacles.push(arrowheadObstacle(drawnPath.routed.points));
     const sentences: SentenceInput[] = [];
     for (const drawnPath of drawnPaths) {
       if (drawnPath.sentence === undefined) continue;
@@ -948,7 +966,9 @@ export function CanvasView({
     startPos: Record<string, Point>;
     current: Point;
   } | null>(null);
-  const [connectDrag, setConnectDrag] = useState<{ sourceStepId: string; current: Point } | null>(null);
+  // `start` is the press point, so a release under the click threshold reads
+  // as a click and writes nothing.
+  const [connectDrag, setConnectDrag] = useState<{ sourceStepId: string; start: Point; current: Point } | null>(null);
   // A group box drag moves every member, the way a multi-step node drag does.
   const [groupDrag, setGroupDrag] = useState<{
     groupId: string;
@@ -1244,7 +1264,8 @@ export function CanvasView({
     e.stopPropagation();
     capturePointer(e);
     setRejectMessage(null);
-    setConnectDrag({ sourceStepId: stepId, current: toSvgPoint(e) });
+    const p = toSvgPoint(e);
+    setConnectDrag({ sourceStepId: stepId, start: p, current: p });
   };
 
   const onHandlePointerMove = (e: React.PointerEvent) => trackPointer(connectDrag, setConnectDrag, { current: toSvgPoint(e) });
@@ -1261,6 +1282,14 @@ export function CanvasView({
     e.stopPropagation();
     if (!connectDrag) return;
     const point = toSvgPoint(e);
+    // Under the threshold this was a click, not a drag: it writes nothing,
+    // the rule the waypoint handle applies. Without it a click, and each
+    // click of a double-click, wrote a way out to the step itself or to a
+    // new step at the press point.
+    if (!exceedsClickThreshold(dragDelta(connectDrag.start, point))) {
+      setConnectDrag(null);
+      return;
+    }
     const sourceIndex = steps.findIndex((s) => s.id === connectDrag.sourceStepId);
     const sourceStep = steps[sourceIndex];
 
