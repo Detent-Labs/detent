@@ -57,21 +57,18 @@ function endsAs(path: Path, at: number, tail: readonly (string | number)[]): boo
 }
 
 /**
- * Turns every expression in `draft` that reads `data.<key>` into a row. A
- * step reads `stepText`, a way out reads `wayOutHeading` over the maps the
- * step page builds, after the step it leaves, and a field reads its label at
- * `contentLocale`, else the base locale, else "(unnamed field)".
+ * The place of a JSON path in the draft: the one classification `readByRows`
+ * and `readByPlaces` read. A step reads `stepText`, a way out reads
+ * `wayOutHeading` over the maps the step page builds, after the step it
+ * leaves, and a field reads its label at `contentLocale`, else the base
+ * locale, else "(unnamed field)".
  */
-export function readByRows(draft: Draft, key: string, contentLocale: string): ReadByRow[] {
-  const sites = keyReaderSites(draft, key);
-  if (sites.length === 0) return [];
-
+function placeOfIn(draft: Draft, contentLocale: string): (path: Path) => Place {
   const baseLocale = draft.baseLocale ?? "en";
   const steps: DraftStep[] = draft.workflow?.steps ?? [];
   const stepTexts = stepTextMap(steps, contentLocale, baseLocale);
   const plainTexts = plainStepTextMap(steps, contentLocale, baseLocale);
   const byId = new Map<string, DraftField>(draftFields(draft).flatMap((f) => (f.id === undefined ? [] : [[f.id, f] as const])));
-  const operands: Operand[] = buildOperands({ fields: draft.fields, locale: contentLocale, baseLocale });
 
   const fieldText = (field: DraftField | undefined) =>
     resolveDraftLocalizedText(field?.label, contentLocale, baseLocale)?.trim() || t("condition.unnamedField");
@@ -152,11 +149,36 @@ export function readByRows(draft: Draft, key: string, contentLocale: string): Re
     return { key: "readBy.other", slots: {}, condition: false };
   };
 
+  return placeOf;
+}
+
+/**
+ * Turns every expression in `draft` that reads `data.<key>` into a row, in
+ * draft order.
+ */
+export function readByRows(draft: Draft, key: string, contentLocale: string): ReadByRow[] {
+  const sites = keyReaderSites(draft, key);
+  if (sites.length === 0) return [];
+
+  const placeOf = placeOfIn(draft, contentLocale);
+  const operands: Operand[] = buildOperands({ fields: draft.fields, locale: contentLocale, baseLocale: draft.baseLocale ?? "en" });
+
   return sites.map(({ path, src }) => {
     const place = placeOf(path);
     const row: ReadByRow = { place: fill(t(place.key), place.slots) };
     if (place.condition) row.sentence = readerSentence(src, operands);
     if (place.target !== undefined) row.target = place.target;
     return row;
+  });
+}
+
+/** The place words of each JSON path, with no sentence and no target: what a
+ * Read by row's place prints. */
+export function readByPlaces(draft: Draft, paths: readonly Path[], contentLocale: string): string[] {
+  if (paths.length === 0) return [];
+  const placeOf = placeOfIn(draft, contentLocale);
+  return paths.map((path) => {
+    const place = placeOf(path);
+    return fill(t(place.key), place.slots);
   });
 }

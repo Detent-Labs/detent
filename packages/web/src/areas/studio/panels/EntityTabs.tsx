@@ -36,7 +36,8 @@ import {
   removeDataSourceAndReferences,
   type DataSourceRemovalReach,
 } from "../draft/data-source-removal";
-import { RemoveFieldDialog } from "./RemoveFieldDialog";
+import { RemoveFieldDialog, type RemovalNameRow } from "./RemoveFieldDialog";
+import { removalNames } from "./removalNames";
 import { RemoveDataSourceDialog } from "./RemoveDataSourceDialog";
 import { DataSourcesPanel } from "./DataSourcesPanel";
 import type { FixRequest } from "../draft/process-tabs";
@@ -350,6 +351,8 @@ interface FieldRemoval {
   fieldId: string;
   label: string;
   reach: FieldRemovalReach;
+  /** The dialog's fact rows, named once per press. */
+  names: RemovalNameRow[];
 }
 
 /**
@@ -551,7 +554,12 @@ export function FieldsTab({
   const requestRemove = (fieldId: string) => {
     const reach = fieldRemovalReach(draft, fieldId);
     if (reach === undefined) return;
-    const removal: FieldRemoval = { fieldId, label: fieldWord(fieldId), reach };
+    const removal: FieldRemoval = {
+      fieldId,
+      label: fieldWord(fieldId),
+      reach,
+      names: hasReach(reach) ? removalNames(draft, reach, contentLocale) : [],
+    };
     if (!hasReach(reach)) {
       removeField(removal);
       return;
@@ -728,6 +736,7 @@ export function FieldsTab({
         <RemoveFieldDialog
           label={pendingRemoval.label}
           reach={pendingRemoval.reach}
+          names={pendingRemoval.names}
           triggerRef={removeTriggerRef}
           onCancel={() => setPendingRemoval(undefined)}
           onConfirm={() => {

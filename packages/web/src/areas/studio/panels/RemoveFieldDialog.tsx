@@ -1,7 +1,7 @@
 import type { RefObject } from "react";
-import { t, type CatalogKey } from "../catalog.js";
+import { t } from "../catalog.js";
 import type { FieldRemovalReach } from "../draft/field-removal.js";
-import { DestructiveConfirm, DialogCount, DialogFacts, DialogNames, DialogNote, StudioDialog } from "./shared/StudioDialog.js";
+import { DestructiveConfirm, DialogFacts, DialogNames, DialogNote, StudioDialog } from "./shared/StudioDialog.js";
 
 /** One fact row of names: its term, and the author's words for each place. */
 export interface RemovalNameRow {
@@ -19,11 +19,8 @@ interface Props {
   label: string;
   /** The removal's reach, measured on the draft before any write. */
   reach: FieldRemovalReach;
-  /**
-   * Rows of names, one per kind of reach, in place of the count rows. A
-   * caller without them gets the counts.
-   */
-  names?: readonly RemovalNameRow[];
+  /** Rows of names, one per kind of reach, from `removalNames`. */
+  names: readonly RemovalNameRow[];
   /** The Remove field control that opened this dialog, for the focus return on a decline. */
   triggerRef: RefObject<HTMLButtonElement | null>;
   /** Handles Cancel and the native `cancel` event (Escape). */
@@ -35,23 +32,13 @@ interface Props {
 /**
  * The removal confirmation (studio-app: "Removing a field that reaches past
  * the field catalog confirms first"). The heading names the field, so the
- * facts print neither its label nor its key. Each fact row gates on its own
- * `FieldRemovalReach` count: a caller renders this dialog only when `hasReach`
- * holds, but a removal with reach can still carry only some of the seven kinds.
+ * facts print neither its label nor its key. A row names each place of one
+ * kind of reach, and a kind the removal does not carry has no row. A caller
+ * renders this dialog only when `hasReach` holds.
  */
 export function RemoveFieldDialog({ label, reach, names, triggerRef, onCancel, onConfirm }: Props) {
   const isGroup = reach.field.type === "group";
   const hasCelOrSettings = reach.celReads > 0 || reach.pluginSettings > 0;
-
-  const counts: [CatalogKey, number][] = [
-    ["fieldCatalog.removeDialogFieldsInsideTerm", reach.fieldsInside],
-    ["fieldCatalog.removeDialogStepsTerm", reach.steps],
-    ["fieldCatalog.removeDialogWritersTerm", reach.writers],
-    ["fieldCatalog.removeDialogContractEntriesTerm", reach.contractEntries],
-    ["fieldCatalog.removeDialogColumnMappingsTerm", reach.columnMappings],
-    ["fieldCatalog.removeDialogCelReadsTerm", reach.celReads],
-    ["fieldCatalog.removeDialogPluginSettingsTerm", reach.pluginSettings],
-  ];
 
   return (
     <StudioDialog
@@ -70,18 +57,14 @@ export function RemoveFieldDialog({ label, reach, names, triggerRef, onCancel, o
       }
     >
       <DialogFacts>
-        {names
-          ? names.map((row) => <DialogNames key={row.term} term={row.term} names={row.names} />)
-          : counts.map(([term, count]) => <DialogCount key={term} term={t(term)} count={count} />)}
+        {names.map((row) => (
+          <DialogNames key={row.term} term={row.term} names={row.names} />
+        ))}
       </DialogFacts>
       <DialogNote>{t("fieldCatalog.removeDialogNoteAlways")}</DialogNote>
       {isGroup && <DialogNote>{t("fieldCatalog.removeDialogNoteGroup")}</DialogNote>}
-      {hasCelOrSettings && (
-        <>
-          <DialogNote>{t("fieldCatalog.removeDialogNoteCelKept")}</DialogNote>
-          <DialogNote>{t("fieldCatalog.removeDialogNoteCheckPublish")}</DialogNote>
-        </>
-      )}
+      {hasCelOrSettings && <DialogNote>{t("fieldCatalog.removeDialogNoteKept")}</DialogNote>}
+      <DialogNote>{t("dialog.noUndo")}</DialogNote>
     </StudioDialog>
   );
 }

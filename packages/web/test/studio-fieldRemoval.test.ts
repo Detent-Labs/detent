@@ -59,7 +59,7 @@ const action = (actionId: string, parts: Record<string, unknown> = {}) => ({ id:
 /** An automatic path back to `step_a`, guarded by `src`. */
 const guarded = (pathId: string, src: string) => ({ id: pathId, key: pathId, label: pathId, to: "step_a", trigger: "automatic", guard: cel(src) });
 
-const NONE: Omit<FieldRemovalReach, "field"> = {
+const NONE: Omit<FieldRemovalReach, "field" | "sites"> = {
   fieldsInside: 0,
   steps: 0,
   writers: 0,
@@ -290,6 +290,82 @@ describe("fieldRemovalReach", () => {
     });
 
     expect(fieldRemovalReach(draft, "fld_owner")).toMatchObject({ ...NONE, pluginSettings: 4 });
+  });
+});
+
+describe("fieldRemovalReach sites", () => {
+  const stepIds = (sites: { steps: { id?: string }[] }) => sites.steps.map((s) => s.id);
+
+  it("lists the fields inside and the steps showing the field", () => {
+    const draft = draftOf({
+      fields: [group("fld_group", "grp", [leaf("fld_a", "a"), leaf("fld_b", "b")])],
+      ...stepsOf(step("step_a", viewOf(ref("fld_a"))), step("step_b", viewOf(ref("fld_b"))), step("step_c", viewOf())),
+    });
+
+    const sites = fieldRemovalReach(draft, "fld_group")?.sites;
+
+    expect(sites?.fieldsInside.map((f) => f.id as string)).toStrictEqual(["fld_a", "fld_b"]);
+    expect(stepIds(sites!)).toStrictEqual(["step_a", "step_b"]);
+  });
+
+  it("lists each writer with its step, position and way out", () => {
+    const writes = (actionId: string) => action(actionId, { output: { fld_status: cel("result.status") } });
+    const draft = draftOf({
+      fields: [leaf("fld_status", "status")],
+      ...stepsOf(
+        step("step_a", {
+          onEntry: [writes("act_entry")],
+          onExit: [writes("act_exit")],
+          onCancel: [writes("act_cancel")],
+          paths: [{ id: "path_a", key: "a", label: "A", to: "step_a", trigger: "automatic", onPath: [writes("act_path")] }],
+          timers: [{ id: "timer_a", duration: "PT1H", onFire: { actions: [writes("act_timer")] } }],
+          subprocess: { processId: "proc_child", versionBinding: "pinned", pinnedVersion: 1, inputMapping: {}, outputMapping: { fld_status: cel("child.data.status") } },
+        }),
+      ),
+    });
+
+    const writers = fieldRemovalReach(draft, "fld_status")?.sites.writers ?? [];
+
+    expect(writers.map((w) => w.position)).toStrictEqual(["onEntry", "onExit", "onCancel", "onPath", "onFire", "outputMapping"]);
+    expect(writers.every((w) => w.step.id === "step_a")).toBe(true);
+    expect(writers.map((w) => w.path?.id as string | undefined)).toStrictEqual([undefined, undefined, undefined, "path_a", undefined, undefined]);
+  });
+
+  it("lists the contract lists naming the field, and the staying field carrying a column mapping", () => {
+    const draft = draftOf({
+      fields: [leaf("fld_name", "name"), leaf("fld_person", "person", { columnMapping: { name: id("fld_name") } })],
+      contract: { inputFields: [id("fld_name")], outputFields: [id("fld_name")], outcomes: ["done"] },
+    });
+
+    const sites = fieldRemovalReach(draft, "fld_name")?.sites;
+
+    expect(sites?.contract).toStrictEqual(["input", "output"]);
+    expect(sites?.columnMappings.map((f) => f.id as string)).toStrictEqual(["fld_person"]);
+  });
+
+  it("lists the JSON path of a kept read and of a setting", () => {
+    const draft = draftOf({
+      fields: [leaf("fld_amount", "amount")],
+      dataSources: [{ id: "ds_a", key: "people", type: "people.directory", config: { valueFromField: "fld_amount" } }],
+      ...stepsOf(step("step_a", { paths: [guarded("path_a", "data.amount > 1.0")] })),
+    });
+
+    const sites = fieldRemovalReach(draft, "fld_amount")?.sites;
+
+    expect(sites?.celReads).toStrictEqual([["workflow", "steps", 0, "paths", 0, "guard"]]);
+    expect(sites?.pluginSettings).toStrictEqual([["dataSources", 0, "config", "valueFromField"]]);
+  });
+
+  it("lists no site for an expression the removal takes along", () => {
+    const draft = draftOf({
+      fields: [leaf("fld_amount", "amount", { default: cel("data.amount"), validation: { rule: cel("data.amount > 0.0") } })],
+      ...stepsOf(step("step_a", viewOf(ref("fld_amount", { visible: cel("data.amount > 1.0") })))),
+    });
+
+    const sites = fieldRemovalReach(draft, "fld_amount")?.sites;
+
+    expect(sites?.celReads).toStrictEqual([]);
+    expect(stepIds(sites!)).toStrictEqual(["step_a"]);
   });
 });
 

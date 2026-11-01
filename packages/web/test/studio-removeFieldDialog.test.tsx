@@ -5,10 +5,10 @@ import { RemoveFieldDialog, type RemovalNameRow } from "../src/areas/studio/pane
 import type { FieldRemovalReach } from "../src/areas/studio/draft/field-removal.js";
 
 /**
- * Static-markup coverage for `RemoveFieldDialog.tsx` (design.md, "Shape
- * brief"; studio-app's "Removing a field that reaches past the field
- * catalog confirms first" and "The removal dialog counts each kind of
- * reach"). The web package has no DOM harness, so this renders the dialog
+ * Static-markup coverage for `RemoveFieldDialog.tsx` (design.md D8;
+ * studio-app's "Removing a field that reaches past the field catalog
+ * confirms first" and "The removal dialog names each kind of reach"). The
+ * web package has no DOM harness, so this renders the dialog
  * unconditionally — a caller only mounts it once `hasReach` holds, but the
  * component itself does not gate on that.
  */
@@ -37,6 +37,7 @@ function reach(over: {
     columnMappings: over.columnMappings ?? 0,
     celReads: over.celReads ?? 0,
     pluginSettings: over.pluginSettings ?? 0,
+    sites: { fieldsInside: [], steps: [], writers: [], contract: [], columnMappings: [], celReads: [], pluginSettings: [] },
   };
 }
 
@@ -45,7 +46,7 @@ function renderDialog(over: { label?: string; reach?: FieldRemovalReach; names?:
     <RemoveFieldDialog
       label={over.label ?? "Booking status"}
       reach={over.reach ?? reach({})}
-      names={over.names}
+      names={over.names ?? []}
       triggerRef={{ current: null }}
       onCancel={() => {}}
       onConfirm={() => {}}
@@ -86,7 +87,11 @@ describe("RemoveFieldDialog's heading", () => {
 
 describe("RemoveFieldDialog's facts", () => {
   it("prints neither the field's label nor its key in a fact", () => {
-    const html = renderDialog({ label: "Booking status", reach: reach({ key: "booking_status", steps: 1 }) });
+    const html = renderDialog({
+      label: "Booking status",
+      reach: reach({ key: "booking_status", steps: 1 }),
+      names: [{ term: "Asked on", names: ["Review"] }],
+    });
 
     expect(html).not.toContain("booking_status");
     expect(html).not.toMatch(/<code[^>]*>/);
@@ -95,52 +100,40 @@ describe("RemoveFieldDialog's facts", () => {
     expect(html.split("Booking status")).toHaveLength(2);
   });
 
-  it("prints no facts list for a removal with no count", () => {
+  it("prints no facts list where no row carries a name", () => {
     expect(renderDialog()).not.toContain("<dl");
+    expect(renderDialog({ names: [{ term: "Asked on", names: [] }] })).not.toContain("<dl");
   });
 
-  it("states a row only for a count above zero, one per kind", () => {
-    const html = renderDialog({ reach: reach({ steps: 2, writers: 1, contractEntries: 1, celReads: 2 }) });
-
-    expect(html).toContain("Steps showing it");
-    expect(html).toContain("Actions and mappings writing it");
-    expect(html).toContain("Contract entries");
-    expect(html).toContain("CEL expressions reading it");
-    expect(html).not.toContain("Fields inside it");
-    expect(html).not.toContain("Column mappings targeting it");
-    expect(html).not.toContain("Plugin settings naming it");
-  });
-
-  it("states each row's own count in mono tabular figures", () => {
-    const html = renderDialog({ reach: reach({ steps: 2, contractEntries: 1 }) });
-
-    expect(html).toMatch(/<dd class="value mono tabular">2<\/dd>/);
-    expect(html).toMatch(/<dd class="value mono tabular">1<\/dd>/);
-  });
-
-  it("states the fields-inside and steps counts for a group", () => {
-    const html = renderDialog({ reach: reach({ type: "group", fieldsInside: 18, steps: 10 }) });
-
-    expect(html).toContain("Fields inside it");
-    expect(html).toContain(">18<");
-    expect(html).toContain("Steps showing it");
-    expect(html).toContain(">10<");
-  });
-
-  it("prints a row of names in place of the counts where the caller passes names", () => {
+  it("prints a row of names per kind, each name in its own item", () => {
     const html = renderDialog({
-      reach: reach({ steps: 2 }),
-      names: [{ term: "Asked on", names: ["Review", "Book"] }],
+      reach: reach({ steps: 2, celReads: 1 }),
+      names: [
+        { term: "Asked on", names: ["Review", "Book"] },
+        { term: "Read by", names: ["On Review: way out Approve → Book"] },
+      ],
     });
 
     expect(html).toMatch(/<dt[^>]*>Asked on<\/dt><dd[^>]*><ul[^>]*><li>Review<\/li><li>Book<\/li><\/ul><\/dd>/);
-    expect(html).not.toContain("Steps showing it");
+    expect(html).toContain("<li>On Review: way out Approve → Book</li>");
+  });
+
+  it("prints no row for a kind with no name, and no count", () => {
+    const html = renderDialog({ reach: reach({ steps: 2 }), names: [{ term: "Asked on", names: ["Review", "Book"] }] });
+
+    expect(html).not.toContain("Written by");
+    expect(html).not.toContain("Filled in from");
+    expect(html).not.toContain("Named in a setting on");
+    expect(html).not.toMatch(/class="value mono tabular"/);
+    expect(html).not.toContain("CEL");
   });
 });
 
 describe("RemoveFieldDialog's notes", () => {
-  it("always states that the removal clears every reference", () => {
-    expect(renderDialog()).toContain("Removing it also clears every step entry and reference that names it.");
+  const noteTexts = (html: string) => [...html.matchAll(/<p[^>]*>([^<]*)<\/p>/g)].map((m) => m[1]);
+
+  it("always states that the removal takes the field off every form and clears what writes to it", () => {
+    expect(renderDialog()).toContain("Removing it takes it off every form and clears what writes to it.");
   });
 
   it("adds the group note only for a group", () => {
@@ -148,25 +141,25 @@ describe("RemoveFieldDialog's notes", () => {
     expect(renderDialog()).not.toContain("Every field inside the group leaves with it.");
   });
 
-  it("adds both CEL/settings notes when celReads is above zero", () => {
-    const html = renderDialog({ reach: reach({ celReads: 1 }) });
-
-    expect(html).toContain("CEL expressions and plugin settings keep their text.");
-    expect(html).toContain("Check each one before you publish.");
+  it("adds the kept note when a read stays", () => {
+    expect(renderDialog({ reach: reach({ celReads: 1 }) })).toContain(
+      "What reads it or names it in a setting stays as written. Check each one before you publish.",
+    );
   });
 
-  it("adds both CEL/settings notes when pluginSettings is above zero", () => {
-    const html = renderDialog({ reach: reach({ pluginSettings: 1 }) });
-
-    expect(html).toContain("CEL expressions and plugin settings keep their text.");
-    expect(html).toContain("Check each one before you publish.");
+  it("adds the kept note when a setting stays", () => {
+    expect(renderDialog({ reach: reach({ pluginSettings: 1 }) })).toContain("stays as written");
   });
 
-  it("omits the CEL/settings notes when both counts are zero", () => {
-    const html = renderDialog();
+  it("omits the kept note when nothing stays", () => {
+    expect(renderDialog()).not.toContain("stays as written");
+  });
 
-    expect(html).not.toContain("CEL expressions and plugin settings keep their text.");
-    expect(html).not.toContain("Check each one before you publish.");
+  it("prints the no-undo note last, after every other note", () => {
+    const notes = noteTexts(renderDialog({ reach: reach({ type: "group", celReads: 1 }) }));
+
+    expect(notes).toHaveLength(4);
+    expect(notes[3]).toBe("The studio has no undo.");
   });
 });
 
@@ -180,7 +173,7 @@ describe("RemoveFieldDialog's accessible name and focus", () => {
   });
 
   it("points aria-describedby at the body holding the facts and the notes", () => {
-    const html = renderDialog({ reach: reach({ steps: 1 }) });
+    const html = renderDialog({ reach: reach({ steps: 1 }), names: [{ term: "Asked on", names: ["Review"] }] });
     const described = /aria-describedby="([^"]+)"/.exec(html);
 
     expect(described).not.toBeNull();
@@ -188,7 +181,7 @@ describe("RemoveFieldDialog's accessible name and focus", () => {
     const inside = body.slice(0, body.indexOf("</div>"));
 
     expect(inside).toContain("<dl");
-    expect(inside).toContain("Removing it also clears every step entry");
+    expect(inside).toContain("Removing it takes it off every form");
   });
 
   it("primes Cancel, and nothing else", () => {

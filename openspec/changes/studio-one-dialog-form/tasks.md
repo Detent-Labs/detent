@@ -30,13 +30,13 @@
 
 ## 3. Remove field names its reach (studio-app)
 
-- [ ] 3.1 Add `sites` to `FieldRemovalReach` per D8. Track the JSON path in the walk. Extend `studio-fieldRemoval.test.ts` with one case per kind, and one that a taken-along expression leaves no site.
-- [ ] 3.1a Narrow `NONE` in that test to `Omit<FieldRemovalReach, "field" | "sites">`. Widen `hasReach` to take `Omit<FieldRemovalReach, "sites">`. Give the dialog test's `reach()` empty `sites`.
-- [ ] 3.2 Refactor `readByRows.ts` so `readByPlaces` and `readByRows` read one `placeOf`. `studio-readByRows.test.ts` stays green unchanged.
-- [ ] 3.3 Add `panels/removalNames.ts` and its catalog keys per D8. Add `studio-removalNames.test.ts` with one case per term and writer position, duplicate places, and a group.
-- [ ] 3.4 Call `removalNames` once per press in `EntityTabs.tsx`'s `requestRemove`, and pass it to `RemoveFieldDialog`. Make `names` required, and reword the notes per D8. Remove the keys this retires.
-- [ ] 3.4a Extend `studio-removeFieldDialog.test.tsx`: names print, and no key and no "CEL" prints. Its header comment stops quoting the removed requirement.
-- [ ] 3.5 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
+- [x] 3.1 Add `sites` to `FieldRemovalReach` per D8. Track the JSON path in the walk. Extend `studio-fieldRemoval.test.ts` with one case per kind, and one that a taken-along expression leaves no site.
+- [x] 3.1a Narrow `NONE` in that test to `Omit<FieldRemovalReach, "field" | "sites">`. Widen `hasReach` to take `Omit<FieldRemovalReach, "sites">`. Give the dialog test's `reach()` empty `sites`.
+- [x] 3.2 Refactor `readByRows.ts` so `readByPlaces` and `readByRows` read one `placeOf`. `studio-readByRows.test.ts` stays green unchanged.
+- [x] 3.3 Add `panels/removalNames.ts` and its catalog keys per D8. Add `studio-removalNames.test.ts` with one case per term and writer position, duplicate places, and a group.
+- [x] 3.4 Call `removalNames` once per press in `EntityTabs.tsx`'s `requestRemove`, and pass it to `RemoveFieldDialog`. Make `names` required, and reword the notes per D8. Remove the keys this retires.
+- [x] 3.4a Extend `studio-removeFieldDialog.test.tsx`: names print, and no key and no "CEL" prints. Its header comment stops quoting the removed requirement.
+- [x] 3.5 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
 
 ## 4. The prompts convert (studio-app, studio-canvas)
 
