@@ -4,7 +4,7 @@ import { FileJson, History, MoreVertical, Play, Trash2 } from "lucide-react";
 import { colors, focus, fonts, space, shadow } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
-import { collectUsedLocales, missingTranslationWarning, resolveDraftLocalizedText } from "../draft/localized-text";
+import { collectUsedLocales, missingTranslationWarning, nameInputPlaceholder, resolveDraftLocalizedText } from "../draft/localized-text";
 import { deriveKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput.js";
 import { IssueList } from "./shared/IssueList.js";
@@ -31,7 +31,7 @@ const styles = stylex.create({
     borderBottomColor: colors.divider,
     marginBottom: space.s3,
   },
-  // Back, name, warning, issue sentence, state, Save, the note and the Versions
+  // Back, name, issue sentence, state, Save, the note and the Versions
   // offer. It takes the row's free space from a zero basis and wraps inside
   // itself, so a control appearing here moves nothing in the trailing cluster.
   // The minimum basis keeps the name readable: where the row cannot give the
@@ -86,6 +86,8 @@ const styles = stylex.create({
     maxWidth: "100%",
   },
   warning: {
+    margin: 0,
+    marginBlockEnd: space.s3,
     color: colors.refusal,
     borderLeftWidth: 3,
     borderLeftStyle: "solid",
@@ -778,10 +780,10 @@ interface Props {
  * after the header row as block siblings. A closed menu must never hide the one
  * moment a conflict most needs attention.
  *
- * The process label's own `LocalizedTextInput` and missing-translation
- * warning stay in the header row's own `<h1>` (studio-app: "Every inline
- * missing-translation warning SHALL survive the move ... the process label,
- * which stays on the screen").
+ * The process label's own `LocalizedTextInput` stays in the header row's own
+ * `<h1>`, and its missing-translation warning stands after the header as a
+ * block sibling (studio-app: "Every inline missing-translation warning SHALL
+ * survive the move ... the process label, which stays on the screen").
  */
 export function ProcessHeaderBar({
   revision,
@@ -861,6 +863,7 @@ export function ProcessHeaderBar({
   const headerBarMenuLinkProps = stylex.props(styles.headerBarMenuLink);
   const backControlProps = stylex.props(styles.backControl);
   const editingLanguage = editingLocaleNote(contentLocale, draft.baseLocale, !structureActive);
+  const nameWarning = missingTranslationWarning(draft.label, contentLocale, draft.baseLocale);
 
   return (
     <>
@@ -892,7 +895,8 @@ export function ProcessHeaderBar({
         <h1 {...stylex.props(styles.headerBarName)}>
           <LocalizedTextInput
             value={draft.label}
-            placeholder={t("headerBar.unnamedProcess")}
+            ariaLabel={t("headerBar.nameLabel")}
+            placeholder={nameInputPlaceholder(draft.label, draft.baseLocale, t("headerBar.unnamedProcess"))}
             disabled={!structureActive}
             className={headerBarNameInputProps.className}
             style={headerBarNameInputProps.style}
@@ -909,9 +913,6 @@ export function ProcessHeaderBar({
             }}
           />
         </h1>
-        {missingTranslationWarning(draft.label, contentLocale, draft.baseLocale) && (
-          <p {...stylex.props(styles.warning)}>{missingTranslationWarning(draft.label, contentLocale, draft.baseLocale)}</p>
-        )}
         <IssueList entityId="process" />
         <DraftStateLine
           ref={stateLineRef}
@@ -1075,6 +1076,11 @@ export function ProcessHeaderBar({
       )}
 
       </header>
+
+      {/* A block sibling, beside the failure banners: in the row it grew the
+          bar to three lines. It reports a gap, not a failure, so it stays
+          through an open dialog, which repeats nothing of it. */}
+      {nameWarning && <p {...stylex.props(styles.warning)}>{nameWarning}</p>}
 
       {publishResult && publishResult.findings.length > 0 && (
         <ul className={`issue-list ${stylex.props(styles.findings).className}`}>

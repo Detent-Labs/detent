@@ -1094,3 +1094,22 @@ system that resulted; this file explains why it took that shape.
   the matrix's sticky headers at 2 and 3. Measured 2026-11-01 on the
   production build, an `elementFromPoint` sweep of 48 points lost 0 over the
   field matrix at 1280x720 and 0 over the Map tab at 400x800.
+- **The add-locale input has no label.** `panels/shared/ContentLocaleSwitcher.tsx`
+  gives it a placeholder alone, "add locale (e.g. de)". `studio-six-tabs`
+  moved it onto the Settings tab's Process view without changing it. The
+  `/impeccable audit` of 2026-10-31 rates it P2. The critique proposes one
+  "Languages" fieldset: "Written first in" as a select of language names,
+  the added languages as ruled rows, "Add a language" as a labelled select.
+
+  Closed by `studio-header-two-rows`: the add control takes the visible label
+  "Add another language". Its refusal reads "That is not a language code. Try
+  one such as de or fr-CH." with an alert role, and the input carries
+  `aria-invalid` and `aria-describedby` while it stands. The critique's
+  "Languages" fieldset stays unbuilt.
+- **BAR-1: the process name input takes its placeholder as its name.** The
+  input has no label (`panels/ProcessHeaderBar.tsx:794-796`). Its accessible name
+  read "(untitled process)" while it held IT Offboarding. Risk (Medium): a
+  screen reader announces an untitled process on every draft (WCAG 4.1.2).
+
+  Closed by `studio-header-two-rows`: the input carries the accessible name
+  "Process name".

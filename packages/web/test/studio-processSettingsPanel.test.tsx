@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DraftProvider } from "../src/areas/studio/draft/store.js";
 import { ProcessSettingsPanel } from "../src/areas/studio/panels/ProcessSettingsPanel.js";
+import { AddLocaleField } from "../src/areas/studio/panels/shared/ContentLocaleSwitcher.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 import { t } from "../src/areas/studio/catalog.js";
 
@@ -47,10 +48,29 @@ describe("ProcessSettingsPanel", () => {
     expect(html).toMatch(/<span[^>]*>Base language<\/span><input type="text" value="de"\/>/);
   });
 
-  it("renders the add-a-language control", () => {
+  it("renders the add-a-language control under a visible label", () => {
     const html = render({ key: KEY });
 
-    expect(html).toContain(`>${t("contentLocale.add")}</button>`);
+    expect(html).toMatch(/<label for="([^"]+)"[^>]*>Add another language<\/label>/);
+    const id = /<label for="([^"]+)"[^>]*>Add another language/.exec(html)![1];
+    expect(html).toContain(`<input id="${id}" type="text" placeholder="Language code, such as de"`);
+    expect(html).toContain(">Add</button>");
+  });
+
+  it("renders no refusal before one stands", () => {
+    const html = render({ key: KEY });
+
+    expect(html).not.toContain('role="alert"');
+    expect(html).not.toContain("aria-invalid");
+  });
+
+  it("renders the refusal as an alert the input points at", () => {
+    const html = renderToStaticMarkup(<AddLocaleField value="xx!" error={t("contentLocale.invalid")} onChange={() => {}} onAdd={() => {}} />);
+    const describedBy = /aria-describedby="([^"]+)"/.exec(html)![1];
+
+    expect(html).toContain('aria-invalid="true"');
+    expect(html).toContain(`<p id="${describedBy}" role="alert"`);
+    expect(html).toContain("That is not a language code. Try one such as de or fr-CH.");
   });
 
   it("checks the cancellable setting when the draft carries no cancellable key", () => {
@@ -112,8 +132,15 @@ describe("ProcessSettingsPanel", () => {
     const html = render({ key: KEY, baseLocale: "en", label: { en: "Expense", de: "Spesen" }, description: { en: "Claims" } });
     const select = html.slice(html.indexOf("<select"), html.indexOf("</select>"));
 
-    expect(select).toContain('<option value="en" selected="">en</option>');
-    expect(select).toContain('<option value="de">de \u2014 1 missing</option>');
+    expect(select).toContain('<option value="en" selected="">English (en)</option>');
+    expect(select).toContain('<option value="de">German (de) \u2014 1 missing</option>');
+  });
+
+  it("prints a language it cannot name as its code alone, with no parenthesis", () => {
+    const html = render({ key: KEY, baseLocale: "en", label: { en: "Expense", zz: "x" } });
+    const select = html.slice(html.indexOf("<select"), html.indexOf("</select>"));
+
+    expect(select).toContain('<option value="zz">zz</option>');
   });
 
   it("prints the revision inside the Developer view only", () => {

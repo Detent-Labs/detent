@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, space } from "form-ui/tokens.stylex";
 import { useDraft } from "../../draft/store";
 import { t } from "../../catalog.js";
 import { localeGapCount, resolveAddLocaleAttempt } from "../../draft/localized-text";
 import type { Draft } from "../../draft/types";
+import { languageName } from "../../screens/draftToolbarState.js";
 import { StudioSelect } from "./StudioSelect";
 
 const styles = stylex.create({
@@ -26,15 +27,22 @@ const styles = stylex.create({
     alignItems: "center",
     gap: space.s2,
   },
+  addLocaleError: {
+    margin: 0,
+    color: colors.refusal,
+  },
 });
 
-/** One locale's option text: the bare code, or the code with its translation
- * gap count when entries lack it. A native `<option>` renders no markup, so
- * the count rides in the text. Omitted at zero. The Publish dialog's
- * Languages fact reads the same wording. */
+/** One locale's option text: the language's name and code, "German (de)", or
+ * the code alone when no name exists. A locale with gaps adds its count of
+ * missing entries. A native `<option>` renders no markup, so the count rides in
+ * the text. Omitted at zero. The Publish dialog's Languages fact reads the same
+ * wording. */
 export function localeOptionLabel(draft: Draft, code: string): string {
+  const name = languageName(code);
+  const language = name === code ? code : `${name} (${code})`;
   const gaps = localeGapCount(draft, code);
-  return gaps > 0 ? t("contentLocale.optionGap").replace("{locale}", () => code).replace("{count}", () => String(gaps)) : code;
+  return gaps > 0 ? t("contentLocale.optionGap").replace("{locale}", () => language).replace("{count}", () => String(gaps)) : language;
 }
 
 /**
@@ -66,9 +74,56 @@ export function ContentLocaleSelect() {
 }
 
 /**
- * The add-locale input and button alone, for the Settings tab's Process view.
- * Declaring a new content locale is a draft-scoped concern, the same as the
- * base locale it sits beside.
+ * The add-locale field with its state lifted out: a visible label above the
+ * input and the button, then the refusal while one stands. The refusal is an
+ * alert, and the input points at it with `aria-describedby`.
+ */
+export function AddLocaleField({
+  value,
+  error,
+  onChange,
+  onAdd,
+}: {
+  value: string;
+  error: string | undefined;
+  onChange: (next: string) => void;
+  onAdd: () => void;
+}) {
+  const inputId = useId();
+  const errorId = useId();
+
+  return (
+    <div {...stylex.props(styles.field)}>
+      <label htmlFor={inputId} {...stylex.props(styles.fieldText)}>
+        {t("contentLocale.addLabel")}
+      </label>
+      <div {...stylex.props(styles.addLocale)}>
+        <input
+          id={inputId}
+          type="text"
+          placeholder={t("contentLocale.addPlaceholder")}
+          value={value}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <button type="button" className="btn btn-secondary" onClick={onAdd}>
+          {t("contentLocale.add")}
+        </button>
+      </div>
+      {error && (
+        <p id={errorId} role="alert" {...stylex.props(styles.addLocaleError)}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The add-locale field for the Settings tab's Process view. Declaring a new
+ * content locale is a draft-scoped concern, the same as the base locale it
+ * sits beside.
  */
 export function AddLocaleControl() {
   const { setContentLocale } = useDraft();
@@ -86,18 +141,5 @@ export function AddLocaleControl() {
     setError(undefined);
   };
 
-  return (
-    <div {...stylex.props(styles.addLocale)}>
-      <input
-        type="text"
-        placeholder={t("contentLocale.addPlaceholder")}
-        value={newLocale}
-        onChange={(e) => setNewLocale(e.target.value)}
-      />
-      <button type="button" className="btn btn-secondary" onClick={addLocale}>
-        {t("contentLocale.add")}
-      </button>
-      {error && <span className="content-locale-error">{error}</span>}
-    </div>
-  );
+  return <AddLocaleField value={newLocale} error={error} onChange={setNewLocale} onAdd={addLocale} />;
 }

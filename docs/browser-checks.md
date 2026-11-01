@@ -3017,7 +3017,7 @@ names another account.
     playwright route, then press Save. Pass: the conflict banner shows below the
     bar, and the state line still reads "Unsaved changes".
 11. **The Editing note on Steps.** On the Settings tab's Process view, add
-    `de` and pick German under "Language you are editing". Open the Steps tab.
+    `de` and pick "German (de)" under "Language you are editing". Open the Steps tab.
     Pass: a ghost button "Editing German" stands beside the state line. Press
     it. Pass: the Process view opens with the language select in reach.
 12. **The Editing note on the Access view.** Open Settings, then Access.
@@ -3033,7 +3033,7 @@ names another account.
     language. Pass: the bar names no locale. Complete it to `de`. Pass: the
     content locale moves, and the note stays away while the two match.
 16. **A name missing its translation.** In German, type a German name, then
-    clear it. Pass: its missing-translation warning prints beside the name, and
+    clear it. Pass: its missing-translation warning stands under the bar, and
     Test, Publish and the `⋮` trigger stay on the bar's row at 1280px.
 17. **A long name.** Type a name of 80 characters. Pass: the input stops near
     40 characters wide. Pass: the commands stay on the first row at 1280px.
@@ -3053,6 +3053,22 @@ names another account.
 20. **Test and Back.** Change a label, then press Test. Pass: the native leave
     prompt appears, and Cancel keeps the draft. Repeat with the back control.
     Save the draft, then press Test. Pass: the Player opens without a prompt.
+21. **The warning below the bar, with the placeholder.** In German, clear the
+    name. Pass: the warning stands as a block under the bar, left of the
+    advisory rule, and the bar keeps one row. Pass: the name input reads the
+    English name as its placeholder, in place of "(untitled process)". Pass: a
+    screen reader names the input "Process name". Clear the English name too
+    on a draft with no German name. Pass: the placeholder reads "(untitled
+    process)".
+22. **The Process view's language words.** Open Settings, Process, with `de`
+    added. Pass: the select reads "English (en)" and "German (de)", and a
+    German entry with gaps reads "German (de) — 2 missing". Pass: "Add another
+    language" labels the input above it, whose placeholder reads "Language
+    code, such as de", beside a button reading "Add". Type `xx!` and press Add.
+    Pass: "That is not a language code. Try one such as de or fr-CH." stands under
+    the field, a screen reader announces it, and the input is marked invalid.
+    Open the Publish dialog. Pass: its Languages fact reads the same
+    "English (en)" and "German (de)" words.
 
 ### Where a confirmation dialog leaves the focus (`studio-publish-gate-and-report`)
 
@@ -4693,9 +4709,9 @@ database, then sign in as `demo-superuser@example.test`, password
 `seed-demo-password`. In the Processes list, find "IT Offboarding" and choose
 "Create draft". Under `playwright-cli`, pass `-s=advisory-role` on every call.
 
-1. Open the Settings tab's Process view. Type `de` into its add-locale
-   control, the input reading "add locale (e.g. de)". Then choose
-   "+ add locale". Pass: the warning callout beside the process name draws its
+1. Open the Settings tab's Process view. Type `de` into the input under
+   "Add another language", the one reading "Language code, such as de". Then
+   choose "Add". Pass: the warning callout under the header bar draws its
    3px rule in `rgb(226, 90, 64)` light and `rgb(255, 151, 131)` dark.
 2. Open the Steps tab and choose "Submit the Exit Notification" in the steps
    rail. In that step page's "Ways out" section, choose "Happens by itself"
@@ -4711,11 +4727,11 @@ database, then sign in as `demo-superuser@example.test`, password
    release.
 
 Step 1 reads the callout through this `run-code` function. The callout is the
-paragraph right after the header bar's `h1`:
+paragraph right after the header bar's `header`:
 
 ```js
 async (page) => {
-  const callout = page.getByRole("heading", { level: 1 }).locator("xpath=following-sibling::p[1]");
+  const callout = page.getByRole("heading", { level: 1 }).locator("xpath=ancestor::header[1]/following-sibling::p[1]");
   const result = { text: await callout.innerText() };
   for (const scheme of ["light", "dark"]) {
     await page.emulateMedia({ colorScheme: scheme });

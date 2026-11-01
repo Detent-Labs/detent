@@ -263,8 +263,8 @@ describe("The publish dialog", () => {
     const list = facts.slice(0, facts.indexOf("</ul>"));
 
     expect(html).toContain(">Languages</dt>");
-    expect(list).toContain("<li>de \u2014 1 missing</li>");
-    expect(list).toContain("<li>en</li>");
+    expect(list).toContain("<li>German (de) \u2014 1 missing</li>");
+    expect(list).toContain("<li>English (en)</li>");
   });
 
   // Mono marks a value the engine matches exactly. "de \u2014 1 missing" is
@@ -760,5 +760,56 @@ describe("The commands over the JSON surface", () => {
     expect(html).toContain(">Publish<");
     expect(html).toContain("More actions");
     expect(html).toContain(">Save<");
+  });
+});
+
+/**
+ * The name's accessible name, its placeholder and its missing translation
+ * warning (`studio-canvas`: "The header bar holds back, name, state, Test,
+ * Publish and the menu").
+ */
+describe("The process name", () => {
+  const translating = {
+    label: { en: "Expense approval" },
+    baseLocale: "en",
+    key: "expense_approval_key",
+  };
+
+  it("carries the accessible name Process name, inside the h1", () => {
+    const html = renderHeader({});
+    const h1 = html.slice(html.indexOf("<h1"), html.indexOf("</h1>"));
+
+    expect(h1).toMatch(/<input[^>]*aria-label="Process name"/);
+  });
+
+  it("stands the missing translation warning after the header, not inside it", () => {
+    const html = renderHeader({ draft: translating, contentLocale: "de" });
+    const warning = html.indexOf("No de translation yet");
+
+    expect(warning).toBeGreaterThan(html.indexOf("</header>"));
+    expect(html.slice(html.indexOf("</header>"))).toMatch(/^<\/header><p[^>]*>No de translation yet/);
+  });
+
+  it("stands the warning through an open dialog, which repeats nothing of it", () => {
+    const html = renderHeader({ draft: translating, contentLocale: "de", actions: { pendingDialog: "publish" } });
+
+    expect(html.indexOf("No de translation yet")).toBeGreaterThan(html.indexOf("</header>"));
+  });
+
+  it("renders no warning in the base language", () => {
+    expect(renderHeader({ draft: translating })).not.toContain("translation yet");
+  });
+
+  it("reads the base-language name as the placeholder while the edited language has none", () => {
+    const html = renderHeader({ draft: translating, contentLocale: "de" });
+
+    expect(html).toContain('placeholder="Expense approval"');
+    expect(html).not.toContain("(untitled process)");
+  });
+
+  it("reads the untitled words with no base-language name", () => {
+    const html = renderHeader({ draft: { baseLocale: "en", key: "k" }, contentLocale: "de" });
+
+    expect(html).toContain('placeholder="(untitled process)"');
   });
 });

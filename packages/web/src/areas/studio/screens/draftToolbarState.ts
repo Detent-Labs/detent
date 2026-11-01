@@ -162,6 +162,19 @@ export function formatSavedTime(at: Date): string {
 }
 
 /**
+ * The English name of a language code, or the code itself when no name
+ * exists. `Intl.DisplayNames#of` throws on a malformed tag and echoes a
+ * well-formed code it cannot name, so a throw prints the code too.
+ */
+export function languageName(code: string): string {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/**
  * The language name for the header bar's "Editing" note, or `undefined` when
  * the bar prints none (studio-app spec: "The header bar says when an author
  * edits another language"). The note stands only while the content locale
@@ -170,8 +183,6 @@ export function formatSavedTime(at: Date): string {
  *
  * An absent base reads as "en", the fallback every other locale reader
  * applies. A malformed base, such as a half-typed `d`, yields no note.
- * `Intl.DisplayNames#of` throws on a malformed tag and echoes a well-formed
- * code it cannot name, so a throw prints the code itself.
  */
 export function editingLocaleNote(
   contentLocale: string,
@@ -182,9 +193,5 @@ export function editingLocaleNote(
   const base = baseLocale ?? "en";
   if (!resolveAddLocaleAttempt(base).ok) return undefined;
   if (contentLocale === base) return undefined;
-  try {
-    return new Intl.DisplayNames(["en"], { type: "language" }).of(contentLocale) ?? contentLocale;
-  } catch {
-    return contentLocale;
-  }
+  return languageName(contentLocale);
 }

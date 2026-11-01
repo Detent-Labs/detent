@@ -8,6 +8,7 @@ import {
   headerStateLine,
   formatSavedTime,
   editingLocaleNote,
+  languageName,
   justPublishedAfter,
   saveFocusTarget,
 } from "../src/areas/studio/screens/draftToolbarState.js";
@@ -475,5 +476,18 @@ describe("saveFocusTarget", () => {
 
   it("moves nothing on a save Save's own press did not start, such as the publish dialog's", () => {
     expect(saveFocusTarget({ ...answered, pressed: false })).toBeUndefined();
+  });
+});
+
+describe("languageName", () => {
+  it("names a language by its English name", () => {
+    expect(languageName("de")).toBe("German");
+    expect(languageName("pt-BR")).toBe("Brazilian Portuguese");
+  });
+
+  it("prints a code it cannot name as itself and never throws", () => {
+    expect(languageName("zz")).toBe("zz");
+    expect(languageName("not a tag")).toBe("not a tag");
+    expect(languageName("")).toBe("");
   });
 });

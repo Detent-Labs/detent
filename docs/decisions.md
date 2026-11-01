@@ -1510,10 +1510,6 @@ Paths under `panels/` and `screens/` start at `packages/web/src/areas/studio/`.
   335.5. The row's padding box ran from 292 to 332. Both sides of the ring
   stay, 32px clear of the edge fade. This is CHANGES-2 on the tab row. Risk
   (Low): the ring still meets WCAG 2.4.7.
-- **BAR-1: the process name input takes its placeholder as its name.** The
-  input has no label (`panels/ProcessHeaderBar.tsx:794-796`). Its accessible name
-  read "(untitled process)" while it held IT Offboarding. Risk (Medium): a
-  screen reader announces an untitled process on every draft (WCAG 4.1.2).
 
 ## Open from test-instance-claim-bypass (needs its own OpenSpec change)
 
@@ -1774,12 +1770,6 @@ this section.
   access lists. The critique's sketch: one checkbox sentence "Another
   process can call this one", two fieldsets in the entity-rail row style,
   outcomes as ruled rows; a picker over users and groups by display name.
-- **The add-locale input has no label.** `panels/shared/ContentLocaleSwitcher.tsx`
-  gives it a placeholder alone, "add locale (e.g. de)". `studio-six-tabs`
-  moved it onto the Settings tab's Process view without changing it. The
-  `/impeccable audit` of 2026-10-31 rates it P2. The critique proposes one
-  "Languages" fieldset: "Written first in" as a select of language names,
-  the added languages as ruled rows, "Add a language" as a labelled select.
 - **Forced colors drop the open mark on every tab strip.** Under
   `forced-colors: active` the sub-row's inset `box-shadow` and the tab
   row's `::after` bar both vanish, and weight 800 stays the only cue. The
@@ -2143,7 +2133,7 @@ MAPLABELS tag is local to this section.
 
 The change cut the header bar to back, name, state, Test, Publish and the `⋮`
 menu. It moved the content-locale switcher and the machine values to Settings
-and the Publish dialog. It left the three points below to later changes. The
+and the Publish dialog. It left the six points below to later changes. The
 HEADER tag is local to this section.
 
 - **HEADER-1: the publish findings list prints raw references.** Each line
@@ -2164,13 +2154,38 @@ HEADER tag is local to this section.
 
   Upgrade entry: add a published check to the `shouldAutoDeriveKey` call in
   `panels/ProcessHeaderBar.tsx`, reading the base version it already holds.
-- **HEADER-3: the name's missing translation warning is a long sentence in the
-  bar.** It stands in the bar's row while the author works outside the base
-  language. The sentence wraps inside the leading group and pushes the row
-  taller. Risk (Low): the bar grows by a line on a draft that lacks one name.
+- **HEADER-4: Test lands on a Player whose two buttons differ, and a dirty
+  draft meets a native prompt first.** The Player's filled create button runs
+  the published version and its outlined one runs the draft. Nothing on the bar
+  says which Test will run. Risk (Low): an author expects Test to run the draft
+  and starts a case on the published version. Change 15 removes the prompt, and
+  the Player's two buttons stay open.
 
-  Upgrade entry: shorten the sentence, or mark the name input and move the
-  sentence to the Process view. The helper is `missingTranslationWarning`.
+  Upgrade entry: name the two runs on the Player's buttons, or let Test open
+  the draft run. The handler is `onPlayer` in `panels/ProcessHeaderBar.tsx`.
+- **HEADER-5: a publish with no changes promises the next version.** The dialog
+  names the next version, closes silently and mints nothing. The dialog's
+  Changes row already says so. Risk (Low): an author reads "Next version" as a
+  promise.
+
+  Upgrade entry: print the version only while the Changes row lists a change,
+  or turn the confirm into a notice. The dialog is `PublishConfirmDialog` in
+  `panels/ProcessHeaderBar.tsx`.
+- **HEADER-6: the `⋮` trigger announces a popup it does not behave as.** It
+  carries `aria-haspopup` with no menu role and no arrow keys. Risk (Low): a
+  screen reader promises a menu and the keyboard offers a plain disclosure.
+
+  Upgrade entry: drop `aria-haspopup`, or build the menu role with arrow-key
+  navigation. The trigger is in `panels/ProcessHeaderBar.tsx`.
+- **HEADER-7: the dialogs print engine words and raw messages.** The Publish
+  dialog's blocked sentence says "the engine" and "somebody". A refused publish
+  can print a raw message such as "label: missing baseLocale". Change 12 maps
+  engine messages. The discard dialog prints the revision, and change 13 owns
+  that dialog. Risk (Medium): an author reads an engine word and a field path.
+
+  Upgrade entry: change 12 maps the message, and change 13 drops the revision.
+  The strings are `draftToolbar.publishDialogBlocked` and its neighbours in
+  `i18n/catalogs/studio.ts`.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

@@ -552,9 +552,10 @@ export const en = {
 
   // A locale option that has gaps. `{locale}` is the code, `{count}` the number of missing entries.
   "contentLocale.optionGap": "{locale} — {count} missing",
-  "contentLocale.invalid": "invalid locale code",
-  "contentLocale.addPlaceholder": "add locale (e.g. de)",
-  "contentLocale.add": "+ add locale",
+  "contentLocale.addLabel": "Add another language",
+  "contentLocale.invalid": "That is not a language code. Try one such as de or fr-CH.",
+  "contentLocale.addPlaceholder": "Language code, such as de",
+  "contentLocale.add": "Add",
 
   "tabs.rowLabel": "Process surface",
   "tabs.map": "Map",
@@ -883,6 +884,7 @@ export const en = {
   "assignment.none": "Nobody in particular",
 
   "headerBar.unnamedProcess": "(untitled process)",
+  "headerBar.nameLabel": "Process name",
   "headerBar.unsaved": "Unsaved changes",
   "headerBar.saved": "Saved",
   "headerBar.findingPrefix": "Stale reference in",
