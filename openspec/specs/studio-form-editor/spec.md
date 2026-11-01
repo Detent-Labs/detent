@@ -1391,4 +1391,3 @@ SHALL move with it.
 - **AND** the developer removes the second tab
 - **THEN** the group card names the first tab
 - **AND** its members still sit inside it, carrying no `tab`
-
