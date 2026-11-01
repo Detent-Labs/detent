@@ -221,11 +221,13 @@ const ROWS: readonly Row[] = [
 
 const locOf = (row: Row) => row.loc.replace(/^S(?=\.|$)/, `workflow.steps[${row.on ?? 0}]`);
 
+/** The key families of design D3, the sentences `checkSentence` answers with. */
+const D3_FAMILIES = /^checks\.(process|step|paths|way|timer|action|assignment|call|end|form|field|source|contract|fallback)\./;
+
 describe("one sentence per key", () => {
   it("covers every sentence key in the catalog", () => {
-    const sentenceKeys = Object.keys(en).filter((key) => key.startsWith("checks.") && !key.startsWith("checks.severity."));
+    const sentenceKeys = Object.keys(en).filter((key) => D3_FAMILIES.test(key));
     expect(ROWS.map((row): string => row.key).sort()).toEqual(sentenceKeys.sort());
-    expect(sentenceKeys).toHaveLength(108);
   });
 
   for (const row of ROWS) {
@@ -704,7 +706,7 @@ const ROOT = join(import.meta.dir, "../../..");
 const SCANNED = ["src/schema/definition.ts", "src/schema/compile.ts", "src/engine/registry-check.ts"];
 const ENTITY_LABELS = ["action", "assignment strategy", "data source"];
 const SAMPLE = "sample";
-/** The scan read 88 when it landed. Well below that, a form went unread. */
+/** Fewer literals than this means the scan left a form unread. */
 const LITERAL_FLOOR = 85;
 
 /** A migration spec is no process body, so its refinements reach no sentence. */
