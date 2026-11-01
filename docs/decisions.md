@@ -1075,7 +1075,8 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
   longer look up. Adding an empty field raises the banner at
   `screens/EditScreen.tsx:967` before the author types. The banner reads
-  `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`,
+  `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`
+  (the banner now reads "Open Checks and fix this draft's structure, so every check can run."),
   and it pushes the page down 35px at 1400px and 99px at 900px. The messages
   come from `src/schema/definition.ts:1014`, `src/schema/compile.ts:612` and
   `src/schema/definition.ts:1095`, and the "ZOD" label from
@@ -2162,6 +2163,39 @@ MAPLABELS tag is local to this section.
   units tall, six lines, whatever the sentence holds. A short sentence at the
   graph's edge then adds blank room to the frame. Risk (Low): the frame comes
   out a little loose.
+
+## Open from studio-header-two-rows (needs its own OpenSpec change)
+
+The change cut the header bar to back, name, state, Test, Publish and the `⋮`
+menu. It moved the content-locale switcher and the machine values to Settings
+and the Publish dialog. It left the three points below to later changes. The
+HEADER tag is local to this section.
+
+- **HEADER-1: the publish findings list prints raw references.** Each line
+  reads "Stale reference in <id>: <field> (...)", with a data source id or a
+  location in the body. Design principle 2 keeps such a value behind a
+  Developer view. The change moved the list under the bar and left its words
+  alone. Risk (Medium): an author reads an id and a field key in plain view,
+  and the line names no step or field label.
+
+  Upgrade entry: print the data source's label and the field's label in the
+  sentence, and keep the raw reference in a Developer view. The strings are
+  `headerBar.findingPrefix` and its neighbours in `i18n/catalogs/studio.ts`.
+- **HEADER-2: a process key follows the name after a publish.** The name input
+  rewrites the key on every keystroke while the key still matches the
+  derivation from the name. A field's key stops following at its first
+  publish (`studio-field-key-follows-name`). Risk (Low): an author who
+  renames a published process changes a key that an outside caller may read.
+
+  Upgrade entry: add a published check to the `shouldAutoDeriveKey` call in
+  `panels/ProcessHeaderBar.tsx`, reading the base version it already holds.
+- **HEADER-3: the name's missing translation warning is a long sentence in the
+  bar.** It stands in the bar's row while the author works outside the base
+  language. The sentence wraps inside the leading group and pushes the row
+  taller. Risk (Low): the bar grows by a line on a draft that lacks one name.
+
+  Upgrade entry: shorten the sentence, or mark the name input and move the
+  sentence to the Process view. The helper is `missingTranslationWarning`.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

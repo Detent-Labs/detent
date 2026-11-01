@@ -35,14 +35,14 @@ register-tab entry states how it filters the actor's own permitted set.
 
 ### The process surface
 
-A draft opens on this one screen, `EditScreen.tsx`. Top to bottom: the screen
-nav, the header bar, the tab row, then one tab body.
+A draft opens on this one screen, `EditScreen.tsx`. Top to bottom: the header
+bar, the tab row, then one tab body.
 
 | Term | Names | Lives in |
 |---|---|---|
 | process surface | the one screen a draft opens on: the tab row and the body under it | `screens/EditScreen.tsx` |
-| screen nav | the row above the header bar. It holds Back to processes and nothing else | `screens/EditScreen.tsx` |
-| header bar | the process-identity row: name, key, revision, dirty/saved state, Save, Discard draft, Publish, the `⋮` menu | `panels/ProcessHeaderBar.tsx` |
+| header bar | the process-identity row: back control, name, state line, Test, Publish and the `⋮` menu. Save stands beside the state line while the draft is dirty | `panels/ProcessHeaderBar.tsx` |
+| state line | the header bar's one status text: Unsaved changes or Saved, then the published version | `panels/ProcessHeaderBar.tsx` (`DraftStateLine`) |
 | restore notice | the notice under the header bar that offers a stored copy of unsaved work after a session ended. It stands over the form editor too | `panels/RestoreNotice.tsx` |
 | tab row | the row of six tabs over the body | `panels/ProcessTabRow.tsx` |
 | edge fade | the fade at an edge of the tab row with more tabs past it | `panels/ProcessTabRow.tsx` |
@@ -65,15 +65,19 @@ A hidden field matrix draws the last draft it drew while visible. The commit
 that reveals the view draws the live draft. Typing on the Catalog view
 therefore costs the hidden matrix nothing.
 
-Save, Discard draft and Publish stand in the header bar's trailing cluster,
-ahead of the `⋮` menu. `panels/ProcessHeaderBar.tsx` renders them there. The
-*draft toolbar* retired: `DraftToolbar.tsx` no longer mounts, and only its
-`useDraftToolbarActions` hook survives.
+Test, Publish and the `⋮` trigger trail the header bar. Save stands beside the
+state line, and only while the draft is dirty. `panels/ProcessHeaderBar.tsx`
+renders all of them. The *draft toolbar* retired: `DraftToolbar.tsx` no longer
+mounts, and only its `useDraftToolbarActions` hook survives.
 
-The header bar also carries the content-locale badge, inline and always
-visible. The `⋮` menu holds one group, "Views". It carries the JSON surface,
-Versions and Player. The badge shows *content locale*, the authored text; the
-account menu's own switcher shows *language*, the UI locale.
+The `⋮` menu holds two groups. Views carries the JSON surface, Versions and
+Player. Draft carries Discard draft.
+
+The content-locale switcher stands on the Settings tab's Process view, under
+its label "Language you are editing". The header bar names a locale only when
+the content locale differs from the base language. It then prints an "Editing"
+note, which opens that Process view. The switcher shows *content locale*, the
+authored text. The account menu's own switcher shows *language*, the UI locale.
 
 The studio's area nav has no draft control. Checks stands as a tab, on the
 tab row below. Its own count carries the severity color, and no other
@@ -92,7 +96,7 @@ Every other term below belongs to one tab.
 | masthead | the step page's top zone. It holds the step number, the kind phrase, the name, the description, and the issues no section claims | `panels/StepPage.tsx` |
 | section | one subject group on the step page, one of six, open one at a time | `panels/sectionsFor.ts` |
 | section header | the button that opens and closes one section. It carries the section's name, a one-line summary and a mark | `panels/StepPage.tsx` |
-| Developer view | a disclosure over raw JSON, CEL or machine values. The step page's, in More, holds the step's key and JSON, and each way-out row's holds that way out's key. The change-list row, each process list row, the form editor and a condition or rule input hold one. A field's own editor keeps its key there, under "What this field asks". The Settings tab's Process view holds one, with the key and the process id. Every Developer view stands closed on open, bar a condition input's, which opens by itself over unparseable source. | `panels/StepPage.tsx`, `panels/PathsPanel.tsx`, `panels/ChangeList.tsx`, `panels/ProcessSettingsPanel.tsx`, `screens/ProcessesScreen.tsx`, `panels/FieldCatalogPanel.tsx`, `screens/FormEditorScreen.tsx`, `panels/shared/ConditionInput.tsx`, `panels/shared/RuleInput.tsx` |
+| Developer view | a disclosure over raw JSON, CEL or machine values. The step page's, in More, holds the step's key and JSON, and each way-out row's holds that way out's key. The change-list row, each process list row, the form editor and a condition or rule input hold one. A field's own editor keeps its key there, under "What this field asks". The Settings tab's Process view and the Publish dialog hold the key, the process id and the revision. Every Developer view stands closed on open, bar a condition input's, which opens by itself over unparseable source. | `panels/StepPage.tsx`, `panels/PathsPanel.tsx`, `panels/ChangeList.tsx`, `panels/ProcessSettingsPanel.tsx`, `panels/ProcessHeaderBar.tsx`, `screens/ProcessesScreen.tsx`, `panels/FieldCatalogPanel.tsx`, `screens/FormEditorScreen.tsx`, `panels/shared/ConditionInput.tsx`, `panels/shared/RuleInput.tsx` |
 | sentence | the line that reads a condition in words. It stands under a condition input's rows and under a Read by row's place. On the canvas, a way out's sentence sits on its line, as "Otherwise" does | `panels/shared/ConditionInput.tsx`, `panels/shared/conditionLogic.ts::readerSentence`, `canvas/mapWords.ts` |
 | Read by zone | the field editor's effect-half zone under "Used in". It lists each expression that reads the field, by place and sentence | `panels/FieldCatalogPanel.tsx`, rows from `panels/readByRows.ts` |
 | rewrite line | the line under a field's label that says how many conditions a key change updated | `panels/FieldCatalogPanel.tsx` |
@@ -100,7 +104,7 @@ Every other term below belongs to one tab.
 | entity rail | the left column of the Catalog and Where values come from views: one row per entity | `panels/EntityTabs.tsx` |
 | field catalog | the Catalog view's editor over the process's field definitions | `panels/FieldCatalogPanel.tsx` |
 | field matrix | the Fields tab's Where fields appear view: a grid of every field against every step | `panels/FieldMatrixPanel.tsx`, `panels/FieldMatrixGrid.tsx` |
-| Settings tab | the tab holding the process-wide settings in four views. The Process view holds the base language, the add-locale control, the cancellable setting, the collaboration defaults and a Developer view | `panels/SettingsTab.tsx`, `panels/ProcessSettingsPanel.tsx` |
+| Settings tab | the tab holding the process-wide settings in four views. The Process view holds the base language, the content-locale switcher and the add-locale control. It also holds the cancellable setting, the collaboration defaults and a Developer view. After a publish, that Developer view adds the version and the definition hash | `panels/SettingsTab.tsx`, `panels/ProcessSettingsPanel.tsx` |
 | data sources | the Settings tab's Where values come from view, over the process's data source definitions | `panels/DataSourcesPanel.tsx` inside `panels/SettingsTab.tsx` |
 | contract | the Settings tab's What it takes in and gives back view, over the `ProcessContract`: input fields, output fields, outcomes | `panels/ContractPanel.tsx` inside `panels/SettingsTab.tsx` |
 | change list | the folded register of entity rows the Publish dialog and the Versions screen both draw over `describeChanges`'s output | `panels/ChangeList.tsx`, `panels/PublishChanges.tsx` |
@@ -133,6 +137,9 @@ The tab row replaced the ribbon over the bench. Seven words went with it: *ribbo
 *section register* and *process links*. Say *tab row* for the row. Say *steps
 rail* for the numbered column, and *step page* for the editor beside it. The
 word *masthead* survives on the step page, and nowhere else.
+
+The header bar lost its screen nav row. The word *screen nav* retired with
+it. Say *back control* for what that row held: the header bar's first control.
 
 The process surface replaced the panels screen too. Six words went with it:
 *panels screen*, *panels screen header*, *index rail*, *open view*, *surface
