@@ -201,13 +201,15 @@ state. The header's JSX stays a list of its parts, with no new context.
 The back control stays a `<button>` because it passes through the leave guard.
 Its accessible name reads "Back to processes", which holds the visible word.
 
-One `leading` group holds back, name, warning, issue sentence, state, Save, the
-note and the Versions offer. Its style reads `display: flex; flexWrap: wrap; flex:
-1 1 0; minWidth: 0`. The cluster takes `flex: 0 1 auto` and keeps its auto-margin. The
-leading group wraps inside itself, so a new control there moves no trailing control.
+One `leading` group holds back, name, issue sentence, state, Save, the note and the
+Versions offer. Its style reads `display: flex; flexWrap: wrap; flex: 1 1 0;
+minWidth: min(24rem, 100%)`. The cluster takes `flex: 0 1 auto` and keeps its
+auto-margin. The leading group wraps inside itself, so a new control there moves no
+trailing control. Below about 600px wide the cluster wraps under it.
 
-The name input takes `fieldSizing: "content"` with a `min(40ch, 100%)` cap. A short
-name leaves no gap, and a long one keeps the commands on the row.
+The `h1` caps the name at `min(40ch, 100%)`. The input takes `fieldSizing: "content"`
+and `maxWidth: 100%`. A short name leaves no gap, and a long one keeps the commands
+on the row.
 
 ### D11. What the critique changed
 

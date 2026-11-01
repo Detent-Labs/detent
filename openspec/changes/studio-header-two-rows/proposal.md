@@ -64,6 +64,8 @@ None.
   compiled-style requirements.
 - `studio-json-view`: the content-locale switcher no longer stands over the JSON
   surface.
+- `authored-content-localization`: the process label's missing translation warning
+  stands below the bar.
 
 ## Impact
 

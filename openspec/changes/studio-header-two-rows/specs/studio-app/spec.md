@@ -45,7 +45,122 @@ focus to the Settings tab. It SHALL stay away while the two match.
 - **WHEN** an author presses that control inside the form editor
 - **THEN** the form editor closes and the Settings tab's Process view opens
 
+### Requirement: The Process view's language controls use the author's words
+
+The content-locale switcher's options SHALL read the language's name and code, as
+"German (de)". A language with gaps SHALL read "German (de) — 20 missing". A code
+with no name SHALL print alone. The add-a-language control SHALL carry a visible
+label. A refused code SHALL read one sentence with an alert role, and the input
+SHALL point at it.
+
+#### Scenario: An option names its language
+
+- **WHEN** a draft holds `de` with three gaps
+- **THEN** the switcher offers "German (de) — 3 missing"
+
+#### Scenario: A code with no name prints alone
+
+- **WHEN** a draft holds a code the browser cannot name
+- **THEN** the switcher offers that code with no parenthesis
+
+#### Scenario: A refused code reads as a sentence
+
+- **WHEN** an author adds a value that is no language code
+- **THEN** a sentence with an alert role says so
+- **AND** the input carries `aria-invalid` and names that sentence
+
 ## MODIFIED Requirements
+
+### Requirement: A LocalizedText entry missing the current locale draws an inline warning
+
+<!-- antislop: allow sentence-length -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
+Take the studio's currently selected `contentLocale`. Take an entry that
+carries the draft's `baseLocale` value but lacks that locale's own value.
+That entry SHALL draw a warning next to its `LocalizedTextInput`. The process
+label is the one exception: its warning SHALL stand directly below the header bar,
+so the bar keeps one row. The
+warning SHALL NOT be an `EditorIssue`, and SHALL NOT block or delay
+publishing.
+
+It SHALL draw at every `LocalizedTextInput` site:
+
+- the process label
+- each step's label and description
+- each field's label and description
+- each field option's label
+- each note's text
+
+An entry that lacks the `baseLocale` value SHALL NOT draw this warning.
+The existing base-locale `EditorIssue` already flags it. The warning
+SHALL NOT draw when `contentLocale` equals `baseLocale`.
+
+A static rule in `packages/web/test/boundaries.test.ts` SHALL enforce that
+list, scoped to `src/areas/studio/`. Every `LocalizedTextInput` rendered
+there SHALL sit beside a call to `missingTranslationWarning`. An exempt site
+SHALL instead carry an inline comment stating why. A hand-kept list does not
+grow with the code. This rule does.
+
+That rule also pins the number of sites it found. A change adding or
+removing a site SHALL move that literal in the same commit. Otherwise the
+rule rejects a tree it exists to admit.
+
+#### Scenario: A step label missing the current locale draws a warning
+
+- **WHEN** the studio's `contentLocale` is `de`, and a draft's step has a
+  `label` carrying an `en` (base locale) value but no `de` value
+- **THEN** the studio shows a warning next to that step's label input
+
+#### Scenario: An entry with the current locale filled in draws no warning
+
+- **WHEN** a draft's field `label` carries both the base-locale value and
+  the current `contentLocale`'s value
+- **THEN** the studio shows no warning next to that field's label input
+
+#### Scenario: Viewing the base locale draws no translation warning
+
+- **WHEN** the studio's `contentLocale` equals the draft's `baseLocale`
+- **THEN** the studio shows no missing-translation warning anywhere
+
+#### Scenario: The warning does not block publishing
+
+- **WHEN** an author publishes a draft carrying a missing-translation
+  warning
+- **THEN** the publish succeeds
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
+#### Scenario: A new render site warns
+
+- **WHEN** the studio area gains a `LocalizedTextInput` site
+- **THEN** the site calls `missingTranslationWarning`
+- **AND** an untranslated entry draws the warning there
+
+#### Scenario: An unguarded site fails the suite
+
+- **WHEN** a source file under `src/areas/studio/` renders a
+  `LocalizedTextInput` with no adjacent `missingTranslationWarning` call and
+  no exempting comment
+- **THEN** the boundary test names the file and fails
+
+#### Scenario: An exempt site says why
+
+- **WHEN** a site legitimately does not need a warning
+- **THEN** an inline comment states the reason, and the rule skips it
+
+#### Scenario: A note's text missing the current locale draws a warning
+
+- **WHEN** the studio's `contentLocale` is `de`, and a note's `text` carries
+  the base-locale value alone
+- **THEN** the note's strip shows the warning beside its text input
+
+#### Scenario: The process label's warning stands below the bar
+
+<!-- antislop: allow negation-habit -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
+- **WHEN** the edited language holds no process name
+- **THEN** the warning stands directly below the header bar
+- **AND** the bar keeps one row
 
 <!-- antislop: allow synonym-rotation -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
