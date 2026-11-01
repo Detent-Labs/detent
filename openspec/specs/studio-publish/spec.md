@@ -330,9 +330,9 @@ reaches this requirement's condition.
 <!-- antislop: allow synonym-rotation trailing-negation -->
 <!-- Why: a platform cancel is the dialog decline, and a tab stop is a focus position, two unrelated concepts. -->
 The studio SHALL confirm a publish in a modal dialog of its own, not in the
-browser's `confirm()` prompt. The dialog SHALL use the native `dialog`
-element opened with `showModal()`. The focus trap, the Escape key and the
-backdrop then come from the platform. The dialog SHALL carry an accessible
+browser's `confirm()` prompt. The dialog SHALL take the studio's one dialog
+form. The Escape key and the backdrop come from the platform, and
+`spa-accessibility` states the keyboard hold. The dialog SHALL carry an accessible
 name through `aria-labelledby`. It SHALL treat a platform cancel as a
 decline.
 
@@ -386,8 +386,8 @@ place that focus itself rather than rely on document order.
 
 When the dialog closes, focus SHALL return to the control that opened it. The
 header bar carries that control. This binds every close route. Those
-are the declining control, the Escape key, a backdrop dismissal, and a request
-that finished. Focus otherwise drops to the document body, and the developer
+are the declining control, the Escape key and a request that finished. A press
+on the backdrop closes nothing. Focus otherwise drops to the document body, and the developer
 restarts their traversal from the top of the screen.
 
 #### Scenario: Publishing a clean draft confirms first
@@ -600,32 +600,3 @@ shows.
 - **WHEN** the rail renders in the canvas ribbon's bar, or on the panels
   screen
 - **THEN** each placement states the publish verdict the other states
-
-### Requirement: The publish-confirmation dialog renders from compiled styles
-
-`panels/ProcessHeaderBar.tsx` renders the publish-confirmation dialog.
-This capability's own requirement names it: "Publishing confirms in a
-modal dialog that names the version and its immutability." The dialog
-SHALL render from compiled component styles, including its
-`::backdrop`. The header bar around it is a different capability's own
-concern. Only the dialog itself is this requirement's scope.
-
-This is a first use of `::backdrop` for this repo's StyleX adoption. A
-task verifies it against a real build first, before this requirement's
-own implementation task runs. That follows `web-styling`'s own
-requirement: a phase verifies an unproven compiler feature against a
-real build first.
-
-#### Scenario: The publish dialog keeps its look
-
-- **WHEN** a browser opens the publish-confirmation dialog
-- **THEN** its computed layout, spacing, color and border equal the
-  values the deleted stylesheet declared, including its `::backdrop`
-
-#### Scenario: The dialog still opens, traps focus, and dismisses correctly
-
-- **WHEN** an author opens the publish-confirmation dialog with the
-  keyboard, then presses Escape
-- **THEN** the dialog still opens through the native `showModal()` call,
-  unchanged from before the migration
-- **AND** focus returns to the control that opened it

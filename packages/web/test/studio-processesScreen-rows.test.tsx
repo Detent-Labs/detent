@@ -52,6 +52,10 @@ describe("A process-list row", () => {
     expect(html).toMatch(new RegExp(`<a href="/studio/processes/${PROCESS_ID}/edit"[^>]*>Laptop Pool</a>`));
   });
 
+  it("gives the name link an id, where the focus lands after a discard", () => {
+    expect(renderRow(both)).toContain(`id="process-name-${PROCESS_ID}"`);
+  });
+
   it("says who saved the draft and when, in a <time>", () => {
     const html = renderRow(both);
 

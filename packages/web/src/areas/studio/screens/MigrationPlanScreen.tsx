@@ -13,6 +13,7 @@ import {
   type PlanRows,
 } from "./migrationPlanLogic.js";
 import { MigrationSpecEditor } from "../panels/MigrationSpecEditor.js";
+import { ghost } from "../panels/shared/btn.js";
 import type { Route } from "../routing.js";
 import type { OrphanKeyScan } from "../api/types.js";
 import { describeCaughtError } from "../errors.js";
@@ -278,8 +279,7 @@ export function MigrationPlanScreen({ processId, from, to, token, navigate, onUn
     <main {...stylex.props(styles.studioScreen)}>
       <button
         type="button"
-        className="btn btn-ghost"
-        {...stylex.props(styles.studioBack)}
+        {...ghost(styles.studioBack)}
         onClick={() => navigate({ name: "versions", processId })}
       >
         {t("migrationPlan.back")}

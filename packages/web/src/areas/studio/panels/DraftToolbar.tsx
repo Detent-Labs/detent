@@ -62,6 +62,8 @@ export type PendingDialog = "publish" | "discard" | null;
 export interface DraftToolbarActions {
   saving: boolean;
   publishing: boolean;
+  /** True while the discard request runs. The discard dialog disables its controls. */
+  discarding: boolean;
   error: string | null;
   /** The server's own text for a refused publish, for a closed Developer view
    * beside `error`. It clears wherever `error` clears. */
@@ -91,12 +93,10 @@ export interface DraftToolbarActions {
  * menu today) never reimplements the logic itself.
  *
  * It raises no native browser prompt. Publish and discard each open the
- * application's own modal dialog instead: `publish()` and `discard()` only set
+ * studio's own dialog (`StudioDialog`): `publish()` and `discard()` only set
  * `pendingDialog`, and `resolveDialog(true)` runs the act the dialog named.
- * The native prompt carried neither the version a publish mints nor the rule
- * that a published version never changes, and it bypassed the design language
- * entirely. `packages/web/test/studio-no-confirm.test.ts` guards the
- * regression that would put it back.
+ * `packages/web/test/studio-no-confirm.test.ts` guards the studio area against
+ * a native `confirm()` call.
  */
 export function useDraftToolbarActions({
   processId,
@@ -117,6 +117,7 @@ export function useDraftToolbarActions({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const [pendingDialog, setPendingDialog] = useState<PendingDialog>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const clearError = () => {
@@ -193,6 +194,8 @@ export function useDraftToolbarActions({
    */
   const runPublish = () =>
     withUnauthorized(async () => {
+      // The slot leaves and returns, so a repeated refusal scrolls and announces again.
+      clearError();
       if (isDraftDirty(draft, savedBody, saveState.layout, savedLayout) && !(await doSave())) {
         setPendingDialog(null);
         return;
@@ -237,9 +240,15 @@ export function useDraftToolbarActions({
   /** The act the discard dialog confirms. */
   const runDiscard = () =>
     withUnauthorized(async () => {
-      await deleteDraft(processId, token);
-      setPendingDialog(null);
-      onDiscarded();
+      clearError();
+      setDiscarding(true);
+      try {
+        await deleteDraft(processId, token);
+        setPendingDialog(null);
+        onDiscarded();
+      } finally {
+        setDiscarding(false);
+      }
     });
 
   /**
@@ -261,6 +270,7 @@ export function useDraftToolbarActions({
   return {
     saving,
     publishing,
+    discarding,
     error,
     errorDetail,
     pendingDialog,

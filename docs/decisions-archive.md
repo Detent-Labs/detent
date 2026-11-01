@@ -1287,3 +1287,141 @@ system that resulted; this file explains why it took that shape.
 
   Resolved by `studio-checks-by-subject`: `studio-publishErrors.test.ts` covers
   the swap on a step and on the contract, with `checks.fallback.contract` behind it.
+
+## Closed by `studio-one-dialog-form`
+- Studio's native `<dialog>` confirm dialogs do not fully hold a keyboard
+  user inside them. `stylex-phase-3-studio`'s own task 11.5 keyboard walk
+  found two gaps, both pre-existing and unrelated to that phase's CSS-only
+  change: verified via the untouched JS in `panels/shared/confirmDialog.tsx`'s
+  `useConfirmDialog` and `ProcessesScreen.tsx`'s `StartPickerDialog`.
+
+<!-- antislop: allow trailing-negation -->
+<!-- Why: the paragraph moved word for word from docs/decisions.md. -->
+  First: Tab from the publish- and discard-confirm dialogs' focused Cancel
+  button lands on `<body>`, not the Publish button before it in DOM order.
+  `useConfirmDialog`'s own comment already names the cause candidate: three
+  separate focus mechanisms race on open (an `autoFocus` prop, React 19's
+  own commit-time `.focus()`, and `showModal()`'s native focusing steps),
+  and the last of those three re-focuses the declining control after
+  `showModal()` already ran. That late re-focus is the untested candidate
+  cause: it may never register with the browser's own tab-order
+  bookkeeping for the modal.
+
+  The removal dialog (`panels/RemoveFieldDialog.tsx`) is a third consumer of
+  the same hook. It shows the identical escape: forward Tab from its focused
+  Cancel lands on `<body>`. Shift+Tab wraps correctly inside the dialog. Only
+  the forward-Tab transition from Cancel breaks.
+
+  Second: `StartPickerDialog` and `PromotionPreviewDialog` (`+ New
+  process`, "Import a promoted version") call `showModal()` on mount with
+  no cleanup. Escape and Cancel both close the dialog and drop focus to
+  `<body>` instead of returning it to the button that opened it.
+  `useConfirmDialog`'s own cleanup effect is the fix these two dialogs
+  lack; neither component uses that hook.
+
+  No follow-up change tracks this yet. It belongs to `studio-publish` or
+  `spa-accessibility`, not `web-styling`: a CSS migration cannot cause or
+  fix either gap.
+- **The studio's three confirmation dialogs (Publish, Discard draft, Remove
+  field) share presentation gaps.**
+  - The heading takes the global `h2` Title role
+    (`packages/web/src/shell/global.css:94-100`: 13.6px, weight 800,
+    uppercase, slate), the least prominent text in the dialog, and renders an
+    author's own label in capitals.
+  - Cancel prints in the accent (`rgb(212, 43, 17)`), beside the
+    accent-outlined destructive confirm.
+  - The fact counts print in the written face, where `DESIGN.md` puts a
+    figure in a column in mono.
+  - The Publish dialog's `<code>` falls back to the browser's `monospace`.
+  - At 420px the dialog spans the viewport with no gutter: the compiled
+    `maxWidth: "34rem"` replaces the browser's own modal width cap.
+  - Discard's heading is a statement, and Remove's is a question.
+  - Publish and Discard have no `aria-describedby`.
+
+  The change `remove-field-takes-its-references` found these in its
+  2026-09-13 critique and audit. Name the fix: one `DESIGN.md` "Dialogs"
+  decision, applied to all three dialogs.
+<!-- antislop: allow negation-habit -->
+<!-- Why: the entry moved word for word from docs/decisions.md. -->
+- **The studio's six remaining `confirm()` prompts.**
+  `studio-publish-gate-and-report` converted the two on the publish path to
+  the application's own modal dialog, and the others stay:
+  `packages/web/src/areas/studio/root.tsx:95`, `EditScreen.tsx`'s arrange gate,
+  `ProcessesScreen.tsx`'s draft discard, `TemplatesScreen.tsx`'s template
+  discard, and two in `FieldCatalogPanel.tsx`. Of these, `TemplatesScreen.tsx`'s template
+  discard hardcodes English rather than reading the catalog. Its
+  template-replace prompt (`TemplatesScreen.tsx:131`), outside the six, does
+  too. The navigation prompt at `packages/web/src/areas/studio/root.tsx:95` is the odd one
+  out: `studio-app` states the `confirm()`/`t()` pattern for it as a
+  requirement, so converting it rewrites that requirement and every scenario
+  under it. The other five belong to `studio-form-editor` and `studio-app`, and
+  each carries its own facts, its own dialog copy and its own catalog keys.
+  Deferred 2026-09-02, on capability ownership and effort, not on
+  reversibility: two of the five discard server state and the studio carries no
+  undo.
+- **ACCORDION-17: the removal dialog's heading uppercases the step's name.**
+  The global `h2` style does it. Its counts print outside mono, and labels and
+  values share no baseline. The two dialogs it copies share all three. Change
+  13 owns the one dialog. Risk (Low): the dialog reads unlike the register it
+  confirms. `studio-checks-by-subject` leaves it: change 13 owns the dialog.
+- **HEADER-7 (narrowed): the discard dialog prints the revision.**
+  `studio-checks-by-subject` replaced the Publish dialog's blocked sentence
+  and a refused publish's message with sentences. The server's text stands in
+  a closed Developer view. Change 13 owns the discard dialog. Risk (Low): an
+  author reads a revision number, a machine value.
+
+  Upgrade entry: change 13 drops the revision. The string is in
+  `i18n/catalogs/studio.ts`.
+- **FIELDCARD-25: the Remove field dialog prints counts, not names.** It says
+  "CEL expressions reading it". Change 13 owns the dialogs. Risk (Medium): an
+  author removes a field without seeing what reads it.
+
+  Upgrade entry: change 13's dialog work.
+- **FIELDS-21: the live `studio-publish` requirement names a backdrop
+  dismissal no dialog has.** Its "Publishing confirms in a modal dialog that
+  names the version and its immutability" requirement names "a backdrop
+  dismissal" among the close routes that return focus
+  (`openspec/specs/studio-publish/spec.md:350`). A native modal has no such
+  route. Measured on 2026-09-13: a backdrop click leaves the Publish and the
+  Discard draft dialogs open. Risk (Low): the requirement asks for a route
+  no dialog offers.
+
+  Two fixes exist, each a change of its own: drop the route from that
+  sentence, or add a deliberate backdrop dismissal (`closedby="any"`) to
+  every studio confirmation dialog, with its focus return.
+- **FIELDS-22: the kept-reference note names no location.** When a removal
+  keeps a CEL read or a plugin setting, the dialog adds "CEL expressions and
+  plugin settings keep their text." and "Check each one before you publish."
+  (`panels/RemoveFieldDialog.tsx:192-193`). It names no expression and no
+  setting, and no later screen lists them all
+  (`openspec/specs/studio-app/spec.md:4527-4529`).
+  A kept CEL read, or a kept `process.start` mapping value, surfaces later as
+  an unknown-key result on the Checks tab.
+  A kept `valueFromField` or `instanceIdField` setting fails the way FIELDS-17
+  already describes.
+
+  The step list the note leans on, "Used in", sits out of view when the
+  author presses Remove field. Measured: its heading sat at -59px on one
+  field and -190px on another, and the pane behind the open dialog stayed
+  inert. The always-shown note's "step entry" is an internal word. The copy
+  table of `remove-field-takes-its-references` fixed that wording
+  (`openspec/changes/archive/2026-09-13-remove-field-takes-its-references/design.md:99`),
+  so a rewrite needs the owner's sign-off too. Risk (Medium): the note tells
+  the author to check references the dialog never lists.
+
+  Name the routes: an advisory "kept reference" check, a
+  `studio-checks-rail` change, or naming locations in the dialog directly,
+  which reopens the owner's "counts only" choice from 2026-09-13.
+- **NAMES-6: three screens still lose their `.btn` look.** Tools, Player and
+  Versions write a literal `.btn` class beside `stylex.props`. The compiled
+  class replaces it, so their back controls differ from the process surface's.
+- **DIALOG-1: the step page's two dialogs can stand modal in a hidden tab
+  body.** `panels/StepPage.tsx` mounts Remove this step and the kind switch.
+  The Steps tab body stays mounted and takes `hidden` when another tab opens.
+  The Fields tab's dialogs clear their pending state when their body hides, and
+  these two do not. Risk (Low): a browser Back under an open dialog leaves a
+  modal in a body nobody sees.
+
+  Upgrade entry: pass `visible` into `StepPage` and clear `removing` and
+  `pendingKind` in the render that hides it, as `EntityTabs.tsx` does for
+  `pendingRemoval`.

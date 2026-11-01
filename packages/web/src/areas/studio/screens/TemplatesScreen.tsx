@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import { stripCompiledContent } from "workflow-engine/schema/strip-compiled";
@@ -7,6 +7,8 @@ import { useFail } from "../../../shell/useFail.js";
 import type { ProcessBody } from "workflow-engine/schema";
 import type { TemplateSummary, ProcessSummary } from "../api/types.js";
 import { templateDisplayName } from "./processListLogic.js";
+import { DeleteTemplateDialog, ReplaceTemplateDialog } from "../panels/confirmations.js";
+import { activeControl } from "../panels/shared/dialogFocus.js";
 
 interface TemplatesScreenProps {
   token: string;
@@ -101,6 +103,16 @@ export function TemplatesScreen({ token, locale, onUnauthorized }: TemplatesScre
   const [templateKey, setTemplateKey] = useState("");
   const [selected, setSelected] = useState("");
   const [creating, setCreating] = useState(false);
+  // What the two dialogs ask about. Each dialog's name comes from the loaded list.
+  const [pendingDelete, setPendingDelete] = useState<{ key: string; name: string } | undefined>(undefined);
+  const [pendingReplace, setPendingReplace] = useState<string | undefined>(undefined);
+  // The control that opened the open dialog, for the focus return on a decline.
+  const dialogTrigger = useRef<HTMLElement | null>(null);
+  const createButton = useRef<HTMLButtonElement>(null);
+  const keyInput = useRef<HTMLInputElement>(null);
+  // Set by a confirm. An effect moves the focus, so it runs after the commit that
+  // unmounts the dialog: the page stands inert until then.
+  const [landOnKey, setLandOnKey] = useState(false);
 
   const fail = useFail(onUnauthorized, (err) => setError(err instanceof Error ? err.message : String(err)));
 
@@ -122,20 +134,33 @@ export function TemplatesScreen({ token, locale, onUnauthorized }: TemplatesScre
     void load();
   }, [load]);
 
-  const create = async () => {
-    const source = sources.find((s) => sourceValue(s.source) === selected)?.source;
-    if (!source) return;
+  useEffect(() => {
+    if (!landOnKey) return;
+    keyInput.current?.focus();
+    setLandOnKey(false);
+  }, [landOnKey]);
+
+  const selectedSource = sources.find((s) => sourceValue(s.source) === selected)?.source;
+
+  const askCreate = () => {
+    if (!selectedSource) return;
     const key = templateKey.trim();
-    if (
-      items.some((item) => item.templateKey === key) &&
-      !confirm(`A template "${key}" exists. Replace it with this version? You lose the old template body.`)
-    ) {
+    const existing = items.find((item) => item.templateKey === key);
+    if (existing === undefined) {
+      void runCreate();
       return;
     }
+    dialogTrigger.current = createButton.current;
+    setPendingReplace(templateDisplayName(existing.label, locale, existing.templateKey));
+  };
+
+  const runCreate = async () => {
+    if (!selectedSource) return;
+    const key = templateKey.trim();
     setCreating(true);
     setError(undefined);
     try {
-      const { body, layout } = await readSource(source, token);
+      const { body, layout } = await readSource(selectedSource, token);
       await saveTemplate(key, body, layout, token);
       setTemplateKey("");
       setSelected("");
@@ -147,8 +172,12 @@ export function TemplatesScreen({ token, locale, onUnauthorized }: TemplatesScre
     }
   };
 
-  const remove = async (key: string) => {
-    if (!confirm(`Delete the template "${key}"? Processes already created from it keep their bodies.`)) return;
+  const askDelete = (template: TemplateSummary) => {
+    dialogTrigger.current = activeControl();
+    setPendingDelete({ key: template.templateKey, name: templateDisplayName(template.label, locale, template.templateKey) });
+  };
+
+  const runDelete = async (key: string) => {
     setError(undefined);
     try {
       await deleteTemplate(key, token);
@@ -171,10 +200,11 @@ export function TemplatesScreen({ token, locale, onUnauthorized }: TemplatesScre
         {...stylex.props(styles.studioControls)}
         onSubmit={(e) => {
           e.preventDefault();
-          if (canCreate) void create();
+          if (canCreate) askCreate();
         }}
       >
         <input
+          ref={keyInput}
           value={templateKey}
           onChange={(e) => setTemplateKey(e.target.value)}
           placeholder="approval…"
@@ -190,13 +220,40 @@ export function TemplatesScreen({ token, locale, onUnauthorized }: TemplatesScre
             </option>
           ))}
         </select>
-        <button type="submit" className="btn btn-primary" disabled={!canCreate}>
+        <button ref={createButton} type="submit" className="btn btn-primary" disabled={!canCreate}>
           {creating ? "Creating…" : "Create template"}
         </button>
         <button type="button" className="btn btn-secondary" onClick={() => void load()} disabled={loading}>
           Refresh
         </button>
       </form>
+
+      {pendingDelete !== undefined && (
+        <DeleteTemplateDialog
+          name={pendingDelete.name}
+          triggerRef={dialogTrigger}
+          onCancel={() => setPendingDelete(undefined)}
+          onConfirm={() => {
+            dialogTrigger.current = null;
+            setPendingDelete(undefined);
+            setLandOnKey(true);
+            void runDelete(pendingDelete.key);
+          }}
+        />
+      )}
+      {pendingReplace !== undefined && (
+        <ReplaceTemplateDialog
+          name={pendingReplace}
+          triggerRef={dialogTrigger}
+          onCancel={() => setPendingReplace(undefined)}
+          onConfirm={() => {
+            dialogTrigger.current = null;
+            setPendingReplace(undefined);
+            setLandOnKey(true);
+            void runCreate();
+          }}
+        />
+      )}
 
       {error && (
         <p {...stylex.props(styles.studioError)} role="alert">
@@ -227,7 +284,7 @@ export function TemplatesScreen({ token, locale, onUnauthorized }: TemplatesScre
                   {new Date(template.updatedAt).toLocaleString()} · {template.createdBy}
                 </td>
                 <td {...stylex.props(styles.studioTableCell)}>
-                  <button type="button" className="btn btn-secondary" onClick={() => void remove(template.templateKey)}>
+                  <button type="button" className="btn btn-secondary" onClick={() => askDelete(template)}>
                     Delete
                   </button>
                 </td>

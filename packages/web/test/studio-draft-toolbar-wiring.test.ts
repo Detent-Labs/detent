@@ -78,7 +78,12 @@ function scan(source: string): string[] {
       violations.push("runPublish does not read isDraftDirty(draft, savedBody, saveState.layout, savedLayout)");
     }
     if (/\bisDirty\s*\(/.test(publish)) violations.push("runPublish reads the body-only isDirty");
+    if (!/^\s*clearError\(\);/.test(publish)) violations.push("runPublish does not clear the last refusal first");
   }
+
+  const discard = bodyAfter(code, "runDiscard");
+  if (discard === undefined) violations.push("runDiscard not found");
+  else if (!/^\s*clearError\(\);/.test(discard)) violations.push("runDiscard does not clear the last refusal first");
 
   const reload = bodyAfter(code, "reload");
   if (reload === undefined) violations.push("reload not found");
@@ -106,6 +111,13 @@ const real = stripComments(readFileSync(new URL(`../${DRAFT_TOOLBAR}`, import.me
 describe("DraftToolbar.tsx wires the saved layout", () => {
   it("the real DraftToolbar.tsx has no violation", () => {
     expect(scan(real)).toEqual([]);
+  });
+
+  it("a retry that keeps the last refusal is flagged, since it neither scrolls nor announces again", () => {
+    const publish = mutate(real, /(const runPublish = [^{]*\{)\s*clearError\(\);/, "$1");
+    expect(scan(publish)).toEqual(["runPublish does not clear the last refusal first"]);
+    const discard = mutate(real, /(const runDiscard = [^{]*\{)\s*clearError\(\);/, "$1");
+    expect(scan(discard)).toEqual(["runDiscard does not clear the last refusal first"]);
   });
 
   it("a save that leaves the saved layout behind is flagged", () => {

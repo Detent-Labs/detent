@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { FileJson, History, MoreVertical, Play, Trash2 } from "lucide-react";
-import { colors, focus, fonts, space, shadow } from "form-ui/tokens.stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import { collectUsedLocales, missingTranslationWarning, nameInputPlaceholder, resolveDraftLocalizedText } from "../draft/localized-text";
@@ -9,7 +9,20 @@ import { deriveKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput.js";
 import { PROCESS_HEADER_NAME_ID } from "../draft/process-tabs.js";
 import { IssueList } from "./shared/IssueList.js";
-import { useConfirmDialog } from "./shared/confirmDialog.js";
+import {
+  DialogDeveloperView,
+  DialogFact,
+  DialogFacts,
+  DialogMonoFact,
+  DialogNames,
+  DialogNote,
+  DialogRefusal,
+  DialogWarning,
+  PrimaryConfirm,
+  RefusalDetail,
+  StudioDialog,
+} from "./shared/StudioDialog.js";
+import { DiscardDraftDialog } from "./DiscardDraftDialog.js";
 import { localeOptionLabel } from "./shared/ContentLocaleSwitcher.js";
 import { PublishChanges } from "./PublishChanges.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
@@ -159,89 +172,6 @@ const styles = stylex.create({
   // muted tone: it names an administrative fact about the actor instead.
   publishBlockedReason: {
     color: colors.refusal,
-  },
-  // `::backdrop` stays a literal fallback in `app.css`, which the
-  // `studio-dialog` class beside this compiled style keeps matching. A long
-  // change list scrolls inside the dialog, so its controls stay reachable.
-  // The scroll box keeps the focus ring's reach clear at every edge.
-  dialog: {
-    maxWidth: "34rem",
-    maxHeight: "85vh",
-    overflowY: "auto",
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: colors.divider,
-    padding: `max(${space.s4}, ${focus.reach})`,
-    scrollPadding: focus.reach,
-    backgroundColor: colors.surface,
-    color: colors.text,
-    overscrollBehavior: "contain",
-    boxShadow: shadow.lg,
-  },
-  dialogFacts: {
-    display: "grid",
-    gridTemplateColumns: "max-content 1fr",
-    gap: `${space.s1} ${space.s3}`,
-    marginBlock: space.s3,
-    marginInline: 0,
-  },
-  dialogFactsDt: {
-    fontFamily: fonts.body,
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    color: colors.textMuted,
-  },
-  dialogFactsDd: {
-    margin: 0,
-    minWidth: 0,
-    overflowWrap: "anywhere",
-  },
-  dialogLanguages: {
-    listStyle: "none",
-    margin: 0,
-    padding: 0,
-  },
-  // The machine values stand in a closed disclosure under the facts, in the
-  // shape the Settings tab's Developer view takes.
-  dialogDeveloper: {
-    marginBlock: space.s3,
-  },
-  dialogDeveloperSummary: {
-    cursor: "pointer",
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: "0.1em",
-    color: colors.textMuted,
-  },
-  dialogMono: {
-    fontFamily: fonts.mono,
-  },
-  dialogNote: {
-    color: colors.textMuted,
-    fontSize: "0.9rem",
-  },
-  dialogBlocked: {
-    color: colors.refusal,
-  },
-  dialogError: {
-    color: colors.refusal,
-    whiteSpace: "pre-line",
-  },
-  // The server's own text for a refusal, kept as it came, line breaks and all.
-  refusalDetail: {
-    fontFamily: fonts.mono,
-    fontSize: "0.9rem",
-    marginBlock: space.s2,
-    whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
-  },
-  controls: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: space.s2,
-    marginBottom: space.s3,
-    alignItems: "center",
   },
   headerBarMenu: {
     position: "relative",
@@ -442,20 +372,19 @@ export function PublishReasonLine({
   );
 }
 
-/** The server's text for a refused request, in a closed Developer view. */
-function RefusalDetail({ detail }: { detail: string }) {
-  return (
-    <details {...stylex.props(styles.dialogDeveloper)}>
-      <summary {...stylex.props(styles.dialogDeveloperSummary)}>{t("draftToolbar.dialogDeveloperView")}</summary>
-      <p {...stylex.props(styles.refusalDetail)}>{detail}</p>
-    </details>
-  );
-}
-
-interface ConfirmDialogProps {
+interface PublishConfirmDialogProps {
   processLabel: string;
   revision: number;
-  /** The nav control that opened this dialog, for `useConfirmDialog`'s focus return. */
+  processId: string;
+  token: string;
+  baseVersion: number | null;
+  draft: Draft;
+  contentLocale: string;
+  nextVersion: string;
+  dirty: boolean;
+  openIssues: number;
+  blocked: boolean;
+  /** The Publish control that opened this dialog, for the focus return. */
   triggerRef: RefObject<HTMLButtonElement | null>;
   /** The refusal to render inside the dialog, or null. A modal puts everything
    * behind it out of reach, so a banner on the screen reports nothing here
@@ -471,13 +400,8 @@ interface ConfirmDialogProps {
 
 /**
  * The publish confirmation (studio-publish: "Publishing confirms in a modal
- * dialog that names the version and its immutability").
- *
- * A native `dialog` opened with `showModal()`, the pattern
- * `ProcessesScreen.tsx`'s `PromotionPreviewDialog` already ships. The focus
- * trap, the Escape key and the backdrop come from the platform, so none of the
- * three is hand-rolled. Mounted only while the dialog is pending, so the open
- * effect runs once.
+ * dialog that names the version and its immutability"). Mounted only while
+ * the dialog is pending, so the open effect runs once.
  */
 function PublishConfirmDialog({
   processLabel,
@@ -497,164 +421,45 @@ function PublishConfirmDialog({
   triggerRef,
   onCancel,
   onConfirm,
-}: ConfirmDialogProps & {
-  processId: string;
-  token: string;
-  baseVersion: number | null;
-  draft: Draft;
-  contentLocale: string;
-  nextVersion: string;
-  dirty: boolean;
-  openIssues: number;
-  blocked: boolean;
-}) {
-  const { ref, declineRef } = useConfirmDialog(triggerRef);
-  const dialogProps = stylex.props(styles.dialog);
+}: PublishConfirmDialogProps) {
   const languages = collectUsedLocales(draft);
 
   return (
-    <dialog
-      ref={ref}
-      className={`studio-dialog ${dialogProps.className}`}
-      style={dialogProps.style}
-      aria-labelledby="publish-confirm-heading"
+    <StudioDialog
+      heading={t("draftToolbar.publishDialogHeading")}
+      triggerRef={triggerRef}
       onCancel={onCancel}
+      busy={busy}
+      confirm={<PrimaryConfirm onClick={onConfirm}>{busy ? t("draftToolbar.publishing") : t("draftToolbar.publish")}</PrimaryConfirm>}
+      refusal={error !== null && <DialogRefusal detail={errorDetail}>{error}</DialogRefusal>}
     >
-      <h2 id="publish-confirm-heading">{t("draftToolbar.publishDialogHeading")}</h2>
-      <dl {...stylex.props(styles.dialogFacts)}>
-        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogProcess")}</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>{processLabel}</dd>
+      <DialogFacts>
+        <DialogFact term={t("draftToolbar.dialogProcess")}>{processLabel}</DialogFact>
         {/* "Next version", not "Version": the engine assigns the number, and
             another environment can promote one between this load and this
             publish. The header bar's state reports what the engine actually
             assigned. */}
-        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.publishDialogNextVersion")}</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>
-          <code>{nextVersion}</code>
-        </dd>
+        <DialogMonoFact term={t("draftToolbar.publishDialogNextVersion")}>{nextVersion}</DialogMonoFact>
         {/* The same `validation.issues[]` the area nav's Checks control counts,
             so the dialog and the control can never disagree. */}
-        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.publishDialogOpenIssues")}</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>{openIssues}</dd>
+        <DialogMonoFact term={t("draftToolbar.publishDialogOpenIssues")}>{openIssues}</DialogMonoFact>
         {/* A draft in one language has no language to name. Each language
             reads as the content-locale select's option does. */}
-        {languages.length > 1 && (
-          <>
-            <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogLanguages")}</dt>
-            <dd {...stylex.props(styles.dialogFactsDd)}>
-              <ul {...stylex.props(styles.dialogLanguages)}>
-                {languages.map((code) => (
-                  <li key={code}>{localeOptionLabel(draft, code)}</li>
-                ))}
-              </ul>
-            </dd>
-          </>
-        )}
+        <DialogNames
+          term={t("draftToolbar.dialogLanguages")}
+          names={languages.length > 1 ? languages.map((code) => localeOptionLabel(draft, code)) : []}
+        />
         <PublishChanges processId={processId} token={token} baseVersion={baseVersion} draft={draft} contentLocale={contentLocale} />
-      </dl>
-      <details {...stylex.props(styles.dialogDeveloper)}>
-        <summary {...stylex.props(styles.dialogDeveloperSummary)}>{t("draftToolbar.dialogDeveloperView")}</summary>
-        <dl {...stylex.props(styles.dialogFacts)}>
-          {draft.key && (
-            <>
-              <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogKey")}</dt>
-              <dd {...stylex.props(styles.dialogFactsDd, styles.dialogMono)}>{draft.key}</dd>
-            </>
-          )}
-          <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogProcessId")}</dt>
-          <dd {...stylex.props(styles.dialogFactsDd, styles.dialogMono)}>{processId}</dd>
-          <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogRevision")}</dt>
-          <dd {...stylex.props(styles.dialogFactsDd, styles.dialogMono)}>{revision}</dd>
-        </dl>
-      </details>
-      {blocked && <p {...stylex.props(styles.dialogBlocked)}>{t("draftToolbar.publishDialogBlocked")}</p>}
-      {dirty && <p {...stylex.props(styles.dialogNote)}>{t("draftToolbar.publishDialogUnsaved")}</p>}
-      <p {...stylex.props(styles.dialogNote)}>{t("draftToolbar.publishDialogImmutable")}</p>
-      {error !== null && (
-        <p {...stylex.props(styles.dialogError)} role="alert">
-          {error}
-        </p>
-      )}
-      {error !== null && errorDetail !== null && <RefusalDetail detail={errorDetail} />}
-      <div {...stylex.props(styles.controls)}>
-        <button type="button" className="btn btn-primary" onClick={onConfirm} disabled={busy}>
-          {busy ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
-        </button>
-        {/* Cancel holds the initial focus, not Publish beside it. A publish
-            mints a version that can never change, and the studio carries no
-            undo, so a reflexive Enter on an opening dialog must not commit
-            the act the dialog exists to question. */}
-        <button ref={declineRef} autoFocus type="button" className="btn btn-ghost" onClick={onCancel} disabled={busy}>
-          {t("draftToolbar.dialogCancel")}
-        </button>
-      </div>
-    </dialog>
-  );
-}
-
-/**
- * The discard confirmation (studio-app: "Discarding a draft confirms in a
- * modal dialog"). Same element, same class and same platform behavior as the
- * publish dialog above; different facts and a different verb.
- *
- * The confirming button is `btn-destructive`, which the design language keeps
- * outlined in the accent rather than filled red.
- */
-function DiscardConfirmDialog({
-  processLabel,
-  revision,
-  lastSavedAt,
-  error,
-  errorDetail,
-  busy,
-  triggerRef,
-  onCancel,
-  onConfirm,
-}: ConfirmDialogProps & { lastSavedAt: Date | undefined }) {
-  const { ref, declineRef } = useConfirmDialog(triggerRef);
-  const dialogProps = stylex.props(styles.dialog);
-
-  return (
-    <dialog
-      ref={ref}
-      className={`studio-dialog ${dialogProps.className}`}
-      style={dialogProps.style}
-      aria-labelledby="discard-confirm-heading"
-      onCancel={onCancel}
-    >
-      <h2 id="discard-confirm-heading">{t("draftToolbar.discardDialogHeading")}</h2>
-      <dl {...stylex.props(styles.dialogFacts)}>
-        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogProcess")}</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>{processLabel}</dd>
-        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogRevision")}</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>{revision}</dd>
-        {lastSavedAt && (
-          <>
-            <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.discardDialogLastSaved")}</dt>
-            <dd {...stylex.props(styles.dialogFactsDd)}>{lastSavedAt.toLocaleTimeString()}</dd>
-          </>
-        )}
-      </dl>
-      <p {...stylex.props(styles.dialogNote)}>{t("draftToolbar.discardDialogKeepsPublished")}</p>
-      {error !== null && (
-        <p {...stylex.props(styles.dialogError)} role="alert">
-          {error}
-        </p>
-      )}
-      {error !== null && errorDetail !== null && <RefusalDetail detail={errorDetail} />}
-      <div {...stylex.props(styles.controls)}>
-        <button type="button" className="btn btn-secondary btn-destructive" onClick={onConfirm} disabled={busy}>
-          {t("draftToolbar.discard")}
-        </button>
-        {/* Cancel holds the initial focus. Discard draft is the first
-            focusable control in DOM order, so the browser's own dialog
-            focusing steps would otherwise prime the one irreversible button
-            on the screen. */}
-        <button ref={declineRef} autoFocus type="button" className="btn btn-ghost" onClick={onCancel} disabled={busy}>
-          {t("draftToolbar.dialogCancel")}
-        </button>
-      </div>
-    </dialog>
+      </DialogFacts>
+      {blocked && <DialogWarning>{t("draftToolbar.publishDialogBlocked")}</DialogWarning>}
+      {dirty && <DialogNote>{t("draftToolbar.publishDialogUnsaved")}</DialogNote>}
+      <DialogNote>{t("draftToolbar.publishDialogImmutable")}</DialogNote>
+      <DialogDeveloperView>
+        {draft.key && <DialogMonoFact term={t("draftToolbar.dialogKey")}>{draft.key}</DialogMonoFact>}
+        <DialogMonoFact term={t("draftToolbar.dialogProcessId")}>{processId}</DialogMonoFact>
+        <DialogMonoFact term={t("draftToolbar.dialogRevision")}>{revision}</DialogMonoFact>
+      </DialogDeveloperView>
+    </StudioDialog>
   );
 }
 
@@ -799,9 +604,9 @@ interface Props {
  * banner below already reads. Both confirmation dialogs render here too. Publish
  * returns the focus to its own control. Discard draft's entry unmounts when the
  * menu closes, so its dialog returns the focus to the `⋮` trigger. Publish names
- * the process, its id, the revision, the next version, the open issue count and
- * the changes since the base version; Discard names the process, the revision
- * and the last-saved time.
+ * the process, the next version, the open issue count and the changes since the
+ * base version, and its Developer view holds the key, the id and the revision.
+ * Discard names the process and the last-saved time.
  *
  * A publish's findings, the action error and the save-conflict banner all render
  * after the header row as block siblings. A closed menu must never hide the one
@@ -879,7 +684,12 @@ export function ProcessHeaderBar({
     if (target === "stateLine") stateLineRef.current?.focus();
   }, [actions.saving, isDirty]);
 
+  // The menu is a conditional render, so its entry unmounts in the commit that
+  // closes it, and a dialog's focus return to that entry would reach nothing.
+  // The trigger takes the focus first, and a dialog the action opens returns
+  // there.
   const runMenuAction = (action: () => void) => {
+    triggerRef.current?.focus();
     setMenuOpen(false);
     action();
   };
@@ -1092,14 +902,12 @@ export function ProcessHeaderBar({
         />
       )}
       {actions.pendingDialog === "discard" && (
-        <DiscardConfirmDialog
+        <DiscardDraftDialog
           processLabel={processLabel}
-          revision={revision}
           lastSavedAt={lastSavedAt}
           triggerRef={triggerRef}
-          error={actions.error}
-          errorDetail={actions.errorDetail}
-          busy={false}
+          refusal={actions.error === null ? null : { message: actions.error, detail: actions.errorDetail }}
+          busy={actions.discarding}
           onCancel={() => actions.resolveDialog(false)}
           onConfirm={() => actions.resolveDialog(true)}
         />

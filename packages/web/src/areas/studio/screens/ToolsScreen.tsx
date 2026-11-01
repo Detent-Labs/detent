@@ -10,6 +10,7 @@ import { describeCaughtError } from "../errors.js";
 import { t } from "../catalog.js";
 import { useFail } from "../../../shell/useFail.js";
 import { createLatestGate } from "../../../shell/latestGate.js";
+import { ghost } from "../panels/shared/btn.js";
 
 const styles = stylex.create({
   studioScreen: {
@@ -196,7 +197,7 @@ export function ToolsScreen({ token, navigate, onUnauthorized }: ToolsScreenProp
 
   return (
     <main {...stylex.props(styles.studioScreen)}>
-      <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
+      <button type="button" {...ghost(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
         ← Back to processes
       </button>
       <h1>Tools</h1>

@@ -46,8 +46,8 @@ describe("RestoreNotice", () => {
     expect(idle).not.toContain("disabled");
   });
 
-  it("carries all four catalog strings, the replace prompt included", () => {
-    for (const key of ["restoreNotice.message", "restoreNotice.restore", "restoreNotice.discard", "restoreNotice.replaceConfirm"] as const) {
+  it("carries its three catalog strings", () => {
+    for (const key of ["restoreNotice.message", "restoreNotice.restore", "restoreNotice.discard"] as const) {
       expect(en[key], key).toBeString();
       expect(t(key).length, key).toBeGreaterThan(0);
     }

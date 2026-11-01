@@ -4,7 +4,8 @@ import { describe, expect, it } from "bun:test";
 /**
  * Every exit from an open, unsaved draft in `root.tsx` asks first.
  *
- * Four kinds of exit leave the draft: in-area navigation (the area nav and
+ * Each one calls `askLeave`, whose question is `LeaveDraftDialog`, and only the
+ * dialog's confirm runs the exit. Four kinds of exit leave the draft: in-area navigation (the area nav and
  * `EditScreen`'s `navigate`), the `go` that `EditScreen` receives (the `⋮`
  * menu's groups link), the account menu's three handlers on `Chrome`, and
  * closing the tab. A raw `navigate`, `go` or `onLogout` on any of them brings
@@ -37,13 +38,14 @@ const SCREENS = [
 /** The area nav's three buttons, by the route name each one opens. */
 const NAV_ROUTES = ["processes", "tools", "templates"] as const;
 
-/** Each guarded wrapper: the guard its body opens with, and the call it then
- * makes. The guard is a literal shape, so a wrapper that asks and ignores the
- * answer fails it. */
+/** Each guarded wrapper: the literal shape of its body. Its callee stands inside
+ * the `proceed` it hands `askLeave`, so a wrapper that asks and then leaves
+ * anyway fails it. An in-area move to another edit address leaves no draft, so
+ * `guardedNavigate` alone carries a branch that asks nothing. */
 const WRAPPERS = [
-  { name: "guardedNavigate", guard: /^if \(\w+\.name !== "edit" && !confirmLeave\(\)\) return;/, callee: "navigate" },
-  { name: "guardedGo", guard: /^if \(!confirmLeave\(\)\) return;/, callee: "go" },
-  { name: "guardedLogout", guard: /^if \(!confirmLeave\(\)\) return;/, callee: "onLogout" },
+  { name: "guardedNavigate", shape: /^if \(\w+\.name === "edit"\) navigate\(\w+, \w+\); else askLeave\(\(\) => navigate\(\w+, \w+\)\);$/ },
+  { name: "guardedGo", shape: /^askLeave\(\(\) => go\(\w+, \w+\)\);$/ },
+  { name: "guardedLogout", shape: /^askLeave\(\(\) => onLogout\(\)\);$/ },
 ] as const;
 
 /** Block comments first, then line comments, as `studio-no-confirm.test.ts`
@@ -142,15 +144,30 @@ function scan(source: string): string[] {
     if (!guardedOnly(propValue(chrome, "onLogout"), "guardedLogout", "onLogout")) violations.push("Chrome onLogout is not guardedLogout");
   }
 
-  // The wrappers must ask and obey the answer, or a guarded name guards nothing.
-  if (!/const\s+confirmLeave\s*=\s*\(\)\s*=>\s*!dirtyRef\.current\s*\|\|\s*confirm\s*\(/.test(code)) {
-    violations.push("confirmLeave does not ask while dirtyRef is set");
+  // The question: a clean draft proceeds at once, and a dirty one waits. The
+  // opener is read from the press, before the dialog takes the focus.
+  const ask = arrowBody(code, "askLeave") ?? "";
+  if (!ask.startsWith("if (!dirtyRef.current) { proceed(); return; }")) violations.push("askLeave does not read dirtyRef before it asks");
+  if (!ask.endsWith("leaveTrigger.current = activeControl(); setLeaving(() => proceed);")) violations.push("askLeave does not hold the exit for the dialog");
+
+  // The wrappers must ask and hand over the exit, or a guarded name guards nothing.
+  for (const { name, shape } of WRAPPERS) {
+    if (!shape.test(arrowBody(code, name) ?? "")) violations.push(`${name} does not leave through askLeave`);
   }
-  for (const { name, guard, callee } of WRAPPERS) {
-    const body = arrowBody(code, name) ?? "";
-    if (!guard.test(body)) violations.push(`${name} skips confirmLeave`);
-    // A statement of its own: `callee(` right after a `;`, `{` or `}`.
-    if (!new RegExp(`(?:^|[;{}] )${callee}\\(`).test(body)) violations.push(`${name} does not call ${callee}`);
+
+  // The dialog runs the held exit, and its decline runs nothing.
+  const dialog = openingTag(code, "LeaveDraftDialog");
+  if (dialog === undefined) violations.push("LeaveDraftDialog is not rendered");
+  else {
+    const confirmed = propValue(dialog, "onConfirm")?.replace(/\s+/g, " ") ?? "";
+    if (!/\bsetLeaving\(undefined\); leaving\(\);/.test(confirmed)) violations.push("the leave dialog's confirm does not run the exit");
+    if (propValue(dialog, "onCancel")?.replace(/\s+/g, " ") !== "() => setLeaving(undefined)") violations.push("the leave dialog's cancel does more than close it");
+    if (propValue(dialog, "triggerRef") !== "leaveTrigger") violations.push("the leave dialog returns the focus elsewhere");
+  }
+
+  // A browser Back under the open dialog closes it.
+  if (!/useEffect\(\(\) => \{\s*setLeaving\(undefined\);\s*\}, \[localPath\]\)/.test(code)) {
+    violations.push("a path change does not clear the leave dialog");
   }
 
   const added = /\.addEventListener\(\s*["']beforeunload["']\s*,\s*(\w+)\s*\)/.exec(code);
@@ -251,35 +268,72 @@ describe("every exit from an unsaved draft in root.tsx asks first", () => {
     expect(scan(negated)).toEqual(["beforeunload handler ignores dirtyRef"]);
   });
 
-  it("a guarded wrapper that skips confirmLeave is flagged", () => {
-    for (const { name } of WRAPPERS) {
-      const skipped = mutate(real, new RegExp(`(const\\s+${name}\\s*=[^;]*?)\\bconfirmLeave\\(\\)`), "$1true");
-      expect(scan(skipped), name).toEqual([`${name} skips confirmLeave`]);
-    }
+  it("a guarded wrapper that skips askLeave is flagged", () => {
+    const skipped = [
+      mutate(real, /else askLeave\(\(\) => (navigate\(dest, opts\))\);/, "else $1;"),
+      mutate(real, /(const guardedGo[^;]*?)askLeave\(\(\) => (go\(href, opts\))\);/, "$1$2;"),
+      mutate(real, /(const guardedLogout[^;]*?)askLeave\(\(\) => (onLogout\(\))\);/, "$1$2;"),
+    ];
+    expect(skipped.map(scan)).toEqual(WRAPPERS.map(({ name }) => [`${name} does not leave through askLeave`]));
   });
 
-  it("a guarded wrapper that asks and ignores the answer is flagged", () => {
-    for (const { name } of WRAPPERS) {
-      const ignored = mutate(real, new RegExp(`(const\\s+${name}\\s*=[^;]*?)!confirmLeave\\(\\)\\) return;`), "$1!confirmLeave()) {}");
-      expect(scan(ignored), name).toEqual([`${name} skips confirmLeave`]);
-    }
+  it("a guarded wrapper that makes its call beside the question is flagged", () => {
+    const beside = [
+      mutate(real, /else askLeave\(\(\) => navigate\(dest, opts\)\);/, "else askLeave(() => {});\nnavigate(dest, opts);"),
+      mutate(real, /askLeave\(\(\) => go\(href, opts\)\);/, "askLeave(() => {});\ngo(href, opts);"),
+      mutate(real, /askLeave\(\(\) => onLogout\(\)\);/, "askLeave(() => {});\nonLogout();"),
+    ];
+    expect(beside.map(scan)).toEqual(WRAPPERS.map(({ name }) => [`${name} does not leave through askLeave`]));
   });
 
-  it("a guarded wrapper that never makes its call is flagged", () => {
-    for (const { name, callee } of WRAPPERS) {
-      const dropped = mutate(real, new RegExp(`(const\\s+${name}\\s*=[\\s\\S]*?return;\\s*)${callee}\\([^;]*;`), "$1");
-      expect(scan(dropped), name).toEqual([`${name} does not call ${callee}`]);
-    }
+  it("a guarded wrapper whose proceed names another call is flagged", () => {
+    const other = [
+      mutate(real, /else askLeave\(\(\) => navigate\(dest, opts\)\);/, "else askLeave(() => go(dest, opts));"),
+      mutate(real, /askLeave\(\(\) => go\(href, opts\)\);/, "askLeave(() => navigate(href, opts));"),
+      mutate(real, /askLeave\(\(\) => onLogout\(\)\);/, "askLeave(() => onUnauthorized());"),
+    ];
+    expect(other.map(scan)).toEqual(WRAPPERS.map(({ name }) => [`${name} does not leave through askLeave`]));
   });
 
-  it("a confirmLeave that never reads dirtyRef is flagged", () => {
-    const blind = mutate(real, /(const\s+confirmLeave\s*=[^;]*?)!dirtyRef\.current \|\| /, "$1");
-    expect(scan(blind)).toEqual(["confirmLeave does not ask while dirtyRef is set"]);
+  it("a move to another address that leaves the draft unasked is flagged", () => {
+    const wide = mutate(real, /if \(dest\.name === "edit"\) navigate/, 'if (dest.name !== "edit") navigate');
+    expect(scan(wide)).toEqual(["guardedNavigate does not leave through askLeave"]);
   });
 
-  it("a confirmLeave that reads dirtyRef the wrong way round is flagged", () => {
-    const flipped = mutate(real, /(const\s+confirmLeave\s*=[^;]*?)!dirtyRef\.current \|\| /, "$1dirtyRef.current || ");
-    expect(scan(flipped)).toEqual(["confirmLeave does not ask while dirtyRef is set"]);
+  it("an askLeave that never reads dirtyRef is flagged", () => {
+    const blind = mutate(real, /if \(!dirtyRef\.current\) \{\s*proceed\(\);\s*return;\s*\}/, "");
+    expect(scan(blind)).toEqual(["askLeave does not read dirtyRef before it asks"]);
+  });
+
+  it("an askLeave that reads dirtyRef the wrong way round is flagged", () => {
+    const flipped = mutate(real, /if \(!dirtyRef\.current\) (\{\s*proceed)/, "if (dirtyRef.current) $1");
+    expect(scan(flipped)).toEqual(["askLeave does not read dirtyRef before it asks"]);
+  });
+
+  it("an askLeave that runs the exit while dirty is flagged", () => {
+    const ran = mutate(real, /setLeaving\(\(\) => proceed\);/, "proceed();");
+    expect(scan(ran)).toEqual(["askLeave does not hold the exit for the dialog"]);
+  });
+
+  it("an askLeave that loses the opener is flagged", () => {
+    const lost = mutate(real, /leaveTrigger\.current = activeControl\(\);/, "");
+    expect(scan(lost)).toEqual(["askLeave does not hold the exit for the dialog"]);
+  });
+
+  it("a leave dialog that is missing or miswired is flagged", () => {
+    const gone = mutate(real, /<LeaveDraftDialog[\s\S]*?\/>/, "");
+    expect(scan(gone)).toEqual(["LeaveDraftDialog is not rendered"]);
+    const noRun = mutate(real, /setLeaving\(undefined\);\s*leaving\(\);/, "setLeaving(undefined);");
+    expect(scan(noRun)).toEqual(["the leave dialog's confirm does not run the exit"]);
+    const cancelRuns = mutate(real, /onCancel=\{\(\) => setLeaving\(undefined\)\}/, "onCancel={() => leaving()}");
+    expect(scan(cancelRuns)).toEqual(["the leave dialog's cancel does more than close it"]);
+    const noReturn = mutate(real, /triggerRef=\{leaveTrigger\}/, "triggerRef={dirtyRef}");
+    expect(scan(noReturn)).toEqual(["the leave dialog returns the focus elsewhere"]);
+  });
+
+  it("a path change that leaves the dialog open is flagged", () => {
+    const stays = mutate(real, /useEffect\(\(\) => \{\s*setLeaving\(undefined\);\s*\}, \[localPath\]\);/, "");
+    expect(scan(stays)).toEqual(["a path change does not clear the leave dialog"]);
   });
 
   it("whitespace and line breaks inside a prop change no verdict", () => {

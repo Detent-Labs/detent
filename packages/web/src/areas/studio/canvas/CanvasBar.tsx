@@ -204,7 +204,7 @@ interface Props {
   /** True when exactly one step is selected and no chain of paths reaches it.
    * The caller resolves it through `reachableStepIds`. */
   unconnected: boolean;
-  /** Deletes every step in the selection. */
+  /** Asks to remove every step in the selection. */
   onDeleteSelection: () => void;
   groups: StepGroup[];
   onGroupsChange: (groups: StepGroup[]) => void;

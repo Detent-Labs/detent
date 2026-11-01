@@ -5,6 +5,7 @@ import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { mergeLocalizedTextEntry, resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text";
 import type { DraftViewTab } from "../draft/view-layout";
+import { ghost } from "./shared/btn.js";
 
 /** The tab button's own element id, and the id of the canvas it controls.
  * Both are exported so `FormEditorScreen` can stamp the matching
@@ -306,15 +307,4 @@ export function FormTabStrip({ tabs, open, contentLocale, baseLocale, onOpen, on
       </div>
     </div>
   );
-}
-
-/** `btn btn-ghost` plus compiled styles, as one set of props. Spreading
- * `stylex.props(...)` beside a `className` attribute drops whichever of the
- * two the JSX writes first, so the two class lists are joined here instead —
- * the same join the form canvas already makes for a note card. The styles
- * arrive as separate arguments, as in `ChangeList.tsx`, so a conditional
- * style stacks after the base one. */
-function ghost(...style: stylex.StyleXStyles[]) {
-  const compiled = stylex.props(...style);
-  return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
 }

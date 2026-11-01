@@ -14,7 +14,38 @@ import { isDraftViewField, type DraftViewEntry } from "./view-layout";
  * reference to a removed field outside a plugin `config` along.
  */
 
-/** A removal's reach: the removed field, and one count per kind of reference. */
+/** One action position a writer sits in, or the subprocess `outputMapping`. */
+export type WriterPosition = "onEntry" | "onExit" | "onCancel" | "onPath" | "onFire" | "outputMapping";
+
+type DraftPathOf = NonNullable<DraftStep["paths"]>[number];
+
+/** One `output` or `outputMapping` entry that names a removed id. */
+export interface WriterSite {
+  step: DraftStep;
+  position: WriterPosition;
+  /** The way out an `onPath` action sits on. */
+  path?: DraftPathOf;
+}
+
+/** The places a removal reaches, one list per kind, in draft order. A list
+ * holds one entry per reference, so a place can appear twice. */
+export interface RemovalSites {
+  /** The fields below the removed field, at every depth. */
+  fieldsInside: DraftField[];
+  /** The steps whose view carries an entry the removal takes out. */
+  steps: DraftStep[];
+  writers: WriterSite[];
+  contract: ("input" | "output")[];
+  /** The field that stays and carries the `columnMapping` entry. */
+  columnMappings: DraftField[];
+  /** The JSON path, from the draft root, of each kept expression that reads a removed key. */
+  celReads: (string | number)[][];
+  /** The JSON path of each string in a plugin `config` that equals a removed id. */
+  pluginSettings: (string | number)[][];
+}
+
+/** A removal's reach: the removed field, one count per kind of reference, and
+ * the places behind the counts. */
 export interface FieldRemovalReach {
   /** The field the author removes. */
   field: DraftField;
@@ -36,6 +67,8 @@ export interface FieldRemovalReach {
   celReads: number;
   /** The string values inside a plugin `config` that equal a removed id. */
   pluginSettings: number;
+  /** The places the counts above count. */
+  sites: RemovalSites;
 }
 
 /**
@@ -82,15 +115,23 @@ function takesEntry(removal: Removal, entry: DraftViewEntry): boolean {
 }
 
 /** A step's actions in all five positions: `onEntry`, `onExit`, `onCancel`,
- * each path's `onPath` and each timer's `onFire.actions`. */
-function stepActions(step: DraftStep) {
+ * each path's `onPath` and each timer's `onFire.actions`, each with its position. */
+function positionedActions(step: DraftStep) {
+  type Action = NonNullable<DraftStep["onEntry"]>[number];
+  const at = (position: WriterPosition, actions: readonly Action[], path?: DraftPathOf) =>
+    actions.map((action) => ({ action, position, path }));
   return [
-    ...(step.onEntry ?? []),
-    ...(step.onExit ?? []),
-    ...(step.onCancel ?? []),
-    ...(step.paths ?? []).flatMap((path) => path.onPath ?? []),
-    ...(step.timers ?? []).flatMap((timer) => timer.onFire?.actions ?? []),
+    ...at("onEntry", step.onEntry ?? []),
+    ...at("onExit", step.onExit ?? []),
+    ...at("onCancel", step.onCancel ?? []),
+    ...(step.paths ?? []).flatMap((path) => at("onPath", path.onPath ?? [], path)),
+    ...(step.timers ?? []).flatMap((timer) => at("onFire", timer.onFire?.actions ?? [])),
   ];
+}
+
+/** A step's actions in all five positions. */
+function stepActions(step: DraftStep) {
+  return positionedActions(step).map(({ action }) => action);
 }
 
 /**
@@ -126,52 +167,78 @@ export function fieldRemovalReach(draft: Draft, fieldId: string): FieldRemovalRe
   const takenAlong = new Set<object>(fields);
   const idKeyedMaps = new Set<object>();
 
-  let steps = 0;
-  let writers = 0;
+  const sites: RemovalSites = {
+    fieldsInside: [...fields].filter((f) => f !== field),
+    steps: [],
+    writers: [],
+    contract: [],
+    columnMappings: [],
+    celReads: [],
+    pluginSettings: [],
+  };
   for (const step of draft.workflow?.steps ?? []) {
     const taken = (step.view?.fields ?? []).filter((entry) => takesEntry(removal, entry));
-    if (taken.length > 0) steps++;
+    if (taken.length > 0) sites.steps.push(step);
     for (const entry of taken) takenAlong.add(entry);
-    for (const map of [...stepActions(step).map((action) => action.output), step.subprocess?.outputMapping]) {
+    const maps = [
+      ...positionedActions(step).map(({ action, position, path }) => ({ map: action.output, position, path })),
+      { map: step.subprocess?.outputMapping, position: "outputMapping" as const, path: undefined },
+    ];
+    for (const { map, position, path } of maps) {
       if (map == null) continue;
       idKeyedMaps.add(map);
-      writers += Object.keys(map).filter(namesRemoved).length;
+      const site: WriterSite = path === undefined ? { step, position } : { step, position, path };
+      for (let hits = Object.keys(map).filter(namesRemoved).length; hits > 0; hits--) sites.writers.push(site);
     }
   }
 
   const contract = draft.contract;
-  const contractEntries = [...(contract?.inputFields ?? []), ...(contract?.outputFields ?? [])].filter(namesRemoved).length;
+  for (const entry of contract?.inputFields ?? []) if (namesRemoved(entry)) sites.contract.push("input");
+  for (const entry of contract?.outputFields ?? []) if (namesRemoved(entry)) sites.contract.push("output");
 
-  let columnMappings = 0;
-  for (const f of staying) columnMappings += Object.values(f.columnMapping ?? {}).filter(namesRemoved).length;
+  for (const f of staying) {
+    for (const target of Object.values(f.columnMapping ?? {})) if (namesRemoved(target)) sites.columnMappings.push(f);
+  }
 
   const keptKeys = new Set(staying.map((f) => f.key));
   const reads = keyReader([...fields].flatMap((f) => (f.key && !keptKeys.has(f.key) ? [f.key] : [])));
-  let celReads = 0;
-  let pluginSettings = 0;
-  const visit = (value: unknown, inConfig: boolean): void => {
+  const visit = (value: unknown, path: (string | number)[], inConfig: boolean): void => {
     if (typeof value === "string") {
-      if (inConfig && ids.has(value)) pluginSettings++;
+      if (inConfig && ids.has(value)) sites.pluginSettings.push(path);
       return;
     }
     if (typeof value !== "object" || value === null || takenAlong.has(value)) return;
+    if (Array.isArray(value)) {
+      value.forEach((child, index) => visit(child, [...path, index], inConfig));
+      return;
+    }
     const record = value as Record<string, unknown>;
     if (record.lang === "cel" && typeof record.src === "string") {
-      if (reads(record.src)) celReads++;
+      if (reads(record.src)) sites.celReads.push(path);
       return;
     }
     for (const [key, child] of Object.entries(record)) {
       if (idKeyedMaps.has(record) && ids.has(key)) continue;
-      visit(child, inConfig || (key === "config" && typeof child === "object" && child !== null));
+      visit(child, [...path, key], inConfig || (key === "config" && typeof child === "object" && child !== null));
     }
   };
-  visit(draft, false);
+  visit(draft, [], false);
 
-  return { field, fieldsInside: fields.size - 1, steps, writers, contractEntries, columnMappings, celReads, pluginSettings };
+  return {
+    field,
+    fieldsInside: sites.fieldsInside.length,
+    steps: sites.steps.length,
+    writers: sites.writers.length,
+    contractEntries: sites.contract.length,
+    columnMappings: sites.columnMappings.length,
+    celReads: sites.celReads.length,
+    pluginSettings: sites.pluginSettings.length,
+    sites,
+  };
 }
 
 /** True when any count of `reach` sits above zero. */
-export function hasReach(reach: FieldRemovalReach): boolean {
+export function hasReach(reach: Omit<FieldRemovalReach, "sites">): boolean {
   const { fieldsInside, steps, writers, contractEntries, columnMappings, celReads, pluginSettings } = reach;
   return [fieldsInside, steps, writers, contractEntries, columnMappings, celReads, pluginSettings].some((count) => count > 0);
 }

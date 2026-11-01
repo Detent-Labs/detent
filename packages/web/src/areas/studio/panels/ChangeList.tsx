@@ -26,6 +26,7 @@ import {
   type ChangeValue,
 } from "../draft/changeSet.js";
 import type { DiffEntry } from "../screens/versionDiffLogic.js";
+import { ghost } from "./shared/btn.js";
 
 const styles = stylex.create({
   headingLine: {
@@ -503,13 +504,4 @@ function RawEntry({ entry }: { entry: DiffEntry }) {
       </code>
     </li>
   );
-}
-
-/** `btn btn-ghost` plus compiled styles, as one set of props. Spreading
- * `stylex.props(...)` beside a `className` attribute drops whichever of the
- * two the JSX writes first, so the class lists join here, as in
- * `FormTabStrip.tsx`. */
-function ghost(...style: stylex.StyleXStyles[]) {
-  const compiled = stylex.props(...style);
-  return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
 }

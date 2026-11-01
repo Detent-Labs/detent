@@ -453,13 +453,14 @@ Open the caret's menu. Pass, measured: it lists two entries, a call to
 another process and an end.
 
 Select one step other than the initial step. Pass, measured: the bar shows
-Remove step, with no count and no group control. Press Remove step. Pass,
-measured: on `purchase_requisition` the draft drops from 13 steps to 12. The
-bar then shows Add step alone.
+Remove step, with no count and no group control. Press Remove step. Pass: the
+dialog "Remove “{step}”?" opens and the draft keeps the step. Press Remove the
+step. Pass, measured: on `purchase_requisition` the draft drops from 13 steps to
+12. The bar then shows Add step alone.
 
-Select the initial step. Press Remove step. Pass, measured: the start marker
-moves to the first remaining step. On `purchase_requisition` it moved from
-Draft Requisition to Manager Approval.
+Select the initial step. Press Remove step, then Remove the step. Pass,
+measured: the start marker moves to the first remaining step. On
+`purchase_requisition` it moved from Draft Requisition to Manager Approval.
 
 Neither press saves the draft. Reload without saving once the walk ends.
 
@@ -1061,9 +1062,10 @@ selected step.
 
 Press a member of a selection and release without moving. Pass: nothing moves.
 
-Select three steps and choose Remove steps. Pass: those three are gone, the
-others stay, and the canvas bar shows Add step alone. If one of them was the
-initial step, the start marker moved to the first remaining step.
+Select three steps and choose Remove steps. Pass: the dialog "Remove 3 steps?"
+names each one. Press Remove the steps. Pass: those three are gone, the others
+stay, and the canvas bar shows Add step alone. If one of them was the initial
+step, the start marker moved to the first remaining step.
 
 Select two steps and read the ribbon bar. Pass: the collapsed checks summary
 still sits there, with the same count it showed for one step.
@@ -1528,14 +1530,13 @@ Open Studio, `purchase-requisition`, the canvas. Pass: the toolbar
 carries a third control, Arrange, beside Fit to view and Rounded
 corners.
 
-Click Arrange on the freshly seeded draft. Pass: no confirm dialog
+Click Arrange on the freshly seeded draft. Pass: no dialog
 appears, since no step carries a hand-placed position yet. All 13 steps
 land at distinct, non-overlapping positions, in a legible left-to-right
 flow. The browser console shows no error.
 
-Click Arrange again. Pass: a confirm dialog appears this time, since
-every step now carries an explicit position from the first arrange.
-Decline it. Pass: every step's position stays exactly where the first
+Click Arrange again. Pass: the dialog "Arrange every step?" opens now. Every
+step carries an explicit position from the first arrange. Press Cancel. Pass: every step's position stays exactly where the first
 arrange left it.
 
 Drag a step Arrange has just positioned, by a real pointer gesture
@@ -1543,12 +1544,12 @@ covering exactly 3 grid steps in `x` and 2 in `y`. Pass: the step lands
 at exactly that delta from its arranged position, with no extra offset.
 
 Select two steps and group them. Note their relative offset. Click
-Arrange, accept the confirm. Pass: the group's own position on the
+Arrange, and press Arrange in the dialog. Pass: the group's own position on the
 canvas changes, and the two members keep their exact prior relative
 offset.
 
 Collapse the group. Drag a waypoint onto a nearby path by hand. Click
-Arrange, and accept the confirm. Pass: the collapsed group still
+Arrange, and press Arrange in the dialog. Pass: the collapsed group still
 renders as one box, and its members still keep their relative offset.
 The waypoint is gone.
 
@@ -1846,15 +1847,16 @@ instead.
 
 Source: `guard-unsaved-studio-draft` task 4.1.
 
-No `bun:test` assertion can click a menu, hold a drag or read a native dialog.
+No `bun:test` assertion can click a menu, hold a drag or read a rendered dialog.
 Run these eight checks in a real browser. Open the production bundle on the
 engine's own port. Sign in as `demo-superuser@example.test`, password
 `seed-demo-password`. In the Processes list, choose "Create draft" on the row
 "IT Offboarding".
 
 Each check opens `/studio/processes/<id>/edit` for that draft, unless it names
-another route. A native dialog blocks automation. Accept or dismiss each one
-on purpose.
+another route. Each prompt is the studio's own dialog, so the check reads its
+heading and presses its controls. Only the `beforeunload` prompt in check 5 is
+native.
 
 **1. The groups link.** Open `/studio/processes/<id>/edit`. On the Fields tab,
 change a field's label and do not save. Pass: the header bar reads "Unsaved
@@ -1862,23 +1864,23 @@ changes".
 
 Open Settings, then Access, and choose "Manage assignment groups for this
 process".
-Pass: the browser's native prompt `Leave this draft? Unsaved edits will be lost.`
-appears. Cancel keeps the screen and the new label.
+Pass: the dialog "Leave this draft?" opens with Cancel focused. Cancel keeps
+the screen and the new label.
 
 Press Save. Pass: the header bar reads "Saved at" and the time. Choose the same link again.
 Pass: the browser navigates to `/admin/groups?processId=<id>` with no prompt.
 
 Open the draft again and change the label once more. Choose the link a third
-time and accept the prompt. Pass: the browser navigates to the same address.
+time and press Leave without saving. Pass: the browser navigates to the same address.
 
 **2. The account menu.** Open the draft and change a field's label without
 saving. Open the account menu, "Account" in the header, and choose "Tasks"
 under "Go to".
 
-Pass: the same native prompt appears. Cancel keeps the draft, and the menu
+Pass: the same dialog opens. Cancel keeps the draft, and the menu
 stays closed.
 
-Choose "Your profile", then "Log out". Pass: each one raises the same prompt,
+Choose "Your profile", then "Log out". Pass: each one opens the same dialog,
 and Cancel keeps the draft and closes the menu.
 
 Press Save. Choose "Tasks" under "Go to". Pass: the browser navigates to `/app`
@@ -1892,7 +1894,7 @@ Pass: the browser returns to `/login` with no prompt.
 Map tab. Drag one step to a new position and change nothing else. Pass: the
 header bar reads "Unsaved changes".
 
-Choose "← Processes". Pass: the native prompt appears. Cancel it.
+Choose "← Processes". Pass: the same dialog opens. Cancel it.
 
 Press Save. Pass: the header bar reads "Saved at" and the time. Choose "← Processes"
 again. Pass: the browser navigates to the process list at `/studio` with no
@@ -1956,10 +1958,10 @@ Change a label, make the save answer 401 and press Save. Unroute the answer,
 log in as `demo-superuser@example.test` and open the draft. While the notice
 shows, change another label. Pass: the header bar reads "Unsaved changes".
 
-Choose "Restore unsaved changes". Pass: the native prompt "Replace your current
-changes with the restored ones?" appears. Dismiss it. Pass: the notice stays,
+Choose "Restore unsaved changes". Pass: the dialog "Replace your current
+changes?" opens. Press Cancel. Pass: the notice stays,
 and the draft keeps the newer label. Choose "Restore unsaved changes" again and
-accept. Pass: the label from the 401 session returns, and the notice is gone.
+press Replace them. Pass: the label from the 401 session returns, and the notice is gone.
 
 The restored draft reads "Unsaved changes". Make the save answer 401 and press
 Save. At the login screen, leave the first context alone. In the second
@@ -2935,24 +2937,26 @@ Tab to Publish. Pass: it takes focus, unlike a natively disabled button. A
 screen reader reads the reason with the control, through `aria-describedby`.
 
 Now sign in as an account holding `system:publish` and open the same draft.
-Choose Publish. Pass: the dialog names the process, the process id, the
-revision and the next version. It also states that a published version can
-never change.
+Choose Publish. Pass: the dialog names the process and the next version.
+The process id and the revision wait in its closed Developer view. It also
+states that a published version can never change.
 
 Press Escape. Pass: the dialog closes and no request goes out. Choose Publish
 again and click the backdrop outside the dialog. Pass: the dialog stays put,
 which is what a native modal does.
 
-Tab through the open dialog. Pass: focus cycles inside it and never reaches
-the header bar behind. Confirm.
+Tab and Shift+Tab through the open dialog. Pass: focus wraps between its
+first control and Cancel, and never reaches the header bar behind. Click a
+fact's text, then press Tab. Pass: a control inside the dialog takes the focus.
+Confirm.
 
 Edit the label and choose Publish again. Pass: the dialog says that publishing
 saves the unsaved changes first. Confirm. Pass: one `PUT` then one `POST`, and
 no second prompt between them.
 
 Open the `⋮` menu and choose Discard draft. Pass: a dialog opens naming the
-process and the revision, and stating that the published versions stay. Cancel. Pass: the draft is still
-open and unchanged.
+process and its last save, and stating that the published versions stay.
+Cancel. Pass: the draft is still open and unchanged.
 
 To see a refusal render, sign back in as `demo-developer` and open the draft.
 Publish through the browser console rather than through the gated control.
@@ -3042,8 +3046,8 @@ names another account.
     appear, at 1280px. Scroll the grid so its sticky headers sit under the
     menu panel, then open the menu. Pass: a press on "Discard draft" reaches
     that entry, and the dialog opens. Repeat on the Map tab at 400px wide.
-20. **Test and Back.** Change a label, then press Test. Pass: the native leave
-    prompt appears, and Cancel keeps the draft. Repeat with the back control.
+20. **Test and Back.** Change a label, then press Test. Pass: the dialog
+    "Leave this draft?" opens, and Cancel keeps the draft. Repeat with the back control.
     Save the draft, then press Test. Pass: the Player opens without a prompt.
 21. **The warning below the bar, with the placeholder.** In German, clear the
     name. Pass: the warning stands as a block under the bar, left of the
@@ -3097,6 +3101,10 @@ page, and never on nothing at all.
 
 Press Tab straight after each close. Pass: the next stop sits right after
 whichever control opened it, not the first control on the screen.
+
+Press Tab and Shift+Tab inside each open dialog. Pass: the focus wraps between
+its controls and never reaches the page behind. Click a fact's text and press
+Tab. Pass: a control inside the dialog takes the focus.
 
 Click the backdrop on each dialog in turn. Pass: the dialog stays open and
 the focus stays inside it.
@@ -4420,7 +4428,7 @@ capped at 20rem tall, and scrolls inside that cap. Every row still shows
 its number, label and grip, and none show a summary line.
 
 Go back to the process list and choose "Discard draft" on the "IT Offboarding"
-row. Accept the browser's confirm. That leaves no draft behind.
+row. Press Discard draft in the dialog. That leaves no draft behind.
 
 ### Steps rail rows in the draft's own order (`steps-rail-follows-author-order`)
 
@@ -4438,7 +4446,7 @@ each on its own fresh draft.
    "Review the Exit Notification" and "Execute the Immediate Lock". Rows two
    and three traded places.
 3. Go back to the process list and choose "Discard draft" on the
-   "IT Offboarding" row, then accept the browser's confirm. Pass: that row
+   "IT Offboarding" row. Press Discard draft in the dialog. Pass: that row
    reads "No draft" under Draft, with "Create draft" as its one button.
 
 ### The Forms tab card miniature (`forms-tab-form-strip`)
@@ -4682,8 +4690,8 @@ alpha 0.14, in `color(srgb …)` notation:
 ```
 
 Choose "← Processes" to return to the process list. Steps 6 and 10
-left the draft dirty, so accept its leave-draft confirm. Then choose
-"Discard draft" on the "IT Offboarding" row, and accept the browser's confirm.
+left the draft dirty, so press Leave without saving in its dialog. Then choose
+"Discard draft" on the "IT Offboarding" row, and press Discard draft in the dialog.
 
 ### The advisory role and the change list's command (`authoring-command-ink-advisory-role`)
 
@@ -4829,8 +4837,8 @@ A passing run returns these values:
 ```
 
 Choose "← Processes" to return to the process list. Step 2 left the
-draft dirty, so accept its leave-draft confirm. Then choose "Discard draft" on the
-"IT Offboarding" row, and accept the browser's confirm.
+draft dirty, so press Leave without saving in its dialog. Then choose "Discard draft" on the
+"IT Offboarding" row, and press Discard draft in the dialog.
 
 ### The field matrix's height (`field-matrix-fill-height`)
 
@@ -4865,7 +4873,7 @@ appear.
    the tab body back up from here. Use the tab body's own scrollbar or the
    keyboard instead.
 5. Go back to the process list and choose "Discard draft" on the
-   "IT Offboarding" row, then accept the browser's confirm.
+   "IT Offboarding" row. Press Discard draft in the dialog.
 6. Find the row "Access Request" and choose "Create draft". Open its Where
    fields appear view at 1440x1200. First confirm the grid's own height sits between
    384px and the height under the toolbar. Pass: the grid's own frame ends
@@ -5046,7 +5054,7 @@ async (page) => {
    Save. Pass: the header bar reads "Saved at" and the time. No conflict
    banner shows.
 5. Go back to the process list. Choose "Discard draft" on the
-   "IT Offboarding" row. Accept the browser's confirm.
+   "IT Offboarding" row. Press Discard draft in the dialog.
 6. Install the 500 route. Press that row's "Create draft". Pass: the error
    banner shows its "Failed" stamp. The row still reads "No draft" under
    Draft. Its button reports no `disabled`.
@@ -5297,8 +5305,7 @@ The card prints no key.
 3. Read the result for 1100px. Pass: the three pass lines of step 2 hold
    here too. The label holds one line at this width as well.
 4. Choose the breadcrumb's first crumb, Forms, then "← Processes". Choose
-   "Discard draft" on the "IT Offboarding" row and accept the browser's confirm.
-   Under `playwright-cli`, `dialog-accept` answers it.
+   "Discard draft" on the "IT Offboarding" row and press Discard draft in the dialog.
 
 ```js
 async (page) => {
@@ -5434,8 +5441,7 @@ returns an object, so an empty printout means it threw.
     - Pass: `after` reads 0. A tab's width change leaves the scrolled row
       where it stands.
 14. Go back to the process list and choose "Discard draft" on the
-    "IT Offboarding" row. Accept the browser's confirm, with `dialog-accept` under
-    `playwright-cli`.
+    "IT Offboarding" row. Press Discard draft in the dialog.
 
 The setup function:
 
@@ -6627,9 +6633,9 @@ Press the import button. Pass: the browser's file chooser opens. Under
 click. Cancel it.
 
 **7. The discard text names the process.** Press "Discard draft" on the "IT
-Offboarding" row. Pass: the browser's confirm reads "Discard the draft of
-“IT Offboarding”? You lose its unpublished edits." Accept it. Pass: the Draft
-cell reads "No draft".
+Offboarding" row. Pass: the dialog "Discard this draft?" names the process
+"IT Offboarding" and the time of the last save. Press Discard draft. Pass: the
+Draft cell reads "No draft".
 
 ### Six tabs, the sub-row and the Settings tab (`studio-six-tabs`)
 
@@ -6717,7 +6723,7 @@ draft's change list stands under the table with no press, and it names the
 renamed field.
 
 Go back to the process list and choose "Discard draft" on the "IT
-Offboarding" row. Accept the browser's confirm.
+Offboarding" row. Press Discard draft in the dialog.
 
 ### The form editor names fields on its cards (`studio-form-editor-names-fields`)
 
@@ -6833,8 +6839,7 @@ palette. Pass: all sixteen kind rows read in full, each as an icon and a name.
 Pass: the palette's box overlaps neither the canvas nor the preview.
 
 Discard the draft from the process list, on the "IT Offboarding" row, and
-accept the browser's confirm. Under `playwright-cli`, `dialog-accept` answers
-it.
+press Discard draft in the dialog.
 
 ### Studio: selects list labels (`studio-selects-show-labels`)
 
@@ -6900,8 +6905,7 @@ The slate chevron sits at the select's own trailing edge, inside its border.
 canvas from "Antrag" to "Abschluss". Open "Antrag" on the Steps tab. Pass: the
 row heading reads "Antrag → Abschluss", with no second "→ Abschluss".
 
-Discard the draft from the process list and accept the browser's confirm.
-Under `playwright-cli`, `dialog-accept` answers it.
+Discard the draft from the process list and press Discard draft in the dialog.
 
 ### The step page's accordion (`studio-step-accordion`)
 
@@ -6998,8 +7002,7 @@ on the canvas.
 Pass: the Steps tab opens, and Ways out stands open. Pass: that path's row
 carries the current mark.
 
-Discard the draft from the process list and accept the browser's confirm.
-Under `playwright-cli`, `dialog-accept` answers it.
+Discard the draft from the process list and press Discard draft in the dialog.
 
 ### The Map's words and double-click (`studio-map-labels`)
 
@@ -7109,8 +7112,7 @@ Press the sentence of "Under threshold", then press Enter. Pass: the Steps tab
 opens on "Route by Amount". The press moved the keyboard's stop to that way
 out, as a press on its line does.
 
-Discard both drafts from the process list and accept the browser's confirm.
-Under `playwright-cli`, `dialog-accept` answers it.
+Discard both drafts from the process list and press Discard draft in each dialog.
 
 ### The field card (`studio-field-card`)
 
@@ -7189,8 +7191,7 @@ devtools the card's container reads `overflow-y: visible`.
 
 Resize to 420px. Pass: nothing scrolls sideways.
 
-Discard the draft from the process list and accept the browser's confirm.
-Under `playwright-cli`, `dialog-accept` answers it.
+Discard the draft from the process list and press Discard draft in the dialog.
 
 ### Checks by subject (`studio-checks-by-subject`)
 
@@ -7324,5 +7325,42 @@ the row is narrow, with its ring whole.
 Below 64rem, select the last step on the steps rail. Pass: the rail scrolls
 that row into view.
 
-Discard the draft from the process list and accept the browser's confirm.
-Under `playwright-cli`, `dialog-accept` answers it.
+Discard the draft from the process list and press Discard draft in the dialog.
+
+### One dialog form (`studio-one-dialog-form`)
+
+Source: `studio-one-dialog-form` task 5.4a.
+
+`e2e/dialog.e2e.ts` covers the keyboard hold, the backdrop, Escape, the leave
+dialog and the canvas bar's two remove dialogs. It also opens a long dialog by
+keyboard in a short window. `e2e/publish.e2e.ts` presses Escape while a request
+runs. Four checks stay manual, since only a human eye reads them. Open a draft
+with a dirty edit for all four, in the production bundle.
+
+These checks need visible scrollbars. Run them headed, or headless without
+`--hide-scrollbars`. Playwright's headless launch passes that flag. A hidden
+scrollbar takes no width, so a short gutter reads as 16px.
+
+**1. The gutter at 420px.** Resize to 420px wide and open the Publish dialog.
+Pass: 16px of page shows on each side of the dialog. Pass: the facts stack in
+one column, with a term above its value. Pass: no text runs past the dialog's
+border.
+
+**2. The sticky footer at 1024 by 600.** Resize to 1024x600. Focus Remove field
+on a group with many fields, and open the dialog with Enter. A pointer press
+sets another input modality and hides a scroll that only a keyboard open causes.
+Pass: the heading shows at the top, and the dialog scrolls under the footer.
+Pass: Cancel and the confirm stay in view with a hairline above them.
+
+Pass: a list of more than eight names prints five, then "and {count} more". Open
+it and Tab to its last line. Pass: the focus ring stands clear of the footer.
+
+**3. The account menu's focus return.** Open the account menu, "Account" in the
+header, and choose "Tasks" under "Go to". Pass: the dialog "Leave this draft?"
+opens with Cancel focused. Press Cancel. Pass: the focus ring stands on the
+account trigger. Repeat with Escape and get the same result.
+
+**4. A closed Developer view has no tab position.** Publish a draft, then change
+a step's label. Open the Publish dialog with the change list closed. Tab through
+it. Pass: the focus stands on each Developer view's summary, and on nothing
+inside a closed one. No e2e flow sees this, since its draft has never published.

@@ -63,8 +63,9 @@ client-side. The server already does that on publish.
 ### Requirement: Import previews the incoming version before publishing it
 
 Studio SHALL show a preview after the guard passes and before any publish
-request. The preview SHALL show the incoming process `key`, its `label`, the
-source `version` number and the source `definitionHash`. It SHALL resolve
+request. The preview SHALL show the incoming process's `label` and the source
+`version` number. A closed Developer view SHALL hold the `key`, the process id
+and the source `definitionHash`. It SHALL resolve
 `label` through the body's own `baseLocale`, since `label` is a localized-text
 map rather than a string.
 
@@ -76,7 +77,8 @@ Publishing SHALL happen only after the developer confirms.
 #### Scenario: A developer reviews the preview and confirms
 
 - **WHEN** the guard passes for a chosen file
-- **THEN** Studio shows `key`, `label`, source `version` and source
+- **THEN** Studio shows `label` and source `version`
+- **AND** its closed Developer view holds `key`, the process id and source
   `definitionHash`
 - **AND** Studio publishes only after the developer confirms
 
@@ -96,8 +98,9 @@ Nothing enforces a unique process `key`, so an import can leave two processes
 in the target sharing one key. Nothing can delete either one afterwards.
 
 The preview SHALL warn when the target already holds a process with the
-incoming `key` under a different `processId`. The warning SHALL NOT block the
-import, because that state can be intentional.
+incoming `key` under a different `processId`. The warning SHALL print no key
+and no id; the Developer view holds the other process's id. The warning SHALL
+NOT block the import, because that state can be intentional.
 
 Studio SHALL derive the warning from the process list it has already loaded. It
 SHALL send no extra request, and SHALL compare against no remote environment.

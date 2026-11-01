@@ -36,7 +36,8 @@ import {
   removeDataSourceAndReferences,
   type DataSourceRemovalReach,
 } from "../draft/data-source-removal";
-import { RemoveFieldDialog } from "./RemoveFieldDialog";
+import { RemoveFieldDialog, type RemovalNameRow } from "./RemoveFieldDialog";
+import { removalNames } from "./removalNames";
 import { RemoveDataSourceDialog } from "./RemoveDataSourceDialog";
 import { DataSourcesPanel } from "./DataSourcesPanel";
 import type { FixRequest } from "../draft/process-tabs";
@@ -350,6 +351,8 @@ interface FieldRemoval {
   fieldId: string;
   label: string;
   reach: FieldRemovalReach;
+  /** The dialog's fact rows, named once per press. */
+  names: RemovalNameRow[];
 }
 
 /**
@@ -428,7 +431,7 @@ export function FieldsTab({
 
   // `pendingRemoval` is the removal `RemoveFieldDialog` asks about, while the
   // dialog stays open. `removeTriggerRef` holds that removal's Remove field
-  // control, where `useConfirmDialog` returns focus on a decline.
+  // control, where `StudioDialog` returns focus on a decline.
   // `announcementFrame` holds the frame a removal's sentence waits for.
   const [pendingRemoval, setPendingRemoval] = useState<FieldRemoval | undefined>(undefined);
   const removeTriggerRef = useRef<HTMLButtonElement>(null);
@@ -551,7 +554,12 @@ export function FieldsTab({
   const requestRemove = (fieldId: string) => {
     const reach = fieldRemovalReach(draft, fieldId);
     if (reach === undefined) return;
-    const removal: FieldRemoval = { fieldId, label: fieldWord(fieldId), reach };
+    const removal: FieldRemoval = {
+      fieldId,
+      label: fieldWord(fieldId),
+      reach,
+      names: hasReach(reach) ? removalNames(draft, reach, contentLocale) : [],
+    };
     if (!hasReach(reach)) {
       removeField(removal);
       return;
@@ -713,6 +721,7 @@ export function FieldsTab({
           onMoveField={moveField}
           openMoreFor={openMoreFor}
           onMoreOpened={clearOpenMore}
+          visible={visible}
         />
       </div>
       {/* Outside the keyed `FieldEditor`, which a confirm remounts. A modal
@@ -728,6 +737,7 @@ export function FieldsTab({
         <RemoveFieldDialog
           label={pendingRemoval.label}
           reach={pendingRemoval.reach}
+          names={pendingRemoval.names}
           triggerRef={removeTriggerRef}
           onCancel={() => setPendingRemoval(undefined)}
           onConfirm={() => {
@@ -777,7 +787,7 @@ export function DataSourcesTab({
 
   // `pendingRemoval` is the removal `RemoveDataSourceDialog` asks about, while
   // the dialog stays open. `removeTriggerRef` holds that removal's Remove data
-  // source control, where `useConfirmDialog` returns focus on a decline.
+  // source control, where `StudioDialog` returns focus on a decline.
   const [pendingRemoval, setPendingRemoval] = useState<DataSourceRemoval | undefined>(undefined);
   const removeTriggerRef = useRef<HTMLButtonElement>(null);
 

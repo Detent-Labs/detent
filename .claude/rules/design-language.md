@@ -134,6 +134,13 @@ draws inset lines only. They are the selection mark, the steps rail's
 drop-position line and the field matrix's flagged-cell ring. None lifts a
 box.
 
+**Dialogs.** The studio has one dialog form, a native `<dialog>` in a 2px
+divider box. Its heading takes the Headline style as an `h2`, in the author's
+own capitals. Facts sit in a two-column grid, term then value, and stack below
+30rem, with slate notes after them. The controls stand in a sticky footer under a
+hairline, confirm first and Cancel last, outlined in ink. A 16px gutter of page
+stays at 420px. See `DESIGN.md`'s Dialogs entry for the detail.
+
 **Actions.** One primary action appears per screen, filled in the accent.
 Every other action stays outlined or plain. Labels sit flush left in any
 button wider than its text. A disabled action drops to 45% opacity.

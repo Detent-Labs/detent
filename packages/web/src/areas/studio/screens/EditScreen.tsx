@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useCallback, type ErrorInfo, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Component, lazy, Suspense, useCallback, type ErrorInfo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { layout, colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { DraftProvider, useDraft } from "../draft/store.js";
@@ -17,6 +17,10 @@ import { FieldsTabViews } from "../panels/FieldsTabViews.js";
 import { SettingsTab } from "../panels/SettingsTab.js";
 import { FormsTab } from "../panels/FormsTab.js";
 import { RestoreNotice } from "../panels/RestoreNotice.js";
+import { ArrangeDialog, RemoveStepsDialog, RestoreOverChangesDialog } from "../panels/confirmations.js";
+import { RemoveStepDialog } from "../panels/RemoveStepDialog.js";
+import { stepRemovalReach } from "../draft/stepRemoval.js";
+import { activeControl } from "../panels/shared/dialogFocus.js";
 import { clearStash, readRestorable, stashDraft, tabStorage } from "../draft/draftStash.js";
 import { stepEntityIds } from "../draft/panel-rail.js";
 import { seedLocalizedText } from "../draft/localized-text";
@@ -56,6 +60,7 @@ import { useFail } from "../../../shell/useFail.js";
 import { focusAtTop, scrollKeyboardFocusIntoView } from "../focusScroll.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
 import type { SectionRequest } from "../panels/stepSummaries.js";
+import { ghost } from "../panels/shared/btn.js";
 import type { NavigateOptions } from "../../../shell/routing.js";
 
 /** The width below which the Steps tab stands one column. `EntityTabs`
@@ -341,14 +346,6 @@ interface ProcessSurfaceProps {
   onDirtyChange?: (dirty: boolean) => void;
 }
 
-/** `btn btn-ghost` plus compiled styles, as one set of props: spreading
- * `stylex.props(...)` beside a `className` attribute drops whichever of the
- * two the JSX writes first. */
-function ghostBack(...style: stylex.StyleXStyles[]) {
-  const compiled = stylex.props(...style);
-  return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
-}
-
 /**
  * Focuses a tab's own button without a scroll, then hands the scroll to
  * `scrollTabIntoRow`, the one function that scrolls the tab row. At a narrow
@@ -499,16 +496,31 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     clearStash(tabStorage(), actorId, processId);
     setStash(undefined);
   };
+  // Restoring over unsaved work asks first. The press takes the focus to the
+  // dialog, so the opener is read from the press.
+  const [restoreAsked, setRestoreAsked] = useState(false);
+  const restoreTrigger = useRef<HTMLElement | null>(null);
+  const askRestore = () => {
+    if (stash === undefined || requestRunning) return;
+    if (dirtyNow) {
+      restoreTrigger.current = activeControl();
+      setRestoreAsked(true);
+    } else {
+      runRestore();
+    }
+  };
   // The stored revision stays, so a save over a draft that moved since
   // answers 409 and the conflict banner appears. `savedBody` and
   // `savedLayout` keep the loaded record, so the restored draft reads dirty.
-  const restoreStash = () => {
-    if (stash === undefined || requestRunning) return;
-    if (dirtyNow && !confirm(t("restoreNotice.replaceConfirm"))) return;
+  // The restore unmounts the notice, so the focus lands on the open tab, by the
+  // effect that runs after the commit: an open dialog keeps the page inert until
+  // that commit unmounts it.
+  const runRestore = () => {
+    if (stash === undefined) return;
     replace(stash.body);
     setSaveState((s) => ({ ...s, revision: stash.revision, layout: stash.layout }));
     dropStash();
-    focusTabButton(openTab);
+    setPendingFocus({ tab: openTab });
   };
   const discardStash = () => {
     if (requestRunning) return;
@@ -593,17 +605,20 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
 
   // Overwrites every step's position at once, unlike onMoveCanvasPosition's one-step
   // write, and clears every waypoint too (design.md, Decisions 2 and 4).
-  // Gated by hasHandPlacedStep, through the browser's own confirm() with a
-  // t() string. Publish and Discard no longer share that pattern: each commits
-  // an act the developer cannot undo, so each confirms in the application's own
-  // modal dialog instead (studio-publish, studio-app). An arrange is a local
-  // layout edit the author can undo by moving a step back, and converting it
-  // is the named follow-up, not this change.
-  // The confirmation runs before the layout library loads. A library that
-  // fails to load leaves the layout as it was and reports through the header
-  // bar's error banner (`studio-canvas`).
-  const onArrange = async () => {
-    if (hasHandPlacedStep(steps as LayoutStep[], saveState.layout) && !confirm(t("canvas.arrangeConfirm"))) return;
+  // Gated by hasHandPlacedStep, through `ArrangeDialog`. The dialog runs before
+  // the layout library loads. A library that fails to load leaves the layout as
+  // it was and reports through the header bar's error banner (`studio-canvas`).
+  const [arrangeAsked, setArrangeAsked] = useState(false);
+  const arrangeTrigger = useRef<HTMLElement | null>(null);
+  const onArrange = () => {
+    if (hasHandPlacedStep(steps as LayoutStep[], saveState.layout)) {
+      arrangeTrigger.current = activeControl();
+      setArrangeAsked(true);
+    } else {
+      void runArrange();
+    }
+  };
+  const runArrange = async () => {
     let arranged: Record<string, Point>;
     try {
       arranged = await arrangeSteps(steps as LayoutStep[], groups, draft.workflow?.initialStep, saveState.layout);
@@ -746,6 +761,50 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
       }
     });
     onSelectStep(undefined);
+  };
+
+  // The canvas bar's two remove controls ask first. The press takes the focus to
+  // the dialog, so the opener is read from the press. A hide declines, since the
+  // question names a selection the author no longer sees.
+  const [selectionRemovalAsked, setSelectionRemovalAsked] = useState(false);
+  const selectionRemovalTrigger = useRef<HTMLElement | null>(null);
+  const mapVisible = !jsonOpen && openTab === "map";
+  if (!mapVisible && selectionRemovalAsked) setSelectionRemovalAsked(false);
+  const askRemoveSelection = () => {
+    selectionRemovalTrigger.current = activeControl();
+    setSelectionRemovalAsked(true);
+  };
+  const cancelRemoveSelection = () => setSelectionRemovalAsked(false);
+  // The removal empties the selection, so the pressed control unmounts and the
+  // focus lands on the open tab, by the effect that runs after the commit.
+  const confirmRemoveSelection = () => {
+    selectionRemovalTrigger.current = null;
+    setSelectionRemovalAsked(false);
+    deleteSelection();
+    setPendingFocus({ tab: openTab });
+  };
+  const selectionRemovalDialog = () => {
+    // The rail's order and the rail's words, so two steps sharing a label read apart.
+    const selected = steps.flatMap((s) => (s.id && selectedStepIds.includes(s.id) ? [s.id] : []));
+    if (selected.length === 1) {
+      return (
+        <RemoveStepDialog
+          label={stepTexts.get(selected[0]!) ?? t("steps.unnamedStep")}
+          reach={stepRemovalReach(draft, selected[0]!, fields)}
+          triggerRef={selectionRemovalTrigger}
+          onCancel={cancelRemoveSelection}
+          onConfirm={confirmRemoveSelection}
+        />
+      );
+    }
+    return (
+      <RemoveStepsDialog
+        names={selected.map((id) => stepTexts.get(id) ?? t("steps.unnamedStep"))}
+        triggerRef={selectionRemovalTrigger}
+        onCancel={cancelRemoveSelection}
+        onConfirm={confirmRemoveSelection}
+      />
+    );
   };
 
   /** The DOM hit test behind both the drop branch and the drag-move
@@ -1130,7 +1189,29 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
         {structuralBannerStands(validation, openTab, jsonOpen) && <p {...stylex.props(styles.draftIncomplete)}>{t("app.draftIncomplete")}</p>}
         {/* Either button moves focus to the open tab, which the tab row holds
             over the form editor too. */}
-        {stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} disabled={requestRunning} />}
+        {stash && <RestoreNotice onRestore={askRestore} onDiscard={discardStash} disabled={requestRunning} />}
+        {restoreAsked && stash && (
+          <RestoreOverChangesDialog
+            triggerRef={restoreTrigger}
+            onCancel={() => setRestoreAsked(false)}
+            onConfirm={() => {
+              restoreTrigger.current = null;
+              setRestoreAsked(false);
+              runRestore();
+            }}
+          />
+        )}
+        {arrangeAsked && (
+          <ArrangeDialog
+            triggerRef={arrangeTrigger}
+            onCancel={() => setArrangeAsked(false)}
+            onConfirm={() => {
+              setArrangeAsked(false);
+              void runArrange();
+            }}
+          />
+        )}
+        {selectionRemovalAsked && selectionRemovalDialog()}
         <div {...stylex.props(styles.surface)}>
           <ProcessTabRow
             open={openTab}
@@ -1175,7 +1256,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                 onDragMove={onCanvasBarDragMove}
                 selectedStepIds={selectedStepIds}
                 unconnected={unconnected}
-                onDeleteSelection={deleteSelection}
+                onDeleteSelection={askRemoveSelection}
                 groups={groups}
                 onGroupsChange={onGroupsChange}
               />
@@ -1199,7 +1280,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                   groups={groups}
                   onGroupsChange={onGroupsChange}
                   insertTargetPathId={insertTargetPathId}
-                  visible={!jsonOpen && openTab === "map"}
+                  visible={mapVisible}
                 />
               </div>
             </>,
@@ -1232,6 +1313,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                 onSectionOpened={clearSectionRequest}
                 navigate={(target) => openFormEditor(target, "steps")}
                 processes={processes ?? []}
+                visible={!jsonOpen && openTab === "steps" && formEditor === null}
               />
             </div>,
           )}
@@ -1346,7 +1428,7 @@ export function EditScreen({ processId, formStepId, tab, view, stepId, token, ro
   if (state.kind === "error") {
     return (
       <main {...stylex.props(styles.studioScreen)}>
-        <button type="button" {...ghostBack(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
+        <button type="button" {...ghost(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
           ← Back to processes
         </button>
         <div {...stylex.props(styles.errorBanner)} role="alert">
@@ -1362,7 +1444,7 @@ export function EditScreen({ processId, formStepId, tab, view, stepId, token, ro
   if (state.kind === "not-found") {
     return (
       <main {...stylex.props(styles.studioScreen)}>
-        <button type="button" {...ghostBack(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
+        <button type="button" {...ghost(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
           ← Back to processes
         </button>
         <div {...stylex.props(styles.errorBanner)} role="alert">

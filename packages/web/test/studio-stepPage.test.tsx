@@ -865,11 +865,12 @@ describe("The removal dialog", () => {
   const factRows = (html: string) => [...html.matchAll(/<dt[^>]*>([^<]*)<\/dt><dd[^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], m[2]]);
   const none: StepRemovalReach = { incomingPaths: 0, formFields: 0, isInitial: false };
 
-  it("names the step in its heading and its first fact row", () => {
+  it("names the step in its heading and in no fact row", () => {
     const html = renderDialog(none);
 
     expect(html).toContain("Remove “Review”?");
-    expect(factRows(html)).toEqual([["Step", "Review"]]);
+    expect(factRows(html)).toEqual([]);
+    expect(html).not.toContain("<dl");
   });
 
   it("fills the heading as written where the label holds a $ pattern", () => {
@@ -880,7 +881,6 @@ describe("The removal dialog", () => {
     const html = renderDialog({ incomingPaths: 2, formFields: 3, isInitial: false });
 
     expect(factRows(html)).toEqual([
-      ["Step", "Review"],
       ["Ways out leading here", "2"],
       ["Fields on its form", "3"],
     ]);
@@ -910,15 +910,24 @@ describe("The removal dialog", () => {
     expect(tags[0]).toContain("btn-secondary btn-destructive");
     expect(tags[0]).not.toContain("autofocus");
     expect(tags[1]).toContain("autofocus");
+    expect(tags[1]).toContain('class="btn btn-secondary"');
     expect(renderDialog(none)).toContain(">Remove the step</button>");
   });
 
-  it("names the dialog by its heading and describes it by the facts and the notes", () => {
-    const html = renderDialog(none);
+  it("names the dialog by its heading and describes it by the body holding the notes", () => {
+    const html = renderDialog({ incomingPaths: 2, formFields: 0, isInitial: false });
+    const labelled = /aria-labelledby="([^"]+)"/.exec(html)![1];
+    const described = /aria-describedby="([^"]+)"/.exec(html)![1];
 
-    expect(html).toContain('aria-labelledby="remove-step-confirm-heading"');
-    expect(html).toContain('id="remove-step-confirm-heading"');
-    expect(html).toContain('aria-describedby="remove-step-confirm-facts remove-step-confirm-notes"');
+    expect(html).toContain(`<h2 id="${labelled}"`);
+    const body = html.slice(html.indexOf(`id="${described}"`));
+    const inside = body.slice(0, body.indexOf("</div>"));
+    expect(inside).toContain("The ways out leading here stay");
+    expect(inside).toContain("The studio has no undo.");
+  });
+
+  it("prints a count in mono tabular figures", () => {
+    expect(renderDialog({ incomingPaths: 2, formFields: 0, isInitial: false })).toMatch(/<dd class="value mono tabular">2<\/dd>/);
   });
 });
 
