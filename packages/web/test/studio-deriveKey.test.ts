@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { deriveKey, dedupeKey, shouldAutoDeriveKey } from "../src/areas/studio/draft/deriveKey.js";
+import { deriveKey, dedupeKey, shouldAutoDeriveKey, transliterate } from "../src/areas/studio/draft/deriveKey.js";
 import { resolveDraftLocalizedText } from "../src/areas/studio/draft/localized-text.js";
 
 describe("deriveKey", () => {
@@ -22,6 +22,32 @@ describe("deriveKey", () => {
   it("lower-cases and collapses runs of non-alphanumeric characters", () => {
     expect(deriveKey("Requested Amount")).toBe("requested_amount");
     expect(deriveKey("Manager  Review!!")).toBe("manager_review");
+  });
+
+  it("spells out umlauts, ß and ligatures instead of splitting the word", () => {
+    expect(deriveKey("Prüfung")).toBe("pruefung");
+    expect(deriveKey("Prüfung der Änderung")).toBe("pruefung_der_aenderung");
+    expect(deriveKey("Größe")).toBe("groesse");
+    expect(deriveKey("Ærø")).toBe("aero");
+  });
+
+  it("drops the combining mark of any other accented letter", () => {
+    expect(deriveKey("Café Straße")).toBe("cafe_strasse");
+  });
+
+  it("reads a letter typed with a combining mark as the letter it composes", () => {
+    expect(deriveKey("a\u0308")).toBe("ae");
+    expect(deriveKey("Pru\u0308fung")).toBe("pruefung");
+  });
+});
+
+describe("transliterate", () => {
+  it("maps the German letters and the Nordic ligatures before decomposing", () => {
+    expect(transliterate("ÄÖÜß æœøł")).toBe("aeoeuess aeoeol");
+  });
+
+  it("drops combining marks from every other letter", () => {
+    expect(transliterate("Éñ")).toBe("en");
   });
 });
 
