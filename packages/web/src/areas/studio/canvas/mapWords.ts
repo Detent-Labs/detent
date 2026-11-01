@@ -15,6 +15,7 @@ import { stepKindPhrase } from "../draft/guided-labels";
 import { guardPhrase, type Operand } from "../panels/shared/conditionLogic";
 import { fill } from "../panels/shared/optionText";
 import { t, type CatalogKey } from "../catalog.js";
+import { NODE_WIDTH } from "./geometry";
 
 type DraftPath = DraftOf<Path>;
 
@@ -33,6 +34,22 @@ export function stampWords(step: DraftStep, initialStepId: string | undefined): 
     words.end = step.outcome ? fill(t("canvas.endStampOutcome"), { outcome: step.outcome }) : t("canvas.endStamp");
   }
   return words;
+}
+
+/** How far a stamp stands in from the node's left or right edge, and how far
+ * below the top edge its host ends (design.md D4). */
+export const STAMP_INSET = 8;
+/** The room between two stamps on one node. */
+export const STAMP_GAP = 4;
+/** A stamp's width cap: the node less an inset on each side. A node carrying
+ * both stamps splits it, less the gap between them. */
+export const STAMP_CAP = NODE_WIDTH - 2 * STAMP_INSET;
+export const STAMP_CAP_SHARED = (STAMP_CAP - STAMP_GAP) / 2;
+
+/** The width each of a node's stamps takes: the whole cap alone, half of it
+ * beside the other stamp. */
+export function stampWidth(words: StampWords): number {
+  return words.start !== undefined && words.end !== undefined ? STAMP_CAP_SHARED : STAMP_CAP;
 }
 
 /** The stamp's rule, each side. */

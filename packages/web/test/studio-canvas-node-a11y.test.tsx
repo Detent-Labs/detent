@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
+import { SENTENCE_MAX_LINES } from "../src/areas/studio/canvas/sentencePlacement.js";
 import { DraftProvider } from "../src/areas/studio/draft/store.js";
 import { CanvasView } from "../src/areas/studio/canvas/CanvasView.js";
 import { t } from "../src/areas/studio/catalog.js";
@@ -268,6 +270,38 @@ describe("the canvas node's accessibility markup", () => {
     for (const edge of EDGES) expect(edge.inner).not.toContain("<text");
     expect(CANVAS.inner).not.toContain(">else<");
     expect(CANVAS.inner).not.toContain("data.amount");
+  });
+
+  // The defect: a 52-unit host, three lines high, centred on the midpoint of
+  // a 60-unit gap, which covered both neighbours' labels and stamps. The
+  // host is now six lines high at the width `placeSentences` chose, and it
+  // stands clear of every drawn node.
+  it("draws each sentence's host six lines high, at a placed width clear of the nodes", () => {
+    const hosts = elementsOf(CANVAS.inner, (openTag) => openTag.startsWith("<foreignObject")).filter((holder) =>
+      holder.inner.includes("edgeLabel"),
+    );
+    expect(hosts.length).toBe(2);
+    const drawn = NODES.map((node) => /translate\((-?[\d.]+), (-?[\d.]+)\)/.exec(attr(node.open, "transform") ?? ""));
+    expect(drawn.every((at) => at !== null)).toBe(true);
+    for (const host of hosts) {
+      expect(attr(host.open, "height")).toBe("96");
+      const x = Number(attr(host.open, "x"));
+      const width = Number(attr(host.open, "width"));
+      expect(width).toBeGreaterThanOrEqual(56);
+      expect(width).toBeLessThanOrEqual(200);
+      const centreY = Number(attr(host.open, "y")) + 48;
+      for (const at of drawn) {
+        const nodeX = Number(at?.[1]);
+        const nodeY = Number(at?.[2]);
+        // The text block's centre line never runs through a node.
+        const crossesRow = centreY > nodeY && centreY < nodeY + 60;
+        const crossesColumn = x < nodeX + 180 && nodeX < x + width;
+        expect(crossesRow && crossesColumn).toBe(false);
+      }
+    }
+    const source = readFileSync(new URL("../src/areas/studio/canvas/CanvasView.tsx", import.meta.url), "utf8");
+    const block = /\n {2}edgeLabel: \{([\s\S]*?)\n {2}\},/.exec(source)?.[1] ?? "";
+    expect(block).toContain(`WebkitLineClamp: ${SENTENCE_MAX_LINES},`);
   });
 
   // The defect: a connect handle with no word for its gesture.

@@ -19,7 +19,6 @@ import {
   legOfSegment,
   routePath,
   midpointOfRoute,
-  segmentLength,
   GRID_STEP,
   NODE_WIDTH,
   NODE_HEIGHT,
@@ -35,11 +34,14 @@ import {
   nodeName,
   pathName,
   stampLines,
+  stampWidth,
   stampWords,
   wayOutSentence,
   STAMP_CHROME_HEIGHT,
+  STAMP_INSET,
   STAMP_LINE_HEIGHT,
 } from "./mapWords";
+import { nodeObstacle, placeSentences, stampObstacles, type Rect, type SentenceBox, type SentenceInput } from "./sentencePlacement";
 import { nextFocus, entryFocus, type ArrowKey, type Focus } from "./traversal";
 import { stepTextMap } from "../panels/shared/optionText";
 import { buildOperands } from "../panels/shared/conditionLogic";
@@ -48,20 +50,9 @@ const HANDLE_RADIUS = 7;
 /** The connect handle's pointer target: 24 units across at a scale of 1,
  * over the 7-unit dot it stands for (design.md D6). */
 const HANDLE_HIT_RADIUS = 12;
-/** How far a stamp stands in from the node's left or right edge, and how far
- * below the top edge its host ends (design.md D4). */
-const STAMP_INSET = 8;
-/** The room between two stamps on one node. */
-const STAMP_GAP = 4;
-/** A stamp's width cap: the node less an inset on each side. A node carrying
- * both stamps splits it, less the gap between them. */
-const STAMP_CAP = NODE_WIDTH - 2 * STAMP_INSET;
-const STAMP_CAP_SHARED = (STAMP_CAP - STAMP_GAP) / 2;
-/** A way out's sentence host: three 16-unit lines plus padding (design.md D5). */
-const SENTENCE_HOST_HEIGHT = 52;
-/** The sentence's width floor and cap, in user units. */
-const SENTENCE_MIN_WIDTH = 120;
-const SENTENCE_MAX_WIDTH = 200;
+/** A way out's sentence host: six 16-unit lines (design.md D5). It centres on
+ * the placed box, so a short estimate never clips a line. */
+const SENTENCE_HOST_HEIGHT = 96;
 /** The waypoint handle's side. A square, not a circle: the canvas already has
  * one control shape, and the connect handle owns it (design.md). */
 const WAYPOINT_HANDLE = 10;
@@ -395,15 +386,16 @@ const styles = stylex.create({
   edgeLabelHost: {
     pointerEvents: "none",
   },
-  // Centres the text block, so one line and three share the route's midpoint.
+  // Centres the text block, so one line and six share the placed box's centre.
   edgeLabelBox: {
     height: "100%",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
   },
-  // Three lines, then an ellipsis: the clamp needs all four of its
-  // declarations, as `nodeLabel`'s does.
+  // Six lines, then an ellipsis: the clamp needs all four of its
+  // declarations, as `nodeLabel`'s does. `SENTENCE_MAX_LINES` in
+  // `sentencePlacement.ts` holds the same six; StyleX cannot read an import.
   edgeLabel: {
     fontFamily: fonts.body,
     fontSize: 12,
@@ -414,7 +406,7 @@ const styles = stylex.create({
     paddingInline: space.s1,
     display: "-webkit-box",
     WebkitBoxOrient: "vertical",
-    WebkitLineClamp: 3,
+    WebkitLineClamp: 6,
     overflow: "hidden",
     overflowWrap: "anywhere",
     pointerEvents: "auto",
@@ -574,26 +566,26 @@ function NodeStamp({ text, corner, width }: { text: string; corner: "start" | "e
 }
 
 /**
- * A way out's sentence, centred on its route's midpoint over up to three
- * lines (design.md D5). The path's own name carries the sentence, so the text
- * block leaves the accessibility tree. It takes the press its host does not.
+ * A way out's sentence, at the box `placeSentences` chose for it, over up to
+ * six lines (design.md D5). The host is the box's width wide and six lines
+ * high, centred on the box. The path's own name carries the sentence, so the
+ * text block leaves the accessibility tree. It takes the press its host does
+ * not.
  */
 function EdgeLabel({
-  x,
-  y,
-  width,
+  box,
   text,
   stepId,
   pathId,
+  onPress,
   onSelect,
   onOpen,
 }: {
-  x: number;
-  y: number;
-  width: number;
+  box: SentenceBox;
   text: string;
   stepId: string;
   pathId: string | undefined;
+  onPress: () => void;
   onSelect: () => void;
   onOpen: () => void;
 }): React.JSX.Element {
@@ -601,9 +593,9 @@ function EdgeLabel({
   const clipped = useClipped(block, text);
   return (
     <foreignObject
-      x={x - width / 2}
-      y={y - SENTENCE_HOST_HEIGHT / 2}
-      width={width}
+      x={box.x}
+      y={box.y + box.height / 2 - SENTENCE_HOST_HEIGHT / 2}
+      width={box.width}
       height={SENTENCE_HOST_HEIGHT}
       className={`panzoom-exclude ${stylex.props(styles.edgeLabelHost).className}`}
       data-path-id={pathId}
@@ -615,6 +607,8 @@ function EdgeLabel({
           {...stylex.props(styles.edgeLabel)}
           aria-hidden="true"
           title={clipped ? text : undefined}
+          // The press takes the roving stop, as a press on the line does.
+          onPointerDown={onPress}
           onPointerUp={(e) => {
             e.stopPropagation();
             onSelect();
@@ -839,6 +833,100 @@ export function CanvasView({
     [nodePositions, hidden],
   );
 
+  // Every path that draws, routed, with the sentence its line carries. Read
+  // by the edge pass below and by the sentence placement. Keyed on the
+  // committed geometry, which is also what the routes follow, so a pointer
+  // move during a drag re-runs neither.
+  const drawnPaths = useMemo(() => {
+    const out: Array<{
+      step: (typeof steps)[number];
+      path: NonNullable<(typeof steps)[number]["paths"]>[number];
+      pathIndex: number;
+      routed: ReturnType<typeof routeThroughWaypoints>;
+      mid: ReturnType<typeof midpointOfRoute>;
+      sentence: string | undefined;
+      sentenceKey: string;
+      pathWaypoints: Point[];
+    }> = [];
+    for (const step of steps) {
+      if (!step.id) continue;
+      const operands = buildOperands({
+        fields: draft.fields,
+        locale: contentLocale,
+        baseLocale,
+        child: loadedChildren[step.id],
+      });
+      for (const [pathIndex, path] of (step.paths ?? []).entries()) {
+        if (!path.to) continue;
+        // Both anchors depend on the target, so they resolve per path
+        // rather than once per step: one step's paths can leave four
+        // different sides. With waypoints they face the first and the
+        // last of those instead.
+        const pathWaypoints = (path.id !== undefined ? waypoints[path.id] : undefined) ?? [];
+        // A collapsed group's box stands in for a hidden member, so the
+        // route ends on the box rather than on a step nobody can see. Two
+        // members of one collapsed group have nothing to draw between.
+        const sourceBox = anchorBoxFor(step.id, groups, positionsById);
+        const targetBox = anchorBoxFor(path.to, groups, positionsById);
+        if (!sourceBox || !targetBox) continue;
+        if (hidden.has(step.id) && hidden.has(path.to) && sourceBox.x === targetBox.x && sourceBox.y === targetBox.y) {
+          continue;
+        }
+        const routed = routeThroughWaypoints(
+          { x: sourceBox.x, y: sourceBox.y },
+          { x: targetBox.x, y: targetBox.y },
+          pathWaypoints,
+          {
+            source: { width: sourceBox.width, height: sourceBox.height },
+            target: { width: targetBox.width, height: targetBox.height },
+          },
+        );
+        out.push({
+          step,
+          path,
+          pathIndex,
+          routed,
+          // The sentence follows the route, not a straight line between the
+          // anchors. On a five-segment route those two points are nowhere
+          // near each other.
+          mid: midpointOfRoute(routed.points),
+          // The sentence the line draws is also the sentence the path's
+          // accessible name reads, so the guard parses once for both.
+          sentence: wayOutSentence(path, step, operands),
+          sentenceKey: path.id ?? `${step.id}-${pathIndex}-sentence`,
+          pathWaypoints,
+        });
+      }
+    }
+    return out;
+  }, [steps, draft.fields, contentLocale, baseLocale, loadedChildren, waypoints, groups, positionsById, hidden]);
+
+  // Where each sentence stands (design.md D5): clear of every drawn node, its
+  // stamps, every collapsed group's box and the sentences placed before it.
+  const sentenceBoxes = useMemo(() => {
+    const obstacles: Rect[] = [];
+    for (const step of steps) {
+      if (!step.id || hidden.has(step.id)) continue;
+      const at = positionsById[step.id];
+      if (!at) continue;
+      obstacles.push(nodeObstacle(at), ...stampObstacles(stampWords(step, initialStepId), at));
+    }
+    for (const { group, box } of groupBoxes) {
+      if (group.collapsed && box) obstacles.push(nodeObstacle(box));
+    }
+    const sentences: SentenceInput[] = [];
+    for (const drawnPath of drawnPaths) {
+      if (drawnPath.sentence === undefined) continue;
+      sentences.push({
+        key: drawnPath.sentenceKey,
+        text: drawnPath.sentence,
+        route: drawnPath.routed.points,
+        midpoint: drawnPath.mid.point,
+      });
+    }
+    return placeSentences(sentences, obstacles);
+  }, [drawnPaths, steps, hidden, positionsById, initialStepId, groupBoxes]);
+
   // `stepIds` is what the gesture moves; `stepId` is the node under the
   // pointer. The two differ whenever the press lands on a member of a
   // multi-step selection. `startPos` snapshots each mover's position at
@@ -1049,6 +1137,14 @@ export function CanvasView({
   const onWaypointDoubleClick = (e: React.MouseEvent, pathId: string, index: number) => {
     e.stopPropagation();
     onWaypointsChange(pathId, (waypoints[pathId] ?? []).filter((_, i) => i !== index));
+  };
+
+  /** The midpoint handle's double-click: the pair the line's double-click
+   * calls, so the source step's Ways out opens on this way out. */
+  const onMidpointDoubleClick = (e: React.MouseEvent, stepId: string, pathId: string) => {
+    e.stopPropagation();
+    onSelectStep(stepId, pathId);
+    onOpenStepPage?.(stepId, pathId);
   };
 
   const onNodePointerUp = (e: React.PointerEvent, stepId: string) => {
@@ -1264,18 +1360,25 @@ export function CanvasView({
   // could sit partly behind a nearby node's fill and read as a clipped
   // fragment. Collected here during the edge pass, rendered after the node
   // pass.
-  const edgeLabels: Array<{ key: string; x: number; y: number; width: number; text: string; stepId: string; pathId: string | undefined }> =
-    [];
+  const edgeLabels: Array<{ key: string; box: SentenceBox; text: string; stepId: string; pathId: string | undefined }> = [];
 
   // Waypoint handles ride that same late pass, and for the same reason: a
   // handle inside the edge group sits behind a nearby node's opaque fill.
   // Drawing after the sentences also keeps a handle grabbable where the two
   // share the route's midpoint.
-  const waypointHandles: Array<{ key: string; x: number; y: number; pathId: string; index?: number; insertAt?: number }> = [];
+  const waypointHandles: Array<{
+    key: string;
+    x: number;
+    y: number;
+    stepId: string;
+    pathId: string;
+    index?: number;
+    insertAt?: number;
+  }> = [];
 
   // The disclosure buttons ride the same late pass, and they need it most: a
   // sentence's text block is up to 200 wide and carries its own pointer
-  // handler, and it lands wherever a route midpoint lands, so it can cover a
+  // handler, and it lands wherever its route has room, so it can cover a
   // box corner. Collected in the group pass, drawn after every other one.
   const disclosures: Array<{ group: StepGroup; x: number; y: number }> = [];
 
@@ -1308,7 +1411,7 @@ export function CanvasView({
     const isInitial = initialStepId === step.id;
     const isTerminal = step.terminal === true;
     const stamps = stampWords(step, initialStepId);
-    const stampWidth = stamps.start !== undefined && stamps.end !== undefined ? STAMP_CAP_SHARED : STAMP_CAP;
+    const widthOfStamps = stampWidth(stamps);
 
     return (
       <g
@@ -1348,8 +1451,8 @@ export function CanvasView({
         <foreignObject x={10} y={0} width={NODE_WIDTH - 36} height={NODE_HEIGHT} className="panzoom-exclude">
           <NodeLabel label={nameText(step.id)} />
         </foreignObject>
-        {stamps.start !== undefined && <NodeStamp text={stamps.start} corner="start" width={stampWidth} />}
-        {stamps.end !== undefined && <NodeStamp text={stamps.end} corner="end" width={stampWidth} />}
+        {stamps.start !== undefined && <NodeStamp text={stamps.start} corner="start" width={widthOfStamps} />}
+        {stamps.end !== undefined && <NodeStamp text={stamps.end} corner="end" width={widthOfStamps} />}
         <circle cx={NODE_WIDTH} cy={NODE_HEIGHT / 2} r={HANDLE_RADIUS} {...stylex.props(styles.connectHandle, isTerminal && styles.connectHandleTerminal)} />
         {/* The handle's pointer target, over the dot. It carries the press,
             the cursor and the tooltip naming the gesture. */}
@@ -1484,148 +1587,93 @@ export function CanvasView({
           );
         })}
 
-        {steps.map((step) => {
-          if (!step.id) return null;
-          const operands = buildOperands({
-            fields: draft.fields,
-            locale: contentLocale,
-            baseLocale,
-            child: loadedChildren[step.id],
-          });
-          return (step.paths ?? []).map((path, pathIndex) => {
-            if (!path.to) return null;
-            // Both anchors depend on the target, so they resolve per path
-            // rather than once per step: one step's paths can leave four
-            // different sides. With waypoints they face the first and the
-            // last of those instead.
-            const pathWaypoints = (path.id !== undefined ? waypoints[path.id] : undefined) ?? [];
-            // A collapsed group's box stands in for a hidden member, so the
-            // route ends on the box rather than on a step nobody can see. Two
-            // members of one collapsed group have nothing to draw between.
-            const sourceBox = anchorBoxFor(step.id as string, groups, positionsById);
-            const targetBox = anchorBoxFor(path.to as string, groups, positionsById);
-            if (!sourceBox || !targetBox) return null;
-            if (hidden.has(step.id as string) && hidden.has(path.to) && sourceBox.x === targetBox.x && sourceBox.y === targetBox.y) {
-              return null;
+        {drawnPaths.map(({ step, path, pathIndex, routed, mid, sentence, sentenceKey, pathWaypoints }) => {
+          const route = routed.points;
+          const d = routePath(route, edgeStyle);
+          const midX = mid.point.x;
+          const midY = mid.point.y;
+          const isSelected = path.id !== undefined && path.id === selectedPathId;
+          const box = sentenceBoxes.get(sentenceKey);
+          if (sentence !== undefined && box !== undefined) {
+            edgeLabels.push({ key: sentenceKey, box, text: sentence, stepId: step.id as string, pathId: path.id });
+          }
+          // Only the selected path shows handles. Every path showing them
+          // would put a control every twenty pixels on a busy graph.
+          if (isSelected && path.id !== undefined) {
+            const pathId = path.id;
+            for (const [index, w] of pathWaypoints.entries()) {
+              waypointHandles.push({ key: `${pathId}-w${index}`, x: w.x, y: w.y, stepId: step.id as string, pathId, index });
             }
-            const routed = routeThroughWaypoints(
-              { x: sourceBox.x, y: sourceBox.y },
-              { x: targetBox.x, y: targetBox.y },
-              pathWaypoints,
-              {
-                source: { width: sourceBox.width, height: sourceBox.height },
-                target: { width: targetBox.width, height: targetBox.height },
-              },
-            );
-            const route = routed.points;
-            const d = routePath(route, edgeStyle);
-            // The sentence follows the route, not a straight line between the
-            // anchors. On a five-segment route those two points are nowhere
-            // near each other.
-            const mid = midpointOfRoute(route);
-            const midX = mid.point.x;
-            const midY = mid.point.y;
-            const isSelected = path.id !== undefined && path.id === selectedPathId;
-            // The sentence the line draws is also the sentence the path's
-            // accessible name reads, so the guard parses once for both.
-            const sentence = wayOutSentence(path, step, operands);
-            if (sentence !== undefined) {
-              // Width follows the free space on the segment the midpoint
-              // actually falls on, so the sentence rarely spills onto a
-              // neighboring node; the post-node paint order (below) is the
-              // fallback where that gap is narrower than the floor.
-              //
-              // The segment, not the anchor gap: a five-segment route puts
-              // its midpoint on a vertical run, where the distance between
-              // the two anchors says nothing about the room available.
-              const gap = segmentLength(route, mid.segment);
-              edgeLabels.push({
-                key: path.id ?? `${step.id}-${pathIndex}-sentence`,
-                x: midX,
-                y: midY,
-                width: Math.min(SENTENCE_MAX_WIDTH, Math.max(SENTENCE_MIN_WIDTH, gap - 24)),
-                text: sentence,
-                stepId: step.id as string,
-                pathId: path.id,
-              });
-            }
-            // Only the selected path shows handles. Every path showing them
-            // would put a control every twenty pixels on a busy graph.
-            if (isSelected && path.id !== undefined) {
-              const pathId = path.id;
-              for (const [index, w] of pathWaypoints.entries()) {
-                waypointHandles.push({ key: `${pathId}-w${index}`, x: w.x, y: w.y, pathId, index });
-              }
-              // The midpoint's own segment names a leg, never a list index:
-              // one leg draws as two to six segments.
-              waypointHandles.push({
-                key: `${pathId}-mid`,
-                x: midX,
-                y: midY,
-                pathId,
-                insertAt: legOfSegment(routed.legStarts, mid.segment),
-              });
-            }
-            const isInsertTarget = path.id !== undefined && path.id === insertTargetPathId;
-            // A path with no id draws, but nothing can reference it, so the
-            // traversal never reaches it and it never joins a fan count.
-            if (path.id !== undefined) {
-              outgoingCount.set(step.id as string, (outgoingCount.get(step.id as string) ?? 0) + 1);
-            }
-            return (
-              <g
-                key={path.id ?? `${step.id}-${pathIndex}`}
-                className={`panzoom-exclude ${stylex.props(styles.edgeGroup, stylex.defaultMarker()).className}`}
-                data-kind="edge"
-                data-path-id={path.id}
-                data-step-id={path.id !== undefined ? step.id : undefined}
-                role="button"
-                tabIndex={focus.kind === "path" && focus.pathId === path.id ? 0 : -1}
-                aria-label={pathName(path, nameText(step.id), nameText(path.to), sentence)}
-                // The press takes the roving stop, entered through the source,
-                // which is the end Up and Down walk from. A path with no id
-                // takes none: nothing can name it.
-                onPointerDown={() => {
-                  if (path.id !== undefined) moveFocus({ kind: "path", pathId: path.id, from: "source" });
-                }}
-                onPointerUp={(e) => {
-                  e.stopPropagation();
-                  onSelectStep(step.id, path.id);
-                }}
-                // Opens the source step's Ways out on this way out, the pair
-                // Enter on a focused path calls. A waypoint handle draws
-                // outside this group, so its own double-click never lands here.
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  onSelectStep(step.id, path.id);
-                  onOpenStepPage?.(step.id as string, path.id);
-                }}
-              >
-                {/* The halo, not a ring: a stroke holds no offset, so a line's
-                    indicator is a band around the shape. It shares the edge's
-                    own `d` and draws before it, and the 1.5px edge paints over
-                    its middle — a manual path keeps its dash, and about 2px of
-                    accent reads on each side. */}
-                <path d={d} {...stylex.props(styles.edgeFocusHalo)} vectorEffect="non-scaling-stroke" />
-                <path
-                  d={d}
-                  {...stylex.props(
-                    styles.edge,
-                    path.trigger === "manual" ? styles.edgeManual : styles.edgeAutomatic,
-                    isSelected && styles.edgeSelected,
-                    isInsertTarget && styles.edgeInsertTarget,
-                  )}
-                  markerEnd="url(#canvas-arrow)"
-                />
-                {/* The same `d`, so the pointer target follows the route
-                    rather than a straight line the canvas no longer draws.
-                    `edgeHitarea` needs `fill: none` for that: a
-                    `<line>` cannot fill, a `<path>` can, and a five-segment
-                    route encloses area SVG would otherwise paint black. */}
-                <path d={d} {...stylex.props(styles.edgeHitarea)} />
-              </g>
-            );
-          });
+            // The midpoint's own segment names a leg, never a list index:
+            // one leg draws as two to six segments.
+            waypointHandles.push({
+              key: `${pathId}-mid`,
+              x: midX,
+              y: midY,
+              stepId: step.id as string,
+              pathId,
+              insertAt: legOfSegment(routed.legStarts, mid.segment),
+            });
+          }
+          const isInsertTarget = path.id !== undefined && path.id === insertTargetPathId;
+          // A path with no id draws, but nothing can reference it, so the
+          // traversal never reaches it and it never joins a fan count.
+          if (path.id !== undefined) {
+            outgoingCount.set(step.id as string, (outgoingCount.get(step.id as string) ?? 0) + 1);
+          }
+          return (
+            <g
+              key={path.id ?? `${step.id}-${pathIndex}`}
+              className={`panzoom-exclude ${stylex.props(styles.edgeGroup, stylex.defaultMarker()).className}`}
+              data-kind="edge"
+              data-path-id={path.id}
+              data-step-id={path.id !== undefined ? step.id : undefined}
+              role="button"
+              tabIndex={focus.kind === "path" && focus.pathId === path.id ? 0 : -1}
+              aria-label={pathName(path, nameText(step.id), nameText(path.to), sentence)}
+              // The press takes the roving stop, entered through the source,
+              // which is the end Up and Down walk from. A path with no id
+              // takes none: nothing can name it.
+              onPointerDown={() => {
+                if (path.id !== undefined) moveFocus({ kind: "path", pathId: path.id, from: "source" });
+              }}
+              onPointerUp={(e) => {
+                e.stopPropagation();
+                onSelectStep(step.id, path.id);
+              }}
+              // Opens the source step's Ways out on this way out, the pair
+              // Enter on a focused path calls. A waypoint handle draws
+              // outside this group, so its own double-click never lands here.
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                onSelectStep(step.id, path.id);
+                onOpenStepPage?.(step.id as string, path.id);
+              }}
+            >
+              {/* The halo, not a ring: a stroke holds no offset, so a line's
+                  indicator is a band around the shape. It shares the edge's
+                  own `d` and draws before it, and the 1.5px edge paints over
+                  its middle — a manual path keeps its dash, and about 2px of
+                  accent reads on each side. */}
+              <path d={d} {...stylex.props(styles.edgeFocusHalo)} vectorEffect="non-scaling-stroke" />
+              <path
+                d={d}
+                {...stylex.props(
+                  styles.edge,
+                  path.trigger === "manual" ? styles.edgeManual : styles.edgeAutomatic,
+                  isSelected && styles.edgeSelected,
+                  isInsertTarget && styles.edgeInsertTarget,
+                )}
+                markerEnd="url(#canvas-arrow)"
+              />
+              {/* The same `d`, so the pointer target follows the route
+                  rather than a straight line the canvas no longer draws.
+                  `edgeHitarea` needs `fill: none` for that: a
+                  `<line>` cannot fill, a `<path>` can, and a five-segment
+                  route encloses area SVG would otherwise paint black. */}
+              <path d={d} {...stylex.props(styles.edgeHitarea)} />
+            </g>
+          );
         })}
 
         {connectDrag &&
@@ -1666,12 +1714,14 @@ export function CanvasView({
         {edgeLabels.map((label) => (
           <EdgeLabel
             key={label.key}
-            x={label.x}
-            y={label.y}
-            width={label.width}
+            box={label.box}
             text={label.text}
             stepId={label.stepId}
             pathId={label.pathId}
+            // The press takes the roving stop exactly as the line's does.
+            onPress={() => {
+              if (label.pathId !== undefined) moveFocus({ kind: "path", pathId: label.pathId, from: "source" });
+            }}
             onSelect={() => onSelectStep(label.stepId, label.pathId)}
             onOpen={() => {
               onSelectStep(label.stepId, label.pathId);
@@ -1705,15 +1755,22 @@ export function CanvasView({
               onPointerDown={(e) => onWaypointPointerDown(e, h.pathId, { index: h.index, insertAt: h.insertAt })}
               onPointerMove={onWaypointPointerMove}
               onPointerUp={onWaypointPointerUp}
-              onDoubleClick={h.index === undefined ? undefined : (e) => onWaypointDoubleClick(e, h.pathId, h.index as number)}
+              // An existing waypoint's double-click deletes it. The midpoint
+              // handle stands over its sentence, so it takes the second click
+              // of a double-click on it, and opens the way out as the line
+              // does. Its first click stayed under the drag threshold, so it
+              // wrote no waypoint.
+              onDoubleClick={(e) =>
+                h.index === undefined ? onMidpointDoubleClick(e, h.stepId, h.pathId) : onWaypointDoubleClick(e, h.pathId, h.index)
+              }
             />
           );
         })}
 
         {/* Last of all, so no route, node, sentence or waypoint handle can
             take a press meant for a disclosure. A sentence's text block is up
-            to 200 wide, carries its own pointer handler, and lands wherever a
-            route midpoint lands. Each button is a sibling of its box
+            to 200 wide, carries its own pointer handler, and lands wherever its
+            route has room. Each button is a sibling of its box
             `<g>`, so the group's drag handlers never see the press either. */}
         {disclosures.map(({ group, x, y }) => (
           <foreignObject

@@ -130,10 +130,10 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     expect(enterAt).toBeGreaterThan(-1);
     expect(binding).toContain("onOpenStepPage?.(focus.stepId)");
     expect(binding).toContain("onOpenStepPage?.(owner.id, focus.pathId)");
-    // Two from Enter, and one from each of the three double-click routes: the
-    // node, the edge group and the sentence. A sixth would mean a single
-    // press reached it too.
-    expect(code.match(/onOpenStepPage\?\.\(/g)).toHaveLength(5);
+    // Two from Enter, and one from each of the four double-click routes: the
+    // node, the edge group, the sentence and the midpoint handle. A seventh
+    // would mean a single press reached it too.
+    expect(code.match(/onOpenStepPage\?\.\(/g)).toHaveLength(6);
   });
 
   it("opens the step from a double-click on its node", () => {
@@ -159,6 +159,33 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     expect(handler).toContain("onOpen()");
     expect(opener).toContain("onSelectStep(label.stepId, label.pathId)");
     expect(opener).toContain("onOpenStepPage?.(label.stepId, label.pathId)");
+  });
+
+  it("opens the way out from a double-click on its midpoint handle, and adds no waypoint", () => {
+    const code = stripComments(read(CANVAS));
+    const at = code.indexOf("const onMidpointDoubleClick");
+    const handler = code.slice(at, code.indexOf("};", at));
+    const handles = code.slice(code.indexOf("{waypointHandles.map("));
+    const wiring = handles.slice(handles.indexOf("onDoubleClick="), handles.indexOf("/>"));
+
+    expect(at).toBeGreaterThan(-1);
+    expect(handler).toContain("e.stopPropagation()");
+    expect(handler).toContain("onSelectStep(stepId, pathId)");
+    expect(handler).toContain("onOpenStepPage?.(stepId, pathId)");
+    expect(handler).not.toContain("onWaypointsChange");
+    // The midpoint handle opens; an existing waypoint's handle still deletes.
+    expect(wiring).toContain("h.index === undefined ? onMidpointDoubleClick(e, h.stepId, h.pathId)");
+    expect(wiring).toContain("onWaypointDoubleClick(e, h.pathId, h.index)");
+  });
+
+  it("moves the roving stop from a press on the sentence, as from a press on the line", () => {
+    const code = stripComments(read(CANVAS));
+    const label = code.slice(code.indexOf("function EdgeLabel"), code.indexOf("export function CanvasView"));
+    const at = code.indexOf("<EdgeLabel");
+    const press = code.slice(code.indexOf("onPress={", at), code.indexOf("onSelect=", at));
+
+    expect(label).toContain("onPointerDown={onPress}");
+    expect(press).toContain('if (label.pathId !== undefined) moveFocus({ kind: "path", pathId: label.pathId, from: "source" })');
   });
 
   it("leaves a pointer press on the canvas, so a set can still be built", () => {
