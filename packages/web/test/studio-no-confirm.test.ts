@@ -20,7 +20,7 @@ import { describe, expect, it } from "bun:test";
  *
  * It names five files and no others: the two that carry publish and discard,
  * the Fields tab that asks before a removal, the removal dialog, and the
- * dialog hook all three dialogs share. Other `confirm()` calls in the studio
+ * dialog frame every dialog shares. Other `confirm()` calls in the studio
  * area stay as they are, `FieldCatalogPanel.tsx`'s two among them, and a
  * wider pattern would fail on each of them today.
  *
@@ -37,8 +37,8 @@ const FILES = [
   "src/areas/studio/panels/EntityTabs.tsx",
   // The removal dialog itself, whose own two controls confirm and decline.
   "src/areas/studio/panels/RemoveFieldDialog.tsx",
-  // The hook the publish, discard and removal dialogs open through.
-  "src/areas/studio/panels/shared/confirmDialog.tsx",
+  // The frame the publish, discard and removal dialogs open through.
+  "src/areas/studio/panels/shared/StudioDialog.tsx",
 ];
 
 /** Block comments first, then line comments — the order matters for a `//`

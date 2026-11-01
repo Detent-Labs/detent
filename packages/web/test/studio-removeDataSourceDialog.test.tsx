@@ -28,32 +28,28 @@ const headingOf = (html: string): string => /<h2[^>]*>(.*?)<\/h2>/.exec(html)?.[
 const codeOf = (html: string): string[] => [...html.matchAll(/<code[^>]*>(.*?)<\/code>/g)].map((m) => m[1]);
 
 describe("RemoveDataSourceDialog's heading", () => {
-  it("holds the question and no key", () => {
-    const heading = headingOf(renderDialog({ label: "countries" }));
-
-    expect(heading).toBe("Remove the data source?");
-    expect(heading).not.toContain("countries");
-  });
-});
-
-describe("RemoveDataSourceDialog's source fact row", () => {
-  it("names the source in the body face, first among the facts", () => {
-    const html = renderDialog({ label: "Cost centres" });
-
-    expect(codeOf(html)).toEqual([]);
-    expect(html).toMatch(/<dl[^>]*><dt[^>]*>Data source<\/dt><dd[^>]*>Cost centres<\/dd>/);
+  it("names the source in curly quotes, in the author's capitals", () => {
+    expect(headingOf(renderDialog({ label: "Cost Centres" }))).toBe("Remove “Cost Centres”?");
   });
 
-  it("names an unnamed source by the rail's fallback word, not in code", () => {
-    const html = renderDialog({ label: "(unnamed source)" });
-
-    expect(html).toContain("(unnamed source)");
-    expect(codeOf(html)).toEqual([]);
+  it("names an unnamed source by the rail's fallback word", () => {
+    expect(headingOf(renderDialog({ label: "(unnamed source)" }))).toBe("Remove “(unnamed source)”?");
   });
 
   // A string replacement would expand `$&` into a matched placeholder.
   it("keeps a name holding a $ pattern as the author typed it", () => {
-    expect(renderDialog({ label: "cost$&" })).toContain("cost$&amp;");
+    const heading = headingOf(renderDialog({ label: "cost$&" }));
+
+    expect(heading).toBe("Remove “cost$&amp;”?");
+    expect(heading).not.toContain("{source}");
+  });
+
+  it("prints the name once and in no code element, so it is no fact row", () => {
+    const html = renderDialog({ label: "Cost centres" });
+
+    expect(codeOf(html)).toEqual([]);
+    expect(html).not.toContain(">Data source</dt>");
+    expect(html.split("Cost centres")).toHaveLength(2);
   });
 });
 
@@ -81,6 +77,14 @@ describe("RemoveDataSourceDialog's facts", () => {
 
   it("names no field, and prints the source in no code element", () => {
     expect(codeOf(renderDialog({ label: "countries" }))).toEqual([]);
+  });
+
+  it("prints each count in mono tabular figures", () => {
+    expect(renderDialog({ reach: { fields: 3, columnMappings: 1 } })).toMatch(/<dd class="value mono tabular">3<\/dd>/);
+  });
+
+  it("prints no facts list when both counts are zero", () => {
+    expect(renderDialog({ reach: { fields: 0, columnMappings: 0 } })).not.toContain("<dl");
   });
 });
 
@@ -116,22 +120,23 @@ describe("RemoveDataSourceDialog's accessible name and focus", () => {
     expect(html).toContain(`<h2 id="${labelled![1]}"`);
   });
 
-  it("points aria-describedby at the facts list and the notes", () => {
+  it("points aria-describedby at the body holding the facts and the notes", () => {
     const html = renderDialog();
     const described = /aria-describedby="([^"]+)"/.exec(html);
 
     expect(described).not.toBeNull();
-    const [factsId, notesId] = described![1].split(" ");
+    const body = html.slice(html.indexOf(`id="${described![1]}"`));
+    const inside = body.slice(0, body.indexOf("</div>"));
 
-    expect(html).toContain(`<dl id="${factsId}"`);
-    expect(html).toContain(`<div id="${notesId}"`);
+    expect(inside).toContain("<dl");
+    expect(inside).toContain("The studio has no undo.");
   });
 
   it("primes Cancel, and nothing else", () => {
     const primed = buttonTags(renderDialog()).filter((b) => b.includes("autofocus"));
 
     expect(primed).toHaveLength(1);
-    expect(primed[0]).toContain("btn-ghost");
+    expect(primed[0]).toContain('class="btn btn-secondary"');
   });
 });
 

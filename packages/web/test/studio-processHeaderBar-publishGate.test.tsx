@@ -60,6 +60,7 @@ const contextValue: DraftContextValue = {
 const noActions: DraftToolbarActions = {
   saving: false,
   publishing: false,
+  discarding: false,
   error: null,
   errorDetail: null,
   pendingDialog: null,
@@ -253,6 +254,30 @@ describe("The publish dialog", () => {
     }
   });
 
+  it("asks its heading as a question", () => {
+    expect(renderHeader({ actions: { pendingDialog: "publish" } })).toContain("Publish this draft?</h2>");
+  });
+
+  it("prints the next version and the open issue count in mono, a zero included", () => {
+    const html = renderHeader({ actions: { pendingDialog: "publish" } });
+
+    expect(html).toMatch(/<dt[^>]*>Next version<\/dt><dd class="value mono">v4<\/dd>/);
+    expect(html).toMatch(/<dt[^>]*>Open issues<\/dt><dd class="value mono">0<\/dd>/);
+  });
+
+  it("prints the process in the written face", () => {
+    expect(renderHeader({ actions: { pendingDialog: "publish" } })).toMatch(/<dt[^>]*>Process<\/dt><dd class="value">Expense approval<\/dd>/);
+  });
+
+  it("disables both controls while a save or a publish runs", () => {
+    for (const actions of [{ saving: true }, { publishing: true }]) {
+      const html = renderHeader({ actions: { pendingDialog: "publish", ...actions } });
+      const dialogTags = buttonTags(html.slice(html.indexOf("<dialog")));
+
+      expect(dialogTags.filter((b) => b.includes("disabled"))).toHaveLength(2);
+    }
+  });
+
   it("omits the key row when the draft has no key", () => {
     const html = renderHeader({ actions: { pendingDialog: "publish" }, draft: { label: { en: "Expense approval" }, baseLocale: "en" } });
     const { inside } = splitDialogDeveloperView(html);
@@ -287,7 +312,7 @@ describe("The publish dialog", () => {
     const html = renderHeader({ actions: { pendingDialog: "publish" }, draft });
     const classesOf = (tag: string) => new Set(/class="([^"]*)"/.exec(tag)?.[1]?.split(" ") ?? []);
     const monoRow = classesOf(html.slice(html.indexOf("</dt>", html.indexOf(">Process id</dt>")) + 5));
-    const plainRow = classesOf(html.slice(html.indexOf("</dt>", html.indexOf(">Open issues</dt>")) + 5));
+    const plainRow = classesOf(html.slice(html.indexOf("</dt>", html.indexOf(">Process</dt>")) + 5));
     const monoOnly = [...monoRow].filter((c) => !plainRow.has(c));
     const list = classesOf(html.slice(html.indexOf("<ul", html.indexOf(">Languages</dt>"))));
 
@@ -366,9 +391,54 @@ describe("The discard dialog", () => {
   it("names what a discard keeps", () => {
     const html = renderHeader({ actions: { pendingDialog: "discard" } });
 
-    expect(html).toContain("Discard this draft");
-    expect(html).toContain("The published versions stay");
+    expect(html).toContain("Discard this draft?</h2>");
+    expect(html).toContain("The published versions stay. Only the unpublished draft goes.");
     expect(html).toContain("btn-destructive");
+  });
+
+  it("states the process and prints no revision", () => {
+    const html = renderHeader({ actions: { pendingDialog: "discard" } });
+
+    expect(html).toMatch(/<dt[^>]*>Process<\/dt><dd class="value">Expense approval<\/dd>/);
+    expect(html).not.toContain("Revision");
+  });
+
+  it("states the last save as a date and a time where one is known", () => {
+    const html = renderHeader({ actions: { pendingDialog: "discard" }, lastSavedAt: new Date(2026, 9, 31, 14, 5) });
+    const row = /<dt[^>]*>Last saved<\/dt><dd[^>]*>([^<]*)<\/dd>/.exec(html);
+
+    expect(row).not.toBeNull();
+    expect(row![1]).toContain("2026");
+    expect(row![1]).toMatch(/\d{1,2}:05/);
+  });
+
+  it("prints no Last saved row where the save time is unknown", () => {
+    expect(renderHeader({ actions: { pendingDialog: "discard" } })).not.toContain("Last saved");
+  });
+
+  it("disables both controls while the request runs", () => {
+    const html = renderHeader({ actions: { pendingDialog: "discard", discarding: true } });
+    const dialogTags = buttonTags(html.slice(html.indexOf("<dialog")));
+
+    expect(dialogTags.filter((b) => b.includes("disabled"))).toHaveLength(2);
+  });
+
+  it("keeps both controls enabled while no request runs", () => {
+    const html = renderHeader({ actions: { pendingDialog: "discard" } });
+    const dialogTags = buttonTags(html.slice(html.indexOf("<dialog")));
+
+    expect(dialogTags.filter((b) => b.includes("disabled"))).toHaveLength(0);
+  });
+
+  it("renders a refusal inside the open dialog, with the server's text in a closed Developer view", () => {
+    const html = renderHeader({ actions: { pendingDialog: "discard", error: "Discard stopped.", errorDetail: "raw\ntext" } });
+
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Discard stopped.");
+    expect(html).toContain("raw\ntext");
+    expect(html.match(/<details/g)).toHaveLength(1);
+    expect(html).not.toMatch(/<details[^>]*\sopen/);
+    expect(html).not.toContain("errorBanner");
   });
 });
 
@@ -382,14 +452,14 @@ describe("Neither dialog primes the button it cannot undo", () => {
     const primed = buttonTags(renderHeader({ actions: { pendingDialog: "publish" } })).filter((b) => b.includes("autofocus"));
 
     expect(primed).toHaveLength(1);
-    expect(primed[0]).toContain("btn-ghost");
+    expect(primed[0]).toContain('class="btn btn-secondary"');
   });
 
   it("primes Cancel in the discard dialog, and nothing else", () => {
     const primed = buttonTags(renderHeader({ actions: { pendingDialog: "discard" } })).filter((b) => b.includes("autofocus"));
 
     expect(primed).toHaveLength(1);
-    expect(primed[0]).toContain("btn-ghost");
+    expect(primed[0]).toContain('class="btn btn-secondary"');
   });
 
   it("leaves Discard draft unprimed, the violating input this rejects", () => {

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
 import { createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -13,6 +14,7 @@ import {
   DialogRefusal,
   DialogWarning,
   PrimaryConfirm,
+  RefusalDetail,
   StudioDialog,
 } from "../src/areas/studio/panels/shared/StudioDialog.js";
 
@@ -232,6 +234,17 @@ describe("the notes", () => {
     expect(details).toContain("409: stale revision");
     // The server's text stays outside the alert, in the closed disclosure.
     expect(detailed.slice(0, detailed.indexOf("</p>"))).not.toContain("409");
+  });
+
+  it("shares one RefusalDetail with the refusal and the header bar's banner", () => {
+    const detail = renderToStaticMarkup(<RefusalDetail detail="409: stale revision" />);
+    const refusal = renderToStaticMarkup(<DialogRefusal detail="409: stale revision">Refused.</DialogRefusal>);
+
+    expect(detail.startsWith("<details")).toBe(true);
+    expect(refusal.endsWith(detail)).toBe(true);
+    const banner = readFileSync(new URL("../src/areas/studio/panels/ProcessHeaderBar.tsx", import.meta.url), "utf8");
+    expect(banner).toContain("RefusalDetail,");
+    expect(banner).not.toContain("function RefusalDetail");
   });
 
   it("holds machine values in a closed Developer view of one facts list", () => {

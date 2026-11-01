@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { FieldId } from "workflow-engine/schema";
-import { RemoveFieldDialog } from "../src/areas/studio/panels/RemoveFieldDialog.js";
+import { RemoveFieldDialog, type RemovalNameRow } from "../src/areas/studio/panels/RemoveFieldDialog.js";
 import type { FieldRemovalReach } from "../src/areas/studio/draft/field-removal.js";
 
 /**
@@ -40,11 +40,12 @@ function reach(over: {
   };
 }
 
-function renderDialog(over: { label?: string; reach?: FieldRemovalReach } = {}): string {
+function renderDialog(over: { label?: string; reach?: FieldRemovalReach; names?: RemovalNameRow[] } = {}): string {
   return renderToStaticMarkup(
     <RemoveFieldDialog
       label={over.label ?? "Booking status"}
       reach={over.reach ?? reach({})}
+      names={over.names}
       triggerRef={{ current: null }}
       onCancel={() => {}}
       onConfirm={() => {}}
@@ -84,18 +85,18 @@ describe("RemoveFieldDialog's heading", () => {
 });
 
 describe("RemoveFieldDialog's facts", () => {
-  it("names the field and its key in a mono element", () => {
-    const html = renderDialog({ label: "Booking status", reach: reach({ key: "booking_status" }) });
+  it("prints neither the field's label nor its key in a fact", () => {
+    const html = renderDialog({ label: "Booking status", reach: reach({ key: "booking_status", steps: 1 }) });
 
-    expect(html).toContain("Booking status");
-    expect(html).toMatch(/<code[^>]*>booking_status<\/code>/);
+    expect(html).not.toContain("booking_status");
+    expect(html).not.toMatch(/<code[^>]*>/);
+    expect(html).not.toContain(">Field</dt>");
+    expect(html).not.toContain(">Group</dt>");
+    expect(html.split("Booking status")).toHaveLength(2);
   });
 
-  it("omits the key element for a field with an empty key, and states the label alone", () => {
-    const html = renderDialog({ label: "Booking status", reach: reach({ key: "" }) });
-
-    expect(html).not.toMatch(/<code[^>]*>/);
-    expect(html).toMatch(/<dd[^>]*>Booking status<\/dd>/);
+  it("prints no facts list for a removal with no count", () => {
+    expect(renderDialog()).not.toContain("<dl");
   });
 
   it("states a row only for a count above zero, one per kind", () => {
@@ -110,11 +111,11 @@ describe("RemoveFieldDialog's facts", () => {
     expect(html).not.toContain("Plugin settings naming it");
   });
 
-  it("states each row's own bare count", () => {
+  it("states each row's own count in mono tabular figures", () => {
     const html = renderDialog({ reach: reach({ steps: 2, contractEntries: 1 }) });
 
-    expect(html).toContain(">2<");
-    expect(html).toContain(">1<");
+    expect(html).toMatch(/<dd class="value mono tabular">2<\/dd>/);
+    expect(html).toMatch(/<dd class="value mono tabular">1<\/dd>/);
   });
 
   it("states the fields-inside and steps counts for a group", () => {
@@ -124,6 +125,16 @@ describe("RemoveFieldDialog's facts", () => {
     expect(html).toContain(">18<");
     expect(html).toContain("Steps showing it");
     expect(html).toContain(">10<");
+  });
+
+  it("prints a row of names in place of the counts where the caller passes names", () => {
+    const html = renderDialog({
+      reach: reach({ steps: 2 }),
+      names: [{ term: "Asked on", names: ["Review", "Book"] }],
+    });
+
+    expect(html).toMatch(/<dt[^>]*>Asked on<\/dt><dd[^>]*><ul[^>]*><li>Review<\/li><li>Book<\/li><\/ul><\/dd>/);
+    expect(html).not.toContain("Steps showing it");
   });
 });
 
@@ -162,28 +173,29 @@ describe("RemoveFieldDialog's notes", () => {
 describe("RemoveFieldDialog's accessible name and focus", () => {
   it("points aria-labelledby at the heading's own id", () => {
     const html = renderDialog();
-    const described = /aria-labelledby="([^"]+)"/.exec(html);
+    const labelled = /aria-labelledby="([^"]+)"/.exec(html);
 
-    expect(described).not.toBeNull();
-    expect(html).toContain(`<h2 id="${described![1]}"`);
+    expect(labelled).not.toBeNull();
+    expect(html).toContain(`<h2 id="${labelled![1]}"`);
   });
 
-  it("points aria-describedby at the facts list and the notes", () => {
-    const html = renderDialog();
+  it("points aria-describedby at the body holding the facts and the notes", () => {
+    const html = renderDialog({ reach: reach({ steps: 1 }) });
     const described = /aria-describedby="([^"]+)"/.exec(html);
 
     expect(described).not.toBeNull();
-    const [factsId, notesId] = described![1].split(" ");
+    const body = html.slice(html.indexOf(`id="${described![1]}"`));
+    const inside = body.slice(0, body.indexOf("</div>"));
 
-    expect(html).toContain(`<dl id="${factsId}"`);
-    expect(html).toContain(`<div id="${notesId}"`);
+    expect(inside).toContain("<dl");
+    expect(inside).toContain("Removing it also clears every step entry");
   });
 
   it("primes Cancel, and nothing else", () => {
     const primed = buttonTags(renderDialog()).filter((b) => b.includes("autofocus"));
 
     expect(primed).toHaveLength(1);
-    expect(primed[0]).toContain("btn-ghost");
+    expect(primed[0]).toContain('class="btn btn-secondary"');
   });
 });
 

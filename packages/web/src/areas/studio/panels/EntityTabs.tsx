@@ -428,7 +428,7 @@ export function FieldsTab({
 
   // `pendingRemoval` is the removal `RemoveFieldDialog` asks about, while the
   // dialog stays open. `removeTriggerRef` holds that removal's Remove field
-  // control, where `useConfirmDialog` returns focus on a decline.
+  // control, where `StudioDialog` returns focus on a decline.
   // `announcementFrame` holds the frame a removal's sentence waits for.
   const [pendingRemoval, setPendingRemoval] = useState<FieldRemoval | undefined>(undefined);
   const removeTriggerRef = useRef<HTMLButtonElement>(null);
@@ -777,7 +777,7 @@ export function DataSourcesTab({
 
   // `pendingRemoval` is the removal `RemoveDataSourceDialog` asks about, while
   // the dialog stays open. `removeTriggerRef` holds that removal's Remove data
-  // source control, where `useConfirmDialog` returns focus on a decline.
+  // source control, where `StudioDialog` returns focus on a decline.
   const [pendingRemoval, setPendingRemoval] = useState<DataSourceRemoval | undefined>(undefined);
   const removeTriggerRef = useRef<HTMLButtonElement>(null);
 

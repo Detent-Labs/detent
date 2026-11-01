@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { Upload } from "lucide-react";
-import { layout, colors, fonts, space, shadow } from "form-ui/tokens.stylex";
+import { layout, colors, fonts, space } from "form-ui/tokens.stylex";
 import {
   listProcesses,
   listDrafts,
@@ -35,58 +35,21 @@ import { areaHref } from "../../../shell/routing.js";
 import { describeCaughtError } from "../errors.js";
 import { t } from "../catalog.js";
 import { is401, useFail } from "../../../shell/useFail.js";
+import {
+  DialogDeveloperView,
+  DialogFact,
+  DialogFacts,
+  DialogMonoFact,
+  DialogNote,
+  DialogRefusal,
+  DialogWarning,
+  PrimaryConfirm,
+  StudioDialog,
+} from "../panels/shared/StudioDialog.js";
 
-/** Every class this file's own markup renders, from `app.css`. `dialog*`
- * duplicates `panels/ProcessHeaderBar.tsx`'s own near-identical shapes on
- * purpose (D9); the source rules survive, dead code, until Group 9's
- * cleanup pass (D11). */
+/** Every class this file's own markup renders. The two dialogs stand on
+ * `panels/shared/StudioDialog.tsx`. */
 const styles = stylex.create({
-  // `::backdrop` itself stays a literal fallback (D12): the real production
-  // build carries no compiled `::backdrop` rule anywhere in its output.
-  // `studio-dialog` composes alongside this style on every `<dialog>`
-  // below, so `app.css`'s literal `.studio-dialog::backdrop` rule keeps
-  // matching.
-  dialog: {
-    maxWidth: "34rem",
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: colors.divider,
-    padding: space.s4,
-    backgroundColor: colors.surface,
-    color: colors.text,
-    overscrollBehavior: "contain",
-    boxShadow: shadow.lg,
-  },
-  dialogFacts: {
-    display: "grid",
-    gridTemplateColumns: "max-content 1fr",
-    gap: `${space.s1} ${space.s3}`,
-    marginBlock: space.s3,
-    marginInline: 0,
-  },
-  dialogFactsDt: {
-    fontFamily: fonts.body,
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    color: colors.textMuted,
-  },
-  dialogFactsDd: {
-    margin: 0,
-    minWidth: 0,
-    overflowWrap: "anywhere",
-  },
-  warning: {
-    color: colors.refusal,
-    borderLeftWidth: 3,
-    borderLeftStyle: "solid",
-    borderLeftColor: colors.advisory,
-    paddingLeft: space.s2,
-  },
-  dialogNote: {
-    color: colors.textMuted,
-    fontSize: "0.9rem",
-  },
   dialogError: {
     color: colors.refusal,
     whiteSpace: "pre-line",
@@ -98,11 +61,10 @@ const styles = stylex.create({
     marginBottom: space.s3,
     alignItems: "center",
   },
-  dialogChoices: {
+  choices: {
     display: "flex",
     flexDirection: "column",
     gap: space.s2,
-    marginBottom: space.s3,
   },
   empty: {
     color: colors.textMuted,
@@ -277,79 +239,47 @@ interface PromotionPreviewDialogProps {
   /** A refused publish, shown inside the dialog — see the failure note below. */
   error: string | undefined;
   busy: boolean;
+  /** The Import control that opened the file chooser, for the focus return. */
+  triggerRef: RefObject<HTMLElement | null>;
   onCancel: () => void;
   onConfirm: () => void;
 }
 
 /**
  * environment-promotion spec: the preview a developer confirms before an import
- * publishes. A native `<dialog>` opened with `showModal()` brings the focus
- * trap, the Escape key and the backdrop with it, so none of that is hand-rolled
- * here. Mounted only while a file is pending, so the open effect runs once.
+ * publishes. Mounted only while a file is pending, so the open effect runs once.
  *
  * Shows the INCOMING version's own metadata only. It never compares against
  * another environment — the target may hold no version of this process at all.
+ * The key, the process id and the source hash wait in the Developer view.
  */
-function PromotionPreviewDialog({ preview, collision, error, busy, onCancel, onConfirm }: PromotionPreviewDialogProps) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => ref.current?.showModal(), []);
-  const dialogProps = stylex.props(styles.dialog);
-
+export function PromotionPreviewDialog({ preview, collision, error, busy, triggerRef, onCancel, onConfirm }: PromotionPreviewDialogProps) {
   return (
-    <dialog
-      ref={ref}
-      className={`studio-dialog ${dialogProps.className}`}
-      style={dialogProps.style}
-      aria-labelledby="promotion-preview-heading"
+    <StudioDialog
+      heading={t("processList.importHeading")}
+      triggerRef={triggerRef}
       onCancel={onCancel}
+      busy={busy}
+      confirm={<PrimaryConfirm onClick={onConfirm}>{busy ? t("draftToolbar.publishing") : t("processList.importConfirm")}</PrimaryConfirm>}
+      // A refused publish leaves the dialog open so the developer can read the
+      // reason beside the file it describes, then cancel or retry. It must
+      // render INSIDE the dialog: `showModal()` puts this element in the top
+      // layer, so anything on the screen behind it is inert and dimmed.
+      refusal={error !== undefined && <DialogRefusal>{error}</DialogRefusal>}
     >
-      <h2 id="promotion-preview-heading">Import a published version</h2>
-      <dl {...stylex.props(styles.dialogFacts)}>
-        <dt {...stylex.props(styles.dialogFactsDt)}>Process</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>{preview.label ?? preview.key ?? preview.processId}</dd>
-        <dt {...stylex.props(styles.dialogFactsDt)}>Key</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>
-          <code>{preview.key === "" ? "—" : preview.key}</code>
-        </dd>
-        <dt {...stylex.props(styles.dialogFactsDt)}>Process id</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>
-          <code>{preview.processId}</code>
-        </dd>
-        <dt {...stylex.props(styles.dialogFactsDt)}>Source version</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>{preview.version === undefined ? "—" : `v${preview.version}`}</dd>
-        <dt {...stylex.props(styles.dialogFactsDt)}>Source hash</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>
-          <code>{preview.definitionHash ?? "—"}</code>
-        </dd>
-      </dl>
-      {collision === undefined ? null : (
-        <p {...stylex.props(styles.warning)}>
-          Another process (<code>{collision}</code>) already publishes under the key <code>{preview.key}</code>. Importing
-          leaves both, and a published process cannot be deleted.
-        </p>
-      )}
-      <p {...stylex.props(styles.dialogNote)}>
-        This environment assigns its own version number. The definition keeps its process id, so a subprocess reference
-        stays valid once its child is promoted too.
-      </p>
-      {/* A refused publish leaves the dialog open so the developer can read the
-          reason beside the file it describes, then cancel or retry. It must
-          render INSIDE the dialog: `showModal()` puts this element in the top
-          layer, so anything on the screen behind it is inert and dimmed. */}
-      {error === undefined ? null : (
-        <p {...stylex.props(styles.dialogError)} role="alert">
-          {error}
-        </p>
-      )}
-      <div {...stylex.props(styles.controls)}>
-        <button type="button" className="btn btn-primary" onClick={onConfirm} disabled={busy}>
-          {busy ? "Publishing…" : "Publish here"}
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={busy}>
-          Cancel
-        </button>
-      </div>
-    </dialog>
+      <DialogFacts>
+        <DialogFact term={t("draftToolbar.dialogProcess")}>{preview.label || t("processList.untitled")}</DialogFact>
+        <DialogMonoFact term={t("processList.importSourceVersion")}>{preview.version === undefined ? "—" : `v${preview.version}`}</DialogMonoFact>
+      </DialogFacts>
+      {collision !== undefined && <DialogWarning>{t("processList.importCollision")}</DialogWarning>}
+      <DialogNote>{t("processList.importNote")}</DialogNote>
+      <DialogDeveloperView>
+        <DialogMonoFact term={t("processList.devKey")}>{preview.key === "" ? "—" : preview.key}</DialogMonoFact>
+        <DialogMonoFact term={t("processList.devProcessId")}>{preview.processId}</DialogMonoFact>
+        <DialogMonoFact term={t("processList.importSourceHash")}>{preview.definitionHash ?? "—"}</DialogMonoFact>
+        {collision !== undefined && <DialogMonoFact term={t("processList.importCollisionId")}>{collision}</DialogMonoFact>}
+      </DialogDeveloperView>
+    </StudioDialog>
   );
 }
 
@@ -358,35 +288,27 @@ const noSeedToRead = (): Promise<never> => Promise.reject(new Error("no seed ver
 
 interface StartPickerDialogProps {
   templates: TemplateSummary[];
+  /** The + New process control, for the focus return on a decline. */
+  triggerRef: RefObject<HTMLElement | null>;
   onCancel: () => void;
   onPick: (templateKey: string | undefined) => void;
 }
 
 /**
- * What `+ New process` opens. The same native `<dialog>` treatment
- * `PromotionPreviewDialog` takes, so the focus trap, Escape and the backdrop
- * come from the platform rather than from hand-rolled code.
+ * What `+ New process` opens. It commits nothing, so the first choice holds
+ * the opening focus and Cancel stands last.
  *
  * The empty choice leads first and stays available when no template exists —
  * an installation starts with none, and the picker must not be a dead end.
  */
-function StartPickerDialog({ templates, onCancel, onPick }: StartPickerDialogProps) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => ref.current?.showModal(), []);
-  const dialogProps = stylex.props(styles.dialog);
+export function StartPickerDialog({ templates, triggerRef, onCancel, onPick }: StartPickerDialogProps) {
+  const emptyChoice = useRef<HTMLButtonElement>(null);
 
   return (
-    <dialog
-      ref={ref}
-      className={`studio-dialog ${dialogProps.className}`}
-      style={dialogProps.style}
-      aria-labelledby="start-picker-heading"
-      onCancel={onCancel}
-    >
-      <h2 id="start-picker-heading">Start a new process</h2>
-      <div {...stylex.props(styles.dialogChoices)}>
-        <button type="button" className="btn btn-primary" onClick={() => onPick(undefined)}>
-          Empty process
+    <StudioDialog heading={t("processList.startHeading")} triggerRef={triggerRef} onCancel={onCancel} initialFocusRef={emptyChoice}>
+      <div {...stylex.props(styles.choices)}>
+        <button ref={emptyChoice} type="button" className="btn btn-primary" onClick={() => onPick(undefined)}>
+          {t("processList.startEmpty")}
         </button>
         {templates.map((template) => (
           <button key={template.templateKey} type="button" className="btn btn-secondary" onClick={() => onPick(template.templateKey)}>
@@ -394,13 +316,8 @@ function StartPickerDialog({ templates, onCancel, onPick }: StartPickerDialogPro
           </button>
         ))}
       </div>
-      {templates.length === 0 && <p {...stylex.props(styles.empty)}>No templates exist yet. A curator creates them on the Templates screen.</p>}
-      <div {...stylex.props(styles.controls)}>
-        <button type="button" className="btn btn-ghost" onClick={onCancel}>
-          Cancel
-        </button>
-      </div>
-    </dialog>
+      {templates.length === 0 && <DialogNote>{t("processList.startNoTemplates")}</DialogNote>}
+    </StudioDialog>
   );
 }
 
@@ -573,6 +490,9 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
   const [importError, setImportError] = useState<string | undefined>(undefined);
   const [importResult, setImportResult] = useState<string | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
+  // The controls that open the two dialogs, for their focus return.
+  const newProcessButton = useRef<HTMLButtonElement>(null);
+  const importButton = useRef<HTMLButtonElement>(null);
   // The start picker's own state. `templates` is undefined until the picker opens,
   // so the list screen issues no template request an author may never need.
   const [picking, setPicking] = useState(false);
@@ -749,14 +669,21 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
 
   return (
     <main {...stylex.props(styles.screen)}>
-      {picking && <StartPickerDialog templates={templates} onCancel={() => setPicking(false)} onPick={(key) => void startProcess(key)} />}
+      {picking && (
+        <StartPickerDialog
+          templates={templates}
+          triggerRef={newProcessButton}
+          onCancel={() => setPicking(false)}
+          onPick={(key) => void startProcess(key)}
+        />
+      )}
       <div {...stylex.props(styles.controls)}>
         {canCreate && (
-          <button type="button" className="btn btn-primary" onClick={() => void newProcess()}>
+          <button ref={newProcessButton} type="button" className="btn btn-primary" onClick={() => void newProcess()}>
             {t("processList.newProcess")}
           </button>
         )}
-        <button type="button" className="btn btn-secondary" onClick={() => fileInput.current?.click()}>
+        <button ref={importButton} type="button" className="btn btn-secondary" onClick={() => fileInput.current?.click()}>
           <Upload size={18} strokeWidth={1.75} aria-hidden="true" />
           {t("processList.import")}
         </button>
@@ -788,6 +715,7 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
           collision={collidingProcessId(pending, rows)}
           error={importError}
           busy={importing}
+          triggerRef={importButton}
           onCancel={cancelImport}
           onConfirm={() => void confirmImport()}
         />

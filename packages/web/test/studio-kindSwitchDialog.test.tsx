@@ -68,6 +68,7 @@ describe("KindSwitchDialog's notes and controls", () => {
     expect(tags.filter((tag) => tag.includes("autofocus"))).toHaveLength(1);
     expect(tags[0]).not.toContain("autofocus");
     expect(tags[1]).toContain("autofocus");
+    expect(tags[1]).toContain('class="btn btn-secondary"');
   });
 
   it("labels the confirming control and keeps it outlined", () => {
@@ -78,8 +79,20 @@ describe("KindSwitchDialog's notes and controls", () => {
 
   it("names the dialog by its heading and describes it by the facts and the note", () => {
     const html = renderDialog("terminal", { paths: 1 });
-    expect(html).toContain('aria-labelledby="kind-switch-confirm-heading"');
-    expect(html).toContain('id="kind-switch-confirm-heading"');
-    expect(html).toContain('aria-describedby="kind-switch-confirm-facts kind-switch-confirm-notes"');
+    const labelled = /aria-labelledby="([^"]+)"/.exec(html)![1];
+    const described = /aria-describedby="([^"]+)"/.exec(html)![1];
+    expect(html).toContain(`<h2 id="${labelled}"`);
+    const body = html.slice(html.indexOf(`id="${described}"`));
+    const inside = body.slice(0, body.indexOf("</div>"));
+    expect(inside).toContain("<dl");
+    expect(inside).toContain("The studio has no undo.");
+  });
+
+  it("prints a count in mono tabular figures", () => {
+    expect(renderDialog("terminal", { paths: 3 })).toMatch(/<dd class="value mono tabular">3<\/dd>/);
+  });
+
+  it("prints no facts list when every count is zero", () => {
+    expect(renderDialog("terminal", { paths: 0, timers: 0 })).not.toContain("<dl");
   });
 });

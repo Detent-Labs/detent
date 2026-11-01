@@ -39,14 +39,13 @@ export const en = {
   // control stays available: the click still opens the confirmation dialog,
   // which states the same warning (`studio-publish`).
   "draftToolbar.publishBlockedReason": "Blocked by an open issue",
-  "draftToolbar.dialogCancel": "Cancel",
   "draftToolbar.dialogProcess": "Process",
   "draftToolbar.dialogProcessId": "Process id",
   "draftToolbar.dialogRevision": "Revision",
   "draftToolbar.dialogKey": "Key",
   "draftToolbar.dialogDeveloperView": "Developer view",
   "draftToolbar.dialogLanguages": "Languages",
-  "draftToolbar.publishDialogHeading": "Publish this draft",
+  "draftToolbar.publishDialogHeading": "Publish this draft?",
   "draftToolbar.publishDialogNextVersion": "Next version",
   "draftToolbar.publishDialogUnsaved": "This draft has unsaved changes. Publishing saves them first.",
   "draftToolbar.publishDialogOpenIssues": "Open issues",
@@ -63,7 +62,7 @@ export const en = {
   "draftToolbar.publishDialogChangesMany": "{count} changes since version {version}.",
   "draftToolbar.publishDialogChangesShow": "Show",
   "draftToolbar.publishDialogChangesHide": "Hide",
-  "draftToolbar.discardDialogHeading": "Discard this draft",
+  "draftToolbar.discardDialogHeading": "Discard this draft?",
   "draftToolbar.discardDialogLastSaved": "Last saved",
   "draftToolbar.discardDialogKeepsPublished": "The published versions stay. Only the unpublished draft goes.",
 
@@ -84,8 +83,6 @@ export const en = {
   // through `.replace()`, as `EntityTabs.tsx` does for the move sentences.
   "fieldCatalog.removeDialogHeadingField": "Remove “{field}”?",
   "fieldCatalog.removeDialogHeadingGroup": "Remove the group “{field}”?",
-  "fieldCatalog.removeDialogFieldTerm": "Field",
-  "fieldCatalog.removeDialogGroupTerm": "Group",
   "fieldCatalog.removeDialogFieldsInsideTerm": "Fields inside it",
   "fieldCatalog.removeDialogStepsTerm": "Steps showing it",
   "fieldCatalog.removeDialogWritersTerm": "Actions and mappings writing it",
@@ -99,7 +96,6 @@ export const en = {
   "fieldCatalog.removeDialogNoteCheckPublish": "Check each one before you publish.",
   "fieldCatalog.removeDialogConfirmField": "Remove field",
   "fieldCatalog.removeDialogConfirmGroup": "Remove group",
-  "fieldCatalog.removeDialogCancel": "Cancel",
   "fieldCatalog.customTypeOption": "custom (plugin)",
   "fieldCatalog.typeDropsFormatConfirm": "The new type doesn't allow this field's format. Switch anyway and drop it?",
   "fieldCatalog.typeDropsControlConfirm": "The new type doesn't allow this field's control. Switch anyway and drop it?",
@@ -210,14 +206,11 @@ export const en = {
   "dataSources.empty": "No data sources yet.",
   "dataSources.addDataSource": "+ Add data source",
   "dataSources.removeDataSource": "Remove data source",
-  "dataSources.removeDialogHeading": "Remove the data source?",
-  "dataSources.removeDialogSourceTerm": "Data source",
+  "dataSources.removeDialogHeading": "Remove “{source}”?",
   "dataSources.removeDialogFieldsTerm": "Fields using it",
   "dataSources.removeDialogColumnMappingsTerm": "Column mappings on them",
   "dataSources.removeDialogNoteClears": "Removing it also clears the data source from those fields.",
   "dataSources.removeDialogNoteClearsMappings": "It also clears the column mappings on them.",
-  "dataSources.removeDialogNoteNoUndo": "The studio has no undo.",
-  "dataSources.removeDialogCancel": "Cancel",
   "dataSources.pickListKey": "Pick a data list",
   "dataSources.dataListLabel": "data list",
   "dataSources.nameCaption": "Name",
@@ -749,14 +742,12 @@ export const en = {
   "stepSummary.attachmentsOff": "Attachments off",
 
   // The Remove this step confirmation (`studio-step-page`: "Removing a step
-  // confirms first"). Cancel reuses `fieldCatalog.removeDialogCancel`.
+  // confirms first").
   "removeStep.heading": "Remove “{step}”?",
-  "removeStep.stepTerm": "Step",
   "removeStep.incomingTerm": "Ways out leading here",
   "removeStep.formFieldsTerm": "Fields on its form",
   "removeStep.firstStepNote": "This is the process's first step. The first remaining step takes its place.",
   "removeStep.incomingNote": "The ways out leading here stay, and the checks report them.",
-  "removeStep.noUndo": "The studio has no undo.",
   "removeStep.confirm": "Remove the step",
 
   // The More section's per-field three-state control
@@ -835,7 +826,6 @@ export const en = {
   "kindSwitch.onCancelTerm": "What happens when cancelled",
   "kindSwitch.cancellableTerm": "Cancellable setting",
   "kindSwitch.outcomeTerm": "How it ended",
-  "kindSwitch.noUndo": "The studio has no undo.",
   "kindSwitch.confirm": "Switch and remove",
 
   // The note under the canvas bar's step-kind menu entries
@@ -1359,6 +1349,19 @@ export const en = {
   "processList.versions": "Versions",
   "processList.discard": "Discard draft",
   "processList.discardConfirm": "Discard the draft of “{name}”? You lose its unpublished edits.",
+
+  // The start picker and the import preview (`screens/ProcessesScreen.tsx`).
+  "processList.startHeading": "Start a new process",
+  "processList.startEmpty": "Empty process",
+  "processList.startNoTemplates": "No templates exist yet. A curator creates them on the Templates screen.",
+  "processList.importHeading": "Publish this version here?",
+  "processList.importSourceVersion": "Source version",
+  "processList.importNote":
+    "This environment assigns its own version number. The definition keeps its process id, so a subprocess reference stays valid once its child is promoted too.",
+  "processList.importCollision": "Another process already uses this internal name. Importing leaves both, and nobody can delete a published process.",
+  "processList.importCollisionId": "Other process with this key",
+  "processList.importSourceHash": "Source hash",
+  "processList.importConfirm": "Publish here",
   "processList.loading": "Loading…",
   "processList.empty": "No processes yet.",
 

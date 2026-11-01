@@ -50,12 +50,17 @@ describe("The publish dialog's change list", () => {
     expect(mount).not.toContain("heading=");
   });
 
-  it("scrolls the list inside its own box, capped at 40vh", () => {
-    const box = source.match(/listBox:\s*\{([^}]*)\}/)?.[1] ?? "";
+  // The dialog is the one scroll box and its footer is sticky, so a nested
+  // scroll box would trap the wheel inside the list.
+  it("keeps no scroll box of its own around the list", () => {
+    expect(source).not.toContain("listBox");
+    expect(source).not.toContain("maxHeight");
+    expect(source).not.toContain("overflowY");
+    expect(source).toMatch(/<\/summary>[\s\S]*<ChangeList rows=\{rows\} \/>\s*<\/details>/);
+  });
 
-    expect(box).toContain('maxHeight: "40vh"');
-    expect(box).toContain('overflowY: "auto"');
-    expect(box).toContain('overscrollBehavior: "contain"');
-    expect(source).toMatch(/<div \{\.\.\.stylex\.props\(styles\.listBox\)\}>\s*<ChangeList\b/);
+  it("prints the Changes sentence as a DialogFact row", () => {
+    expect(source).toMatch(/<DialogFact term=\{t\("draftToolbar\.publishDialogChanges"\)\}>/);
+    expect(source).not.toContain("<dt");
   });
 });

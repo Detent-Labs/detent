@@ -400,6 +400,16 @@ export function DialogWarning({ children }: { children: ReactNode }) {
   return <p {...stylex.props(styles.warning)}>{children}</p>;
 }
 
+/** The server's text for a refused request, in a closed Developer view. */
+export function RefusalDetail({ detail }: { detail: string }) {
+  return (
+    <details {...stylex.props(styles.developer)}>
+      <summary {...stylex.props(styles.developerSummary)}>{t("draftToolbar.dialogDeveloperView")}</summary>
+      <p {...stylex.props(styles.refusalDetail)}>{detail}</p>
+    </details>
+  );
+}
+
 /** The refusal's alert. A closed Developer view holds the server's text, where there is one. */
 export function DialogRefusal({ detail, children }: { detail?: string | null; children: ReactNode }) {
   return (
@@ -407,12 +417,7 @@ export function DialogRefusal({ detail, children }: { detail?: string | null; ch
       <p {...stylex.props(styles.refusal)} role="alert">
         {children}
       </p>
-      {detail != null && (
-        <details {...stylex.props(styles.developer)}>
-          <summary {...stylex.props(styles.developerSummary)}>{t("draftToolbar.dialogDeveloperView")}</summary>
-          <p {...stylex.props(styles.refusalDetail)}>{detail}</p>
-        </details>
-      )}
+      {detail != null && <RefusalDetail detail={detail} />}
     </>
   );
 }

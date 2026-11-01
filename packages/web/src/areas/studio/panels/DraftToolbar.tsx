@@ -62,6 +62,8 @@ export type PendingDialog = "publish" | "discard" | null;
 export interface DraftToolbarActions {
   saving: boolean;
   publishing: boolean;
+  /** True while the discard request runs. The discard dialog disables its controls. */
+  discarding: boolean;
   error: string | null;
   /** The server's own text for a refused publish, for a closed Developer view
    * beside `error`. It clears wherever `error` clears. */
@@ -117,6 +119,7 @@ export function useDraftToolbarActions({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const [pendingDialog, setPendingDialog] = useState<PendingDialog>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const clearError = () => {
@@ -237,9 +240,14 @@ export function useDraftToolbarActions({
   /** The act the discard dialog confirms. */
   const runDiscard = () =>
     withUnauthorized(async () => {
-      await deleteDraft(processId, token);
-      setPendingDialog(null);
-      onDiscarded();
+      setDiscarding(true);
+      try {
+        await deleteDraft(processId, token);
+        setPendingDialog(null);
+        onDiscarded();
+      } finally {
+        setDiscarding(false);
+      }
     });
 
   /**
@@ -261,6 +269,7 @@ export function useDraftToolbarActions({
   return {
     saving,
     publishing,
+    discarding,
     error,
     errorDetail,
     pendingDialog,

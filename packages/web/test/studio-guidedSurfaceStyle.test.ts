@@ -607,7 +607,7 @@ describe("the advisory tone reads its own role", () => {
     ["src/areas/studio/panels/shared/InstanceQueryForm.tsx", "studioWarning", "borderLeftColor"],
     ["src/areas/studio/screens/FormEditorScreen.tsx", "studioWarning", "borderLeftColor"],
     ["src/areas/studio/screens/MigrationPlanScreen.tsx", "studioWarning", "borderLeftColor"],
-    ["src/areas/studio/screens/ProcessesScreen.tsx", "warning", "borderLeftColor"],
+    ["src/areas/studio/panels/shared/StudioDialog.tsx", "warning", "borderLeftColor"],
   ] as const;
 
   for (const [file, name, property] of READERS) {

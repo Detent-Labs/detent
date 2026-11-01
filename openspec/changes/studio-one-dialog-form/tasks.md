@@ -17,15 +17,15 @@
 
 ## 2. The dialogs that exist (studio-app, studio-publish, environment-promotion)
 
-- [ ] 2.1 Rebuild `RemoveStepDialog.tsx`, `KindSwitchDialog.tsx` and `RemoveDataSourceDialog.tsx` on the frame. Drop the Step row, and move the source's name into the heading per D8. Extend their tests. Remove the catalog keys this retires, per D7 and D8.
-- [ ] 2.2 Add `panels/DiscardDraftDialog.tsx`. Move the publish dialog onto the frame in `ProcessHeaderBar.tsx`, with its heading from D7. Drop the discard revision and its catalog use. Remove the catalog keys this retires.
-- [ ] 2.2a Move `RefusalDetail` so the frame and the header bar's banner share it. Give `PublishChanges.tsx` the `DialogFact` row, and remove its `listBox` height and scroll.
-- [ ] 2.2b Make `runMenuAction` focus the `⋮` trigger first, per D4. Extend `studio-processHeaderBar-publishGate.test.tsx`, `studio-processSurface.test.ts` and `studio-publishChanges.test.ts`.
-- [ ] 2.2c In the publish-gate test's Languages case, point `plainRow` at the `>Process</dt>` row, which stays a written-face `DialogFact`.
-- [ ] 2.3 Add a `discarding` flag to `useDraftToolbarActions` so the discard dialog disables its controls during the request. Read it in the header bar's `busy`. Add it to the `noActions` fixture in the publish-gate test.
-- [ ] 2.4 Move `StartPickerDialog` and `PromotionPreviewDialog` onto the frame in `ProcessesScreen.tsx`, with ref openers for + New process and Import. Move their literals into the catalog. Move the key, the id and the hash into the Developer view per D7. The import's Process fact falls back per D7, and its refusal keeps `pre-line`. Add a static test for both.
-- [ ] 2.5 Rebuild `RemoveFieldDialog.tsx` on the frame with an optional `names` prop per D8, without the key. Its full names rows arrive in group 3. Update `studio-removeFieldDialog.test.tsx` for the frame.
-- [ ] 2.6 Delete `panels/shared/confirmDialog.tsx`, now that its last consumer moved. Replace its `FILES` entry in `studio-no-confirm.test.ts` with `panels/shared/StudioDialog.tsx`.
+- [x] 2.1 Rebuild `RemoveStepDialog.tsx`, `KindSwitchDialog.tsx` and `RemoveDataSourceDialog.tsx` on the frame. Drop the Step row, and move the source's name into the heading per D8. Extend their tests. Remove the catalog keys this retires, per D7 and D8.
+- [x] 2.2 Add `panels/DiscardDraftDialog.tsx`. Move the publish dialog onto the frame in `ProcessHeaderBar.tsx`, with its heading from D7. Drop the discard revision and its catalog use. Remove the catalog keys this retires.
+- [x] 2.2a Move `RefusalDetail` so the frame and the header bar's banner share it. Give `PublishChanges.tsx` the `DialogFact` row, and remove its `listBox` height and scroll.
+- [x] 2.2b Make `runMenuAction` focus the `⋮` trigger first, per D4. Extend `studio-processHeaderBar-publishGate.test.tsx`, `studio-processSurface.test.ts` and `studio-publishChanges.test.ts`.
+- [x] 2.2c In the publish-gate test's Languages case, point `plainRow` at the `>Process</dt>` row, which stays a written-face `DialogFact`.
+- [x] 2.3 Add a `discarding` flag to `useDraftToolbarActions` so the discard dialog disables its controls during the request. Read it in the header bar's `busy`. Add it to the `noActions` fixture in the publish-gate test.
+- [x] 2.4 Move `StartPickerDialog` and `PromotionPreviewDialog` onto the frame in `ProcessesScreen.tsx`, with ref openers for + New process and Import. Move their literals into the catalog. Move the key, the id and the hash into the Developer view per D7. The import's Process fact falls back per D7, and its refusal keeps `pre-line`. Add a static test for both.
+- [x] 2.5 Rebuild `RemoveFieldDialog.tsx` on the frame with an optional `names` prop per D8, without the key. Its full names rows arrive in group 3. Update `studio-removeFieldDialog.test.tsx` for the frame.
+- [x] 2.6 Delete `panels/shared/confirmDialog.tsx`, now that its last consumer moved. Replace its `FILES` entry in `studio-no-confirm.test.ts` with `panels/shared/StudioDialog.tsx`.
 - [ ] 2.7 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
 
 ## 3. Remove field names its reach (studio-app)

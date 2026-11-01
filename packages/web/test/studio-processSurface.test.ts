@@ -117,9 +117,28 @@ describe("what the surface no longer carries", () => {
 
   it("returns the discard dialog's focus to the menu trigger", () => {
     const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
-    const dialog = code.slice(code.indexOf("<DiscardConfirmDialog"));
+    const dialog = code.slice(code.indexOf("<DiscardDraftDialog"));
 
     expect(dialog).toContain("triggerRef={triggerRef}");
+  });
+
+  // The menu is a conditional render: its entry unmounts in the commit that
+  // closes it, so the dialog's focus return needs the trigger to hold the
+  // focus before the entry goes.
+  it("focuses the ⋮ trigger before a menu action closes the menu", () => {
+    const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
+    const run = code.slice(code.indexOf("const runMenuAction"), code.indexOf("const dialogOpen"));
+
+    expect(run).toContain("triggerRef.current?.focus()");
+    expect(run.indexOf("triggerRef.current?.focus()")).toBeLessThan(run.indexOf("setMenuOpen(false)"));
+    expect(run.indexOf("setMenuOpen(false)")).toBeLessThan(run.indexOf("action()"));
+  });
+
+  it("reads the discard request's pending flag into the discard dialog's busy", () => {
+    const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
+    const dialog = code.slice(code.indexOf("<DiscardDraftDialog"));
+
+    expect(dialog).toContain("busy={actions.discarding}");
   });
 
   // `studio-draftToolbarState.test.ts` tests the rule. This pins its wiring: the
