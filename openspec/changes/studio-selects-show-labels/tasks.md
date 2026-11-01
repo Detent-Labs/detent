@@ -44,20 +44,32 @@
 ## 4. Docs and records
 
 - [x] 4.1 In `docs/authoring-guide.md`, beside "The key follows the label.", say how umlauts read in a derived key.
-- [x] 4.2 Add a `docs/browser-checks.md` entry for this change holding the walk of task 5.6.
+- [x] 4.2 Add a `docs/browser-checks.md` entry for this change holding the walk of task 6.6.
 - [x] 4.3 In `docs/decisions.md`, record the open points of design.md's Non-goals under this change's heading.
 - [x] 4.4 Run `antislop check` on every Markdown file this group touched. Add no finding.
 
-## 5. Verification
+## 5. Fix wave from the final review and the audit
 
-- [ ] 5.1 Run `bun run typecheck` and report its last lines.
-- [ ] 5.2 Run `bun run build` and report its last lines.
-- [ ] 5.3 Run `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test` and report pass, skip and fail.
-- [ ] 5.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and report its exit code.
-- [ ] 5.5 On the host, run the same pipe with `whitespace.sh` and report its exit code.
-- [ ] 5.6 Browser check on the production build: the six selects, a heading, a new step "Prüfung" and its key.
-- [ ] 5.7 Run `/impeccable critique` and `/impeccable audit` on the Steps tab, plus `impeccable detect --json`.
-- [ ] 5.8 Fix every P0 and P1 the audit reports, then rerun 5.1 to 5.3.
+- [ ] 5.1 Add `stepTextMap` and the two catalog keys to `optionText.ts`, per design D7, with tests.
+- [ ] 5.2 Make `PathsPanel.tsx` and `TimersPanel.tsx` read `stepTextMap`, and drop both map builders.
+- [ ] 5.3 Make `wayOutHeading` print the label alone when it already ends with the target, per D8, with a test.
+- [ ] 5.4 Move the studio select into `panels/shared/StudioSelect.tsx`, and render it in both panels, per D9.
+- [ ] 5.5 Give each field-map row's select, value input and delete control a name, per D10, with a test.
+- [ ] 5.6 Rewrite the "Review (2)" step expectations in the panel tests to the rail-number form.
+- [ ] 5.7 In `docs/decisions.md`, add the final review's and the audit's open points to this change's section.
+- [ ] 5.8 In `docs/browser-checks.md`, change this change's walk to the rail-number form and the named rows.
+- [ ] 5.9 Run typecheck, then the full suite, both in the foreground. Name any failing test.
+
+## 6. Verification
+
+- [ ] 6.1 Run `bun run typecheck` and report its last lines.
+- [ ] 6.2 Run `bun run build` and report its last lines.
+- [ ] 6.3 Run `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test` and report pass, skip and fail.
+- [ ] 6.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and report its exit code.
+- [ ] 6.5 On the host, run the same pipe with `whitespace.sh` and report its exit code.
+- [ ] 6.6 Browser check on the production build: the six selects, a heading, a new step "Prüfung" and its key.
+- [ ] 6.7 Run `/impeccable critique` and `/impeccable audit` on the Steps tab, plus `impeccable detect --json`.
+- [ ] 6.8 Fix every P0 and P1 the audit reports, then rerun 6.1 to 6.3.
 
 ## Workflow follow-up
 

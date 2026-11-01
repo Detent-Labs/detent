@@ -115,10 +115,9 @@ two keys drift.
 
 ### D2. The step selects
 
-Both step selects in `PathsPanel.tsx` list `numberRepeats(steps, stepText)`
-in draft order. The panel zips that list into a map from step id to text.
-The way-out heading calls `wayOutHeading` with the same map. "Review (2)" in a heading names the same step as "Review (2)" in the
-select beside it.
+Both step selects in `PathsPanel.tsx` list the step texts of D7 in draft
+order. The way-out heading calls `wayOutHeading` with the same map. A
+heading then names a step exactly as the select beside it does.
 
 ### D3. The time-limit select
 
@@ -177,11 +176,52 @@ placeholder. The key fallback goes. The path's derived key follows: an
 unnamed side contributes the placeholder's slug, as a punctuation-only
 label already does.
 
+### D7. A repeated step carries its rail number
+
+The audit found a misreading. "Review (2)" reads as step 2, while the rail
+numbers the second "Review" as 6. So a repeated step label takes its rail
+number, its 1-based draft index.
+
+`optionText.ts` gains `stepTextMap(steps, contentLocale, baseLocale)`, a map
+from step id to text. A label that one step alone carries stays plain. Steps sharing a label read
+`options.repeatedStep`, "{label} (step {n})". Unnamed steps sharing the
+placeholder read `steps.unnamedStepNumbered`, "(unnamed step {n})". A single
+unnamed step keeps "(unnamed step)".
+
+`PathsPanel.tsx` and `TimersPanel.tsx` both call `stepTextMap`, so the two
+copies of the map builder go. Ways out, fields and operands keep
+`numberRepeats` and its "{label} ({n})": no numbered list stands beside
+them.
+
+### D8. A heading names its target once
+
+A path the canvas creates carries the default label "Source → Target". The
+heading template "{path} → {step}" then repeats the target. The result
+reads "Prüfung → Capture → Capture".
+`wayOutHeading` prints the label alone when it already ends with " → "
+plus the target's text. The default label stays as `studio-canvas` states
+it, since a participant's button reads it.
+
+### D9. The time-limit select takes the studio select
+
+The time limit's select now prints a full heading and grew wide. The studio
+select of `PathsPanel.tsx` (`selectWrap`, `select`, `selectIcon`) moves to a
+shared component, `panels/shared/StudioSelect.tsx`. Both panels show it,
+so the time limit's select spans its column with the slate chevron.
+
+### D10. Field-map rows carry accessible names
+
+The audit found the field-map row controls unnamed (WCAG 4.1.2). The row
+select reads `mapping.targetLabel`, "Field". The value input reads
+`mapping.valueLabel`, "Value for {field}". The remove control reads
+`mapping.removeLabel`, "Remove: {field}", which starts with the visible
+text the change `studio-form-editor-names-fields` chose for its controls.
+Each `{field}` is the row's target text.
+
 ## Risks / Trade-offs
 
-- Two steps named alike read "Review" and "Review (2)". The count follows
-  draft order, so a reorder can swap which one carries it. The steps rail
-  numbers both steps by the same order. Acceptable.
+- A reorder changes a repeated step's rail number, and the select follows.
+  The rail moves with it, so the two never disagree.
 - A transliterated key can collide where the old one did not. "Müller" and
   "Mueller" both derive `mueller`. The existing dedupe adds `_2`.
 - Some tests pin old keys. A test that expects `pr_fung` or a key in an

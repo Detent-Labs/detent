@@ -47,10 +47,9 @@ Three selects on the step page list steps or ways out. They are "Leads to",
 SHALL print a key or an id.
 
 A step SHALL read its label at the content locale, else at the base locale,
-else "(unnamed step)". A way out SHALL read its row heading. A repeated text
-SHALL add a count in draft order, as in "Review (2)". A way-out heading SHALL
-name its target by that counted text. Each option SHALL store the entity's
-`id`.
+else "(unnamed step)". A way out SHALL read its row heading. Ways out that
+share a heading SHALL add a count in list order, as in "Approve → Book (2)".
+Each option SHALL store the entity's `id`.
 
 #### Scenario: "Leads to" lists step labels
 
@@ -71,13 +70,6 @@ name its target by that counted text. Each option SHALL store the entity's
 - **WHEN** a draft holds a step with an empty label and the key `review`
 - **THEN** both step selects offer that step as "(unnamed step)"
 
-#### Scenario: Two steps sharing a label stay apart
-
-- **WHEN** a draft holds two steps both labelled "Review"
-- **THEN** both step selects offer "Review" and "Review (2)", in draft order
-- **AND** a way out leading to the second step heads its row with
-  "Review (2)"
-
 #### Scenario: The time limit lists ways out by their heading
 
 - **WHEN** a step carries a way out labelled "Freigeben" leading to
@@ -87,14 +79,15 @@ name its target by that counted text. Each option SHALL store the entity's
 
 ### Requirement: Every field-map select on the step page lists labels
 
-Three field-map selects on the step page list fields: two output mappings
-and a called process's input mapping. No option SHALL print a key.
+Three field-map selects on the step page list fields. No option SHALL print
+a key.
 
-A field SHALL read its label at the content locale, else "(unnamed field)". A called
-process's field SHALL read its label in that process's base locale. No group
-SHALL appear. A repeated text SHALL add a count in list order. Each option
-SHALL store the field's `id`. A stored id
-that no list holds SHALL print with the "(not in the list)" mark.
+A field SHALL read its label at the content locale, else at the base locale,
+else "(unnamed field)". A called process's field SHALL read its label in that
+process's base locale. No group SHALL appear. A repeated text SHALL add a
+count in list order. Each option SHALL store the field's `id`.
+
+A stored id that no list holds SHALL print with the "(not in the list)" mark.
 
 #### Scenario: An action's output mapping lists field labels
 
@@ -121,11 +114,57 @@ that no list holds SHALL print with the "(not in the list)" mark.
   and a field labelled "Amount"
 - **THEN** the input-mapping select offers "Amount" and not the group
 
+### Requirement: A repeated step label carries its steps-rail number
+
+Steps that share a label SHALL each add their steps-rail number, as in
+"Review (step 6)". This holds in every step select and way-out heading. Unnamed steps that
+share the placeholder SHALL each read "(unnamed step 8)" with that number. A
+step whose label no other step shares SHALL read its label alone.
+
+#### Scenario: Two steps sharing a label carry their rail numbers
+
+- **WHEN** a draft holds two steps labelled "Review", at rail rows 2 and 6
+- **THEN** both step selects offer "Review (step 2)" and "Review (step 6)"
+- **AND** a way out leading to the second one heads its row with
+  "Review (step 6)"
+
+#### Scenario: Two unnamed steps carry their rail numbers
+
+- **WHEN** a draft holds two steps with empty labels, at rail rows 7 and 8
+- **THEN** both step selects offer "(unnamed step 7)" and "(unnamed step 8)"
+
+### Requirement: A way-out heading names its target once
+
+A way-out heading SHALL name its target by the step select's text. A
+way-out label can already end with an arrow and that text. The heading SHALL
+then print the label alone. The time limit's select SHALL take the studio
+select's form and span its column.
+
+#### Scenario: A default way-out label does not repeat its target
+
+- **WHEN** a way out labelled "Prüfung → Capture" leads to the step "Capture"
+- **THEN** its row heading reads "Prüfung → Capture"
+- **AND** the time limit's select offers "Prüfung → Capture"
+
+### Requirement: A field-map row's controls carry accessible names
+
+Each field-map row's select, value input and remove control SHALL carry an
+accessible name. The remove control's name SHALL name the row's field.
+
+#### Scenario: A mapping row's controls have names
+
+- **WHEN** an action maps its result into the field labelled "Credit score"
+- **THEN** the row's select, its value input and its remove control each
+  carry an accessible name
+- **AND** the remove control's name contains "Credit score"
+
 ### Requirement: The operand picker and the selects share one count rule
 
-The condition builder's operand picker and every select this capability
-lists SHALL number a repeated text by one rule. The second and later item
-sharing a text SHALL read "{label} ({n})", in list order.
+The condition builder's operand picker, the way-out select and the field-map
+selects SHALL number a repeated text by one rule. The second and later item
+sharing a text SHALL read "{label} ({n})", in list order. The step selects
+name a repeat by its steps-rail number in its place, since the rail already
+numbers each step.
 
 #### Scenario: The picker and a select number a repeat alike
 
