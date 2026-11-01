@@ -1130,8 +1130,9 @@ Press a kind, or drag it. The new field lands on the canvas. A kind that
 offers choices starts with two, named Choice 1 and Choice 2.
 
 A new card takes its name on the card, in an input that has the focus. The
-first keystroke is the field's label, and the key follows the label. Press
-Enter to accept the name, and the focus moves to the card. A Group kind takes
+input holds the kind's name, selected, so the first keystroke replaces it. The
+key follows the label. Press Enter to accept the name, and the focus moves to
+the card. A Group kind takes
 its name on its legend. To rename a field later, use the strip's **Name**
 control or the Fields tab.
 

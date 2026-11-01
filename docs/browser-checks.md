@@ -4370,16 +4370,16 @@ choose "Create draft". Open its Forms tab, at
 9. Read the bounding box of one card's open control. Pass: its height reads
    24px or more.
 10. On the "Prepare the Offboarding" card, choose the open control. In the
-    form editor, choose the "Forward to this address" entry, whose card prints
-    `forwarding_address`. In the "Selected field" strip that card opens, under
+    form editor, choose the card that reads "Forward to this address". In
+    the "Selected field" strip that card opens, under
     required, open the Developer view. Pick CEL in its select. The CEL input
     stands directly under the builder, with no second disclosure. Type
     `data.email_forwarding == true` there.
 
-    Choose the `forwarding_address` card again, so the strip closes and opens
-    fresh for the next entry. Author the same condition on "M365 backup by Fabrikam
-    as standard", whose card prints `m365_backup_confirmed`. That entry is a
-    boolean, so its mark draws 8px. Choose the breadcrumb's first crumb, Forms,
+    Choose the "Forward to this address" card again, so the strip closes and
+    opens fresh for the next entry. Author the same condition on the card that
+    reads "M365 backup by Fabrikam as standard". That entry is a boolean, so
+    its mark draws 8px. Choose the breadcrumb's first crumb, Forms,
     without pressing Save. Pass: that card draws two dashed marks in both color
     schemes, and its foot still reads "16 fields".
 11. Turn forced colors on through a `run-code` call to
@@ -6623,13 +6623,18 @@ with Steps current. Pass: the breadcrumb reads Steps, Confirm the Deactivation
 Date, then Form. Pass: the heading reads "The form for Confirm the
 Deactivation Date" in the body face.
 
+Pass: the focus stands on that heading. Reload the page
+on the editor's address. Pass: the focus stands on the heading again.
+
 Read every card. Pass: no card prints a key, "string", "boolean" or "CEL".
 Each card reads its label, with its kind word beneath in capitals.
 
 **3. Mint a Number by click.** Under "Add a field to the process", press
-"Number". Pass: a new last card holds an input reading "Name this field…", and
-the focus stands in it. Type "Amount". Pass: the card reads "Amount", with
-NUMBER beneath.
+"Number". Pass: a new last card holds an input reading "Number", and the focus
+stands in it. Pass: the input's whole text stands selected.
+
+Type "Amount". Pass: the first keystroke replaces the name. Pass: the card
+reads "Amount", with NUMBER beneath.
 
 Press Enter. Pass: the input gives way to the card, and the focus stands on
 the card's own body button. Choose the Fields tab and open the Catalog view.
@@ -6642,28 +6647,33 @@ Then open the Fields tab and choose "Pick". Read its options. Pass: two
 options read "Choice 1" and "Choice 2".
 
 **5. A Group takes its name on its legend.** Back in the editor, press
-"Group". Pass: a group box draws, and its legend holds the same "Name this
-field…" input with the focus. Type "Bank details" and press Enter. Pass: the
-legend reads "Bank details", and the box keeps its Remove control.
+"Group". Pass: a group box draws, and its legend holds the same input with the
+focus. Pass: it reads "Group", selected. Type "Bank details" and press Enter.
+Pass: the legend reads "Bank details", and the box keeps its Remove control.
 
-**6. The breadcrumb's three crumbs.** Press Tab from the heading's start
-until the breadcrumb takes the focus. Pass: two buttons take a stop, "Steps"
-then "Confirm the Deactivation Date". Pass: the third crumb, "Form", takes
-none, and the accessibility tree marks it as the current page. Pass: the
-landmark's accessible name reads "Breadcrumb".
+**6. The breadcrumb's three crumbs.** The breadcrumb stands above the
+heading. Focus the heading and press Shift+Tab until the breadcrumb takes the
+focus. Pass: two buttons take a stop, "Confirm the Deactivation Date" then
+"Steps". Pass: the third crumb, "Form", takes none, and the accessibility tree
+marks it as the current page. Pass: the landmark's accessible name reads
+"Breadcrumb".
 
 Press "Steps". Pass: the Steps tab shows the step page of "Confirm the
-Deactivation Date", with that step selected. Press "Open the form" again, then
-the crumb "Confirm the Deactivation Date". Pass: the same step page opens
-under Steps. Pass: the page keeps any text you typed on it before.
+Deactivation Date", with that step selected. Pass: the focus stands on the
+tab button "Steps". Press "Open the form" again, then the crumb "Confirm the
+Deactivation Date". Pass: the same step page opens under Steps.
+
+Pass: the focus stands on the tab button "Steps" again. Pass: the page keeps
+any text you typed on it before.
 
 **7. The tab row from a Forms card.** Open the Forms tab. On the card headed
 "Submit the Exit Notification", choose "Open the form". Pass: Forms stands
 current in the tab row. Pass: the breadcrumb's first crumb reads "Forms".
 
-Press that crumb. Pass: the Forms tab opens. Open the same card once more.
-Then press the tab "Steps". Pass: the editor leaves, and Steps opens on the step
-that card names.
+Press that crumb. Pass: the Forms tab opens, and the focus stands on its tab
+button. Open the same card once more. Then press the tab "Steps". Pass: the
+editor leaves, and Steps opens on the step that card names. Pass: the focus
+stands on the tab button "Steps".
 
 **8. Put this field on a step.** Open the Fields tab and its Catalog view.
 Press "+ Add field". Name the new field "Spare" and select it. Pass: the "Used in"
@@ -6678,7 +6688,11 @@ first section lists "Spare".
 "Bank account". Press Enter. Resize the window to 1100x800. Pass: the card
 reads "Bank account" on one line. Pass: no word breaks mid-word.
 
-**10. A new card's input on a two-column form.** At 1440px, set the Columns
+**10. A kept name.** Press "Date", then press Enter at once. Pass: the card
+reads "Date", with DATE beneath. Pass: no banner reads "Draft is not yet
+structurally valid".
+
+**11. A new card's input on a two-column form.** At 1440px, set the Columns
 control to Two. Press "Text". Read the new card's input width in devtools
 before you type. Pass: the input stands wide enough to show a twelve-letter
 word whole, with no horizontal scroll inside it.
@@ -6687,7 +6701,7 @@ Pass: the card's move and Remove controls wrap onto a second row under the
 input. Type "Bank account number" and press Enter. Pass: the label stays whole
 on the card.
 
-**11. The palette at 1280px.** Resize the window to 1280x800 and scroll the
+**12. The palette at 1280px.** Resize the window to 1280x800 and scroll the
 palette. Pass: all sixteen kind rows read in full, each as an icon and a name.
 Pass: the palette's box overlaps neither the canvas nor the preview.
 

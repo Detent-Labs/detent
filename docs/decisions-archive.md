@@ -934,5 +934,13 @@ system that resulted; this file explains why it took that shape.
   Risk (Low): an author reads a long key broken mid-word from 1281px to
   about 1390px.
 
-  Resolved by `studio-form-editor-names-fields`: cards print labels, so the
-  editor prints no key and the long-key wrap is gone.
+  Resolved by `studio-form-editor-names-fields`: cards print labels, and
+  cards print no key, so the long-key wrap is gone.
+- **NAMES-3: the focus falls to the page body at two moments.** It does so
+  when the editor opens, and again when the breadcrumb leaves it. The old
+  full-screen swap did the same, so this is no regression. A later pass can
+  move the focus to the editor's heading on open, and to the tab or step page
+  on leave.
+
+  Resolved by `studio-form-editor-names-fields`: the editor's heading takes
+  the focus on open, and the destination tab's button takes it on leave.

@@ -1876,7 +1876,7 @@ last six. The SENTENCE tag is local to this section.
 ## Open from studio-form-editor-names-fields (needs its own OpenSpec change)
 
 The change named fields on the form editor's cards and stood the editor under
-the tab row. It left three points to later changes. The NAMES tag is local to
+the tab row. It left two points to later changes. The NAMES tag is local to
 this section.
 
 - **NAMES-1: the Forms tab's legend says "Section" and the palette says
@@ -1888,11 +1888,6 @@ this section.
   with an empty label keeps its name input and offers no strip. The input says
   what to do, and the Fields tab still edits the field. Change 11's field card
   may answer whether such a card can take a selection.
-- **NAMES-3: the focus falls to the page body at two moments.** It does so
-  when the editor opens, and again when the breadcrumb leaves it. The old
-  full-screen swap did the same, so this is no regression. A later pass can
-  move the focus to the editor's heading on open, and to the tab or step page
-  on leave.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
