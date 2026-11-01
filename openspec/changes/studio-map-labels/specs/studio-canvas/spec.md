@@ -100,9 +100,6 @@ The handle's pointer target SHALL measure at least 24px across at a canvas
 scale of 1. Its drawn dot stays the size it is. Its cursor SHALL read as a
 crosshair, and as not-allowed on an end step.
 
-The handle SHALL draw above every way-out sentence, so a sentence never
-takes its press.
-
 #### Scenario: Hovering the handle names the gesture
 
 - **WHEN** the author rests the pointer on a task step's connect handle
@@ -120,6 +117,18 @@ takes its press.
 - **WHEN** the author presses 10px right of the handle's centre, at a canvas
   scale of 1
 - **THEN** the press starts a connect drag
+
+### Requirement: The connect handle draws above the way-out sentences
+
+The connect handle SHALL draw above every way-out sentence, so a sentence
+never takes its press.
+
+#### Scenario: A sentence beside a handle leaves the drag alone
+
+- **WHEN** a sentence in a 60-unit column gap reaches the source step's
+  connect handle
+- **AND** the author presses the handle and drags to another step
+- **THEN** the drag adds a way out, as it does from a clear handle
 
 ### Requirement: A double-click opens the step on the Steps tab
 
