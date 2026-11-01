@@ -15,9 +15,6 @@ state. The Test control, the Publish control and the `⋮` menu trail them. The
 back control reads "← Processes". Its accessible name SHALL read "Back to
 processes".
 
-`useDraftToolbarActions` computes when each command is available and what it
-does. The bar keeps no copy of that logic.
-
 #### Scenario: A clean draft's bar holds six things
 
 - **WHEN** an author opens a saved draft of a published process
@@ -32,24 +29,37 @@ does. The bar keeps no copy of that logic.
 
 ### Requirement: The header bar's process name fits its text
 
-The process name SHALL size to its own text, up to a cap. The name's missing
-translation warning and its issue sentence stay beside it.
+The process name SHALL size to its own text, up to a cap. Its issue sentence stays
+beside it. Its missing translation warning SHALL stand below the bar, so the bar
+keeps one row. While the name has no entry in the edited language, its placeholder
+SHALL read the base-language name. The name input SHALL carry an accessible name.
 
 #### Scenario: A long name keeps the commands on the row
 
 - **WHEN** an author types a 60-character name at 1440 wide
 - **THEN** Test, Publish and the `⋮` trigger keep their line
 
+### Requirement: The header bar keeps no command logic
+
+`useDraftToolbarActions` SHALL compute when each command is available and what it
+does. The bar SHALL keep no copy of that logic.
+
+#### Scenario: The bar calls the one hook
+
+- **WHEN** an author presses Save or Publish
+- **THEN** the call runs the logic `useDraftToolbarActions` holds
+
 ### Requirement: The header bar prints no machine value
 
 The bar SHALL print no key, no process id, no revision and no hash. It SHALL
-print a locale only in the "Editing" note `studio-app` states and in the name's
-missing translation warning.
+print a locale only in the "Editing" note `studio-app` states.
 
-#### Scenario: A note and a warning are the two locale sites
+#### Scenario: The note is the one locale site
 
-- **WHEN** an author edits a translated draft with a complete name
+- **WHEN** an author edits a draft in another language
 - **THEN** the "Editing" note is the one place the bar names a language
+- **AND** the name's missing translation warning stands below the bar
+- **AND** the name's placeholder reads the base-language name
 
 ### Requirement: The header bar's state says what holds for the draft
 

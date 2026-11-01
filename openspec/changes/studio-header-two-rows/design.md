@@ -209,6 +209,20 @@ leading group wraps inside itself, so a new control there moves no trailing cont
 The name input takes `fieldSizing: "content"` with a `min(40ch, 100%)` cap. A short
 name leaves no gap, and a long one keeps the commands on the row.
 
+### D11. What the critique changed
+
+The first critique scored the bar 21/40. Four of its points belong here. The
+rest stay with the changes that own them, and `docs/decisions.md` records them.
+
+- The name's missing translation warning moves below the bar. It stands only
+  while an author translates, and in the row it grew the bar to three lines.
+- While the name has no entry in the edited language, its placeholder reads the
+  base-language name, in place of "(untitled process)".
+- The name input takes an accessible name, "Process name".
+- The Process view's language controls take the author's words. The select's
+  options and the dialog's Languages fact read "German (de)". The add control gets
+  a visible label. Its refusal becomes a sentence with an alert role.
+
 ## Risks / Trade-offs
 
 - Save appears on the first keystroke. The `leading` group wraps inside itself, so
