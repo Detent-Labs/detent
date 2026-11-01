@@ -49,21 +49,21 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
-- [ ] 6.2 Run `bun run build` in the devcontainer. Expect exit code 0.
-- [ ] 6.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`, with `OPENSPEC_TELEMETRY=0`.
-- [ ] 6.4 Read the pass, skip and fail counts off that run. Name any failing test. Compare the pass count with `scripts/gates/pass-floor.txt`.
-- [ ] 6.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
-- [ ] 6.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
-- [ ] 6.7 On the production bundle, open a `purchase_requisition` draft's Fields tab at 1440px. The sub-row reads Catalog, Where fields appear, Where values come from. A field's card reads Name, Kind, Choices, Asked on, Read by, More, with More closed.
-- [ ] 6.8 Add a choice named "In review" to a choice field. Its Developer view reads `in_review`. Rename it; the value follows. Open a published field's Choices Developer view: the sentence says the name no longer sets its values.
-- [ ] 6.9 On a field two steps ask for, the Asked on rows print Required, Read-only or Not asked as words. They print their condition sentences too. "Open the form" lands on the form editor. The requiredness checkbox writes both views.
-- [ ] 6.10 Press "Open" on a Read by way-out row: the Steps tab opens on that step with the way out marked. Press "Open" on a field-rule row: the rail selects that field and More stands open.
-- [ ] 6.11 Open Where values come from on Fields. The editor heads with the source's name, the caption reads Name, and the kind picker prints names. Open Settings: its sub-row holds three entries. Load `/edit/settings/sources`: the Process view opens.
-- [ ] 6.12 Open Where fields appear. Headers print labels and kind words, and no key. Badges read Asked, Required, Read-only. A CEL flag reads Condition, and the legend prints no "CEL". Open the Forms tab: the legend reads Group.
-- [ ] 6.13 At 1024px, the card's container reads `overflow-y: visible` and the view body scrolls the whole card. At 420px nothing scrolls sideways.
-- [ ] 6.14 Run `/impeccable critique` and `/impeccable audit` on `/studio/processes/<id>/edit/fields`. Run `impeccable detect --json` on the changed files, since the app's CSP blocks the overlay.
-- [ ] 6.15 Run `sh scripts/dev-exec.sh bun run e2e` in the devcontainer. Expect every flow to pass.
+- [x] 6.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
+- [x] 6.2 Run `bun run build` in the devcontainer. Expect exit code 0.
+- [x] 6.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`, with `OPENSPEC_TELEMETRY=0`.
+- [x] 6.4 Read the pass, skip and fail counts off that run. Name any failing test. Compare the pass count with `scripts/gates/pass-floor.txt`.
+- [x] 6.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
+- [x] 6.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
+- [x] 6.7 On the production bundle, open a `purchase_requisition` draft's Fields tab at 1440px. The sub-row reads Catalog, Where fields appear, Where values come from. A field's card reads Name, Kind, Choices, Asked on, Read by, More, with More closed.
+- [x] 6.8 Add a choice named "In review" to a choice field. Its Developer view reads `in_review`. Rename it; the value follows. Open a published field's Choices Developer view: the sentence says the name no longer sets its values.
+- [x] 6.9 On a field two steps ask for, the Asked on rows print Required, Read-only or Not asked as words. They print their condition sentences too. "Open the form" lands on the form editor. The requiredness checkbox writes both views.
+- [x] 6.10 Press "Open" on a Read by way-out row. The Steps tab opens on that step with the way out marked. Press "Open" on a field-rule row: the rail selects that field and More stands open.
+- [x] 6.11 Open Where values come from on Fields. The editor heads with the source's name, the caption reads Name, and the kind picker prints names. Open Settings: its sub-row holds three entries. Load `/edit/settings/sources`: the Process view opens.
+- [x] 6.12 Open Where fields appear. Headers print labels and kind words, and no key. Badges read Asked, Required, Read-only. A CEL flag reads Condition, and the legend prints no "CEL". Open the Forms tab: the legend reads Group.
+- [x] 6.13 At 1024px, the card's container reads `overflow-y: visible` and the view body scrolls the whole card. At 420px nothing scrolls sideways.
+- [x] 6.14 Run `/impeccable critique` and `/impeccable audit` on `/studio/processes/<id>/edit/fields`. Run `impeccable detect --json` on the changed files, since the app's CSP blocks the overlay.
+- [x] 6.15 Run `sh scripts/dev-exec.sh bun run e2e` in the devcontainer. Expect every flow to pass.
 
 ## Workflow follow-up
 
