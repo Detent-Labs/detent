@@ -961,4 +961,4 @@ system that resulted; this file explains why it took that shape.
   key input moved into the field editor's Developer view with an Escape
   revert, a refusal under the input and a "Read by" zone. Every key change
   rewrites the readers and says how many. The pending hint stays open as
-  KEYS-1 in `docs/decisions.md`.
+  KEYFOLLOW-1 in `docs/decisions.md`.

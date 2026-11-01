@@ -1290,9 +1290,9 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   string.** A change or deletion of an option `value` on a field leaves every
   CEL comparison such as `data.priority == "high"` on the old string. The
   type check raises no error and the studio shows no message.
-  The key-rename guard (audit finding E2-7) locks the key against label
-  changes and counts the readers of a key. It leaves this gap open on purpose, since
-  finding a comparison needs a heuristic over CEL string literals, and that
+  The key follows its label until the first publish, and a key change
+  rewrites the expressions that read the old key. That rewrite leaves this
+  gap open on purpose, since finding a comparison needs a heuristic over CEL string literals, and that
   heuristic gives false positives. Risk (Medium): a guard stops matching after
   an option rename, and the path parks.
 
@@ -1965,9 +1965,9 @@ local to this section.
 
 The change let a field key follow its label until the first publish. It also
 rewrote every reader on a key change and added the "Read by" zone. It left
-seven points to later changes. The KEYS tag is local to this section.
+seven points to later changes.
 
-- **KEYS-1: the key input shows no pending hint while the typed text differs
+- **KEYFOLLOW-1: the key input shows no pending hint while the typed text differs
   from the key.** The typed text commits on blur or Enter. Until then nothing
   says the key has not changed. `FIELDS-27` named this gap, and the change
   closed the rest of that entry. Risk (Low): an author types a key, moves on
@@ -1975,14 +1975,14 @@ seven points to later changes. The KEYS tag is local to this section.
 
   Upgrade entry: show a hint in `panels/FieldCatalogPanel.tsx` while the typed
   text differs from `field.key`.
-- **KEYS-2: an index read stays on the old key after a rename.** A source such
+- **KEYFOLLOW-2: an index read stays on the old key after a rename.** A source such
   as `data["amount"]` is not a member read, so the rewrite and the reader count
   skip it. The checks rail reports the old key as unknown. Risk (Low): a
   hand-written guard strands after a rename, and the rail names it.
 
   Upgrade entry: extend `rewriteFieldRead` and `keyReaderSites` in
   `draft/key-readers.ts` to match an index with a string literal.
-- **KEYS-3: a child's key commit leaves its callers on the old key.** A parent
+- **KEYFOLLOW-3: a child's key commit leaves its callers on the old key.** A parent
   reads `child.data.<key>`, and the rewrite reaches only the open draft. The
   hash `contractRef` covers field ids, so the signature stays and a
   `latest-at-spawn` binding keeps the child. Risk (Medium): that parent's guard
@@ -1990,28 +1990,28 @@ seven points to later changes. The KEYS tag is local to this section.
 
   Upgrade entry: when a published child's key commits, list the callers in
   `panels/FieldCatalogPanel.tsx` and rewrite their `child.data` reads.
-- **KEYS-4: the form editor rewrites readers on a rename and shows no rewrite
+- **KEYFOLLOW-4: the form editor rewrites readers on a rename and shows no rewrite
   line.** Both screens share `draft/fieldLabel.ts::writeFieldLabel`. Only the
   Fields tab counts the rewrites. Risk (Low): an author renames in the form
   editor and never learns that conditions moved.
 
   Upgrade entry: count the readers before the write in
   `screens/FormEditorScreen.tsx` and show the line the Fields tab shows.
-- **KEYS-5: a "Read by" row for a step form names a shared step label
+- **KEYFOLLOW-5: a "Read by" row for a step form names a shared step label
   plainly.** A way-out heading numbers the same label. Two steps called
   "Review" read alike in a form row and apart in a way-out row. Risk (Low): an
   author cannot tell which of two same-named steps a form row means.
 
   Upgrade entry: number a repeated step label in `panels/readByRows.ts`, as
   `optionText.ts::wayOutHeading` does.
-- **KEYS-6: closing the Developer view hides a pending key refusal and the
+- **KEYFOLLOW-6: closing the Developer view hides a pending key refusal and the
   typed text.** The refusal and the text live in the key input's state. A
   closed `<details>` hides both and keeps them. Risk (Low): an author reopens
   the view later and finds a refusal for text they forgot.
 
   Upgrade entry: clear the typed text when `panels/FieldCatalogPanel.tsx`
   closes the Developer view.
-- **KEYS-7: the empty-prior-label rule releases a hand-committed key once a
+- **KEYFOLLOW-7: the empty-prior-label rule releases a hand-committed key once a
   base label appears.** A field with a hand-committed key and an empty label
   keeps that key while a condition reads it. The first label that derives a
   key then moves the key and its readers. Risk (Low): a key an author set by

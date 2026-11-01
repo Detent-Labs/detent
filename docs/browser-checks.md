@@ -1602,7 +1602,8 @@ row. Pass: a Fields row stands folded under the Fields heading, its stamp
 reads Changed. Press Cancel.
 
 Back on the Fields tab, rename `unit_price`'s label too, without saving. Pass:
-its Developer view reads the same sentence. Key still reads `unit_price`.
+open its Developer view. It reads the same sentence. Key still reads
+`unit_price`.
 
 Press Publish, then Show again. Pass: a second Fields row now stands beside
 the first. Press Cancel.
@@ -3497,8 +3498,9 @@ invisible against its row in either scheme.
 
 At a window about 1040px wide, just above the 64rem `NARROW` breakpoint,
 open a field's editor and its Developer view. Pass: its Key input and its
-move control both stay inside their own column. Pass: `document.documentElement.scrollWidth`
-equals `clientWidth` at that width too.
+move control both stay inside their own column. Pass:
+`document.documentElement.scrollWidth` equals `clientWidth` at that width
+too.
 
 ### The Fields view inside a group (`group-child-own-editor`)
 
@@ -3623,13 +3625,14 @@ Pass: it reads "This field is in a published version. The label no longer
 sets its key." Change the label to `Amount`. Pass: Key still reads
 `quantity`.
 
+Save the draft.
+
 Select the text in Key, type `qty` and press Tab. Pass: the unsaved mark
 appears, and the line under the label reads "Updated 2 conditions." Choose
 the Steps tab, then the two routing steps. Pass: each way out whose guard read
 `quantity` now reads `data.qty`.
 
-Type `other` into Key and press Escape. Pass: Key reads `qty` again, and the
-unsaved mark does not change.
+Type `other` into Key and press Escape. Pass: Key reads `qty` again.
 
 Type each of the following into Key and press Enter. Pass: Key keeps the typed
 text and the draft keeps `qty`. A warning callout stands under the input, and
@@ -3660,7 +3663,7 @@ out whose condition changed stands beside it, with its Only if changed from
 Type `Total Amount` into Key and press Enter, so a callout stands. Close the
 Developer view. Pass: the callout and the typed text leave the screen. Open
 the view again. Pass: both stand as left, since closing hides them and clears
-neither. KEYS-6 in the decisions file records this.
+neither. KEYFOLLOW-6 in the decisions file records this.
 
 ### Removing a field that reaches past the field catalog confirms first (`remove-field-takes-its-references`)
 
