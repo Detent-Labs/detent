@@ -68,10 +68,10 @@ The brief states its assumptions. The mode is Operate.
    goal. The page caps its column at 52rem and the rail widens to 22rem.
    Machine values stand one disclosure away, in More.
 4. **Scope and boundaries.** In scope: the page's layout, its headers, the
-   open state, the More body and the dialog. The Steps tab's grid too.
-   Untouched: the masthead's controls, the section bodies' own editors
-   and the steps rail's rows. The walk, the form editor and the Checks tab's
-   grouping stay too. Anti-goals: a side inspector, dense property rows,
+   open state, the More body and the dialog. The Steps tab's grid, and the
+   unnamed-step text of the rail row and the walk. Untouched: the masthead's
+   controls, the section bodies' own editors, the rest of the steps rail and
+   the walk. The form editor and the Checks tab's grouping stay too. Anti-goals: a side inspector, dense property rows,
    machine chips, a second column.
 5. **States and ranges.** Zero to about twelve ways out. Zero to three time
    limits. A summary runs one line at 52rem and wraps after it. German runs
@@ -400,7 +400,8 @@ numerals, so "2 when entered, 0 when left" is a full sentence from one key.
 - `studio-stepPage.test.tsx`, continued: the Done mark and the badge stand in
   the header. The Developer view stands inside the last body. The Remove
   control carries `btn-destructive`. A step-level issue prints once, inside
-  its body. The two-column block goes.
+  its body. The Form-section cases read the size sentence from the header
+  and the control from the body. The two-column block goes.
 - `studio-guidedSurfaceStyle.test.ts`: the page's `overflowY` reads `auto`
   by default and `visible` under `NARROW`; the `stepsTab` grid reads 22rem
   and `auto auto` rows.
@@ -428,7 +429,7 @@ section, the badge, the dialog and the 420px layout. The steps rail entry's
   More instead.
 - Lines 6324 to 6326 press Remove this step and read the focus. A confirm
   press in the dialog comes between.
-- Lines 5896 to 5898 credit the developer section's padding with clearing
+- Lines 5896 to 5899 credit the developer section's padding with clearing
   the ring at the page's bottom edge. The walk's padding does that now.
 
 `docs/decisions.md`: RAIL-6, RAIL-7, SENTENCE-7, SELECTS-1 and SELECTS-2

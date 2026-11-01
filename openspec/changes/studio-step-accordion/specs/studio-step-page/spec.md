@@ -247,6 +247,91 @@ its own. The tab body then holds two scroll boxes.
 - **THEN** the tab body scrolls the rail and the page as one
 - **AND** the page has no scroll box of its own
 
+### Requirement: The steps rail lists each step in the draft's own order
+
+The rail SHALL list every step of the draft, in the order `workflow.steps`
+holds them. No walk over the paths SHALL decide where a row stands.
+
+A row's number SHALL name the step's place in that order. Dragging a row to
+any position in the list SHALL move it there. That move SHALL land in the
+rail and in the draft together.
+
+Each row SHALL carry a number and the step's label. A row SHALL have no summary
+line under the label. That holds for every step kind: a task step, a call to
+another process, and an end step. The step page names who works a step, the
+fields its form carries, the process it calls and its outcome.
+
+A step with no label SHALL read "(unnamed step)" in its row. The row SHALL
+print no key.
+
+#### Scenario: The rail numbers steps in the draft's own order
+
+- **WHEN** a draft holds a call step, then an end step, then a task step
+- **THEN** the rail numbers the call one, the end two and the task three
+
+#### Scenario: A move control moves its own row
+
+- **WHEN** an author drags the rail's fourth row and drops it between the
+  first and second row
+- **THEN** that row stands second
+- **AND** the rows that stood first through third each move one place later
+
+#### Scenario: A keyboard move relocates the focused row
+
+- **WHEN** an author focuses the rail's third row's grip and issues the
+  move-later command
+- **THEN** that row stands fourth
+- **AND** keyboard focus stays on the moved row's grip
+- **AND** a live region announces the row's label and its new position
+
+#### Scenario: A task row names no assignment and no field count
+
+- **WHEN** a task step names a group as its assignment and carries four view
+  fields
+- **THEN** its rail row carries the step's number and label
+- **AND** the row names neither who works the step nor a field count
+
+#### Scenario: A call row names no process
+
+- **WHEN** a subprocess step calls the process labeled "Credit check"
+- **THEN** its rail row has no line naming that process
+
+#### Scenario: An end row names no outcome
+
+- **WHEN** an end step declares the outcome `approved`
+- **THEN** its rail row has no line naming that outcome
+
+#### Scenario: An unnamed step's row reads the placeholder
+
+- **WHEN** a step has an empty label and the key `review`
+- **THEN** its rail row reads "(unnamed step)"
+- **AND** the row does not contain `review`
+
+### Requirement: The step page walks to the previous and the next step
+
+The step page's foot SHALL carry one control that opens the previous step and
+one that opens the next step. The order SHALL be the rail's order. Each
+control SHALL name the step it opens. A neighbour with no label SHALL read
+"(unnamed step)" there, and the control SHALL print no key.
+
+The control SHALL refuse the press at the end of the walk it belongs to.
+
+#### Scenario: The next control names its step
+
+- **WHEN** the next step in the rail carries the label "Credit check"
+- **THEN** the next control names "Credit check"
+
+#### Scenario: The last step refuses the next control
+
+- **WHEN** the step page holds the last step in the rail's order
+- **THEN** the next control refuses the press
+
+#### Scenario: An unnamed neighbour reads the placeholder
+
+- **WHEN** the next step in the rail has an empty label and the key `review`
+- **THEN** the next control reads "Next: (unnamed step)"
+- **AND** it does not contain `review`
+
 ### Requirement: The step page names its step and keeps its key in the Developer view
 
 The step page SHALL open with a kicker naming the step's number and its

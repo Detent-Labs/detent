@@ -22,7 +22,8 @@
 
 - [ ] 2.1 In `screens/EditScreen.tsx`, make `stepsTab` read `"22rem minmax(0, 1fr)"` and, under `NARROW`, rows `"auto auto"`, per D6. Rewrite the comment above it.
 - [ ] 2.2 In `EditScreen.tsx`'s `walkNeighbour` and in `StepsRail.tsx`'s row label, read `stepText(step, contentLocale, baseLocale)` in place of the label-else-key chain, per D11.
-- [ ] 2.3 In `packages/web/test/studio-guidedSurfaceStyle.test.ts`, assert the page's `overflowY` pair and the grid's two values per D9. In `studio-stepsRail.test.tsx`, assert an unnamed step's row reads "(unnamed step)" and not its key. Run the full gated suite in the foreground.
+- [ ] 2.3 In `packages/web/test/studio-guidedSurfaceStyle.test.ts`, assert the page's `overflowY` pair and the grid's two values per D9. In `studio-stepsRail.test.tsx`, assert an unnamed step's row reads "(unnamed step)" and not its key.
+- [ ] 2.4 In `studio-stepPage.test.tsx`, assert an unnamed next neighbour reads "Next: (unnamed step)". Run the full gated suite in the foreground.
 
 ## 3. Docs, glossary and roadmap
 
