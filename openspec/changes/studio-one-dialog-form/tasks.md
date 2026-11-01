@@ -93,19 +93,19 @@
 
 ## 7. Verification
 
-- [ ] 7.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
-- [ ] 7.2 Run `bun run build` in the devcontainer. Expect exit code 0.
-- [ ] 7.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test` with `DATABASE_URL` set by the pod.
-- [ ] 7.4 Read the pass, skip and fail counts off that run. Name any failing test. Compare the pass count with `scripts/gates/pass-floor.txt`.
-- [ ] 7.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
-- [ ] 7.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
-- [ ] 7.7 On the production bundle, open each dialog of D7 once. Read the heading, the confirm label and the opening focus. Cancel it and read `document.activeElement`.
-- [ ] 7.7a Confirm Restore, a template delete and a list discard, and read `document.activeElement` each time. Hide the Fields tab with browser Back under the kind dialog, and no modal stays.
-- [ ] 7.8 Press Tab through the Publish dialog on a draft with changes since its base. Do it with the change list and Developer view closed, then open. Read every stop. No stop is `body`.
-- [ ] 7.9 At 420px, measure the gutter on a dialog. Below 30rem, facts stack. Open the IT Offboarding group's removal with Enter at 1024 by 600. Its heading and Cancel stand on screen. At a viewport short enough to overflow, ArrowDown with Cancel focused moves `scrollTop`. A refusal under a long list scrolls into view.
-- [ ] 7.10 Leave a dirty draft by five routes. They are the area nav, the back control, the `⋮` menu's Versions, the account menu's profile entry and logout. Decline each: the focus returns. Confirm one.
-- [ ] 7.11 Run `/impeccable critique` and `/impeccable audit` on the dialogs. Run `impeccable detect --json` on the changed files, since the app's CSP blocks the overlay.
-- [ ] 7.12 Read `git grep -n "confirm(" -- packages/web/src/areas/studio`. Only comments and `onConfirm(` remain. A `git grep` of each key D7 and D8 retire prints nothing.
+- [x] 7.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
+- [x] 7.2 Run `bun run build` in the devcontainer. Expect exit code 0.
+- [x] 7.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test` with `DATABASE_URL` set by the pod.
+- [x] 7.4 Read the pass, skip and fail counts off that run. Name any failing test. Compare the pass count with `scripts/gates/pass-floor.txt`.
+- [x] 7.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
+- [x] 7.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
+- [x] 7.7 On the production bundle, open each dialog of D7 once. Read the heading, the confirm label and the opening focus. Cancel it and read `document.activeElement`.
+- [x] 7.7a Confirm Restore, a template delete and a list discard, and read `document.activeElement` each time. Hide the Fields tab with browser Back under the kind dialog, and no modal stays.
+- [x] 7.8 Press Tab through the Publish dialog on a draft with changes since its base. Do it with the change list and Developer view closed, then open. Read every stop. No stop is `body`.
+- [x] 7.9 At 420px, measure the gutter on a dialog. Below 30rem, facts stack. Open the IT Offboarding group's removal with Enter at 1024 by 600. Its heading and Cancel stand on screen. At a viewport short enough to overflow, ArrowDown with Cancel focused moves `scrollTop`. A refusal under a long list scrolls into view.
+- [x] 7.10 Leave a dirty draft by five routes. They are the area nav, the back control, the `⋮` menu's Versions, the account menu's profile entry and logout. Decline each: the focus returns. Confirm one.
+- [x] 7.11 Run `/impeccable critique` and `/impeccable audit` on the dialogs. Run `impeccable detect --json` on the changed files, since the app's CSP blocks the overlay.
+- [x] 7.12 Read `git grep -n "confirm(" -- packages/web/src/areas/studio`. Only comments and `onConfirm(` remain. A `git grep` of each key D7 and D8 retire prints nothing.
 
 ## Workflow follow-up
 
