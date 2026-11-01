@@ -37,23 +37,23 @@ describe("RemoveDataSourceDialog's heading", () => {
 });
 
 describe("RemoveDataSourceDialog's source fact row", () => {
-  it("names the source by its key inside code, first among the facts", () => {
-    const html = renderDialog({ label: "countries" });
+  it("names the source in the body face, first among the facts", () => {
+    const html = renderDialog({ label: "Cost centres" });
 
-    expect(codeOf(html)).toEqual(["countries"]);
-    expect(html).toMatch(/<dl[^>]*><dt[^>]*>Data source<\/dt><dd[^>]*><code[^>]*>countries<\/code><\/dd>/);
+    expect(codeOf(html)).toEqual([]);
+    expect(html).toMatch(/<dl[^>]*><dt[^>]*>Data source<\/dt><dd[^>]*>Cost centres<\/dd>/);
   });
 
   it("names an unnamed source by the rail's fallback word, not in code", () => {
-    const html = renderDialog({ label: "(unnamed data source)" });
+    const html = renderDialog({ label: "(unnamed source)" });
 
-    expect(html).toContain("(unnamed data source)");
+    expect(html).toContain("(unnamed source)");
     expect(codeOf(html)).toEqual([]);
   });
 
   // A string replacement would expand `$&` into a matched placeholder.
-  it("keeps a key holding a $ pattern as the author typed it", () => {
-    expect(codeOf(renderDialog({ label: "cost$&" }))).toEqual(["cost$&amp;"]);
+  it("keeps a name holding a $ pattern as the author typed it", () => {
+    expect(renderDialog({ label: "cost$&" })).toContain("cost$&amp;");
   });
 });
 
@@ -79,8 +79,8 @@ describe("RemoveDataSourceDialog's facts", () => {
     expect(renderDialog({ reach: { fields: 0, columnMappings: 0 } })).not.toContain("Fields using it");
   });
 
-  it("names no field", () => {
-    expect(codeOf(renderDialog({ label: "countries" }))).toEqual(["countries"]);
+  it("names no field, and prints the source in no code element", () => {
+    expect(codeOf(renderDialog({ label: "countries" }))).toEqual([]);
   });
 });
 

@@ -117,10 +117,10 @@ describe("the open view's sub-state of the edit route", () => {
     expect(TAB_VIEWS).toEqual({
       map: [],
       steps: [],
-      fields: ["catalog", "matrix"],
+      fields: ["catalog", "matrix", "sources"],
       forms: [],
       checks: [],
-      settings: ["process", "sources", "contract", "access"],
+      settings: ["process", "contract", "access"],
     });
   });
 
@@ -140,7 +140,7 @@ describe("the open view's sub-state of the edit route", () => {
 
   it("drops a view the tab does not hold and keeps the tab", () => {
     expect(matchRoute("/processes/proc_1/edit/settings/nonsense")).toEqual({ name: "edit", processId: "proc_1", tab: "settings" });
-    expect(matchRoute("/processes/proc_1/edit/fields/sources")).toEqual({ name: "edit", processId: "proc_1", tab: "fields" });
+    expect(matchRoute("/processes/proc_1/edit/settings/sources")).toEqual({ name: "edit", processId: "proc_1", tab: "settings" });
   });
 
   it("drops a view on a tab that holds none", () => {
@@ -154,9 +154,9 @@ describe("the open view's sub-state of the edit route", () => {
 
   it("writes the tab alone when the route carries a view the tab does not hold", () => {
     // Without the guard, the writer would print `/edit/steps/matrix` and
-    // `/edit/fields/sources`, addresses the matcher then drops a segment of.
+    // `/edit/settings/sources`, addresses the matcher then drops a segment of.
     expect(routePath({ name: "edit", processId: "proc_1", tab: "steps", view: "matrix" })).toBe("/processes/proc_1/edit/steps");
-    expect(routePath({ name: "edit", processId: "proc_1", tab: "fields", view: "sources" })).toBe("/processes/proc_1/edit/fields");
+    expect(routePath({ name: "edit", processId: "proc_1", tab: "settings", view: "sources" })).toBe("/processes/proc_1/edit/settings");
   });
 
   it("writes the tab alone when the route carries no view", () => {
@@ -175,7 +175,7 @@ describe("the retired tab addresses", () => {
       canvas: { tab: "map" },
       paths: { tab: "steps" },
       matrix: { tab: "fields", view: "matrix" },
-      dataSources: { tab: "settings", view: "sources" },
+      dataSources: { tab: "fields", view: "sources" },
       contract: { tab: "settings", view: "contract" },
       access: { tab: "settings", view: "access" },
     });
@@ -189,7 +189,7 @@ describe("the retired tab addresses", () => {
     expect(matchRoute("/processes/proc_1/edit/dataSources")).toEqual({
       name: "edit",
       processId: "proc_1",
-      tab: "settings",
+      tab: "fields",
       view: "sources",
     });
   });
@@ -210,7 +210,7 @@ describe("the retired panels address", () => {
   it("maps each old view name onto the place that holds it now", () => {
     expect(PANEL_VIEW_TARGET).toEqual({
       fields: { tab: "fields" },
-      dataSources: { tab: "settings", view: "sources" },
+      dataSources: { tab: "fields", view: "sources" },
       contract: { tab: "settings", view: "contract" },
       matrix: { tab: "fields", view: "matrix" },
       paths: { tab: "steps" },

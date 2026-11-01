@@ -118,7 +118,7 @@ describe("checkTarget", () => {
   });
 
   it("opens the Settings tab's sources view for a data source issue", () => {
-    expect(target("dataSource", "ds_1")).toEqual({ tab: "settings", view: "sources" });
+    expect(target("dataSource", "ds_1")).toEqual({ tab: "fields", view: "sources" });
   });
 
   it("opens the Settings tab's contract view for a contract issue", () => {

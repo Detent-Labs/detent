@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { t } from "../catalog.js";
 import { HeldDraft } from "../draft/held-while-hidden.js";
 import type { FieldsView, TabView } from "../routing.js";
-import { FieldsTab } from "./EntityTabs.js";
+import { DataSourcesTab, FieldsTab } from "./EntityTabs.js";
 import { FieldMatrixPanel } from "./FieldMatrixPanel.js";
 import { SubRow, subTabDomId, subTabPanelDomId } from "./SubRow.js";
 
@@ -41,10 +41,11 @@ interface Props {
 }
 
 /**
- * The Fields tab: a sub-row over the catalog and the field matrix
- * (`studio-process-tabs`: "The Fields tab carries the catalog and the matrix
- * as views"). Both view bodies stay mounted, and `hidden` reveals one, so the
- * catalog keeps its selected field and the matrix its selected cell.
+ * The Fields tab: a sub-row over the catalog, the field matrix and the data
+ * sources (`studio-process-tabs`: "The Fields tab carries the catalog and the
+ * matrix as views"). Every view body stays mounted, and `hidden` reveals one,
+ * so the catalog keeps its selected field, the matrix its selected cell and
+ * the data sources their half-typed name.
  *
  * The matrix derives from the whole draft. While hidden it reads the draft it
  * last drew, so typing in the catalog skips it (`studio-app`).
@@ -52,6 +53,7 @@ interface Props {
 export function FieldsTabViews({ view, onOpenView, token, visible, onShowStep, onOpenForm }: Props) {
   const catalogHidden = view !== "catalog";
   const matrixHidden = view !== "matrix";
+  const sourcesHidden = view !== "sources";
   return (
     <div {...stylex.props(styles.column)}>
       <SubRow
@@ -59,6 +61,7 @@ export function FieldsTabViews({ view, onOpenView, token, visible, onShowStep, o
         views={[
           { id: "catalog", label: t("fieldsViews.catalog") },
           { id: "matrix", label: t("fieldsViews.matrix") },
+          { id: "sources", label: t("fieldsViews.sources") },
         ]}
         open={view}
         onOpen={onOpenView}
@@ -83,6 +86,15 @@ export function FieldsTabViews({ view, onOpenView, token, visible, onShowStep, o
         <HeldDraft visible={visible && view === "matrix"}>
           <FieldMatrixPanel />
         </HeldDraft>
+      </div>
+      <div
+        id={subTabPanelDomId("fields", "sources")}
+        role="tabpanel"
+        aria-labelledby={subTabDomId("fields", "sources")}
+        hidden={sourcesHidden}
+        {...stylex.props(styles.view, sourcesHidden && styles.viewHidden)}
+      >
+        <DataSourcesTab token={token} visible={visible && view === "sources"} />
       </div>
     </div>
   );

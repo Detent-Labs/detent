@@ -30,7 +30,7 @@ export interface TabCountDraft {
 
 /**
  * What each tab prints beside its name (`studio-process-tabs`). `undefined`
- * is a tab that prints no number: Map draws a graph, and Settings holds four
+ * is a tab that prints no number: Map draws a graph, and Settings holds three
  * views of process-wide settings, so neither has a total to report.
  *
  * Forms counts the steps that carry a view, the whole set the Forms tab
@@ -105,7 +105,7 @@ export function checkTarget(
     case "field":
       return { tab: "fields", view: "catalog" };
     case "dataSource":
-      return { tab: "settings", view: "sources" };
+      return { tab: "fields", view: "sources" };
     case "contract":
       return { tab: "settings", view: "contract" };
     case "process":

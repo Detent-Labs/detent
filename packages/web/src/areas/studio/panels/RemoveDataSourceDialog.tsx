@@ -42,9 +42,6 @@ const styles = stylex.create({
     minWidth: 0,
     overflowWrap: "anywhere",
   },
-  studioMono: {
-    fontFamily: fonts.mono,
-  },
   dialogNote: {
     color: colors.textMuted,
     fontSize: "0.9rem",
@@ -66,9 +63,10 @@ const NOTES_ID = "remove-data-source-confirm-notes";
 
 interface Props {
   /**
-   * The removed data source's key, with the rail's own fallback for an unnamed
-   * source already applied by the caller (`DataSourcesTab`'s
-   * `t("panelsScreen.unnamedDataSource")`).
+   * The removed data source's name, with the rail's own fallback for an
+   * unnamed source already applied by the caller (`DataSourcesTab`'s
+   * `t("panelsScreen.unnamedDataSource")`). It prints in the body face: the
+   * engine matches no source by its name.
    */
   label: string;
   /** The removal's reach, measured on the draft before any write. */
@@ -89,7 +87,7 @@ interface Props {
  * divider box, and the `btn-secondary btn-destructive` confirming control,
  * never filled red.
  *
- * Counts only: the first fact row names the source by its key in mono, and
+ * Counts only: the first fact row names the source by its name, and
  * the dialog names no field. A count row prints for a count above zero alone.
  *
  * Cancel holds the initial focus, never the confirming control: the studio
@@ -99,10 +97,6 @@ interface Props {
 export function RemoveDataSourceDialog({ label, reach, triggerRef, onCancel, onConfirm }: Props) {
   const { ref, declineRef } = useConfirmDialog(triggerRef);
   const dialogProps = stylex.props(styles.dialog);
-
-  // The caller already swapped an empty key for the unnamed word, which is
-  // prose and keeps the body face; a real key is a machine value and prints mono.
-  const isNamed = label !== t("panelsScreen.unnamedDataSource");
 
   return (
     <dialog
@@ -117,7 +111,7 @@ export function RemoveDataSourceDialog({ label, reach, triggerRef, onCancel, onC
       <dl id={FACTS_ID} {...stylex.props(styles.dialogFacts)}>
         <dt {...stylex.props(styles.dialogFactsDt)}>{t("dataSources.removeDialogSourceTerm")}</dt>
         <dd {...stylex.props(styles.dialogFactsDd)}>
-          {isNamed ? <code {...stylex.props(styles.studioMono)}>{label}</code> : label}
+          {label}
         </dd>
         {reach.fields > 0 && (
           <>

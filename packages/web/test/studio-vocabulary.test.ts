@@ -189,3 +189,29 @@ describe("Change list vocabulary", () => {
     ]);
   });
 });
+
+describe("data source and contract vocabulary", () => {
+  it("names the sources' view, name, kind legend and kinds in the author's words", () => {
+    expectRows([
+      ["fieldsViews.sources", "Where values come from"],
+      ["dataSources.nameCaption", "Name"],
+      ["dataSources.kindLegend", "What kind of source"],
+      ["dataSourceKind.db.list", "A data list an operator keeps"],
+      ["dataSourceKind.instance.query", "Cases of another process"],
+      ["panelsScreen.unnamedDataSource", "(unnamed source)"],
+    ]);
+  });
+
+  it("words the contract view as what the process takes in and gives back", () => {
+    expectRows([
+      ["settings.contract", "What it takes in and gives back"],
+      ["contract.callableCheckbox", "Other processes can call this one"],
+      ["contract.inputFieldsLegend", "What it takes in"],
+      ["contract.outputFieldsLegend", "What it gives back"],
+      ["contract.outcomesLegend", "How it can end"],
+      ["contract.newOutcomePlaceholder", "Name of an ending"],
+      ["contract.addOutcome", "+ Add an ending"],
+      ["contract.removeOutcome", "Remove"],
+    ]);
+  });
+});

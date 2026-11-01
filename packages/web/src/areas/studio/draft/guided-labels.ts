@@ -48,6 +48,17 @@ export function assignmentStrategyLabel(type: AssignmentStrategyName): { name: s
   return { name: t(`assignmentStrategy.${type}.name`), note: t(`assignmentStrategy.${type}.note`) };
 }
 
+/**
+ * What the data source kind picker prints for one registered type. `db.list`
+ * and `instance.query` take a plain name. A type the table misses prints its
+ * registry type, the fallback `assignmentWord` makes too.
+ */
+export function dataSourceKindLabel(type: string): string {
+  if (type === "db.list") return t("dataSourceKind.db.list");
+  if (type === "instance.query") return t("dataSourceKind.instance.query");
+  return type;
+}
+
 /** Whether the curated table above names this registry type. */
 export function isCuratedAssignmentStrategy(type: string): type is AssignmentStrategyName {
   return (CURATED as readonly string[]).includes(type);

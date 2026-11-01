@@ -692,7 +692,7 @@ interface DataSourceRemoval {
 }
 
 /**
- * The Settings tab's Where values come from view: the declared sources' own entity rail beside the open
+ * The Fields tab's Where values come from view: the declared sources' own entity rail beside the open
  * source's editor. A data source nests under nothing, so no entry carries a
  * move control.
  */
@@ -701,7 +701,7 @@ export function DataSourcesTab({
   visible,
 }: {
   token: string;
-  /** False while the Settings tab's Where values come from view hides. Every
+  /** False while the Fields tab's Where values come from view hides. Every
    * tab body and view stays mounted, so a browser Back can hide this view
    * while its removal dialog stands open. A hide declines that removal, the
    * way `FieldsTab` does. */

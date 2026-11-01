@@ -222,7 +222,6 @@ export const en = {
 
   "fieldValidation.notEvaluated": "not evaluated for this field type",
 
-  "dataSources.heading": "Data sources",
   "dataSources.empty": "No data sources yet.",
   "dataSources.addDataSource": "+ Add data source",
   "dataSources.removeDataSource": "Remove data source",
@@ -236,8 +235,11 @@ export const en = {
   "dataSources.removeDialogCancel": "Cancel",
   "dataSources.pickListKey": "Pick a data list",
   "dataSources.dataListLabel": "data list",
-  "dataSources.keyCaption": "Key",
-  "dataSources.pluginLegend": "Data source plugin",
+  "dataSources.nameCaption": "Name",
+  "dataSources.kindLegend": "What kind of source",
+  // The kind picker's names. A type this table misses prints its registry type.
+  "dataSourceKind.db.list": "A data list an operator keeps",
+  "dataSourceKind.instance.query": "Cases of another process",
   // `{list}` is the data list key the draft names.
   "dataSources.unknownListWarning":
     "The server has no data list '{list}'. Publishing still works. The field's options stay empty until an operator creates the list.",
@@ -344,14 +346,13 @@ export const en = {
   "actions.removeOutputMapping": "Remove",
   "actions.resultCelPlaceholder": "result CEL",
 
-  "contract.heading": "Contract",
-  "contract.callableCheckbox": "this process is subprocess-callable",
-  "contract.inputFieldsLegend": "inputFields",
-  "contract.outputFieldsLegend": "outputFields",
-  "contract.outcomesLegend": "outcomes",
-  "contract.removeOutcome": "remove",
-  "contract.newOutcomePlaceholder": "new outcome name",
-  "contract.addOutcome": "+ Add outcome",
+  "contract.callableCheckbox": "Other processes can call this one",
+  "contract.inputFieldsLegend": "What it takes in",
+  "contract.outputFieldsLegend": "What it gives back",
+  "contract.outcomesLegend": "How it can end",
+  "contract.removeOutcome": "Remove",
+  "contract.newOutcomePlaceholder": "Name of an ending",
+  "contract.addOutcome": "+ Add an ending",
 
   // The form editor. It replaced the override-row list, so the old `view.*`
   // keys went with it. The strip's captions read words ("Asked", "Required",
@@ -577,12 +578,12 @@ export const en = {
   "fieldsViews.rowLabel": "Views of the fields",
   "fieldsViews.catalog": "Catalog",
   "fieldsViews.matrix": "Where fields appear",
+  "fieldsViews.sources": "Where values come from",
 
   // The Settings tab: its sub-row, then the Process view's controls
   // (`studio-process-tabs`).
   "settings.rowLabel": "Views of the settings",
   "settings.process": "Process",
-  "settings.sources": "Where values come from",
   "settings.contract": "What it takes in and gives back",
   "settings.access": "Access",
   "settings.baseLocale": "Base language",
@@ -652,7 +653,7 @@ export const en = {
 
   "panelsScreen.railLabel": "Editors",
   "panelsScreen.unnamedField": "(unnamed field)",
-  "panelsScreen.unnamedDataSource": "(unnamed data source)",
+  "panelsScreen.unnamedDataSource": "(unnamed source)",
   "panelsScreen.issueMark": "issues",
   "panelsScreen.railEntryGroup": "in {group}",
   "panelsScreen.moveTargetLabel": "Move this field to",
