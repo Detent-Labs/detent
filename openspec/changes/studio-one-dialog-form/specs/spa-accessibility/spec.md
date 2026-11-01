@@ -4,7 +4,7 @@
 
 ### Requirement: A modal dialog holds the keyboard until it closes
 
-Tab and Shift+Tab SHALL move the focus among a modal dialog's own controls and wrap at both ends. The focus SHALL NOT reach the document body or the page behind. A Tab pressed with the focus outside the dialog's controls, as after a click on its text, SHALL land on a control of the dialog. A control inside a closed Developer view SHALL NOT be a stop.
+Tab and Shift+Tab SHALL move the focus among a modal dialog's own controls and wrap at both ends. The focus SHALL NOT reach the document body or the page behind. A click on the dialog's text can leave the focus outside its controls. The next Tab SHALL then land on one of them. A control inside a closed Developer view SHALL NOT be a tab position.
 
 #### Scenario: Tab from Cancel wraps
 
@@ -22,14 +22,14 @@ Tab and Shift+Tab SHALL move the focus among a modal dialog's own controls and w
 - **WHEN** the author clicks a fact's text and then presses Tab
 - **THEN** the dialog's first control holds the focus
 
-#### Scenario: A closed Developer view holds no stop
+#### Scenario: A closed Developer view has no tab position
 
 - **WHEN** the Publish dialog opens with its Developer view closed
-- **THEN** Tab stops on the view's summary and not on anything inside it
+- **THEN** Tab lands on the view's summary and on nothing inside it
 
 ### Requirement: A modal dialog returns the focus when it closes
 
-Every close route that keeps the opener on the page SHALL return the focus to the control that opened the dialog. Those routes are Cancel, Escape and a confirm that leaves the opener in place. A confirm that removes the opener SHALL place the focus on a named control, never on the document body. A press on the backdrop SHALL close nothing.
+Every close route that keeps the opener on the page SHALL return the focus to it. Cancel, Escape and a confirm that leaves the opener in place are those routes. A confirm that removes the opener SHALL place the focus on a named control, never on the document body. A press on the backdrop SHALL close nothing.
 
 #### Scenario: Escape returns the focus
 
@@ -53,7 +53,7 @@ Every close route that keeps the opener on the page SHALL return the focus to th
 
 ### Requirement: A modal dialog states its name and description
 
-A modal dialog SHALL name itself through `aria-labelledby` on its heading. It SHALL carry `aria-describedby` pointing at its body, the facts and notes between the heading and the controls. A refusal SHALL stand outside that description and carry `role="alert"`.
+A modal dialog SHALL name itself through `aria-labelledby` on its heading. Its `aria-describedby` SHALL point at its body. The body holds the facts and notes under the heading. A refusal SHALL stand outside that description and carry `role="alert"`.
 
 #### Scenario: A screen reader hears the facts
 
@@ -63,5 +63,5 @@ A modal dialog SHALL name itself through `aria-labelledby` on its heading. It SH
 
 #### Scenario: A refusal reads once
 
-- **WHEN** a discard is refused inside the dialog
+- **WHEN** the engine refuses a discard inside the dialog
 - **THEN** the reason sits in an alert outside the dialog's description
