@@ -47,6 +47,8 @@ focus to the Settings tab. It SHALL stay away while the two match.
 
 ### Requirement: The Process view's language controls use the author's words
 
+<!-- antislop: allow em-dash -->
+<!-- Why: the dash stands inside the catalog's own option text, quoted exactly. -->
 The content-locale switcher's options SHALL read the language's name and code, as
 "German (de)". A language with gaps SHALL read "German (de) — 20 missing". A code
 with no name SHALL print alone. The add-a-language control SHALL carry a visible
@@ -56,6 +58,8 @@ SHALL point at it.
 #### Scenario: An option names its language
 
 - **WHEN** a draft holds `de` with three gaps
+<!-- antislop: allow em-dash -->
+<!-- Why: the dash stands inside the catalog's own option text, quoted exactly. -->
 - **THEN** the switcher offers "German (de) — 3 missing"
 
 #### Scenario: A code with no name prints alone
