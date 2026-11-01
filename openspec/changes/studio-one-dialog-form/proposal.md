@@ -55,6 +55,6 @@ Section 8 of the concept names `studio-form-editor` too. The form editor raises 
 - Changed in support: `draft/field-removal.ts`, `draft/field-usage.ts`, `panels/readByRows.ts`, `panels/EntityTabs.tsx`, `panels/DraftToolbar.tsx`.
 - Changed too: `panels/PublishChanges.tsx`, `panels/ChangeList.tsx`, `panels/FormTabStrip.tsx`, `screens/FormEditorScreen.tsx` and the four screens of design D10.
 - `packages/web/src/i18n/catalogs/studio.ts`: the new sentences, and one `dialog.cancel` and one `dialog.noUndo`.
-- `packages/web/test`, and `e2e/dialog.e2e.ts` for what only a real browser shows.
+- `packages/web/test`, with `e2e/dialog.e2e.ts` and `e2e/publish.e2e.ts` for what only a real browser shows.
 - `DESIGN.md`, `.claude/rules/design-language.md`, `.claude/rules/ui-glossary.md`, `docs/browser-checks.md`, `docs/decisions.md`, `docs/decisions-archive.md` and `ROADMAP.md`.
 - No engine code and no HTTP route changes. `src/schema/definition.ts` stays as it is.

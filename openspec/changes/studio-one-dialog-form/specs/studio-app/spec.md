@@ -147,7 +147,7 @@ A row's Discard draft SHALL open the same dialog as the header bar's entry. A re
 
 ### Requirement: The removal dialog names each kind of reach
 
-The heading SHALL name the removed field by its label, and say so for a group. The facts SHALL name, in the author's words, each place the removal reaches, one row per kind. The kinds are the fields inside it, the steps asking for it, what writes it, the process's inputs and outputs, the fields filling it in, what reads it and the settings naming it. A kind it does not carry SHALL print no row. No key, id or CEL source SHALL print.
+The heading SHALL name the removed field by its label, and say so for a group. The facts SHALL name, in the author's words, each place the removal reaches, one row per kind. The kinds are the fields inside it, the steps asking for it, what writes it, the process's inputs and outputs, the fields filling it in, what reads it and the settings naming it. A kind it does not carry SHALL print no row. No key, id or CEL source SHALL print. A data source's name in the settings row is the one exception, since a source has no other name.
 
 #### Scenario: A group names the fields inside it and its steps
 

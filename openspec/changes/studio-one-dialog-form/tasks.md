@@ -21,6 +21,7 @@
 - [ ] 2.2 Add `panels/DiscardDraftDialog.tsx`. Move the publish dialog onto the frame in `ProcessHeaderBar.tsx`, with its heading from D7. Drop the discard revision and its catalog use. Remove the catalog keys this retires.
 - [ ] 2.2a Move `RefusalDetail` so the frame and the header bar's banner share it. Give `PublishChanges.tsx` the `DialogFact` row, and remove its `listBox` height and scroll.
 - [ ] 2.2b Make `runMenuAction` focus the `⋮` trigger first, per D4. Extend `studio-processHeaderBar-publishGate.test.tsx`, `studio-processSurface.test.ts` and `studio-publishChanges.test.ts`.
+- [ ] 2.2c In the publish-gate test's Languages case, point `plainRow` at the `>Process</dt>` row, which stays a written-face `DialogFact`.
 - [ ] 2.3 Add a `discarding` flag to `useDraftToolbarActions` so the discard dialog disables its controls during the request. Read it in the header bar's `busy`. Add it to the `noActions` fixture in the publish-gate test.
 - [ ] 2.4 Move `StartPickerDialog` and `PromotionPreviewDialog` onto the frame in `ProcessesScreen.tsx`, with ref openers for + New process and Import. Move their literals into the catalog. Move the key, the id and the hash into the Developer view per D7. The import's Process fact falls back per D7, and its refusal keeps `pre-line`. Add a static test for both.
 - [ ] 2.5 Rebuild `RemoveFieldDialog.tsx` on the frame with an optional `names` prop per D8, without the key. Its full names rows arrive in group 3. Update `studio-removeFieldDialog.test.tsx` for the frame.
@@ -43,20 +44,21 @@
 - [ ] 4.2 Convert `root.tsx` per D5. Update `studio-leave-guard.test.ts`: pin `askLeave`'s dirty read, and each wrapper's callee inside its `proceed`, with its mutation cases.
 - [ ] 4.3 Convert `EditScreen.tsx`'s Arrange and restore per D6, with the openers and landings of D4.
 - [ ] 4.3a Update `studio-stash-wiring.test.ts` to `askRestore`, keeping its `requestRunning` pin and its mutation. Drop the removed key from `studio-restoreNotice.test.tsx`.
-- [ ] 4.4 Convert `FieldCatalogPanel.tsx`'s `changeKind` and `toggleTechnical` per D6, with `visible` passed down so a hide clears each pending state. Rewrite the comment in `field-usage.ts`.
+- [ ] 4.4 Convert `FieldCatalogPanel.tsx`'s `changeKind` and `toggleTechnical` per D6, with `visible` passed down so a hide clears each pending state. `FieldCatalogPanel` writes `visible = true`, so its static test still types. Rewrite the comment in `field-usage.ts`.
 - [ ] 4.5 Convert `ProcessesScreen.tsx`'s discard onto `DiscardDraftDialog`, with the refusal inside it and the focus landing of D4. Add a name link id on the row.
+- [ ] 4.5a Hold a `discarding` state beside `importing`, and pass it as `busy`. The dialog closes only after the `DELETE` answers. The row landing runs after `load()`.
 - [ ] 4.6 Convert `TemplatesScreen.tsx`'s delete and replace per D6, naming a template by `templateDisplayName`, with the landings of D4.
 - [ ] 4.7 Rewrite `studio-no-confirm.test.ts` to walk `src/areas/studio`, per D11. It fails on a planted `confirm(` in a fixture string and on a second `<dialog` site.
 - [ ] 4.8 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
 
 ## 5. A real browser, and the docs (spa-accessibility)
 
-- [ ] 5.1 Add `e2e/dialog.e2e.ts`. On a dirty draft's Publish dialog, Tab repeatedly: `document.activeElement` stays inside the dialog. Click a fact's text and press Tab: it stays inside. Press Escape: the Publish control holds the focus. Press the backdrop: the dialog stays.
+- [ ] 5.1 Add `e2e/dialog.e2e.ts`. On a dirty draft's Publish dialog, Tab repeatedly: `document.activeElement` stays inside the dialog. Click a fact's text and press Tab: it stays inside. Press the backdrop: the dialog stays. Press Escape: the Publish control holds the focus.
 - [ ] 5.1a In that file, press the back control on the dirty draft. "Leave this draft?" opens, Cancel keeps the draft, and the confirm leaves.
 - [ ] 5.1b In `e2e/publish.e2e.ts`'s refused flow, expect Cancel to hold the focus after the refusal.
 - [ ] 5.2 Run `sh scripts/dev-exec.sh bun run e2e` in the devcontainer. Install Chromium once if the pod lacks it. Expect every flow to pass.
 - [ ] 5.3 Rewrite the "Dialogs" entry in `DESIGN.md`, and its `design-language.md` mention, per D1 and D2. Its Hierarchy line says a dialog heading takes Headline as an `h2`.
-- [ ] 5.3a Add a `dialog` row to `.claude/rules/ui-glossary.md`, and add the import preview to its Developer view row.
+- [ ] 5.3a Add a `dialog` row to `.claude/rules/ui-glossary.md`, and add the import preview to its Developer view row. Narrow its sentence on a refused publish's Developer view to the Publish dialog and the banner.
 - [ ] 5.4 Update `docs/browser-checks.md`: the Tab and focus entries, and each hit of the pattern `native prompt|browser's confirm|accept the confirm|dialog-accept`. Admin's entries stay.
 - [ ] 5.4a Add an entry "One dialog form" there. It names what stays manual: the 420px gutter, the sticky footer at 1024 by 600, and the account menu's focus return.
 - [ ] 5.5 Move the closed entries of `docs/decisions.md` word for word to `docs/decisions-archive.md`. They are the keyboard hold, the presentation gaps, the six prompts, ACCORDION-17, HEADER-7, FIELDCARD-25, FIELDS-21, FIELDS-22 and NAMES-6.

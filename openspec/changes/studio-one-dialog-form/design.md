@@ -46,7 +46,7 @@ The owner pre-approved every decision, so no confirmation round ran. Assumptions
 
 **Outcome and proof.** The author reads what will go, in their own words, and decides. Success is a reflexive Enter that commits nothing, and a list of names that makes the decision without a trip back to the card.
 
-**Selected direction.** Inside the established register. A dialog is a ruled record slip lifted over the page. It reads top to bottom: the question, the facts as term and value, the notes, the two controls. No new tone, no new motion, no icon. `DESIGN.md` stays the authority, and only its Dialogs entry grows.
+**Selected direction.** Inside the established register. A dialog is a ruled record slip lifted over the page. It reads top to bottom: the question, the facts as term and value, the notes, the two controls. No new tone, no new motion, no icon. `DESIGN.md` stays the authority. Only its Dialogs entry and one Hierarchy line change.
 
 **Scope.** Every dialog in the studio area, and the eight prompts, built in full. Everything behind the dialog stays untouched. Anti-goals: a filled destructive button, a side inspector, machine values outside a Developer view, a toast.
 
@@ -240,7 +240,7 @@ The import's collision warning reads "Another process already uses this internal
 
 ### D8. Remove field names its reach
 
-`FieldRemovalReach` keeps its counts, so `hasReach` and the walk's tests stand. It gains `sites`:
+`FieldRemovalReach` keeps its counts, so `hasReach` and the walk's runtime tests stand, with the typing of task 3.1a. It gains `sites`:
 
 ```ts
 sites: {
