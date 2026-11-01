@@ -3,7 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { FIELD_KINDS, type FieldId, type FieldKindName, type Step, type View, type ViewNote } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
-import { draftFields, type DraftField } from "../draft/fields";
+import type { DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
 import { updateInDraftArray } from "../draft/draft-array-crud";
@@ -45,6 +45,7 @@ import {
 } from "../draft/view-tree";
 import { PALETTE_FIELD_KINDS, mintCatalogField } from "../draft/mintField";
 import { writeFieldLabel } from "../draft/fieldLabel";
+import { takenFieldKeys } from "../panels/fieldCatalogLogic";
 import { usePublishedFieldIds } from "../draft/publishedFields";
 import { seedLocalizedText, missingTranslationWarning, resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text";
 import { BooleanOrExpressionInput } from "../panels/shared/BooleanOrExpressionInput";
@@ -1176,9 +1177,10 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
    * row commit together, so a mid-mutation reader never sees one without
    * the other. The field is minted outside the recipe, so its id is the one
    * `naming` holds. The selection clears: it is an array index the insert
-   * shifts. */
+   * shifts. The key steps past the Fields tab's taken set (`takenFieldKeys`),
+   * so a key only an expression reads, or a CEL literal word, takes a number. */
   const mintAndPlace = (kind: FieldKindName, slot: number) => {
-    const taken = new Set(draftFields(draft).map((f) => f.key ?? "").filter((key) => key !== ""));
+    const taken = takenFieldKeys(draft, undefined, kind === "group");
     const field = mintCatalogField(kind, seedLocalizedText(contentLocale), baseLocale, taken);
     const fieldId = field.id as FieldId;
     mutate((d) => {

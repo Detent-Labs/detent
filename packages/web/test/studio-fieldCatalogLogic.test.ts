@@ -90,6 +90,27 @@ describe("nextFieldKey", () => {
       expect(nextFieldKey("amount", priorLabel, newLabel, "en", new Set(), false)).toBe("total_amount");
     });
   });
+
+  describe("after a prior label that derives no key", () => {
+    const priorLabel = { en: "€" };
+
+    it("follows from a key an expression reads, once the new label derives one", () => {
+      expect(nextFieldKey("amount", priorLabel, { en: "€ Total" }, "en", new Set(), false, true)).toBe("total");
+    });
+
+    it("leaves a key nothing reads", () => {
+      expect(nextFieldKey("amount", priorLabel, { en: "€ Total" }, "en", new Set(), false, false)).toBeUndefined();
+    });
+
+    it("leaves a read key while the new base label derives none, a translation included", () => {
+      expect(nextFieldKey("amount", priorLabel, { en: "€$" }, "en", new Set(), false, true)).toBeUndefined();
+      expect(nextFieldKey("amount", priorLabel, { en: "€", de: "Gesamt" }, "en", new Set(), false, true)).toBeUndefined();
+    });
+
+    it("leaves a read key under the lock", () => {
+      expect(nextFieldKey("amount", priorLabel, { en: "€ Total" }, "en", new Set(), true, true)).toBeUndefined();
+    });
+  });
 });
 
 describe("droppedByKindChange", () => {

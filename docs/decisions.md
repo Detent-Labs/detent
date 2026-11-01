@@ -1290,27 +1290,15 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   string.** A change or deletion of an option `value` on a field leaves every
   CEL comparison such as `data.priority == "high"` on the old string. The
   type check raises no error and the studio shows no message.
-  The key-rename guard (audit finding E2-7) locks the key against label
-  changes and counts the readers of a key. It leaves this gap open on purpose, since
-  finding a comparison needs a heuristic over CEL string literals, and that
+  The key follows its label until the first publish, and a key change
+  rewrites the expressions that read the old key. That rewrite leaves this
+  gap open on purpose, since finding a comparison needs a heuristic over CEL string literals, and that
   heuristic gives false positives. Risk (Medium): a guard stops matching after
   an option rename, and the path parks.
 
   Upgrade entry: extend the reader walk in
   `packages/web/src/areas/studio/draft/key-readers.ts` to report a string
   literal compared with the field.
-- **FIELDS-27: a key notice names no reader and a rename leaves them
-  dangling.** The notice counts the expressions that read a key, names none
-  and offers no jump to them. The "Used in" column beside it has a "Show on
-  the canvas" pattern to copy. After a committed rename, the notice recomputes
-  for the new key and drops to no readers. An expression that now reads a key
-  no field has gets no message beyond the checks rail's unknown-variable
-  result. The key input has no Escape revert and no pending hint while the
-  typed text differs from the key. Risk (Medium): a rename silently strands
-  every guard that read the old key.
-
-  Upgrade entry: a "rename and rewrite readers" command can close all three
-  gaps. A rewrite would reuse the traversal of `removeFieldAndReferences`.
 - **FIELDS-28: the lock shows no notice while the base version loads or
   fails.** Until the base version body has loaded, a field with a non-empty
   key counts as published, so the label no longer sets its key. The notice
@@ -1972,6 +1960,93 @@ local to this section.
 - **SELECTS-18: the operand picker counts repeats on untrimmed labels.** The
   field-map selects trim a label before they count it. A label with a trailing
   space then counts apart in the picker alone.
+
+## Open from studio-field-key-follows-name (needs its own OpenSpec change)
+
+The change let a field key follow its label until the first publish. It also
+rewrote every reader on a key change and added the "Read by" zone. It left
+eleven points to later changes. The critique and the audit of 2026-11-01
+raised the last four.
+
+- **KEYFOLLOW-1: the key input shows no pending hint while the typed text differs
+  from the key.** The typed text commits on blur or Enter. Until then nothing
+  says the key has not changed. `FIELDS-27` named this gap, and the change
+  closed the rest of that entry. Risk (Low): an author types a key, moves on
+  and believes it took effect.
+
+  Upgrade entry: show a hint in `panels/FieldCatalogPanel.tsx` while the typed
+  text differs from `field.key`.
+- **KEYFOLLOW-2: an index read stays on the old key after a rename.** A source such
+  as `data["amount"]` is not a member read, so the rewrite and the reader count
+  skip it. The checks rail reports the old key as unknown. Risk (Low): a
+  hand-written guard strands after a rename, and the rail names it.
+
+  Upgrade entry: extend `rewriteFieldRead` and `keyReaderSites` in
+  `draft/key-readers.ts` to match an index with a string literal.
+- **KEYFOLLOW-3: a child's key commit leaves its callers on the old key.** A parent
+  reads `child.data.<key>`, and the rewrite reaches only the open draft. The
+  hash `contractRef` covers field ids, so the signature stays and a
+  `latest-at-spawn` binding keeps the child. Risk (Medium): that parent's guard
+  then reads no match, and the path parks.
+
+  Upgrade entry: when a published child's key commits, list the callers in
+  `panels/FieldCatalogPanel.tsx` and rewrite their `child.data` reads.
+- **KEYFOLLOW-4: the form editor rewrites readers on a rename and shows no rewrite
+  line.** Both screens share `draft/fieldLabel.ts::writeFieldLabel`. Only the
+  Fields tab counts the rewrites. Risk (Low): an author renames in the form
+  editor and never learns that conditions moved.
+
+  Upgrade entry: count the readers before the write in
+  `screens/FormEditorScreen.tsx` and show the line the Fields tab shows.
+- **KEYFOLLOW-5: a "Read by" row for a step form names a shared step label
+  plainly.** A way-out heading numbers the same label. Two steps called
+  "Review" read alike in a form row and apart in a way-out row. Risk (Low): an
+  author cannot tell which of two same-named steps a form row means.
+
+  Upgrade entry: number a repeated step label in `panels/readByRows.ts`, as
+  `optionText.ts::wayOutHeading` does.
+- **KEYFOLLOW-6: closing the Developer view hides a pending key refusal and the
+  typed text.** The refusal and the text live in the key input's state. A
+  closed `<details>` hides both and keeps them. Risk (Low): an author reopens
+  the view later and finds a refusal for text they forgot.
+
+  Upgrade entry: clear the typed text when `panels/FieldCatalogPanel.tsx`
+  closes the Developer view.
+- **KEYFOLLOW-7: the empty-prior-label rule releases a hand-committed key once a
+  base label appears.** A field with a hand-committed key and an empty label
+  keeps that key while a condition reads it. The first label that derives a
+  key then moves the key and its readers. Risk (Low): a key an author set by
+  hand follows a label typed later.
+
+  Upgrade entry: bind `priorEmptyHeld` in
+  `panels/fieldCatalogLogic.ts::nextFieldKey` to `keyFollowsLabel` as well.
+- **KEYFOLLOW-8: the rewrite line counts the conditions and names none.** It
+  reads "Updated 1 condition." under the label. The rewritten rows stand in
+  the "Read by" zone, in the other half of the editor. Risk (Low): an author
+  must search for what moved.
+
+  Upgrade entry: name up to three places in the line, and tint the rewritten
+  rows in `panels/FieldCatalogPanel.tsx` with the usage tint.
+- **KEYFOLLOW-9: a "Read by" row offers no way to its condition.** The "Used
+  in" rows carry "Show on the canvas", and a "Read by" row has no control.
+  Risk (Low): an author opens the Steps tab and finds the way out by hand.
+
+  Upgrade entry: change 11 (`studio-field-card`) gives each row a control that
+  opens the section holding the condition.
+- **KEYFOLLOW-10: a condition on a field no step asks for can never match.** The
+  "Read by" zone lists it like any other. Nothing says the field stays empty.
+  Risk (Medium): a way out that waits on such a field never opens.
+
+  Upgrade entry: compare `panels/readByRows.ts`'s rows with the "Used in"
+  rows and add a sentence when no step asks for the field.
+- **KEYFOLLOW-11: at 1024px the field editor scrolls in a short band.** Below
+  64rem the entity rail stacks above the editor. Measured on 2026-11-01 at
+  1024x800, the editor scrolls inside a 225px box. The label and the "Read by"
+  zone then stand about 1,060px apart. Risk (Low): the rewrite line and the
+  conditions it counts never stand on screen together.
+
+  Upgrade entry: changes 10 and 11 own the stacked layout, as `RAIL-7` records
+  for the Steps tab.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

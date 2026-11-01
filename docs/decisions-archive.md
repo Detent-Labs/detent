@@ -944,3 +944,21 @@ system that resulted; this file explains why it took that shape.
 
   Resolved by `studio-form-editor-names-fields`: the editor's heading takes
   the focus on open, and the destination tab's button takes it on leave.
+- **FIELDS-27: a key notice names no reader and a rename leaves them
+  dangling.** The notice counts the expressions that read a key, names none
+  and offers no jump to them. The "Used in" column beside it has a "Show on
+  the canvas" pattern to copy. After a committed rename, the notice recomputes
+  for the new key and drops to no readers. An expression that now reads a key
+  no field has gets no message beyond the checks rail's unknown-variable
+  result. The key input has no Escape revert and no pending hint while the
+  typed text differs from the key. Risk (Medium): a rename silently strands
+  every guard that read the old key.
+
+  Upgrade entry: a "rename and rewrite readers" command can close all three
+  gaps. A rewrite would reuse the traversal of `removeFieldAndReferences`.
+
+  Resolved by `studio-field-key-follows-name`, except the pending hint: the
+  key input moved into the field editor's Developer view with an Escape
+  revert, a refusal under the input and a "Read by" zone. Every key change
+  rewrites the readers and says how many. The pending hint stays open as
+  KEYFOLLOW-1 in `docs/decisions.md`.

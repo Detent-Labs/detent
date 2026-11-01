@@ -565,6 +565,19 @@ export function conditionSentence(condition: Condition, operands: Operand[], sto
 }
 
 /**
+ * A stored condition as one sentence, for a place that lists conditions
+ * without a builder. The complete rows' clauses read as the builder's
+ * sentence does, and a raw row reads as the catalog's phrase. Source that
+ * does not parse, or holds no complete row, reads as a hand-written rule.
+ */
+export function readerSentence(src: string, operands: Operand[]): string {
+  const condition = fromCel(src, operands);
+  const clauses = condition ? summarizeCondition(condition, operands, "phrase") : "";
+  if (!clauses) return t("condition.readerRaw");
+  return capitalize(fill(t("condition.sentence"), { condition: clauses }));
+}
+
+/**
  * The readable form of a guard's CEL text: a plain-English summary when the
  * guard parses into rows, the raw CEL text otherwise (a fragment the builder
  * cannot represent at all — see "A fragment the builder cannot represent

@@ -21,6 +21,15 @@ const draftWith = (fields: unknown[], viewFields: unknown[] = []): Draft =>
     },
   }) as unknown as Draft;
 
+type Step = { paths?: unknown[] };
+const stepOf = (d: Draft) => d.workflow!.steps![0] as unknown as Step;
+
+/** Puts one way out on the draft's step, guarded by `src`. */
+const guardOn = (d: Draft, src: string) => {
+  stepOf(d).paths = [{ id: "path_a", key: "p", label: "P", to: "step_a", trigger: "manual", guard: { lang: "cel", src } }];
+};
+const guardSrc = (d: Draft) => (stepOf(d).paths![0] as { guard: { src: string } }).guard.src;
+
 describe("writeFieldLabel", () => {
   it("writes the label and lets a key-less field's key follow it", () => {
     const d = draftWith([{ id: "field_a", key: "", type: "number", label: { en: "" } }]);
@@ -93,6 +102,24 @@ describe("writeFieldLabel", () => {
     expect(fieldIn(d, "field_group").label).toEqual({ en: "Line items" });
     expect(fieldIn(d, "field_group").key).toBe("line_items");
     expect(d.workflow!.steps![0]!.view!.fields as unknown).toEqual([{ ref: "field_group" }, { ref: "field_nested", group: "line_items" }]);
+  });
+
+  it("rewrites a guard that reads the key the label moves", () => {
+    const d = draftWith([{ id: "field_a", key: "amount", type: "number", label: { en: "Amount" } }]);
+    guardOn(d, "data.amount > 1000.0");
+    writeFieldLabel(d, "field_a", { en: "Total amount" }, "en", new Set());
+
+    expect(fieldIn(d, "field_a").key).toBe("total_amount");
+    expect(guardSrc(d)).toBe("data.total_amount > 1000.0");
+  });
+
+  it("leaves the guard on a published field, whose key stays", () => {
+    const d = draftWith([{ id: "field_a", key: "amount", type: "number", label: { en: "Amount" } }]);
+    guardOn(d, "data.amount > 1000.0");
+    writeFieldLabel(d, "field_a", { en: "Total amount" }, "en", new Set(["field_a"]));
+
+    expect(fieldIn(d, "field_a").key).toBe("amount");
+    expect(guardSrc(d)).toBe("data.amount > 1000.0");
   });
 
   it("writes nothing for an id the catalog does not hold", () => {

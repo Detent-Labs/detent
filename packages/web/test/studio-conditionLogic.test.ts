@@ -7,6 +7,7 @@ import {
   fromCel,
   guardEdgeLabel,
   operandSignature,
+  readerSentence,
   operatorsFor,
   summarizeCondition,
   toCel,
@@ -669,5 +670,40 @@ describe("conditionSentence", () => {
   it("asks for a finished row when the stored source does not parse", () => {
     const unfinished: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: undefined }] };
     expect(conditionSentence(unfinished, operands, "data.amount >")).toBe("Finish a row to set the condition.");
+  });
+});
+
+// `studio-condition-builder`: "A condition reads as a sentence outside the builder".
+describe("readerSentence", () => {
+  const operands = catalog([
+    { id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" } as never,
+    { id: "field_status", key: "status", label: { en: "Status" }, type: "string" } as never,
+  ]);
+
+  it("reads a guard in words", () => {
+    expect(readerSentence("data.amount > 1000.0", operands)).toBe("Amount is greater than 1,000.");
+  });
+
+  it("reads source that does not parse as a hand-written rule, with no CEL", () => {
+    const sentence = readerSentence("data.amount >", operands);
+    expect(sentence).toBe("A hand-written rule.");
+    expect(sentence).not.toContain("data.");
+  });
+
+  it("joins a two-row condition the way the builder's sentence does", () => {
+    expect(readerSentence('data.amount > 1000.0 && data.status == "open"', operands)).toBe(
+      "Amount is greater than 1,000 and Status is “open”.",
+    );
+  });
+
+  it("reads a row the builder cannot read as the catalog's phrase, never as CEL", () => {
+    const sentence = readerSentence("data.amount > 1000.0 || !(data.status == \"open\")", operands);
+    expect(sentence).toBe("Amount is greater than 1,000 or a hand-written rule.");
+    expect(sentence).not.toContain("data.");
+  });
+
+  it("reads source with no row, or with a raw row alone, as a hand-written rule", () => {
+    expect(readerSentence("", operands)).toBe("A hand-written rule.");
+    expect(readerSentence('data.unknown == "x"', operands)).toBe("A hand-written rule.");
   });
 });

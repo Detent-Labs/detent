@@ -47,17 +47,30 @@ const ZONE_BY_KEY: Record<string, FieldCheckZone> = {
  * nothing is scanned and the answer is `undefined`.
  */
 export function fieldCheckZone(loc: string): FieldCheckZone | undefined {
+  for (const segment of segmentsAfterAnchor(loc)) {
+    const zone = ZONE_BY_KEY[segment];
+    if (zone) return zone;
+  }
+  return undefined;
+}
+
+/**
+ * Whether a check's `loc` names the field's own key, read off the same anchor
+ * `fieldCheckZone` reads. The field editor opens its key's Developer view
+ * while such a check stands.
+ */
+export function namesFieldKey(loc: string): boolean {
+  return segmentsAfterAnchor(loc)[0] === "key";
+}
+
+/** The `loc` segments after its last `fields` token, index suffixes dropped,
+ * or none for a `loc` with no such token. */
+function segmentsAfterAnchor(loc: string): string[] {
   const segments = loc
     .split(".")
     .map((s) => s.replace(/\[\d+\]$/, ""))
     .filter((s) => s.length > 0);
 
   const anchor = segments.lastIndexOf("fields");
-  if (anchor === -1) return undefined;
-
-  for (const segment of segments.slice(anchor + 1)) {
-    const zone = ZONE_BY_KEY[segment];
-    if (zone) return zone;
-  }
-  return undefined;
+  return anchor === -1 ? [] : segments.slice(anchor + 1);
 }

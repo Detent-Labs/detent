@@ -32,6 +32,8 @@ import {
   type ChangeRow,
 } from "../src/areas/studio/draft/changeSet.js";
 import { t } from "../src/areas/studio/catalog.js";
+import { writeFieldKey } from "../src/areas/studio/draft/fieldKey.js";
+import type { Draft } from "../src/areas/studio/draft/types.js";
 import { containerNodes } from "./zodContainerPaths.js";
 
 // Fixtures are plain JSON, mutated per case. `any` keeps the mutations short;
@@ -967,5 +969,54 @@ describe("describeChanges: word coverage", () => {
       }
     }
     expect(unlisted).toEqual([]);
+  });
+});
+
+describe("describeChanges: a key change", () => {
+  it("shows a committed key on the field's row and the rewritten guard on its way out's row", () => {
+    const before = minimal(
+      [
+        {
+          id: "step_review",
+          key: "review",
+          label: { en: "Review" },
+          type: "task",
+          paths: [
+            {
+              id: "path_book",
+              key: "book",
+              label: "Book",
+              to: "step_done",
+              trigger: "automatic",
+              priority: 1,
+              guard: { lang: "cel", src: "data.amount > 1000.0" },
+            },
+          ],
+        },
+        { id: "step_done", key: "done", label: { en: "Done" }, type: "task", terminal: true },
+      ],
+      [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number" }],
+    );
+    const after = structuredClone(before);
+    writeFieldKey(after as Draft, "field_amount", "total");
+
+    const rows = describeChanges(before, after);
+    const field = rows.find((r) => r.key === "fields:field_amount");
+    const wayOut = rows.find((r) => r.key === "paths:path_book");
+
+    expect(rows).toHaveLength(2);
+    expect(field?.kind).toBe("changed");
+    expect(field?.properties).toEqual([
+      { name: "Key", kind: "changed", before: { text: "amount", mono: true }, after: { text: "total", mono: true } },
+    ]);
+    expect(wayOut?.kind).toBe("changed");
+    expect(wayOut?.properties).toEqual([
+      {
+        name: "Only if",
+        kind: "changed",
+        before: { text: "data.amount > 1000.0", mono: true },
+        after: { text: "data.total > 1000.0", mono: true },
+      },
+    ]);
   });
 });

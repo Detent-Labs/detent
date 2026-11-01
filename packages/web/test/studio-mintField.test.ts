@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { FIELD_KINDS } from "workflow-engine/schema";
 import { baseTypeForPaletteKind, mintCatalogField, PALETTE_FIELD_KINDS } from "../src/areas/studio/draft/mintField.js";
 import { fieldKindLabel } from "../src/areas/studio/draft/field-type-labels.js";
-import { labelChangePatch } from "../src/areas/studio/panels/fieldCatalogLogic.js";
+import { labelChangePatch, takenFieldKeys } from "../src/areas/studio/panels/fieldCatalogLogic.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 import { insertViewField, isDraftViewField } from "../src/areas/studio/draft/view-layout.js";
 
@@ -81,6 +81,30 @@ describe("mintCatalogField", () => {
 
     expect(draft.fields![0]!.label).toEqual({ en: "Due date" });
     expect(keys).toEqual(["due_date", "due_date_2"]);
+  });
+
+  it("passes over a key only an expression reads, through the Fields tab's taken set", () => {
+    const draft = {
+      baseLocale: "en",
+      fields: [],
+      workflow: { steps: [{ id: "step_a", paths: [{ id: "path_a", guard: { lang: "cel", src: "data.date != \"\"" } }] }] },
+    } as unknown as Draft;
+    const field = mintCatalogField("date", { en: "" }, "en", takenFieldKeys(draft));
+
+    expect(field.key).toBe("date_2");
+    const guard = (draft.workflow as unknown as { steps: { paths: { guard: { src: string } }[] }[] }).steps[0]!.paths[0]!.guard;
+    expect(guard.src).toBe('data.date != ""');
+  });
+
+  it("mints a group against the other fields' keys alone", () => {
+    const draft = {
+      baseLocale: "en",
+      fields: [],
+      workflow: { steps: [{ id: "step_a", paths: [{ id: "path_a", guard: { lang: "cel", src: "data.group" } }] }] },
+    } as unknown as Draft;
+
+    expect(mintCatalogField("group", { en: "" }, "en", takenFieldKeys(draft, undefined, true)).key).toBe("group");
+    expect(mintCatalogField("text", { en: "" }, "en", takenFieldKeys(draft)).key).toBe("text");
   });
 
   it("mints a Number as a number field with no format or control", () => {
