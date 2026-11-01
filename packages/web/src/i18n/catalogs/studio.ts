@@ -371,7 +371,7 @@ export const en = {
   "formEditor.noteKind": "Note",
   "formEditor.stepNotFound": "This step no longer exists in the draft.",
   "formEditor.loadFailed": "The form editor could not load. Your draft is unchanged: go back, save it, then reload the page.",
-  "formEditor.navigateAwayKeepsChanges": "Every change is already in the draft. Save, Discard and Publish stay on the header bar.",
+  "formEditor.navigateAwayKeepsChanges": "Every change is already in the draft. The header bar saves and publishes it, and its ⋮ menu discards it.",
   "formEditor.paletteLabel": "Catalog fields not on this form",
   "formEditor.paletteHeading": "Available fields",
   "formEditor.paletteEmpty": "Every catalog field is on this form.",

@@ -8,6 +8,8 @@ import {
   headerStateLine,
   formatSavedTime,
   editingLocaleNote,
+  justPublishedAfter,
+  saveFocusTarget,
 } from "../src/areas/studio/screens/draftToolbarState.js";
 import { applyReload, applySaveResult, initialSaveState } from "../src/areas/studio/screens/draftSaveLogic.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
@@ -423,5 +425,55 @@ describe("editingLocaleNote", () => {
 
   it("names nothing while the JSON surface is open", () => {
     expect(editingLocaleNote("de", "en", true)).toBeUndefined();
+  });
+});
+
+describe("justPublishedAfter", () => {
+  /** The flag across a run of renders, each named by whether the draft is dirty. */
+  const across = (start: boolean, renders: boolean[]) => renders.reduce(justPublishedAfter, start);
+
+  it("stands through clean renders after a publish", () => {
+    expect(across(true, [false, false, false])).toBe(true);
+  });
+
+  it("falls on the first dirty render", () => {
+    expect(across(true, [false, true])).toBe(false);
+  });
+
+  it("stays down after a publish, an edit and a save", () => {
+    expect(across(true, [true, false])).toBe(false);
+  });
+
+  it("stays down when the author undoes the edit by hand", () => {
+    expect(across(true, [true, true, false, false])).toBe(false);
+  });
+
+  it("never rises on its own, on a draft nobody published in this session", () => {
+    expect(justPublishedAfter(false, false)).toBe(false);
+    expect(justPublishedAfter(false, true)).toBe(false);
+  });
+});
+
+describe("saveFocusTarget", () => {
+  const answered = { pressed: true, clean: true, focusOnBody: true };
+
+  it("moves the focus to the state line when a pressed Save vanished from the focus", () => {
+    expect(saveFocusTarget(answered)).toBe("stateLine");
+  });
+
+  it("moves nothing on a refused save, which leaves the draft dirty", () => {
+    expect(saveFocusTarget({ ...answered, clean: false })).toBeUndefined();
+  });
+
+  it("moves nothing on a successful save with a draft edited meanwhile", () => {
+    expect(saveFocusTarget({ ...answered, clean: false, focusOnBody: false })).toBeUndefined();
+  });
+
+  it("moves nothing when the author moved the focus elsewhere", () => {
+    expect(saveFocusTarget({ ...answered, focusOnBody: false })).toBeUndefined();
+  });
+
+  it("moves nothing on a save Save's own press did not start, such as the publish dialog's", () => {
+    expect(saveFocusTarget({ ...answered, pressed: false })).toBeUndefined();
   });
 });

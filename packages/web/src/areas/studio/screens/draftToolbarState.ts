@@ -131,6 +131,31 @@ export function headerStateLine(
   return { state: "saved", ...version };
 }
 
+/**
+ * The just-published flag after a render (studio-publish spec: "After a publish
+ * the header bar states the version and offers Versions"). A successful publish
+ * raises it directly. A dirty draft lowers it, and nothing here raises it again,
+ * so a later save leaves it down.
+ */
+export function justPublishedAfter(current: boolean, dirty: boolean): boolean {
+  return current && !dirty;
+}
+
+/**
+ * Where the focus goes once a save has answered (studio-process-tabs spec: "A
+ * keyboard save keeps its place"). `"stateLine"` only when Save's own press
+ * started that save, the answer left the draft clean, so the button is gone, and
+ * the focus fell to the body. `undefined` leaves the focus where it stands: a
+ * refused save keeps the button, and focus the author moved stays put.
+ */
+export function saveFocusTarget(answer: {
+  pressed: boolean;
+  clean: boolean;
+  focusOnBody: boolean;
+}): "stateLine" | undefined {
+  return answer.pressed && answer.clean && answer.focusOnBody ? "stateLine" : undefined;
+}
+
 /** The clock time of a save, hour and minute, in the browser's locale. */
 export function formatSavedTime(at: Date): string {
   return at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });

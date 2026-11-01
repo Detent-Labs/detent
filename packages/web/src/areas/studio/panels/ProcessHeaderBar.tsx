@@ -11,7 +11,7 @@ import { IssueList } from "./shared/IssueList.js";
 import { useConfirmDialog } from "./shared/confirmDialog.js";
 import { PublishChanges } from "./PublishChanges.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
-import { editingLocaleNote, formatSavedTime, headerStateLine, nextVersionLabel, publishAvailability } from "../screens/draftToolbarState.js";
+import { editingLocaleNote, formatSavedTime, headerStateLine, nextVersionLabel, publishAvailability, saveFocusTarget } from "../screens/draftToolbarState.js";
 import type { DraftToolbarActions } from "./DraftToolbar.js";
 import type { ValidationResult } from "../draft/validation.js";
 import type { PublishResult } from "../api/types.js";
@@ -791,12 +791,13 @@ export function ProcessHeaderBar({
   }, [menuOpen]);
 
   // A save's answer can unmount the button that holds the focus, which drops the
-  // focus to the body. Only then does it move to the state line. A refused save
-  // keeps the button, and focus the author moved since stays where it is.
+  // focus to the body. `saveFocusTarget` rules on it once the save has answered.
   useEffect(() => {
-    if (actions.saving || !savePressedRef.current) return;
+    if (actions.saving) return;
+    const pressed = savePressedRef.current;
     savePressedRef.current = false;
-    if (!isDirty && document.activeElement === document.body) stateLineRef.current?.focus();
+    const target = saveFocusTarget({ pressed, clean: !isDirty, focusOnBody: document.activeElement === document.body });
+    if (target === "stateLine") stateLineRef.current?.focus();
   }, [actions.saving, isDirty]);
 
   const runMenuAction = (action: () => void) => {

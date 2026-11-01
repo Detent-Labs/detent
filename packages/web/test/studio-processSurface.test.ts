@@ -122,12 +122,16 @@ describe("what the surface no longer carries", () => {
     expect(dialog).toContain("triggerRef={triggerRef}");
   });
 
-  it("moves the focus to the state line only when a pressed Save vanished from the focus", () => {
+  // `studio-draftToolbarState.test.ts` tests the rule. This pins its wiring: the
+  // inputs the effect hands over, and the wait for the save's answer.
+  it("wires Save's press and the focus on the body into saveFocusTarget", () => {
     const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
+    const effect = code.slice(code.indexOf("useEffect(() => {\n    if (actions.saving) return;"), code.indexOf("const runMenuAction"));
 
     expect(code).toContain("savePressedRef.current = true");
-    expect(code).toContain("if (actions.saving) return;");
-    expect(code).toContain("if (!isDirty && document.activeElement === document.body) stateLineRef.current?.focus();");
+    expect(effect).toContain("saveFocusTarget({ pressed, clean: !isDirty, focusOnBody: document.activeElement === document.body })");
+    expect(effect).toContain('target === "stateLine"');
+    expect(effect).toContain("[actions.saving, isDirty]");
   });
 
   it("sizes the process name to its text, up to the cap", () => {
@@ -158,11 +162,13 @@ describe("the process surface's frame around the header bar", () => {
     expect(bannerAt).toBeGreaterThan(code.indexOf("/>", barAt));
   });
 
-  it("raises the just-published flag from a publish and clears it during render on a dirty draft", () => {
+  // `studio-draftToolbarState.test.ts` tests the transition. This pins its
+  // wiring: a publish raises the flag, and each render feeds it the dirty state.
+  it("wires the just-published flag to a publish and to justPublishedAfter", () => {
     const code = stripComments(read(SURFACE));
 
     expect(code).toContain("setJustPublished(result !== null)");
-    expect(code).toContain("if (justPublished && dirtyNow) setJustPublished(false);");
+    expect(code).toContain("justPublishedAfter(justPublished, dirtyNow)");
   });
 
   it("opens Settings on its Process view, leaving the form editor where one stands", () => {

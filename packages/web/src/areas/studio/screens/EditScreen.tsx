@@ -29,7 +29,7 @@ import { checkTarget, formEditorReturnTab, processTabCounts, surfaceTab, type Ch
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { showsStructuralBanner } from "../draft/startGaps.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
-import { isDraftDirty } from "./draftToolbarState.js";
+import { isDraftDirty, justPublishedAfter } from "./draftToolbarState.js";
 import { CanvasView } from "../canvas/CanvasView.js";
 import { CanvasBar } from "../canvas/CanvasBar.js";
 import { reachableStepIds } from "../draft/registerOrder.js";
@@ -461,8 +461,9 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // change away from `edit` can never leave a stale `true` behind.
   const dirtyNow = isDraftDirty(draft, savedBody, saveState.layout, savedLayout);
   // The first dirty render retires the offer, during render, the way React
-  // adjusts state from state. A later save leaves it retired.
-  if (justPublished && dirtyNow) setJustPublished(false);
+  // adjusts state from state.
+  const nextJustPublished = justPublishedAfter(justPublished, dirtyNow);
+  if (nextJustPublished !== justPublished) setJustPublished(nextJustPublished);
   useEffect(() => {
     onDirtyChange?.(dirtyNow);
     return () => onDirtyChange?.(false);
