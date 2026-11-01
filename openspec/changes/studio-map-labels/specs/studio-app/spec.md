@@ -91,6 +91,7 @@ body, and no empty band sits below it.
   the browser's Back control
 - **THEN** the Map tab returns, and the draft keeps every change
 
+<!-- The scenario name repeats the live spec's; a MODIFIED block cannot rename a scenario. -->
 #### Scenario: Show on the canvas preselects a step
 
 - **WHEN** the author picks "Show on the map" on a used-in row of the

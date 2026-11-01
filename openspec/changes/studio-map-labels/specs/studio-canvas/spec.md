@@ -145,7 +145,7 @@ writes a step's label.
 #### Scenario: A new step's key follows its label as the developer types
 
 - **WHEN** the developer, while the studio's content locale is the draft's
-  base locale, creates a step from the palette
+  base locale, creates a step from the canvas bar
 - **AND** the developer types "Manager review" into its label, having never
   touched its key field
 - **THEN** the step's key reads `manager_review`
@@ -154,7 +154,7 @@ writes a step's label.
 
 - **WHEN** the developer has switched the studio's content locale away from
   the draft's base locale
-- **AND** the developer creates a step from the palette and types a label
+- **AND** the developer creates a step from the canvas bar and types a label
   into it
 - **AND** the developer never touches its key field
 - **THEN** the step's key stays empty. A newly created step's label seeds
@@ -199,9 +199,11 @@ The place SHALL count the step's automatic paths by `priority`, lowest first.
 A guarded path with no `priority` SHALL read "Only if" alone. No path SHALL
 draw a number badge or an "else" marker.
 
-The condition SHALL read in the condition builder's clause words. A row the
-builder cannot read, and source that does not parse, SHALL read "a
-hand-written rule holds". The sentence SHALL NOT carry CEL source.
+The condition SHALL read in the condition builder's clause words. A
+condition with no readable row, and source that does not parse, SHALL read "a
+hand-written rule holds". A raw row beside readable rows reads "a hand-written
+rule", as the builder's sentence does. The sentence SHALL NOT carry CEL
+source.
 
 A terminal step SHALL carry an end stamp. A terminal step bound to a
 contract `outcome` SHALL carry that outcome's whole name on the stamp.
@@ -235,7 +237,8 @@ contract `outcome` SHALL carry that outcome's whole name on the stamp.
 
 #### Scenario: An unreadable guard prints no CEL
 
-- **WHEN** a path's guard holds source the builder cannot read
+- **WHEN** a path's guard reads `size(data.amount) > 3`, which no row of the
+  builder reads
 - **THEN** its line reads "Only if a hand-written rule holds"
 - **AND** the guard's source text appears nowhere on the canvas
 
@@ -272,9 +275,11 @@ end stamp sits in the top-right corner.
 ### Requirement: A step node prints the step's label, centred and resolved for the content locale
 
 A step node SHALL print the step's `label`, resolved against the studio's
-content locale with fallback to the draft's `baseLocale`. It SHALL fall back
-to the unnamed-step string when that resolution yields nothing. It SHALL NOT
-fall back to the step's `key`.
+content locale with fallback to the draft's `baseLocale`. It SHALL print the
+step text the step page's selects print. An unnamed step reads the
+unnamed-step string, numbered when two or more steps lack one. A label two
+steps share adds the rail number. The node SHALL NOT fall back to the step's
+`key`.
 
 That resolved text is the only text the node body draws. The node SHALL NOT
 draw the step's key on a line of its own. The terminal and initial stamps are
@@ -356,12 +361,19 @@ carrying a translation in the chosen locale.
   switches the content locale to `de`
 - **THEN** the node prints "Prüfen"
 
+<!-- The scenario name repeats the live spec's; a MODIFIED block cannot rename a scenario. -->
 #### Scenario: A step with no resolvable label falls back to its key
 
 - **WHEN** a step carries key `capture` and a `label` with no entry for the
   content locale and none for the base locale
 - **THEN** the node prints "(unnamed step)"
 - **AND** `capture` is nowhere in the node body
+
+#### Scenario: Two unnamed steps read apart
+
+- **WHEN** the draft's third and fifth steps have no label
+- **THEN** their nodes print "(unnamed step 3)" and "(unnamed step 5)", as the
+  steps rail does
 
 ### Requirement: The canvas is keyboard-operable, and traversal follows the paths
 
@@ -415,8 +427,8 @@ and Left on the initial step SHALL move nothing. Down on the last step in the
 draft order and Up on the first SHALL move nothing. The same holds at either
 end of a fan.
 
-The step's `aria-label` SHALL name, in order, its resolved label, its kind,
-its count of ways out and its stamps' words. It SHALL NOT name the step's
+The step's `aria-label` SHALL name four things in order. They are the text its
+node prints, its kind, its count of ways out and its stamps' words. It SHALL NOT name the step's
 key. The kind SHALL read the phrase the step page's kind control prints. The
 count SHALL cover the reachable paths alone, and SHALL read "way out" or
 "ways out" in agreement with it.
@@ -505,8 +517,8 @@ count SHALL cover the reachable paths alone, and SHALL read "way out" or
 
 Each path SHALL be a focusable control with `role="button"`, a roving
 `tabindex` and an `aria-label`. Activating a path SHALL resolve to that path's
-source step. The step page then holds that source step, with its Path to
-section in view.
+source step. The step page then holds that source step, with Ways out open on
+that way out.
 
 The guard label's own `<div>` SHALL leave the accessibility tree. A pointer
 already reaches the path anywhere along its route. The edge group's own
@@ -530,6 +542,7 @@ set. A path entered from its target SHALL walk that target's incoming set.
 - **THEN** the step page opens on that path's source step, and the author can
   change the guard it carries
 
+<!-- The scenario name repeats the live spec's; a MODIFIED block cannot rename a scenario. -->
 #### Scenario: An automatic path announces its priority
 
 - **WHEN** focus reaches the first of two automatic paths, carrying
@@ -539,7 +552,7 @@ set. A path entered from its target SHALL walk that target's incoming set.
 - **AND** the number 10 stands nowhere in it
 
 <!-- antislop: allow negation-habit -->
-<!-- Why: the scenario name repeats the live spec's, so the delta can match it. -->
+<!-- Why: the scenario name repeats the live spec's; a MODIFIED block cannot rename a scenario. -->
 #### Scenario: A guardless default says it carries no guard
 
 - **WHEN** focus reaches the guardless automatic path at a step's highest
@@ -564,6 +577,445 @@ set. A path entered from its target SHALL walk that target's incoming set.
   "Review"
 - **THEN** its accessible name reads "Send, from Capture to Review, a person
   chooses, no condition"
+
+### Requirement: A path draws as the drop target under an edit-rail drag
+
+While an edit-rail drag runs, the path under the pointer SHALL render in a
+drop-target state. That state is the affordance the gesture has. The canvas
+SHALL add no permanent control to an edge for it.
+
+At most one path SHALL carry the state. It SHALL clear on release, and as soon
+as the pointer leaves the path.
+
+The state SHALL differ from a plain path in stroke weight as well as in color.
+The signal then does not rest on color alone.
+
+A drag carrying an `end` step SHALL draw the state on no path. Such a step
+never lands inside one, so nothing may suggest that it does.
+
+The state SHALL NOT move the way out's sentence. It SHALL NOT
+add a second control at the route midpoint. A selected path already carries a
+waypoint handle there.
+
+#### Scenario: The path under the pointer marks itself
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: the line repeats the live spec's wording verbatim; this change edits another sentence of the block. -->
+- **WHEN** the developer holds a Step from the edit rail over a path
+- **THEN** that path renders in the drop-target state
+- **AND** every other path renders unchanged
+
+#### Scenario: The state clears when the pointer moves off
+
+- **WHEN** the pointer moves from the path to empty canvas
+- **THEN** no path renders in the drop-target state
+
+#### Scenario: An end step marks nothing
+
+- **WHEN** the developer holds an End from the edit rail over a path
+- **THEN** no path renders in the drop-target state
+
+### Requirement: The structure surface lays out a canvas ribbon, a steps register and the configuration pane
+
+The Canvas tab SHALL carry the canvas bar and the canvas, in that order. The
+canvas SHALL fill the body the bar leaves. No other bar and no band SHALL
+stand over it. No expand control SHALL stand, and no control SHALL change the
+canvas height.
+
+The steps register and the configuration pane SHALL NOT stand. The steps rail
+and the step page hold that work, per `studio-step-page`.
+
+Every canvas gesture the other requirements of this capability state SHALL
+stay live. Those gestures cover the drag, the connect and the drop on a path.
+They cover the pan, the zoom, the keyboard traversal and the focus ring. They
+also cover auto layout, Arrange, the grid snap, groups, waypoints and the
+double-click.
+
+The canvas and the step page SHALL share one selected step. Pressing a node
+SHALL make that step the one the step page holds. Pressing a rail row SHALL
+mark that step's node on the canvas. Pressing a path edge SHALL resolve to
+that path's source step. The step page then holds that source step, with its
+Path to section in view.
+
+The canvas bar SHALL keep the delete control for a selection of one step or
+more. It SHALL keep the selection count for a selection of more than one step.
+This capability's own selection requirement states both rules.
+
+The canvas SHALL fill the height the tab body leaves under the bar, above a
+floor of 36rem. Past that floor the page scrolls.
+
+<!-- The scenario names below repeat the live spec's wording verbatim, so a delta can match them. -->
+<!-- antislop: allow synonym-rotation -->
+#### Scenario: The three regions appear
+
+- **WHEN** an author opens the Canvas tab
+- **THEN** the canvas bar stands under the tab row
+- **AND** the canvas fills the body under it
+- **AND** no ribbon, no steps register and no configuration pane stand beside
+  it
+
+#### Scenario: The ribbon starts collapsed
+
+- **WHEN** an author opens the Canvas tab
+- **THEN** the canvas stands at its full height under the bar, carrying no
+  band
+
+#### Scenario: The control expands and collapses the ribbon
+
+- **WHEN** an author looks for a control that changes the canvas height
+- **THEN** the Canvas tab carries none
+
+#### Scenario: The bar holds its height across a selection
+
+- **WHEN** an author selects three steps, then clears the selection, in a
+  window wide enough for the row
+- **THEN** the bar's height never changes
+- **AND** the canvas never reflows
+
+#### Scenario: A canvas selection opens the pane
+
+- **WHEN** an author presses a step node on the Canvas tab
+- **THEN** the step page holds that step
+- **AND** the node reads as selected
+
+#### Scenario: A register selection marks the node
+
+- **WHEN** an author presses a row of the steps rail
+- **THEN** that step's node reads as selected on the Canvas tab
+
+<!-- The scenario name repeats the live spec's wording verbatim, so a delta can match it. -->
+<!-- antislop: allow synonym-rotation -->
+#### Scenario: Several steps show the count
+
+- **WHEN** an author selects more than one step on the canvas
+- **THEN** the canvas bar carries the selection count and its delete control
+
+#### Scenario: A reload returns the ribbon to collapsed
+
+- **WHEN** an author reloads the Canvas tab
+- **THEN** the canvas fills the body under the bar, as it did before the
+  reload
+
+#### Scenario: Saving a draft writes no ribbon state
+
+- **WHEN** an author saves the draft
+- **THEN** the saved `layout` blob has no key naming a ribbon
+
+#### Scenario: A short window holds the floor
+
+- **WHEN** an author opens the Canvas tab in a window shorter than the floor
+- **THEN** the canvas keeps 36rem and the page scrolls
+
+### Requirement: A path renders as an orthogonal route, under one canvas-wide style
+
+A path SHALL render as an orthogonal route rather than a straight line. Every
+segment SHALL lie on one axis.
+
+Each anchor SHALL sit at the midpoint of one side of its own box. That side
+is the one the box turns toward the next point on the route. For the source
+anchor that point is the first waypoint. Without waypoints it is the target
+box's centre. For the target anchor it is the last waypoint, or the source
+box's centre.
+
+A box is a step node at the canvas node size. It is also a collapsed group, at
+the group box's own size. The anchor rule SHALL read that size rather than
+assume a node's. Nothing else about the rule changes.
+
+The larger of the two offsets SHALL pick the axis. A horizontal offset larger
+than the vertical one SHALL put the anchor on a left or a right side.
+Otherwise it SHALL sit on a top or a bottom side.
+
+A path with no waypoints SHALL therefore draw exactly as it drew before
+waypoints existed. Its two anchors read offsets that negate each other
+exactly. They land on opposing sides, and both leave on one axis.
+
+A zero offset on the chosen axis SHALL put the anchor on the right
+side. Two steps stacked on one position reach that case, and every path SHALL
+draw.
+
+An anchor SHALL NOT take a free angle on the node's border. A segment leaving
+at an angle has no square turn, and every segment here stays on one axis.
+
+The route SHALL leave each anchor along the axis that anchor sits on.
+
+A path whose source or target sits inside a collapsed group SHALL anchor on
+that group's box. It SHALL NOT anchor on the hidden member. A path between two
+members of one collapsed group SHALL NOT render at all.
+
+A path MAY carry an ordered list of waypoints. The route SHALL run from the
+source anchor to the first waypoint. It SHALL run from each waypoint to the
+next, and from the last waypoint to the target anchor. Every waypoint SHALL
+lie on the drawn route.
+
+<!-- antislop: allow negation-habit -->
+<!-- Why: the line repeats the live spec's wording verbatim; this change edits another sentence of the block. -->
+A leg between two points SHALL draw as one straight segment, or as two when
+the points share no axis. It SHALL carry no gutter. The gutter clears the node
+an anchor sits on, and a waypoint has no box to clear.
+
+The route SHALL NOT double back on itself at any point. Two consecutive
+segments on one axis SHALL NOT travel in opposite directions.
+
+The first leg SHALL travel first along its anchor's own axis. The last leg
+SHALL arrive along the target anchor's axis. A leg between two waypoints SHALL
+travel first along the larger offset between them.
+
+The canvas-wide style SHALL govern every segment of a waypointed route. A path
+SHALL NOT carry a style of its own. Switching the toolbar control SHALL
+re-route the path between the same waypoints.
+
+The segment count SHALL follow from the two anchors, on both axes. It governs
+a path with no waypoints. A waypointed route takes its count from its legs
+instead.
+
+A target is ahead when its entry anchor sits beyond the source's exit anchor.
+That reading runs along the leaving axis, in the leaving direction. An anchor
+pair that is ahead and level on the other axis SHALL take one segment. That is
+the common case: the auto-layout places a linear chain of steps on one row. An
+anchor pair that is ahead and not level SHALL take three segments.
+
+An anchor pair that is not ahead SHALL take five segments. The route has to
+reach the target's entry edge from outside it.
+
+Each turn SHALL sit a whole grid step clear of the node it leaves or enters.
+That clearance runs along the axis the anchor leaves on. The turn's
+other coordinate follows the anchor, which sits at the node's own middle.
+
+Two styles SHALL ship, and no third. `step` draws square corners.
+`smoothstep` draws the same route with rounded ones. There SHALL be no
+straight style, and no style that reproduces the pre-change rendering.
+
+The corner radius SHALL clamp to half the shorter of the two segments a corner
+joins. A short segment therefore cannot carry an arc that overshoots its own
+corner.
+
+The route SHALL carry the pointer over its whole length. The area a developer
+clicks SHALL follow the route. It SHALL NOT follow a straight line between the
+anchors.
+
+A way out's sentence SHALL centre on the route's own midpoint.
+
+The connect handle SHALL stay at the source node's right-middle, whatever
+anchor a path leaving that node takes. The handle is a control an author
+presses. A handle that moved under the pointer would be harder to press.
+
+The drag-to-connect preview SHALL stay a straight line from that handle. It
+follows the pointer and reaches no target. It has neither a route to draw nor
+a side to face.
+
+A selected path SHALL draw one handle at each of its waypoints, and one at the
+route's midpoint. An unselected path SHALL draw none. The canvas holds at most
+one selected path, so at most one path shows handles.
+
+A handle SHALL draw after the way out's sentence, which reads the same
+midpoint. A handle stays grabbable that way. It may cover part of a
+label, and an author reading a guard deselects the path to clear the handles.
+
+A waypoint handle SHALL draw after the midpoint handle and take the pointer
+where the two coincide. A symmetric bend puts the route midpoint on the
+waypoint itself, and only the waypoint handle answers a double-click.
+
+Dragging the midpoint handle SHALL add a waypoint at the release point.
+Dragging a waypoint handle SHALL move that waypoint. Each SHALL land on the
+canvas lattice, the way a dragged step already does.
+
+A new waypoint SHALL take the position in the list that keeps the route's
+order. The midpoint handle sits on one leg of the route, and the new waypoint
+goes at that leg's own index.
+
+A route segment's index SHALL NOT stand in for a waypoint's index. One leg
+draws as one or two segments, so the route carries more segments than the list
+carries points.
+
+Double-clicking a waypoint handle SHALL delete that waypoint. A path whose
+last waypoint goes SHALL draw the direct route again. That is the whole of
+reset, and nothing stores what the route was before.
+
+#### Scenario: A path along one row draws straight
+
+- **WHEN** a step has a path to a step placed to its right on the same row
+- **THEN** the path renders as one horizontal segment, and it turns no corner
+
+#### Scenario: A path to a step ahead of it on another row turns two corners
+
+- **WHEN** a step has a path to a step placed to its right and one row down
+- **AND** the horizontal gap is the larger of the two
+- **THEN** the path renders as three axis-aligned segments, leaving the source
+  horizontally and entering the target horizontally
+
+#### Scenario: A path to a step below it leaves the bottom side
+
+- **WHEN** a step has a path to a step placed below it
+- **AND** the vertical gap is the larger of the two
+- **THEN** the path leaves the source's bottom-middle and enters the target's
+  top-middle
+- **AND** every segment lies on one axis
+
+#### Scenario: A path to a step above it leaves the top side
+
+- **WHEN** a step has a path to a step placed above it
+- **AND** the vertical gap is the larger of the two
+- **THEN** the path leaves the source's top-middle and enters the target's
+  bottom-middle
+
+#### Scenario: A path to a step behind it on the same row draws straight
+
+- **WHEN** a step has a path to a step placed to its left on the same row
+- **AND** the two nodes do not overlap on the horizontal
+- **THEN** the path leaves the source's left-middle and enters the target's
+  right-middle
+- **AND** it renders as one horizontal segment, and it turns no corner
+
+#### Scenario: A path to a step behind it reaches the entry edge from outside
+
+- **WHEN** a step has a path to a step placed to its left and one row down
+- **AND** the two nodes overlap on the horizontal
+- **THEN** the path renders as five axis-aligned segments
+- **AND** it enters the target from outside the target's entry edge
+
+<!-- antislop: allow negation-habit -->
+<!-- Why: the scenario name repeats the live spec's, so the delta can match it. -->
+#### Scenario: A straight route carries no arc under either style
+
+- **WHEN** a same-row path renders under `smoothstep`
+- **THEN** it draws as one straight segment, with no arc at either end
+
+#### Scenario: The smooth style rounds the same route
+
+- **WHEN** the developer switches the style to `smoothstep`
+- **THEN** every path keeps its corner points and draws each corner as an arc
+
+#### Scenario: A short segment does not overshoot its corner
+
+- **WHEN** two steps sit close enough that a route segment is shorter than
+  twice the corner radius
+- **THEN** the arc clamps to half that segment, and the route stays within its
+  own corner points
+
+<!-- The scenario name repeats the live spec's; a MODIFIED block cannot rename a scenario. -->
+#### Scenario: A guard label follows the route
+
+- **WHEN** a way out with a sentence renders under either style
+- **THEN** its sentence centres on the midpoint of the route
+- **AND** it does not sit at the midpoint of a straight line between the
+  anchors
+
+#### Scenario: Clicking the route selects the path
+
+- **WHEN** the developer clicks a route where it turns a corner, away from the
+  straight line between its anchors
+- **THEN** the canvas draws that path as selected
+
+#### Scenario: The connect handle stays put while the anchor moves
+
+- **WHEN** a step's only path leaves its bottom side
+- **THEN** that step's connect handle still sits at its right-middle
+- **AND** a drag from that handle still previews as a straight line to the
+  pointer
+
+#### Scenario: Dragging a step moves its anchors
+
+- **WHEN** the developer drags a target step from the right of its source to
+  below it
+- **THEN** the path's anchors move to the facing sides, with no reload
+
+#### Scenario: A waypointed route passes through its waypoint
+
+- **WHEN** a path carries one waypoint
+- **THEN** the drawn route passes through that point
+- **AND** every segment lies on one axis
+
+#### Scenario: A waypointed route never doubles back
+
+- **WHEN** a path carries a waypoint the route reaches head-on
+- **THEN** no segment of the route travels back along the one before it
+- **AND** no spike stands out of the route at that waypoint
+
+#### Scenario: A waypoint above the two steps turns the route above them
+
+- **WHEN** a path between two steps on one row carries a waypoint above both
+- **THEN** the route leaves the source, rises to that waypoint, and comes back
+  down into the target
+
+#### Scenario: The source anchor faces the first waypoint
+
+- **WHEN** a path to a step on its right carries a first waypoint above the
+  source
+- **THEN** the route leaves the source's top side rather than its right side
+
+#### Scenario: The style still governs a waypointed route
+
+- **WHEN** a path carrying waypoints renders under `smoothstep`
+- **THEN** every corner of every leg draws as an arc
+- **AND** the waypoints do not move
+
+#### Scenario: Only a selected path shows handles
+
+- **WHEN** the developer selects a path
+- **THEN** that path draws a handle at each waypoint and one at its midpoint
+- **AND** no other path draws a handle
+
+#### Scenario: Dragging the midpoint handle adds a waypoint
+
+- **WHEN** the developer drags a selected path's midpoint handle and releases
+- **THEN** the path carries one more waypoint, at the released point rounded
+  to the lattice
+- **AND** the route passes through it
+
+#### Scenario: Dragging a waypoint handle moves that waypoint
+
+- **WHEN** the developer drags an existing waypoint handle and releases
+- **THEN** that waypoint sits at the released point rounded to the lattice
+- **AND** the list holds the same number of waypoints as before
+
+#### Scenario: Double-clicking a waypoint handle deletes it
+
+- **WHEN** the developer double-clicks a waypoint handle
+- **THEN** the path carries one fewer waypoint
+
+#### Scenario: Deleting the last waypoint restores the direct route
+
+- **WHEN** the developer deletes a path's only waypoint
+- **THEN** the path draws the route it drew before any waypoint existed
+
+<!-- Why: the header must match the base spec character for character, or the
+     delta adds a requirement rather than modifying one. -->
+
+### Requirement: The canvas renders from compiled styles
+
+`canvas/CanvasView.tsx` and `canvas/EditRail.tsx` SHALL render from compiled
+component styles, reading `form-ui/tokens.stylex`. The rendered result
+SHALL match the previous stylesheet declaration for declaration. This
+covers every pointer-driven state (drag, selection, insert-target,
+group-collapsed) and every keyboard-driven state (roving focus ring,
+`:focus-visible` halo).
+
+`canvas-node` and `panzoom-exclude` SHALL remain literal, unhashed class
+strings on every element that carries them today. Keyboard-focus targeting
+and Panzoom's own exclude-class contract both read one of these two strings
+directly, outside the compiled-style system.
+
+#### Scenario: The canvas keeps its look and its keyboard model
+
+- **WHEN** a browser renders the canvas edit screen
+- **AND** a developer walks its nodes and edges with the keyboard, in
+  Chromium and in Firefox
+- **THEN** the canvas's computed layout, spacing, color and border equal
+  the values the deleted stylesheet declared
+- **AND** the keyboard traversal, selection and focus-ring behavior stay
+  exactly as they were before
+
+#### Scenario: Panzoom still excludes every node and edge group from panning
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: the line repeats the live spec's wording verbatim; this change edits another sentence of the block. -->
+- **WHEN** a developer starts a pointer drag on one of the canvas's
+  excluded elements
+- **AND** the element is a step node, an edge group or a waypoint handle
+- **THEN** the press reaches the canvas's own handlers and does not pan
+  the canvas
+- **AND** each of those elements still carries the literal
+  `panzoom-exclude` class Panzoom's own exclude-class option reads
 
 ## REMOVED Requirements
 

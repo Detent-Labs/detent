@@ -90,11 +90,11 @@ asked for.
 It exports pure functions over the draft types and the catalog:
 
 - `stampWords(step, initialStepId)` returns `{ start?: string; end?: string }`.
+- `stampLines(text, width)` estimates how many lines a stamp takes.
 - `wayOutSentence(path, step, operands)` returns a string, or `undefined`
   where the path has nothing to say.
-- `nodeName(step, label, outgoing, stamps)` and `pathName(path, source,
+- `nodeName(step, text, outgoing, stamps)` and `pathName(path, source,
   target, sentence)` return the two accessible names.
-- `orderWord(rank)` returns "First" to "Fifth", then "Number {n}".
 
 `canvas/pathName.ts` goes; `mapWords.ts` takes its job.
 
@@ -106,10 +106,13 @@ so a pure module is the one place a test reads a sentence directly.
 
 `panels/shared/conditionLogic.ts` replaces `guardEdgeLabel` and
 `edgeGuardLabel` with one export, `guardPhrase(src, operands)`. It returns
-the complete rows' clauses through `summarizeCondition(…, "phrase")`, with
-no capital added. Source that does not parse, or has no complete row,
-returns the catalog's `condition.handWrittenHolds`, "a hand-written rule
-holds".
+the complete rows' clauses through `summarizeCondition`, with no capital
+added. Source that does not parse returns the catalog's
+`condition.handWrittenHolds`, "a hand-written rule holds". A condition with
+no complete `cmp` row returns it too. A raw row counts as complete
+(`isComplete`), so the test reads the row kind. A raw row beside readable
+rows reads `condition.clause.raw` inside the joined clauses, as the
+builder's sentence does.
 
 `draft/guarded-path-notes.ts` reads `guardPhrase` and drops its `raw` flag.
 `FormPreview.tsx` drops the `<code>` branch, and its `cel` style if nothing
@@ -119,6 +122,11 @@ The `"source"` reading of `RawRowReading` loses its last caller. The
 argument and the type go. `summarizeCondition` then always reads the phrase.
 
 ### D3. The way-out sentence
+
+A path counts as guarded where `guard.src` holds text after trimming. Two
+callers read `guardPhrase` only then: `wayOutSentence` and
+`guardedManualPathNotes`. That way
+so an empty source reads as no guard, as it does today.
 
 `wayOutSentence` picks one form per path:
 
@@ -144,9 +152,15 @@ owner rated the bare number cryptic (c1), and the step page already says
 ### D4. Stamps: `NodeStamp`, an HTML stamp in a `<foreignObject>`
 
 A small component draws one stamp from `{ text, corner, width }`. The host
-`<foreignObject>` is 40 units high and ends 8 units below the node's top
-edge. A flex column puts the stamp at its bottom, so a second line grows
-upward. The start corner aligns left at x = 8. The end corner aligns right,
+`<foreignObject>` ends 8 units below the node's top edge. A flex column puts
+the stamp at its bottom, so a second line grows upward. The host's height
+follows `stampLines`: 13 units per line plus 6 for the rule and padding.
+
+`stampLines` estimates at 7.5 units per character, the 11px mono advance
+plus its tracking, over the width inside the rule and padding. The estimate
+keeps `getBBox()`, and so Fit to view, framing the stamp's real extent. The
+host also sets `overflow: visible`, so a short estimate never clips a
+letter. The start corner aligns left at x = 8. The end corner aligns right,
 ending 8 units in from the right edge.
 
 A stamp's width cap is the node width minus 16. When a node carries both,
@@ -179,7 +193,8 @@ The floor rises from 60 to 120, because a wrapped sentence at 60 units
 reads one word per line.
 
 The host takes no pointer events. The text block takes them, so the empty
-host corners never swallow a press meant for a node.
+host corners never swallow a press meant for a node. The text block carries
+`aria-hidden`, since the path's own name carries the sentence.
 
 `NodeLabel`'s clip measurement moves into a hook, `useClipped(ref, text)`.
 Both labels read it, so the title shows only where the clamp cut the text.
@@ -201,8 +216,8 @@ sentence call `onSelectStep(sourceId, pathId)`, then
 `onOpenStepPage` gains an optional `pathId`. `EditScreen` bumps a counter,
 `waysOutRequest`, whenever it receives one, and passes it to `StepPage`.
 The page's effect that opens Ways out for a selected way out keys on it
-too. The section then reopens when the selected path stays the same. That closes ACCORDION-1. Enter on a focused path passes the `pathId`
-too.
+too. The section then reopens when the selected path stays the same. That
+closes ACCORDION-1. Enter on a focused path passes the `pathId` too.
 
 A waypoint handle sits outside the edge group and stops its own
 double-click, so removing a waypoint opens nothing.
@@ -240,15 +255,30 @@ end. The keys `canvas.nodeLabelOnePath`, `nodeLabelOutcome`,
 ### D10. New catalog keys for the marks
 
 `canvas.startStamp` "Start", `canvas.endStamp` "End", `canvas.endStampOutcome`
-"End: {outcome}", `canvas.onlyIf` "Only if {phrase}", `canvas.orderedOnlyIf`
-"{order}, only if {phrase}", `canvas.otherwise` "Otherwise",
-`canvas.order.1` to `canvas.order.5` "First" to "Fifth", `canvas.order.other`
-"Number {n}", `canvas.connectHandle`, `canvas.connectHandleEnd` and
-`condition.handWrittenHolds`. Each sentence keeps one key.
+"End: {outcome}", `canvas.onlyIf` "Only if {phrase}", `canvas.otherwise`
+"Otherwise", `canvas.connectHandle`, `canvas.connectHandleEnd` and
+`condition.handWrittenHolds`.
+
+Each ranked sentence takes a whole key of its own. The keys run from
+`canvas.onlyIf.first`, "First, only if {phrase}", to `canvas.onlyIf.fifth`.
+The key `canvas.onlyIf.nth` reads "Number {n}, only if {phrase}".
+`design-language.md` asks for one key per sentence, never a sentence built
+from fragments.
+
+The stamp words are canvas keys and not `stepRole.*` words, because "End:
+{outcome}" has no `stepRole` peer. Task 1.6 rewrites the two catalog
+comments these keys make stale: the `stepRole` block and the accessible-name
+block.
 
 ### D11. The node's fallback and the catalog control
 
-`stepLabel` falls back to `steps.unnamedStep`, never to `step.key`.
+The node body and both accessible names read the step text from
+`stepTextMap` in `panels/shared/optionText.ts`. That map never falls back to
+`step.key`. It numbers two or more unnamed steps, as in "(unnamed step 3)".
+It adds the rail number to a label two steps share, as the step page's
+selects do. The canvas and the step page then tell such steps apart the same
+way.
+
 `fieldCatalog.showOnCanvas` reads "Show on the map". The key keeps its name,
 since a code identifier stays out of the glossary's reach.
 
@@ -273,3 +303,8 @@ since a code identifier stays out of the glossary's reach.
 ## Migration Plan
 
 No data changes. The draft layout and the definition stay as they are.
+
+## Open Questions
+
+None. The owner pre-approved the concept, and the shape brief marks each
+assumption it made.

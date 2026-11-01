@@ -54,11 +54,11 @@ builds on change 4, which shipped on 2026-10-31.
 - **BREAKING** for authors: the canvas's inline rename goes. The
   step page's name line stays the one place to name a step.
 - A node's accessible name drops the key and speaks the vocabulary table:
-  "Review, A step someone works, 2 ways out, start". A way out's name reads
-  "Approve, from Review to Done, a person chooses, only if Amount is greater
+  "Review, A step someone works, 2 ways out, Start". A way out's name reads
+  "Approve, from Review to Done, a person chooses, Only if Amount is greater
   than 1,000".
-- A step with no label prints "(unnamed step)" on its node. The node no
-  longer falls back to the step's key.
+- A step with no label prints "(unnamed step)" on its node, numbered when
+  two or more lack a name. The node no longer falls back to the step's key.
 - The field catalog's "Show on the canvas" control reads "Show on the map".
 - `src/schema/definition.ts` stays as it is. No API changes.
 
@@ -76,6 +76,10 @@ None.
 - `studio-form-editor`: the form preview notes a guarded way out. An
   unreadable condition there reads "a hand-written rule holds", never CEL.
 - `studio-app`: the field catalog's control reads "Show on the map".
+- `studio-condition-builder`: the canvas reads a guard in words with no CEL
+  fallback. The requirement that kept raw CEL on the edge goes.
+- `studio-step-page`: a repeated open request from the Map reopens Ways out
+  for the selected way out.
 
 ## Impact
 
@@ -87,9 +91,13 @@ None.
 - `packages/web/src/areas/studio/panels/shared/conditionLogic.ts`,
   `draft/guarded-path-notes.ts`, `panels/FormPreview.tsx`: the condition in
   words with no CEL fallback.
+- `screens/EditScreen.tsx` and `panels/StepPage.tsx`: the open request that
+  reopens Ways out. `panels/stepsPanelLogic.ts`: one comment.
 - `packages/web/src/i18n/catalogs/studio.ts`: canvas keys added, renamed and
   removed. `fieldCatalog.showOnCanvas` reads "Show on the map".
-- Tests under `packages/web/test/`, `docs/browser-checks.md`,
+- Tests under `packages/web/test/`, `studio-processSurface.test.ts` and
+  `studio-formPreview.test.tsx` among them. Also `docs/authoring-guide.md`,
+  `docs/browser-checks.md`,
   `docs/decisions.md` (SELECTS-4, SENTENCE-3 and the Show on the canvas
   entry close), `.claude/rules/ui-glossary.md` where it names the canvas's
   words, and `ROADMAP.md` stage 64.
