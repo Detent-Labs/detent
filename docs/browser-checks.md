@@ -1592,18 +1592,17 @@ task 6.1.
 
 Seed the database and open a draft of `purchase-requisition`.
 
-Choose `quantity` on the Fields tab. Pass: a notice under Key reads "Read by 2
-expressions. The label no longer sets this key, and changing the key does not
-touch them."
+Choose `quantity` on the Fields tab and open its Developer view. Pass: it
+reads "This field is in a published version. The label no longer sets its
+key."
 
-Rename its label, without saving. Pass: Key still reads `quantity`, since two
-guards read `data.quantity`. Press Publish, then Show in the dialog's Changes
+Rename its label, without saving. Pass: Key still reads `quantity`, since a
+published field's key stays. Press Publish, then Show in the dialog's Changes
 row. Pass: a Fields row stands folded under the Fields heading, its stamp
 reads Changed. Press Cancel.
 
 Back on the Fields tab, rename `unit_price`'s label too, without saving. Pass:
-its notice reads "Read by 1 expression. The label no longer sets this key,
-and changing the key does not touch it." Key still reads `unit_price`.
+its Developer view reads the same sentence. Key still reads `unit_price`.
 
 Press Publish, then Show again. Pass: a second Fields row now stands beside
 the first. Press Cancel.
@@ -3497,8 +3496,8 @@ its own text color, in the light and the dark scheme alike. No icon reads
 invisible against its row in either scheme.
 
 At a window about 1040px wide, just above the 64rem `NARROW` breakpoint,
-open a field's editor. Pass: its Key input and its move control both stay
-inside their own column. Pass: `document.documentElement.scrollWidth`
+open a field's editor and its Developer view. Pass: its Key input and its
+move control both stay inside their own column. Pass: `document.documentElement.scrollWidth`
 equals `clientWidth` at that width too.
 
 ### The Fields view inside a group (`group-child-own-editor`)
@@ -3598,31 +3597,70 @@ current mark.
 Focus, scroll position and the current mark need a live draft store and a
 real DOM.
 
-### The Key input commits on blur and warns about readers (`guard-field-key-renames`)
+### A key change rewrites its readers and the Read by zone lists them (`studio-field-key-follows-name`)
 
-Source: `guard-field-key-renames` tasks 5.4.
+Source: `studio-field-key-follows-name` tasks 8.7 to 8.9.
 
 Seed the database and open a `purchase-requisition` draft on the Fields tab.
+The seeded process stands published at version 1, so its fields count as
+published.
 
-Choose `quantity`. Pass: a notice under Key reads "Read by 2 expressions. The
-label no longer sets this key, and changing the key does not touch them."
+Add a field with "+ Add field" and label it `Budget`. Open the field's
+Developer view. Pass: the view stands closed on open, and it reads "The key
+follows the label until the first publish." Key reads `budget`.
 
-Type `qty` into Key, without leaving the input. Pass: the header bar shows no
-unsaved mark. Press Tab. Pass: the unsaved mark appears, and Key reads `qty`.
+On the Steps tab, give a way out of the first step an "Only if" that reads
+Budget. Return to the Fields tab and choose Budget. Pass: the "Read by" zone
+holds one row that starts with "Way out", and a sentence about Budget under it.
 
-The two guards still read `data.quantity`. The field now has no readers, so
-the notice reads "This field is in a published version. The label no longer
-sets its key."
+Change the label to `Total budget`. Pass: Key reads `total_budget`. The line
+under the label reads "Updated 1 condition." The way out still reads Budget
+in its row. Open the way out's Developer view on the Steps tab. Pass: its CEL
+reads `data.total_budget`.
 
-Type `quantity` back into Key and press Enter. Pass: Key reads `quantity`.
-Change the label to `Amount`. Pass: Key still reads `quantity`.
+Choose `quantity`, which two seeded guards read. Open its Developer view.
+Pass: it reads "This field is in a published version. The label no longer
+sets its key." Change the label to `Amount`. Pass: Key still reads
+`quantity`.
 
-Choose `justification`, which no expression reads. Pass: the notice reads "This
-field is in a published version. The label no longer sets its key." Change the
-label to `Reason`. Pass: Key still reads `justification`.
+Select the text in Key, type `qty` and press Tab. Pass: the unsaved mark
+appears, and the line under the label reads "Updated 2 conditions." Choose
+the Steps tab, then the two routing steps. Pass: each way out whose guard read
+`quantity` now reads `data.qty`.
 
-Add a new field with "+ Add field", then type a label into it. Pass: no notice
-shows under Key, and Key follows the label as it changes.
+Type `other` into Key and press Escape. Pass: Key reads `qty` again, and the
+unsaved mark does not change.
+
+Type each of the following into Key and press Enter. Pass: Key keeps the typed
+text and the draft keeps `qty`. A warning callout stands under the input, and
+the input carries `aria-invalid`.
+
+- Nothing at all. The callout reads "Type a key, or press Escape to keep the
+  current one."
+- `Total Amount`. The callout reads "A key starts with a letter or _ and holds
+  only lower-case letters, digits and _."
+- `true`. The callout reads "Conditions read this word as a value. Pick
+  another key."
+- The key of another field, such as `unit_price`. The callout reads "Another
+  field already uses this key."
+
+Type one more character. Pass: the callout goes. Press Escape to put `qty`
+back.
+
+Open the "Read by" zone of `qty`. Pass: it lists two rows, each with a place
+and a sentence in words. No row prints `data.`, a key or an id. Choose a field
+nothing reads, such as `justification`. Pass: the zone reads "No condition
+reads this field."
+
+Press Publish, then Show in the dialog's Changes row. Pass: a Fields row for
+the field with its Key changed from `quantity` to `qty`. A row for each way
+out whose condition changed stands beside it, with its Only if changed from
+`data.quantity` to `data.qty`. Press Cancel.
+
+Type `Total Amount` into Key and press Enter, so a callout stands. Close the
+Developer view. Pass: the callout and the typed text leave the screen. Open
+the view again. Pass: both stand as left, since closing hides them and clears
+neither. KEYS-6 in the decisions file records this.
 
 ### Removing a field that reaches past the field catalog confirms first (`remove-field-takes-its-references`)
 

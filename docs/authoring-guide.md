@@ -1088,6 +1088,12 @@ first, because a view, a guard and an action output all reference a field.
 Give each field a key that matches `/^[a-z_][a-z0-9_]*$/`. A guard reads it as
 `data.<key>`, and the key must survive that.
 
+The key follows the label until the field's first publish. After that, the
+key stays when the label changes. The key sits in the field's Developer view,
+under "What this field asks". A key change there rewrites every condition
+that reads it, and the studio says how many. A label change before the first
+publish does the same.
+
 Does a field take its options from somewhere else? Declare that source on
 the **Settings** tab, in its **Where values come from** view. Then point the
 field at it.
@@ -1131,9 +1137,9 @@ offers choices starts with two, named Choice 1 and Choice 2.
 
 A new card takes its name on the card, in an input that has the focus. The
 input holds the kind's name, selected, so the first keystroke replaces it. The
-key follows the label. Press Enter to accept the name, and the focus moves to
-the card. A Group kind takes
-its name on its legend. To rename a field later, use the strip's **Name**
+key follows the label until the field's first publish, and a rename rewrites
+the conditions that read it. Press Enter to accept the name, and the focus
+moves to the card. A Group kind takes its name on its legend. To rename a field later, use the strip's **Name**
 control or the Fields tab.
 
 A derived key writes ä, ö, ü as ae, oe, ue and ß as ss. It drops other
