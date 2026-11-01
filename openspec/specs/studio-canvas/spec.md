@@ -1489,7 +1489,7 @@ per `studio-process-tabs`.
 The masthead SHALL NOT stand. The step page carries the step's name line, its
 first-step mark and its remove control. Those belong to `studio-step-page`.
 
-The step's key field SHALL stand on the step page, beside the name line. The
+The step's key field SHALL stand in the step page's Developer view. The
 key-derivation requirement below governs it.
 
 The step's `id` SHALL stand in the step page's Developer view. That disclosure
@@ -1513,7 +1513,7 @@ An end step declares its outcome on departure.
 - **WHEN** an author opens a step on the step page
 - **THEN** the page carries the step's kind, its label, its key and its
   description
-- **AND** the Canvas tab carries no masthead
+- **AND** the Canvas tab has no masthead
 
 #### Scenario: The label edits inline
 
@@ -1523,7 +1523,7 @@ An end step declares its outcome on departure.
 
 #### Scenario: The masthead keeps its translation warnings
 
-- **WHEN** the content locale is `de` and the step's label carries no `de`
+- **WHEN** the content locale is `de` and the step's label has no `de`
   value
 - **THEN** the missing-translation warning stands beside the name line
 
@@ -1546,14 +1546,13 @@ An end step declares its outcome on departure.
 
 #### Scenario: The issue count covers a path's issue
 
-- **WHEN** a step carries no issue of its own, and one of its paths carries a
+- **WHEN** a step has no issue of its own, and one of its paths carries a
   failing guard
 - **THEN** that step's rail row counts one
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
 <!-- antislop: allow synonym-rotation -->
-
 ### Requirement: The configuration pane's sections follow the performed-by control
 
 The step page's sections SHALL follow the performed-by control. A section

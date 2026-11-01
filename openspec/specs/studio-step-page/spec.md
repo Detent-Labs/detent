@@ -110,10 +110,11 @@ where any of those issues blocks a publish.
 
 Each rail row SHALL carry a grip that drags it to any position in the list.
 A drop SHALL move that step to the dropped position in the draft. Each row SHALL also
-answer a move-earlier and a move-later command from the keyboard whenever
-an author focuses its grip.
-`spa-accessibility` already requires this: a list offering a drag move
-answers that same move from the keyboard, in the list itself. The first row
+answer a move-earlier and a move-later command from the keyboard. That holds
+whenever an author focuses its grip.
+
+The capability `spa-accessibility` already requires this. A list offering a
+drag move answers that same move from the keyboard, in the list itself. The first row
 SHALL refuse the move-earlier command. The last row SHALL refuse the
 move-later command.
 
@@ -131,6 +132,11 @@ process, and an end.
 - **WHEN** an author presses the add-an-end control in the rail's foot
 - **THEN** the draft carries one more end step
 - **AND** the step page holds the new step
+
+#### Scenario: Adding a step focuses its name
+
+- **WHEN** an author presses an add control in the rail's foot
+- **THEN** keyboard focus stands in the new step's Name input
 
 ### Requirement: The step page names its step and keeps its key in the Developer view
 
@@ -172,6 +178,12 @@ confirmation dialog this capability requires.
 
 - **WHEN** the step's label is missing a translation for the content locale
 - **THEN** the warning stands under the name line
+
+#### Scenario: A name check stands under the name
+
+- **WHEN** the step's label has no base-locale entry
+- **THEN** one sentence stands directly under the name line
+- **AND** it names no validator
 
 ### Requirement: A way out reads as a sentence and keeps its key in its own Developer view
 
@@ -247,6 +259,13 @@ Each option SHALL store the entity's `id`.
   "Abschluss", with the key `pr-fung-abschluss`
 - **THEN** the time limit's way-out select offers "Freigeben → Abschluss"
 - **AND** no option reads `pr-fung-abschluss`
+
+#### Scenario: A removed target reads as removed
+
+- **WHEN** a way out names a step the draft no longer holds
+- **THEN** its heading and its Leads to select read "(step removed)"
+- **AND** the select holds that as a disabled choice
+- **AND** picking a step writes it
 
 ### Requirement: Every field-map select on the step page lists labels
 
@@ -706,7 +725,7 @@ Each section SHALL print the open issues that belong to it inside its body,
 above its controls, as sentences. The header SHALL count them. An issue about
 the assignment SHALL stand at Who acts. An issue about a way out SHALL stand
 at Ways out, in that way out's row. An issue about the form SHALL stand at
-Form.
+Form. An issue about the step's key SHALL stand at More.
 
 An issue SHALL stand at exactly one section. The Checks tab SHALL keep listing
 every issue, including those a section already prints.
@@ -756,7 +775,8 @@ The control SHALL refuse the press at the end of the walk it belongs to.
 
 The step page SHALL carry a Developer view disclosure inside the More
 section, after the cancelling and collaboration controls. The disclosure
-SHALL stand closed until an author opens it. An open disclosure SHALL carry
+SHALL stand closed until an author opens it, or until a check names the
+step's key. An open disclosure SHALL carry
 the step's key input, the step's `id` and the step's own JSON.
 
 <!-- antislop: allow synonym-rotation -->
@@ -780,6 +800,12 @@ the disclosure.
 
 - **WHEN** an author opens More
 - **THEN** the Developer view disclosure stands last in its body, closed
+
+#### Scenario: A key check opens the Developer view
+
+- **WHEN** a check names the step's key
+- **THEN** More's Developer view stands open, with the key input in view
+- **AND** an author may still close it
 
 ### Requirement: The first process choice on a subprocess step writes a whole spec
 
@@ -1002,3 +1028,24 @@ Previous and Next walk from one step to its neighbour. Each press mounts the pag
 
 - **WHEN** the author presses Next and reaches the last step
 - **THEN** Previous holds the focus
+
+### Requirement: The steps rail keeps the current row in view
+
+When the current step changes, the steps rail SHALL scroll that row into view,
+by the least distance.
+
+#### Scenario: A Fix landing shows its row
+
+- **WHEN** a Fix control opens a step whose rail row sits past the rail's
+  capped height, below 64rem
+- **THEN** that row stands whole in the rail's view
+
+### Requirement: A failed child file load raises an alert
+
+A failed load of a called process's file on a subprocess step SHALL print its
+message with `role="alert"`.
+
+#### Scenario: A bad file reports
+
+- **WHEN** an author picks a file with no process definition in it
+- **THEN** the message stands under the file control with `role="alert"`

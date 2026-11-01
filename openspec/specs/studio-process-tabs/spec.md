@@ -473,59 +473,123 @@ SHALL stay there.
 - **WHEN** a keyboard user presses Save and the save request fails
 - **THEN** focus stands on Save
 
-### Requirement: A check opens the tab that owns its subject
+### Requirement: A check's Fix control lands on its place on Steps
 
-A row in the Checks tab SHALL open the place its subject lives. An issue about
-a step SHALL open the Steps tab with that step selected. An issue about a
-timer or an action SHALL open the Steps tab with the step that carries it
-selected. An issue about a path SHALL open the Steps tab on the step the
-path leaves. That way out SHALL read as selected there.
+A row on the Checks tab SHALL carry one Fix control. A press on a step's issue
+SHALL open the Steps tab on that step, with the owning section open. A way out,
+a time limit or an action SHALL open its owning section on its step. An issue
+on the step's name, description or kind SHALL open the step alone. Leaving
+Checks SHALL drop the rail's narrowing.
 
-An issue about a field SHALL open the Fields tab's Catalog view. An issue
-about a data source SHALL open the Settings tab's Where values come from
-view. An issue about the contract SHALL open the Settings tab's What it takes
-in and gives back view. An issue about the process itself SHALL leave the
-Checks tab open.
+#### Scenario: A step's assignment check opens Who acts
 
-#### Scenario: A step issue opens the step
-
-- **WHEN** an author presses a check that names a step
+- **WHEN** an author presses Fix on a check about a step's assignment
 - **THEN** the Steps tab is the open one
-- **AND** the step page stands on that step
+- **AND** the step page stands on that step, with Who acts open
 
-#### Scenario: A path issue opens the step that leaves by it
+#### Scenario: A way out's check marks its row
 
-- **WHEN** an author presses a check that names a path
-- **THEN** the Steps tab is the open one
-- **AND** the step page stands on the step the path leaves
+- **WHEN** an author presses Fix on a check about a way out
+- **THEN** the step page stands on the step the way out leaves, with Ways out open
 - **AND** that way out's row reads as selected
 
-#### Scenario: A data source issue opens its Settings view
+#### Scenario: A time limit's check opens Time limit
 
-- **WHEN** an author presses a check that names a data source
-- **THEN** the Settings tab is the open one, on Where values come from
+- **WHEN** an author presses Fix on a check about a time limit
+- **THEN** the step page stands on that step, with Time limit open
 
-### Requirement: A check opening another tab moves focus onto that tab
+#### Scenario: A first-step check opens the Steps tab
 
-A press on a Checks row SHALL move keyboard focus onto the tab it opens. The
-pressed control stands in a body that hides once the other tab opens. Focus
-SHALL NOT fall back to the page body. The focused tab SHALL carry
-`tabindex="0"`. A check about the process itself keeps the Checks tab open.
-Focus SHALL then move onto the Checks tab at once, and a later tab switch
-SHALL NOT pull it back.
+- **WHEN** an author presses Fix on the check that no step comes first
+- **THEN** the Steps tab is the open one
 
-#### Scenario: A check moves focus onto the tab it opens
+### Requirement: A check's Fix control lands on its place on Fields
 
-- **WHEN** a keyboard user presses a check that names a field
-- **THEN** the Fields tab is the open one
-- **AND** keyboard focus stands on the Fields tab in the tab row
+An issue on a field SHALL open the Fields tab's Catalog view with that field
+selected. More SHALL open where the check stands inside it. An issue on a data
+source SHALL open the Where values come from view with that source selected.
 
-#### Scenario: A process-level check keeps focus in the tab row
+#### Scenario: A field's check selects the field and opens More
 
-- **WHEN** a keyboard user presses a check that names the process itself
+- **WHEN** an author presses Fix on a field's validation check
+- **THEN** the Fields tab's Catalog view is open with that field selected
+- **AND** More stands open
+
+#### Scenario: A data source's check opens its view on Fields
+
+- **WHEN** an author presses Fix on a data source's check
+- **THEN** the Fields tab is open on Where values come from, with that source
+  selected
+
+### Requirement: A check's Fix control lands on the process's own places
+
+An issue on the contract SHALL open the Settings tab's What it takes in and
+gives back view. An issue on the process's key or base language SHALL open the
+Settings tab's Process view. An issue on the process's name SHALL stay on the
+open tab. An issue whose sentence names the JSON surface SHALL open it. Each
+sentence's rule SHALL name its place, so the two cannot disagree.
+
+#### Scenario: A contract's check opens its Settings view
+
+- **WHEN** an author presses Fix on a contract check
+- **THEN** the Settings tab is open on What it takes in and gives back
+
+#### Scenario: A machine-only check opens the JSON surface
+
+- **WHEN** an author presses Fix on a check about two steps sharing one id
+- **THEN** the JSON surface stands open
+
+#### Scenario: A duplicate field key opens Fields
+
+- **WHEN** an author presses Fix on the check that two fields share one key
+- **THEN** the Fields tab's Catalog view stands open
+
+### Requirement: A Fix control moves focus to the place
+
+A press on Fix SHALL move keyboard focus to the place it opened. The
+scenarios below name each place. Focus SHALL NOT fall to the page body. The opened tab
+SHALL take focus where no finer place exists, and it SHALL carry
+`tabindex="0"`. A later tab switch SHALL NOT pull focus back.
+
+#### Scenario: Focus lands on the section header
+
+- **WHEN** a keyboard user presses Fix on a check about a step's assignment
+- **THEN** keyboard focus stands on the Who acts header
+
+#### Scenario: Focus lands on the key input
+
+- **WHEN** a keyboard user presses Fix on a check about a step's key
+- **THEN** More and its Developer view stand open
+- **AND** keyboard focus stands in the key input
+
+#### Scenario: Focus lands on the Name input
+
+- **WHEN** a keyboard user presses Fix on a step's name check
+- **THEN** keyboard focus stands in that step's Name input
+
+#### Scenario: Focus lands on a field's sentence
+
+- **WHEN** a keyboard user presses Fix on a field's check
+- **THEN** keyboard focus stands on that check's sentence on the field card
+
+#### Scenario: A process name check focuses the name
+
+- **WHEN** a keyboard user presses Fix on the process's name check
 - **THEN** the Checks tab stays the open one
-- **AND** keyboard focus stands on the Checks tab in the tab row
+- **AND** keyboard focus stands on the name input in the header bar
 - **AND** a later press on the Steps tab leaves focus on the Steps tab
+
+#### Scenario: A JSON check focuses the JSON input
+
+- **WHEN** a keyboard user presses Fix on a check about an internal id
+- **THEN** keyboard focus stands on the JSON surface's input
+
+#### Scenario: A contract check moves focus onto its tab
+
+- **WHEN** a keyboard user presses Fix on a contract check
+- **THEN** keyboard focus stands on the Settings tab in the tab row
+
+
 
 ### Requirement: The tab row follows the area's roving-tabindex pattern
 
@@ -622,15 +686,15 @@ of slack.
 ### Requirement: A focused tab rests whole in the tab row's view
 
 A tab that takes focus from an arrow key SHALL stand whole in view. So SHALL
-a tab that takes focus from a Checks row's focus hand-off. So SHALL a tab
-that takes keyboard focus from the Tab key.
+a tab that takes focus from a Fix control's or a Read by row's hand-off. So
+SHALL a tab that takes keyboard focus from the Tab key.
 
 #### Scenario: A row command's focus hand-off lands the tab in view
 
 - **WHEN** the tab row stands at its end in a window 400px wide
-- **AND** a keyboard user presses a check that names a step
-- **THEN** keyboard focus stands on the Steps tab
-- **AND** the Steps tab stands whole in view, clear of the edge fade
+- **AND** a keyboard user presses Fix on a row about a contract
+- **THEN** keyboard focus stands on the Settings tab
+- **AND** the Settings tab stands whole in view, clear of the edge fade
 
 #### Scenario: An arrow key lands the focused tab in view
 
@@ -737,7 +801,9 @@ draft carries some other Zod issue.
 <!-- antislop: allow sentence-length -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
 The banner SHALL stand below the header bar. It SHALL read one sentence that
-says what to do and prints no engine word: no "Zod", no "CEL", no "registry".
+says what to do and prints no engine word: no "Zod", no "CEL", no "registry". It
+SHALL NOT stand while the Checks tab's body is open, where it only repeats the
+list. The JSON surface stands in place of that body, so the banner stands there.
 
 This banner SHALL NOT take the bordered, rotated stamp treatment. This
 screen already reserves that treatment for a load or a request that comes
@@ -788,3 +854,14 @@ failed request. So that one-shape rule does not reach it.
 - **WHEN** an author adds a first task step that has no name and no way out
 - **THEN** the banner stands, since those two gaps lie outside the start
   gaps
+
+#### Scenario: The banner stands over the JSON surface
+
+- **WHEN** the JSON surface stands open from the Checks tab on an invalid draft
+- **THEN** the banner stands
+
+#### Scenario: The banner leaves the Checks tab
+
+- **WHEN** a structurally invalid draft stands on the Checks tab
+- **THEN** no such banner stands
+- **AND** it stands again on the Steps tab

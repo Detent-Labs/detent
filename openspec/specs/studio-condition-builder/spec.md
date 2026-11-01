@@ -662,25 +662,25 @@ carries.
 - **THEN** the path has no `priority` key
 - **AND** its guard stays as it was
 
-### Requirement: A way out's guard stands under "Only when" for either trigger
+### Requirement: A way out's guard stands under "Only if" for either trigger
 
-The row SHALL render the existing `ConditionBuilder` row UI under an "Only
-when" heading for both triggers. On an automatic way out the guard decides
-whether the engine takes it. On a manual way out the guard decides whether
-the person gets the button. The row SHALL say so beside the guard. The
-`priority` input SHALL render for an automatic way out alone.
+The row SHALL render the existing `ConditionBuilder` row UI under an "Only if"
+heading for both triggers. On an automatic way out the guard decides whether
+the engine takes it. On a manual way out the guard decides whether the person
+gets the button. The row SHALL say so beside the guard. The `priority` input
+SHALL render for an automatic way out alone.
 
-#### Scenario: An automatic way out shows the guard under "Only when"
+#### Scenario: An automatic way out shows the guard under "Only if"
 
 - **WHEN** a way out's `trigger` is `automatic`
-- **THEN** the existing `ConditionBuilder` row UI renders under an "Only
-  when" heading
+- **THEN** the existing `ConditionBuilder` row UI renders under an "Only if"
+  heading
 - **AND** a `priority` input renders beside it
 
 #### Scenario: A manual way out shows its guard editor
 
 - **WHEN** the developer opens a manual way out
-- **THEN** the "Only when" heading and the `ConditionBuilder` row UI render
+- **THEN** the "Only if" heading and the `ConditionBuilder` row UI render
 - **AND** no `priority` input renders
 
 ### Requirement: Every condition site keeps its CEL in a Developer view
@@ -696,7 +696,7 @@ override. It SHALL show the CEL text input with no second disclosure.
 
 #### Scenario: A way out's guard holds its CEL in a Developer view
 
-- **WHEN** a developer opens a way out's "Only when" on the Steps tab
+- **WHEN** a developer opens a way out's "Only if" on the Steps tab
 - **THEN** a closed "Developer view" disclosure stands under the sentence
 - **AND** opening it shows the CEL text input, with the rows still above it
 
