@@ -5,6 +5,8 @@ import type { Draft } from "../src/areas/studio/draft/types.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/store.js";
 import { StepsRail } from "../src/areas/studio/panels/StepsRail.js";
+import { stepText } from "../src/areas/studio/panels/shared/optionText.js";
+import type { DraftStep } from "../src/areas/studio/draft/createStep.js";
 
 /**
  * The Steps tab's leading column (`studio-step-page`: "The steps rail lists
@@ -188,6 +190,41 @@ describe("The steps rail's order and numbering", () => {
  * state". A rail row is not a disclosure. It opens the step page, so it takes
  * `aria-current` and never `aria-expanded`.
  */
+describe("An unnamed step's row", () => {
+  const UNNAMED_DRAFT = {
+    baseLocale: "en",
+    workflow: {
+      initialStep: "step_x",
+      steps: [{ id: "step_x", key: "review", label: { en: "" }, type: "task", paths: [] }],
+    },
+  } as unknown as Draft;
+
+  it("reads the placeholder and never the step's key", () => {
+    const rows = rowTexts(render({ draft: UNNAMED_DRAFT }));
+
+    expect(rows).toEqual(["1(unnamed step)"]);
+    expect(render({ draft: UNNAMED_DRAFT })).not.toContain(">review<");
+  });
+
+  it("names the grip after the placeholder", () => {
+    expect(render({ draft: UNNAMED_DRAFT })).not.toMatch(/aria-label="[^"]*review[^"]*"/);
+  });
+});
+
+describe("stepText, the one label the rail and the walk read", () => {
+  it("returns the placeholder for an empty label, whatever the key", () => {
+    const step = { id: "step_x", key: "review", label: { en: "" } } as unknown as DraftStep;
+
+    expect(stepText(step, "en", "en")).toBe("(unnamed step)");
+  });
+
+  it("returns the placeholder for an absent label", () => {
+    const step = { id: "step_x", key: "review" } as unknown as DraftStep;
+
+    expect(stepText(step, "en", "en")).toBe("(unnamed step)");
+  });
+});
+
 describe("A steps rail row selects rather than discloses", () => {
   it("gives each row a button that carries `aria-current` and no `aria-expanded`", () => {
     // The row's own button is the one carrying neither a move control's

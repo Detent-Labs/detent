@@ -554,6 +554,12 @@ describe("The step page's walk", () => {
     expect(html).toContain("Next: Credit check");
   });
 
+  it("reads the placeholder for an unnamed neighbour", () => {
+    const html = render({ next: { id: "step_b", label: "(unnamed step)" } });
+
+    expect(html).toContain("Next: (unnamed step)");
+  });
+
   it("refuses the press at each end of the walk", () => {
     const html = render();
     const walk = buttonTags(html).filter((b) => b.includes("disabled"));

@@ -22,6 +22,7 @@ import { stepEntityIds } from "../draft/panel-rail.js";
 import { seedLocalizedText } from "../draft/localized-text";
 import { getDraft, listProcesses } from "../api/client.js";
 import { useFetchOnce } from "../panels/shared/useFetchOnce.js";
+import { stepText } from "../panels/shared/optionText.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
 import { DEFAULT_TAB, FIELDS_VIEWS, SETTINGS_VIEWS, type ProcessTab, type Route, type TabView } from "../routing.js";
 import { checkTarget, formEditorReturnTab, processTabCounts, surfaceTab, type CheckTarget } from "../draft/process-tabs.js";
@@ -267,13 +268,15 @@ const styles = stylex.create({
   },
   // The Steps tab: a fixed-width numbered rail on the leading edge and one
   // wide step page beside it (`studio-step-page`). Below the breakpoint the
-  // rail gives up its column and the two fall under one another, in source
-  // order.
+  // rail gives up its column and stands above the page. Both rows size to
+  // their content, so the page takes its content's height and the tab body
+  // scrolls the two as one. The tab then holds two scroll boxes, the body and
+  // the capped rail, and not three.
   stepsTab: {
     display: "grid",
     flex: "1 1 auto",
-    gridTemplateColumns: { default: "18rem minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
-    gridTemplateRows: { default: "none", [NARROW]: "auto minmax(0, 1fr)" },
+    gridTemplateColumns: { default: "22rem minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
+    gridTemplateRows: { default: "none", [NARROW]: "auto auto" },
     gap: space.s3,
     alignItems: "stretch",
     minHeight: "36rem",
@@ -667,8 +670,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     if (neighbour?.id === undefined) return undefined;
     return {
       id: neighbour.id,
-      label:
-        resolveDraftLocalizedText(neighbour.label, contentLocale, baseLocale) || neighbour.key || t("steps.unnamedStep"),
+      label: stepText(neighbour, contentLocale, baseLocale),
     };
   };
 
