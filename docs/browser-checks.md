@@ -6717,7 +6717,7 @@ it. The header bar's own "Discard draft" does not work, per DRAFT-1 in
 
 ### Studio: selects list labels (`studio-selects-show-labels`)
 
-Source: `studio-selects-show-labels` task 5.6. The bun tests pin the option
+Source: `studio-selects-show-labels` task 6.6. The bun tests pin the option
 text, the numbering of repeats and the key derivation. A select's open list
 and the Developer view need a real page.
 
@@ -6770,6 +6770,14 @@ Open that way out's Developer view. Pass: the key reads `pruefung-abschluss`.
 back". Point it at a field labelled "Credit score". Read the row in the
 accessibility tree. Pass: the select reads "Field". The value input reads
 "Value for Credit score", and the remove control reads "Remove: Credit score".
+
+**9. The time limit's select spans its column.** Open the Time limit section
+of a step with a way out. Pass: the way-out select is as wide as its column.
+The slate chevron sits at the select's own trailing edge, inside its border.
+
+**10. A default way-out label names its target once.** Draw a way out on the
+canvas from "Antrag" to "Abschluss". Open "Antrag" on the Steps tab. Pass: the
+row heading reads "Antrag → Abschluss", with no second "→ Abschluss".
 
 Discard the draft from the process list and accept the browser's confirm.
 Under `playwright-cli`, `dialog-accept` answers it.

@@ -125,7 +125,7 @@ describe("the time limit's way-out select", () => {
     expect(wayOutOptions(html)[1]).toEqual(["path_1", "Weiter → Prüfung (step 2)"]);
   });
 
-  it("offers a default label naming a repeated target plainly as written", () => {
+  it("offers a default label naming a repeated target by its rail number", () => {
     const html = renderToStaticMarkup(
       <DraftContext.Provider value={context}>
         <TimersPanel
@@ -139,7 +139,7 @@ describe("the time limit's way-out select", () => {
         />
       </DraftContext.Provider>,
     );
-    expect(wayOutOptions(html)[1]).toEqual(["path_1", "Start → Prüfung"]);
+    expect(wayOutOptions(html)[1]).toEqual(["path_1", "Start → Prüfung (step 2)"]);
   });
 
   it("takes the studio select, its chevron trailing the select", () => {

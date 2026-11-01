@@ -1910,8 +1910,8 @@ this section.
 ## Open from studio-selects-show-labels (needs its own OpenSpec change)
 
 The change made the step page's selects print labels and made derived keys
-transliterate umlauts. It left fourteen points to later changes. The final
-review and the design audit raised SELECTS-7 to SELECTS-14. The SELECTS tag is
+transliterate umlauts. It left sixteen points to later changes. The final
+review and the design audit raised SELECTS-7 to SELECTS-16. The SELECTS tag is
 local to this section.
 
 - **SELECTS-1: the steps rail still falls back to a step key.** An unnamed
@@ -1947,9 +1947,9 @@ local to this section.
 - **SELECTS-10: CEL inputs stand beside the field-map selects.** They sit
   outside a Developer view. These are stage 27's low-code sites. Change 10 or
   change 11 settles them.
-- **SELECTS-11: the field border measures 1.33:1 against the ground.** The
-  fault is systemic. It belongs to `DESIGN.md`'s field tokens and reaches
-  every screen.
+- **SELECTS-11: the field border contrast already has an entry.** The audit
+  measured 1.33:1 again. The 2026-09-11 design audits section holds the entry,
+  "A field's border reads 1.32:1 in light and 1.64:1 in dark".
 - **SELECTS-12: the arrow glyph renders small in the fallback face.** The
   `system-ui` stack draws "→" below the text size. It lasts until Archivo
   ships.
@@ -1957,6 +1957,14 @@ local to this section.
   A field-map select greys that option out. No text says another row holds it.
 - **SELECTS-14: the "How it ended" select lists outcome names as typed.** Each
   option prints the contract's outcome name. No label stands in for it.
+- **SELECTS-15: a studio select stands 37 to 40px tall.** That is under the
+  44px touch target. The studio serves a desktop audience, so this stays a
+  note, as the `.btn` height entry does.
+- **SELECTS-16: the guide states the umlaut rule in one place only.** The
+  form editor's paragraph in `docs/authoring-guide.md` says how a derived key
+  reads umlauts. The rule covers process, step and way-out keys too. The Path
+  section does not repeat it. A later guide edit moves the note to a shared
+  place.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

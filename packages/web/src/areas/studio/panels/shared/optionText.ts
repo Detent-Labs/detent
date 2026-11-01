@@ -85,9 +85,10 @@ function heading(pathLabel: string, stepLabel: string): string {
 
 /**
  * A way out's heading: its label, then the target's text from `stepTexts`
- * (step id to text). A label that already ends with the arrow and the
- * target's text, numbered from `stepTexts` or plain from `plainTexts` (as a
- * default "Source → Target" label carries it), prints alone.
+ * (step id to text). A label that already ends with the arrow and that text
+ * prints alone. A label ending with the target's plain text from
+ * `plainTexts`, as a default "Source → Target" label does, takes the
+ * numbered text in place of that tail.
  */
 export function wayOutHeading(
   path: DraftPath,
@@ -99,7 +100,10 @@ export function wayOutHeading(
   const named = path.label?.trim() ? path.label : undefined;
   if (named !== undefined && target !== undefined) {
     const label = named.trim();
-    if (label.endsWith(heading("", target)) || (plain !== undefined && label.endsWith(heading("", plain)))) return named;
+    const tail = heading("", target);
+    if (label.endsWith(tail)) return named;
+    const plainTail = plain !== undefined ? heading("", plain) : undefined;
+    if (plainTail !== undefined && label.endsWith(plainTail)) return label.slice(0, -plainTail.length) + tail;
   }
   return heading(named ?? t("paths.unnamedPath"), target ?? t("paths.noTargetYet"));
 }

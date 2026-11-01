@@ -137,14 +137,21 @@ step whose label no other step shares SHALL read its label alone.
 
 A way-out heading SHALL name its target by the step select's text. A
 way-out label can already end with an arrow and the target's label, plain
-or numbered. The heading SHALL then print the label alone. The time limit's select SHALL take the studio
-select's form and span its column.
+or numbered. The heading SHALL then print the label alone. A plain tail SHALL
+take the numbered text where the target carries one. The time limit's select
+SHALL take the studio select's form and span its column.
 
 #### Scenario: A default way-out label does not repeat its target
 
 - **WHEN** a way out labelled "Prüfung → Capture" leads to the step "Capture"
 - **THEN** its row heading reads "Prüfung → Capture"
 - **AND** the time limit's select offers "Prüfung → Capture"
+
+#### Scenario: A default label names a repeated target by its number
+
+- **WHEN** a way out labelled "Antrag → Review" leads to the second of two
+  steps labelled "Review", at rail row 6
+- **THEN** its row heading reads "Antrag → Review (step 6)"
 
 ### Requirement: A field-map row's controls carry accessible names
 
