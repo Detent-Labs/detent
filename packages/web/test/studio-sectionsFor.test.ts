@@ -1,17 +1,18 @@
 /**
- * Which sections the step page stands for a performed-by value, and which of
- * its two columns each one takes (`panels/sectionsFor.ts`), tested as pure
- * functions — no DOM, no rendering.
+ * Which sections the step page stands for a performed-by value, in reading
+ * order, and the catalog key each header reads (`panels/sectionsFor.ts`),
+ * tested as pure functions — no DOM, no rendering.
  */
 import { describe, expect, it } from "bun:test";
 import { step } from "workflow-engine/schema";
 import type { PerformedBy } from "../src/areas/studio/draft/performedBy.js";
-import { sectionColumns, sectionsFor, type SectionName } from "../src/areas/studio/panels/sectionsFor.js";
+import { sectionLabel, sectionsFor, type SectionName } from "../src/areas/studio/panels/sectionsFor.js";
 
 /**
  * Where each key of the engine's `step` schema is edited on the step page
- * (`panels/StepPage.tsx`): in one of its sections, or in the masthead. `onCancel`
- * is edited beside `onExit`, and `outcome` in How the case ends.
+ * (`panels/StepPage.tsx`): in one of its sections, or in the masthead. The
+ * three action lists stand in When entered or left, and `cancellable` and
+ * `collaboration` in More.
  */
 const STEP_KEY_SECTION: { readonly [key: string]: SectionName | "masthead" } = {
   id: "masthead",
@@ -20,62 +21,69 @@ const STEP_KEY_SECTION: { readonly [key: string]: SectionName | "masthead" } = {
   description: "masthead",
   type: "masthead",
   terminal: "masthead",
-  cancellable: "cancellable",
+  cancellable: "more",
   outcome: "howItEnds",
   subprocess: "subprocess",
   view: "form",
   assignment: "assignment",
-  collaboration: "collaboration",
-  onEntry: "entry",
-  onExit: "exit",
-  onCancel: "exit",
+  collaboration: "more",
+  onEntry: "lifecycle",
+  onExit: "lifecycle",
+  onCancel: "lifecycle",
   timers: "timers",
   paths: "paths",
 };
 
 describe("sectionsFor", () => {
-  it("stands the eight task sections for a step someone works", () => {
-    const sections = sectionsFor("participant");
-
-    expect(sections).toContain("paths");
-    expect(sections).toContain("assignment");
-    expect(sections).toContain("cancellable");
-    expect(sections).toContain("entry");
-    expect(sections).toContain("exit");
-    expect(sections).toContain("timers");
-    expect(sections).toContain("form");
-    expect(sections).toContain("collaboration");
-    expect(sections).toHaveLength(8);
+  it("stands six sections for a step someone works, in reading order", () => {
+    expect(sectionsFor("participant")).toEqual(["assignment", "form", "paths", "timers", "lifecycle", "more"]);
   });
 
-  it("names neither Which process it calls nor How the case ends on a task step", () => {
-    expect(sectionsFor("participant")).not.toContain("subprocess");
-    expect(sectionsFor("participant")).not.toContain("howItEnds");
+  it("leads a subprocess step with the process it calls, and drops Who acts and Form", () => {
+    expect(sectionsFor("subprocess")).toEqual(["subprocess", "paths", "timers", "lifecycle", "more"]);
   });
 
-  it("gives an end step How the case ends, and no way out", () => {
-    const sections = sectionsFor("terminal");
-
-    expect(sections).toContain("howItEnds");
-    expect(sections).not.toContain("paths");
-    expect(sections).not.toContain("exit");
-    expect(sections).not.toContain("timers");
+  it("gives an end step How the case ends in place of Ways out, and no Time limit", () => {
+    expect(sectionsFor("terminal")).toEqual(["assignment", "form", "howItEnds", "lifecycle", "more"]);
   });
 
-  it("omits Who acts, Form and Collaboration on a subprocess step, which has no participant form", () => {
-    const sections = sectionsFor("subprocess");
-
-    expect(sections).toContain("subprocess");
-    expect(sections).not.toContain("assignment");
-    expect(sections).not.toContain("form");
-    expect(sections).not.toContain("collaboration");
+  it("stands six sections at most for any kind", () => {
+    for (const kind of ["participant", "subprocess", "terminal"] as const) {
+      expect(sectionsFor(kind).length).toBeLessThanOrEqual(6);
+    }
   });
 
   it("hands back a fresh array, so a caller cannot reach the module's own list", () => {
     const first = sectionsFor("participant");
     first.length = 0;
 
-    expect(sectionsFor("participant")).toHaveLength(8);
+    expect(sectionsFor("participant")).toHaveLength(6);
+  });
+});
+
+describe("sectionLabel", () => {
+  it("reads When entered or left on a task step and a subprocess step", () => {
+    expect(sectionLabel("lifecycle", "participant")).toBe("stepSections.lifecycle");
+    expect(sectionLabel("lifecycle", "subprocess")).toBe("stepSections.lifecycle");
+  });
+
+  it("reads When entered on an end step, which is never left", () => {
+    expect(sectionLabel("lifecycle", "terminal")).toBe("stepSections.lifecycleEntryOnly");
+  });
+
+  it("keeps every other section's own key, whatever the kind", () => {
+    const keys: [SectionName, string][] = [
+      ["assignment", "stepSections.assignment"],
+      ["form", "stepSections.form"],
+      ["subprocess", "stepSections.subprocess"],
+      ["paths", "stepSections.paths"],
+      ["howItEnds", "stepSections.howItEnds"],
+      ["timers", "stepSections.timers"],
+      ["more", "stepSections.more"],
+    ];
+    for (const kind of ["participant", "subprocess", "terminal"] as const) {
+      for (const [section, key] of keys) expect(`${kind} ${section}: ${sectionLabel(section, kind)}`).toBe(`${kind} ${section}: ${key}`);
+    }
   });
 });
 
@@ -94,37 +102,5 @@ describe("sectionsFor: the engine's step keys", () => {
       .map(([key]) => key);
 
     expect(unstood).toEqual([]);
-  });
-});
-
-describe("sectionColumns", () => {
-  it("puts the routing and the actor in the leading column", () => {
-    const { leading, trailing } = sectionColumns(sectionsFor("participant"));
-
-    expect(leading).toEqual(["paths", "assignment", "cancellable"]);
-    expect(trailing).toEqual(["entry", "exit", "timers", "form", "collaboration"]);
-  });
-
-  it("leads an end step with How the case ends", () => {
-    const { leading, trailing } = sectionColumns(sectionsFor("terminal"));
-
-    expect(leading).toEqual(["assignment", "howItEnds"]);
-    expect(trailing).toEqual(["entry", "form", "collaboration"]);
-  });
-
-  it("leads a subprocess step with the process it calls", () => {
-    const { leading, trailing } = sectionColumns(sectionsFor("subprocess"));
-
-    expect(leading).toEqual(["paths", "cancellable", "subprocess"]);
-    expect(trailing).toEqual(["entry", "exit", "timers"]);
-  });
-
-  it("places every section a kind stands, and no other", () => {
-    for (const kind of ["participant", "subprocess", "terminal"] as const) {
-      const sections = sectionsFor(kind);
-      const { leading, trailing } = sectionColumns(sections);
-
-      expect([...leading, ...trailing].sort()).toEqual([...sections].sort());
-    }
   });
 });

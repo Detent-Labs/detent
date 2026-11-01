@@ -25,9 +25,11 @@ const LOC_SECTION: Record<string, SectionName> = {
   view: "form",
   subprocess: "subprocess",
   outcome: "howItEnds",
-  onEntry: "entry",
-  onExit: "exit",
-  onCancel: "exit",
+  onEntry: "lifecycle",
+  onExit: "lifecycle",
+  onCancel: "lifecycle",
+  cancellable: "more",
+  collaboration: "more",
   paths: "paths",
   timers: "timers",
 };
@@ -44,9 +46,9 @@ function sectionByEntityId(step: DraftStep): Map<string, SectionName> {
     for (const action of actions ?? []) claim(action.id, section);
   };
 
-  claimActions(step.onEntry, "entry");
-  claimActions(step.onExit, "exit");
-  claimActions(step.onCancel, "exit");
+  claimActions(step.onEntry, "lifecycle");
+  claimActions(step.onExit, "lifecycle");
+  claimActions(step.onCancel, "lifecycle");
   for (const path of step.paths ?? []) {
     claim(path.id, "paths");
     claimActions(path.onPath, "paths");
@@ -69,9 +71,9 @@ function locKeys(loc: string): string[] {
 
 /**
  * One issue's section, or `undefined` where it belongs to none of the
- * sections this step's kind stands. An end step carries no When left section,
- * so an `onExit` issue on one lands nowhere rather than at a heading the page
- * does not draw.
+ * sections this step's kind stands. An end step carries no Time limit
+ * section, so a `timers` issue on one lands nowhere rather than at a header
+ * the page does not draw.
  */
 export function sectionOfIssue(
   step: DraftStep,
@@ -115,16 +117,18 @@ export function issuesBySection(
 }
 
 /**
- * The issues one section prints beside its own heading.
+ * The step-level issues one section prints at the top of its body, above its
+ * controls. The header counts these and the row issues together, through
+ * `issuesBySection`.
  *
  * A path's, a timer's and an action's issue already prints at its own row
  * inside the section's body: `PathsPanel`, `TimersPanel` and
- * `ActionListEditor` each mount an `IssueList` per entity. Printing it at the
- * heading too would say one sentence twice, two inches apart, so the heading
- * leaves those to the row that names the entity they belong to.
+ * `ActionListEditor` each mount an `IssueList` per entity. Printing it above
+ * the controls too would say one sentence twice, so this leaves those to the
+ * row that names the entity they belong to.
  *
- * An issue that resolved to the step itself has no row to stand at. The
- * heading is its one place, and it is what the assignment, the form, the
+ * An issue that resolved to the step itself has no row to stand at. The top
+ * of the body is its one place, and it is what the assignment, the form, the
  * subprocess spec and the outcome all raise.
  */
 export function headingIssues(
