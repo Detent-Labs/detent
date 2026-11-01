@@ -100,6 +100,9 @@ The handle's pointer target SHALL measure at least 24px across at a canvas
 scale of 1. Its drawn dot stays the size it is. Its cursor SHALL read as a
 crosshair, and as not-allowed on an end step.
 
+The handle SHALL draw above every way-out sentence, so a sentence never
+takes its press.
+
 #### Scenario: Hovering the handle names the gesture
 
 - **WHEN** the author rests the pointer on a task step's connect handle
