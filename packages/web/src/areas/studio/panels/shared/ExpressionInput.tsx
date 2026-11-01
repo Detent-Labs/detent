@@ -15,11 +15,13 @@ interface Props {
   value: DraftOf<Expression> | undefined;
   onChange: (next: DraftOf<Expression> | undefined) => void;
   placeholder?: string;
+  /** The input's accessible name, where no `<label>` wraps it. */
+  "aria-label"?: string;
 }
 
 /** Raw CEL text entry — no non-CEL condition-builder abstraction. The text is
  * a machine value, so it carries `translate="no"`. */
-export function ExpressionInput({ value, onChange, placeholder }: Props) {
+export function ExpressionInput({ value, onChange, placeholder, "aria-label": ariaLabel }: Props) {
   // `cel-input` plus the compiled style, joined in one `className`: a
   // `className` written after a spread of `stylex.props` would replace it.
   // The literal class names the input for the tests that find it.
@@ -30,6 +32,7 @@ export function ExpressionInput({ value, onChange, placeholder }: Props) {
       {...compiled}
       className={`cel-input ${compiled.className ?? ""}`.trim()}
       translate="no"
+      aria-label={ariaLabel}
       placeholder={placeholder ?? t("expression.placeholder")}
       value={value?.src ?? ""}
       onChange={(e) => {

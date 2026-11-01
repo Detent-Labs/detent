@@ -1136,6 +1136,9 @@ the card. A Group kind takes
 its name on its legend. To rename a field later, use the strip's **Name**
 control or the Fields tab.
 
+A derived key writes ä, ö, ü as ae, oe, ue and ß as ss. It drops other
+accents, so "Prüfung" keys `pruefung`.
+
 Drag a field from the palette onto the canvas to add it. Drag a card to
 another position to reorder the view. Each card also carries move-up and
 move-down buttons, which make the same change without a pointer. Take a card

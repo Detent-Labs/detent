@@ -1907,6 +1907,72 @@ this section.
   none, so the focus falls to the page body. The archived NAMES-3 fix covers
   only the first two exits.
 
+## Open from studio-selects-show-labels (needs its own OpenSpec change)
+
+The change made the step page's selects print labels and made derived keys
+transliterate umlauts. It left sixteen points to later changes. The final
+review and the design audit raised SELECTS-7 to SELECTS-16. The SELECTS tag is
+local to this section.
+
+- **SELECTS-1: the steps rail still falls back to a step key.** An unnamed
+  step reads its key in the rail. The step selects read "(unnamed step)".
+  Change 10 (`studio-step-accordion`) owns the rail.
+- **SELECTS-2: the Previous and Next labels still fall back to a step key.**
+  The step page foot prints the key of an unnamed neighbor. The Checks
+  narrowing label does the same. Both live in `EditScreen.tsx`. Change 10 owns
+  the page foot. Change 12 (`studio-checks-by-subject`) owns the Checks label.
+- **SELECTS-3: the Fields tab's data source select prints `ds.key ?? ds.id`.**
+  The select shows a key where the step selects show a label. Change 11 owns
+  the Sources view and can settle the wording.
+- **SELECTS-4: the canvas node's accessible name carries the step key.** A
+  screen reader hears the key and not the label. Change 5 owns the canvas
+  words.
+- **SELECTS-5: the migration plan form keeps its key and label choices.** No
+  change is planned. A migration maps instance data by key, so its spec asks
+  for both.
+- **SELECTS-6: a key derived before this change stops following its label.**
+  A draft keyed `pr_fung` no longer counts as derived. A rename of "Prüfung"
+  leaves that key alone. The change accepts this, since nothing is deployed.
+- **SELECTS-7: three more sites still fall back to a field key.** The
+  contract's input and output checkboxes print `f.key ?? f.id`
+  (`ContractPanel.tsx:67`, `:81`). The data source column map's target select
+  prints a key (`FieldCatalogPanel.tsx:1124`). The usage list reads a step key
+  (`draft/field-usage.ts:38`). Change 11 owns the Fields and Settings bodies.
+- **SELECTS-8: three letters still split a derived key.** The letters ı, đ and
+  þ have no decomposition, so `transliterate` drops them. A later change extends
+  the letter map.
+- **SELECTS-9: the time-limit and mapping rows keep unstyled literal classes.**
+  The class names `timer-row` and `mapping-row` have no rule. Their captions
+  stand beside the controls. Change 10 owns the step page's sections.
+- **SELECTS-10: CEL inputs stand beside the field-map selects.** They sit
+  outside a Developer view. These are stage 27's low-code sites. Change 10 or
+  change 11 settles them.
+- **SELECTS-11: the field border contrast already has an entry.** The audit
+  measured 1.33:1 again. The 2026-09-11 design audits section holds the entry,
+  "A field's border reads 1.32:1 in light and 1.64:1 in dark".
+- **SELECTS-12: the arrow glyph renders small in the fallback face.** The
+  `system-ui` stack draws "→" below the text size. It lasts until Archivo
+  ships.
+- **SELECTS-13: a target another row holds shows disabled with no reason.**
+  A field-map select greys that option out. No text says another row holds it.
+- **SELECTS-14: the "How it ended" select lists outcome names as typed.** Each
+  option prints the contract's outcome name. No label stands in for it.
+- **SELECTS-15: a studio select stands 37 to 40px tall.** That is under the
+  44px touch target. The studio serves a desktop audience, so this stays a
+  note, as the `.btn` height entry does.
+- **SELECTS-16: the guide states the umlaut rule in one place only.** The
+  form editor's paragraph in `docs/authoring-guide.md` says how a derived key
+  reads umlauts. The rule covers process, step and way-out keys too. The Path
+  section does not repeat it. A later guide edit moves the note to a shared
+  place.
+- **SELECTS-17: no test covers the add-way-out target reset.** The
+  `studio-canvas` scenarios say "+ Add a way out" stays disabled with no target
+  chosen, and the target select resets after an add. `PathsPanel.tsx` does
+  both. No test pins either.
+- **SELECTS-18: the operand picker counts repeats on untrimmed labels.** The
+  field-map selects trim a label before they count it. A label with a trailing
+  space then counts apart in the picker alone.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused

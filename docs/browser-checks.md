@@ -6714,3 +6714,70 @@ Discard the draft from the process list, on the "IT Offboarding" row, and
 accept the browser's confirm. Under `playwright-cli`, `dialog-accept` answers
 it. The header bar's own "Discard draft" does not work, per DRAFT-1 in
 `docs/decisions.md`.
+
+### Studio: selects list labels (`studio-selects-show-labels`)
+
+Source: `studio-selects-show-labels` task 6.6. The bun tests pin the option
+text, the numbering of repeats and the key derivation. A select's open list
+and the Developer view need a real page.
+
+Use the production build, as "Before you start" describes. Seed the database
+and sign in as `demo-superuser@example.test`, password `seed-demo-password`.
+Create a draft of a process with at least three steps. Under `playwright-cli`,
+pass `-s=selects-show-labels` on every call.
+
+**1. A way out's step selects list labels.** Open the Steps tab and select a
+step with a way out. Open the way out's "Leads to" select. Pass: each option
+reads a step's label. No option shows a key or an id.
+
+Open "Where the new way out leads". Pass: its options read the same labels.
+
+**2. Two steps named alike take their rail numbers.** Rename a second step to
+the first step's label, such as "Review". Open "Leads to". Pass: each of the
+two options reads "Review (step N)", N being that step's number in the steps
+rail.
+
+Read the heading of the way out that leads to the second step. Pass: it ends
+in "→ Review (step N)" with that step's rail number.
+
+**3. A step with no label reads as unnamed.** Drop a new step on the canvas
+and clear its label. Open "Leads to" on another step. Pass: the new step's
+option reads "(unnamed step)".
+
+**4. The time limit lists way-out headings.** Name a way out "Approve". Point
+it at a step named "Done". Open the Time limit section of the step that holds
+the way out, then its way-out select. Pass: an option reads "Approve → Done". No
+option shows a key.
+
+**5. An action lists field labels.** Open an action under "What happens when
+entered". Open a target select in "Values it writes back". Pass: the options
+read field labels. A group does not appear.
+
+**6. A call lists field labels in both mappings.** Open a step that calls a
+process. Open a target select in "Values passed to the child". Pass: the
+options read the child process's field labels, and none shows a key.
+
+Open a target select in "Values copied back from the child". Pass: the
+options read this process's field labels.
+
+**7. A derived key transliterates.** Add a step and name it "Prüfung". Open
+the step's Developer view. Pass: the key reads `pruefung`.
+
+Add a step named "Abschluss". Add a way out from "Prüfung" to "Abschluss".
+Open that way out's Developer view. Pass: the key reads `pruefung-abschluss`.
+
+**8. A field-map row names its controls.** Add a row under "Values it writes
+back". Point it at a field labelled "Credit score". Read the row in the
+accessibility tree. Pass: the select reads "Field". The value input reads
+"Value for Credit score", and the remove control reads "Remove: Credit score".
+
+**9. The time limit's select spans its column.** Open the Time limit section
+of a step with a way out. Pass: the way-out select is as wide as its column.
+The slate chevron sits at the select's own trailing edge, inside its border.
+
+**10. A default way-out label names its target once.** Draw a way out on the
+canvas from "Antrag" to "Abschluss". Open "Antrag" on the Steps tab. Pass: the
+row heading reads "Antrag → Abschluss", with no second "→ Abschluss".
+
+Discard the draft from the process list and accept the browser's confirm.
+Under `playwright-cli`, `dialog-accept` answers it.

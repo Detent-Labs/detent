@@ -20,12 +20,20 @@ describe("derivePathDefaults", () => {
     expect(key).toBe("manager-review-finance-sign-off");
   });
 
-  it("falls back to a step's key when its label is empty", () => {
+  it("reads the placeholder, never the key, when a step's label is empty", () => {
     const source = step("step_a", "manager-review", "");
     const target = step("step_b", "finance-signoff", "Finance sign-off");
     const { key, label } = derivePathDefaults(source, target, "en", "en", UNNAMED);
-    expect(label).toBe("manager-review → Finance sign-off");
-    expect(key).toBe("manager-review-finance-sign-off");
+    expect(label).toBe(`${UNNAMED} → Finance sign-off`);
+    expect(key).toBe("unnamed-step-finance-sign-off");
+  });
+
+  it("transliterates a non-ASCII label into the key", () => {
+    const source = step("step_a", "", "Prüfung");
+    const target = step("step_b", "", "Abschluss");
+    const { key, label } = derivePathDefaults(source, target, "en", "en", UNNAMED);
+    expect(label).toBe("Prüfung → Abschluss");
+    expect(key).toBe("pruefung-abschluss");
   });
 
   it("falls back to the placeholder when a step has neither label nor key", () => {

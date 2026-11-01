@@ -230,13 +230,16 @@ creation.
 
 The default `label` SHALL name the source step, then an arrow, then the
 target step. Each step contributes its own label when it carries one
-non-empty after trimming. A step with no such label contributes its key
-instead, when the key is non-empty after trimming. A step with neither
-contributes the "unnamed step" placeholder.
+non-empty after trimming. A step with no such label contributes the
+"unnamed step" placeholder. A step's key SHALL NOT stand in the label.
 
-The default `key` SHALL be a slug built the same way. A side whose name
-slugs to an empty string SHALL contribute the placeholder's slug instead.
-That way the joined `key` never comes out empty. Neither default
+The default `key` SHALL be a slug built the same way. The slug SHALL
+transliterate first, by the rule the process key derivation states. It SHALL
+join its words with `-`. A side whose name slugs to an empty string SHALL
+contribute the placeholder's slug instead. That way the joined `key` never
+comes out empty.
+
+Neither default
 stays in sync with a later rename of either step. Each gets computed
 once, at creation. Each stays freely editable afterward, like any other
 path field.
@@ -244,10 +247,11 @@ path field.
 A drag to empty canvas creates a new step as part of the same gesture. So
 does a step dropped on an existing path. Both leave the new step with an
 empty `key` and an empty `label`. The method `newStep()` hardcodes the
-one, and its callers seed the other empty. That path's default SHALL come
-from the new step's own, likewise defaulted, key and label. It SHALL fall
-back to the "unnamed step" placeholder, not to an empty or arrow-only
-string.
+one, and its callers seed the other empty.
+
+That path's default SHALL come from the new step's own, likewise
+defaulted, label. It SHALL fall back to the "unnamed step"
+placeholder. An empty or arrow-only string SHALL NOT stand in its place.
 
 #### Scenario: A path dragged between two named steps gets a derived label
 
@@ -293,7 +297,7 @@ string.
 - **WHEN** a connect-handle drag from step A to empty canvas creates both a
   new step and a path to it
 - **THEN** `newPath()` derives the path's default `key` and `label` from
-  step A and the newly created step's own default key and label
+  step A and the newly created step's own default label
 
 #### Scenario: A path to a freshly created, unnamed step falls back to a placeholder
 
@@ -318,6 +322,21 @@ string.
 - **THEN** the derivation falls back to the "unnamed step" placeholder for
   the target side
 - **AND** the new path keeps the original `to` id
+
+#### Scenario: A path from a step with an umlaut keeps the letter's reading
+
+- **WHEN** a connect-handle drag runs from step "Prüfung" to step
+  "Abschluss"
+- **THEN** the path's `label` reads "Prüfung → Abschluss"
+- **AND** the path's `key` reads `pruefung-abschluss`
+
+#### Scenario: A step with a key and no label contributes the placeholder
+
+- **WHEN** an author creates a path from a step whose label is empty and
+  whose key reads `review`
+- **THEN** the path's `label` names that side with the "unnamed step"
+  placeholder
+- **AND** the label does not contain `review`
 
 ### Requirement: A path draws as the drop target under an edit-rail drag
 
@@ -1636,7 +1655,17 @@ prior value.
 
 Derivation SHALL read only the process label's base-locale entry. An edit
 to any other locale's translation SHALL NOT trigger key derivation.
-Derivation SHALL lower-case the label. It SHALL collapse every run of
+
+Derivation SHALL lower-case the label. It SHALL then transliterate. The
+letters "ä", "ö" and "ü" read "ae", "oe" and "ue", and "ß" reads "ss". The
+letters "æ" and "œ" read "ae" and "oe", "ø" reads "o" and "ł" reads "l".
+Every other letter SHALL lose its combining marks, so "é" reads "e".
+
+A base
+letter typed with a combining mark SHALL read as the letter they compose. So
+"u" plus a diaeresis reads "ue".
+
+After that, derivation SHALL collapse every run of
 characters outside `[a-z0-9]` to a single `_`. It SHALL trim a leading or
 trailing `_`. A result starting with a digit SHALL gain a leading `_`.
 
@@ -1665,6 +1694,18 @@ throughout. Nothing about it SHALL become read-only or disabled otherwise.
 - **AND** the developer types a translation into the process label's
   non-base-locale entry
 - **THEN** the process key stays unchanged
+
+#### Scenario: A process label with umlauts derives a readable key
+
+- **WHEN** the developer types "Prüfung der Änderung" into a new draft's
+  process label, having never touched the key field
+- **THEN** the process key reads `pruefung_der_aenderung`
+
+#### Scenario: A letter with an accent loses only its mark
+
+- **WHEN** the developer types "Café Straße" into a new draft's process
+  label, having never touched the key field
+- **THEN** the process key reads `cafe_strasse`
 
 ### Requirement: A step node prints the step's label, centred and resolved for the content locale
 

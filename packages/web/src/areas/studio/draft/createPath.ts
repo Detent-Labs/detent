@@ -2,32 +2,30 @@ import type { Path, PathTrigger } from "workflow-engine/schema";
 import type { DraftOf } from "./types";
 import type { DraftStep } from "./createStep";
 import { mintId } from "./ids";
+import { transliterate } from "./deriveKey";
 import { resolveDraftLocalizedText } from "./localized-text";
 
 type DraftPath = DraftOf<Path>;
 
-/** A slug: lower-cased, with every run of non-alphanumeric characters
- * collapsed to a single hyphen, and leading/trailing hyphens stripped. Can
- * come out empty for a string with no alphanumeric characters at all
- * (`"!!!"`). */
+/** A slug: transliterated and lower-cased, with every run of non-alphanumeric
+ * characters collapsed to a single hyphen, and leading/trailing hyphens
+ * stripped. Can come out empty for a string with no alphanumeric characters
+ * at all (`"!!!"`). */
 function slugify(text: string): string {
-  return text
-    .toLowerCase()
+  return transliterate(text)
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
 
 /** One side's display text for the derived default: the step's own label
- * when non-empty after trimming, else its key when non-empty after
- * trimming, else the caller-resolved "unnamed step" placeholder.
- * `resolveDraftLocalizedText` reads the label at the studio's current
- * content locale, since `Step.label` is a multi-locale map and
- * `newPath()`'s derived `Path.label` is a single plain string. */
+ * when non-empty after trimming, else the caller-resolved "unnamed step"
+ * placeholder. A step's key never stands in. `resolveDraftLocalizedText`
+ * reads the label at the studio's current content locale, since `Step.label`
+ * is a multi-locale map and `newPath()`'s derived `Path.label` is a single
+ * plain string. */
 function sideText(step: DraftStep | undefined, contentLocale: string, baseLocale: string, unnamedStepPlaceholder: string): string {
   const label = resolveDraftLocalizedText(step?.label, contentLocale, baseLocale)?.trim();
   if (label) return label;
-  const key = step?.key?.trim();
-  if (key) return key;
   return unnamedStepPlaceholder;
 }
 

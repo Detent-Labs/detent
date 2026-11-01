@@ -1,19 +1,14 @@
 import type { Expression, FieldId } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
+import type { DraftField } from "../../draft/fields";
+import { resolveDraftLocalizedText } from "../../draft/localized-text";
+import { t } from "../../catalog.js";
+import { numberRepeats } from "./optionText";
+import type { TargetRef } from "./useTargetProcessCatalog";
 
 type Mapping = Partial<Record<FieldId, DraftOf<Expression>>>;
 
-/**
- * What the editor reads off a target field. `DraftField` and a child's input
- * ref both fit. `type` is `unknown` because a plugin-typed `DraftField` carries
- * an envelope object there; the editor compares it to `"group"` only.
- */
-export interface MapTargetField {
-  id?: string;
-  key?: string;
-  type?: unknown;
-}
-
+/** One option of a row's select: the id the mapping stores and the text it prints. */
 export interface MapTarget {
   id: string;
   label: string;
@@ -29,14 +24,38 @@ export interface RowOption {
 /** An emptied CEL input keeps its row: the entry stays, with no text. */
 export const EMPTY_EXPRESSION: DraftOf<Expression> = { lang: "cel", src: "" };
 
-/** A group has no value of its own, so it is never a target. */
-export function targetsOf(fields: readonly MapTargetField[]): MapTarget[] {
+/** A repeated text takes a count, in list order. */
+function numbered(targets: readonly MapTarget[]): MapTarget[] {
+  const labels = numberRepeats(targets, (target) => target.label);
+  return targets.map((target, i) => ({ id: target.id, label: labels[i] ?? target.label }));
+}
+
+/**
+ * The calling process's fields as targets, in catalog order. `fields` is the
+ * flat catalog (`draftFields`). A group has no value of its own, so it is
+ * never a target; a field with no id yet is skipped. A field reads its label
+ * at the content locale, else the base locale, else the unnamed-field
+ * placeholder.
+ */
+export function fieldTargets(fields: readonly DraftField[], contentLocale: string, baseLocale: string): MapTarget[] {
   const out: MapTarget[] = [];
   for (const f of fields) {
     if (f.id === undefined || f.type === "group") continue;
-    out.push({ id: f.id, label: f.key ?? f.id });
+    const label = resolveDraftLocalizedText(f.label, contentLocale, baseLocale)?.trim() || t("condition.unnamedField");
+    out.push({ id: f.id, label });
   }
-  return out;
+  return numbered(out);
+}
+
+/**
+ * A called process's input fields as targets, in the contract's order. Each
+ * ref's label was already resolved in the child's base locale. A contract may
+ * name a group, which is never a target.
+ */
+export function refTargets(refs: readonly TargetRef[]): MapTarget[] {
+  return numbered(
+    refs.filter((r) => r.type !== "group").map((r) => ({ id: r.id, label: r.label.trim() || t("condition.unnamedField") })),
+  );
 }
 
 /**
@@ -64,8 +83,8 @@ export function rowOptions(
 }
 
 /** The first target no row holds, or `undefined` when none is left. */
-export function nextUnusedTarget(fields: readonly MapTargetField[], usedKeys: readonly string[]): string | undefined {
-  return targetsOf(fields).find((t) => !usedKeys.includes(t.id))?.id;
+export function nextUnusedTarget(targets: readonly MapTarget[], usedKeys: readonly string[]): string | undefined {
+  return targets.find((target) => !usedKeys.includes(target.id))?.id;
 }
 
 /** The map after the CEL input of one row changed. An emptied input keeps the row. */

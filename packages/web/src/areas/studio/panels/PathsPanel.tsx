@@ -1,14 +1,14 @@
 import { useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { ChevronDown } from "lucide-react";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Path, Step, StepId } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { newPath, pathWithTrigger, triggerForNewPath } from "../draft/createPath";
 import { removeAt, replaceAt, updateAt } from "../draft/list-ops";
-import { resolveDraftLocalizedText } from "../draft/localized-text";
 import { t } from "../catalog.js";
+import { plainStepTextMap, stepTextMap, wayOutHeading } from "./shared/optionText";
+import { StudioSelect } from "./shared/StudioSelect";
 import { ConditionInput } from "./shared/ConditionInput";
 import { IssueList } from "./shared/IssueList";
 import { ActionListEditor } from "./ActionListEditor";
@@ -91,32 +91,6 @@ const styles = stylex.create({
   // The gap between the Name label and the Leads to label below it.
   nameLabel: {
     marginBlockEnd: space.s2,
-  },
-  // The studio select: a native `<select>` with its UA chevron dropped in
-  // favor of a decorative `ChevronDown` layered over the trailing edge.
-  selectWrap: {
-    position: "relative",
-    display: "block",
-  },
-  select: {
-    // `selectWrap` stretches to the flex column's full width (its own
-    // `<label>` parent is a flex column, and a flex item stretches on the
-    // cross axis by default), but a bare `<select>` sizes to its option
-    // text unless told otherwise. Without this, the select's own box stays
-    // content-width while `selectIcon` sits at the wrapper's trailing edge,
-    // landing well past the select's own right border.
-    width: "100%",
-    appearance: "none",
-    paddingInlineEnd: space.s8,
-  },
-  selectIcon: {
-    position: "absolute",
-    insetInlineEnd: space.s2,
-    insetBlock: 0,
-    display: "flex",
-    alignItems: "center",
-    color: colors.textMuted,
-    pointerEvents: "none",
   },
   // The same shorthand StyleX drops on the step page's own picker: a
   // `<fieldset>` keeps the UA's `2px groove` when it goes, so the longhand
@@ -254,26 +228,21 @@ export function PathsPanel({
   const sourceStep = steps.find((s) => s.id === stepId);
   const targetStep = steps.find((s) => s.id === newPathTarget);
 
+  // One text per step: the step selects and every row heading read the same
+  // map, so "Review (step 6)" names one step everywhere.
+  const stepTexts = stepTextMap(steps, contentLocale, baseLocale);
+  const plainTexts = plainStepTextMap(steps, contentLocale, baseLocale);
+  const stepOptions = steps.map((s) => (
+    <option key={s.id} value={s.id}>
+      {s.id !== undefined ? stepTexts.get(s.id) : undefined}
+    </option>
+  ));
+
   const addPath = () => {
     if (!sourceStep || !targetStep?.id) return;
     const trigger = triggerForNewPath(sourceStep);
     onChange([...list, newPath(sourceStep, targetStep, targetStep.id, trigger, contentLocale, baseLocale, t("steps.unnamedStep"))]);
     setNewPathTarget("");
-  };
-
-  /** The row's heading sentence (design.md D4). The target reads its label in
-   * the content locale, then its key, then its id, the way the select prints
-   * a step. */
-  const rowHeading = (path: DraftPath): string => {
-    const pathLabel = path.label?.trim() ? path.label : t("paths.unnamedPath");
-    const target = path.to === undefined || path.to === "" ? undefined : steps.find((s) => s.id === path.to);
-    const targetLabel =
-      target === undefined
-        ? t("paths.noTargetYet")
-        : resolveDraftLocalizedText(target.label, contentLocale, baseLocale)?.trim() || target.key || target.id || t("paths.noTargetYet");
-    // One pass over both placeholders: a label holding `{step}` or `$&`
-    // passes through literally.
-    return t("paths.rowHeading").replace(/\{(path|step)\}/g, (_, k: string) => (k === "path" ? pathLabel : targetLabel));
   };
 
   const removePath = (index: number) => onChange(removeAt(list, index));
@@ -291,7 +260,7 @@ export function PathsPanel({
           key={path.id ?? index}
         >
           {/* An h4: the step page's section heading above is an h3. */}
-          <h4 {...stylex.props(styles.rowHeading)}>{rowHeading(path)}</h4>
+          <h4 {...stylex.props(styles.rowHeading)}>{wayOutHeading(path, stepTexts, plainTexts)}</h4>
           <label {...stylex.props(styles.fieldLabel, styles.nameLabel)}>
             <span {...stylex.props(styles.fieldLabelText)}>
               {t("paths.labelCaption")}
@@ -306,25 +275,12 @@ export function PathsPanel({
             <span {...stylex.props(styles.fieldLabelText)}>
               {t("paths.toCaption")}
             </span>
-            <span {...stylex.props(styles.selectWrap)}>
-              <select
-                {...stylex.props(styles.select)}
-                value={path.to ?? ""}
-                onChange={(e) => updatePath(index, { to: e.target.value as StepId })}
-              >
-                <option value="" disabled>
-                  {t("paths.selectTargetStep")}
-                </option>
-                {steps.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.key ?? s.id}
-                  </option>
-                ))}
-              </select>
-              <span {...stylex.props(styles.selectIcon)}>
-                <ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" />
-              </span>
-            </span>
+            <StudioSelect value={path.to ?? ""} onChange={(e) => updatePath(index, { to: e.target.value as StepId })}>
+              <option value="" disabled>
+                {t("paths.selectTargetStep")}
+              </option>
+              {stepOptions}
+            </StudioSelect>
           </label>
 
           {/* "How it is taken": a two-option restyle of the existing `trigger`
@@ -393,6 +349,8 @@ export function PathsPanel({
             actions={path.onPath}
             onChange={(onPath) => updatePath(index, { onPath })}
             fields={fields}
+            contentLocale={contentLocale}
+            baseLocale={baseLocale}
             registryTypes={registryTypes}
             registrySchemas={registrySchemas}
           />
@@ -424,21 +382,12 @@ export function PathsPanel({
       ))}
       <label {...stylex.props(styles.fieldLabel)}>
         <span {...stylex.props(styles.fieldLabelText)}>{t("paths.newPathTargetLabel")}</span>
-        <span {...stylex.props(styles.selectWrap)}>
-          <select {...stylex.props(styles.select)} value={newPathTarget} onChange={(e) => setNewPathTarget(e.target.value)}>
-            <option value="" disabled>
-              {t("paths.selectTargetStep")}
-            </option>
-            {steps.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.key ?? s.id}
-              </option>
-            ))}
-          </select>
-          <span {...stylex.props(styles.selectIcon)}>
-            <ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" />
-          </span>
-        </span>
+        <StudioSelect value={newPathTarget} onChange={(e) => setNewPathTarget(e.target.value)}>
+          <option value="" disabled>
+            {t("paths.selectTargetStep")}
+          </option>
+          {stepOptions}
+        </StudioSelect>
       </label>
       <button type="button" className="btn btn-secondary" onClick={addPath} disabled={steps.length === 0 || terminal || !newPathTarget}>
         {t("paths.addPath")}

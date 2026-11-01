@@ -7,6 +7,7 @@ import { removeAt, updateAt } from "../draft/list-ops";
 import type { DraftField } from "../draft/fields";
 import type { ConfigFieldDescriptor } from "../api/types.js";
 import { FieldExpressionMapEditor } from "./shared/FieldExpressionMapEditor";
+import { fieldTargets, type MapTarget } from "./shared/fieldExpressionMapLogic";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { IssueList, NotCheckedBadge } from "./shared/IssueList";
 import { useDraft } from "../draft/store";
@@ -19,6 +20,9 @@ interface Props {
   actions: DraftAction[] | undefined;
   onChange: (next: DraftAction[]) => void;
   fields: DraftField[];
+  /** The studio's content locale and the draft's base locale, for the output mapping's field labels. */
+  contentLocale: string;
+  baseLocale: string;
   /** The action registry's live type names and config-schema descriptions (GET /registry). */
   registryTypes?: string[];
   registrySchemas?: Record<string, ConfigFieldDescriptor[]>;
@@ -30,8 +34,18 @@ interface Props {
  * mutates in place — always calls `onChange` with a full new array so the
  * caller's own `mutate` recipe stays the single source of the write.
  */
-export function ActionListEditor({ label, actions, onChange, fields, registryTypes, registrySchemas }: Props) {
+export function ActionListEditor({
+  label,
+  actions,
+  onChange,
+  fields,
+  contentLocale,
+  baseLocale,
+  registryTypes,
+  registrySchemas,
+}: Props) {
   const list = actions ?? [];
+  const targets = fieldTargets(fields, contentLocale, baseLocale);
 
   const addAction = () => {
     const next: DraftAction = { id: mintId("action"), type: "", config: {} };
@@ -54,7 +68,7 @@ export function ActionListEditor({ label, actions, onChange, fields, registryTyp
         <ActionRow
           key={action.id ?? index}
           action={action}
-          fields={fields}
+          targets={targets}
           registryTypes={registryTypes}
           registrySchemas={registrySchemas}
           onChange={(patch) => updateAction(index, patch)}
@@ -70,14 +84,14 @@ export function ActionListEditor({ label, actions, onChange, fields, registryTyp
 
 function ActionRow({
   action,
-  fields,
+  targets,
   registryTypes,
   registrySchemas,
   onChange,
   onRemove,
 }: {
   action: DraftAction;
-  fields: DraftField[];
+  targets: readonly MapTarget[];
   registryTypes?: string[];
   registrySchemas?: Record<string, ConfigFieldDescriptor[]>;
   onChange: (patch: Partial<DraftAction>) => void;
@@ -115,7 +129,7 @@ function ActionRow({
         removeLabel={t("actions.removeOutputMapping")}
         placeholder={t("actions.resultCelPlaceholder")}
         mapping={output}
-        fields={fields}
+        targets={targets}
         onChange={setOutput}
       />
 

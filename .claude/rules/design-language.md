@@ -180,8 +180,8 @@ and placement detail.
 
 **Fields.** Label sits above control, 4px apart. The error list sits as a
 sibling of the label and never nests inside it. The studio select
-(`panels/PathsPanel.tsx`) is the one `<select>` that drops its UA chevron;
-every other keeps its own. See `DESIGN.md`'s Inputs / Fields section for
+(`panels/shared/StudioSelect.tsx`) is the one `<select>` that drops its UA
+chevron; every other keeps its own. See `DESIGN.md`'s Inputs / Fields section for
 the toolbar exception and the rest of the detail.
 
 **Error, emptiness, waiting.** A failed request shows its error where the

@@ -265,6 +265,11 @@ export const en = {
   "instanceQuery.duplicateColumnKey": "An earlier row already uses this column key, so this row is not saved.",
 
   "steps.unnamedStep": "(unnamed step)",
+  // Two or more unnamed steps, each by its steps-rail number.
+  "steps.unnamedStepNumbered": "(unnamed step {n})",
+  "options.repeatedLabel": "{label} ({n})",
+  // A step label two or more steps share, each by its steps-rail number.
+  "options.repeatedStep": "{label} (step {n})",
   "steps.crossProcessLegend": "cross-process check (checkSubprocessChildRefs)",
   "steps.crossProcessChecked": "checked against loaded child —",
   "steps.unload": "unload",
@@ -468,7 +473,6 @@ export const en = {
   "condition.celCaption": "CEL",
   // The operand picker's entries and headings.
   "condition.unnamedField": "(unnamed field)",
-  "condition.duplicateLabel": "{label} ({n})",
   "condition.operand.caseStatus": "The case's status",
   "condition.operand.personRoles": "The person's roles",
   "condition.operand.childOutcome": "How the called process ended",
@@ -1053,6 +1057,11 @@ export const en = {
 
   "expression.placeholder": "CEL expression",
   "mapping.unlistedKey": "(not in the list)",
+  // The accessible names of a field-map row's select, value input and remove
+  // control. `{field}` is the row's target text.
+  "mapping.targetLabel": "Field",
+  "mapping.valueLabel": "Value for {field}",
+  "mapping.removeLabel": "Remove: {field}",
   "plugin.typePlaceholder": "plugin type identifier",
   "plugin.selectType": "-- select type --",
   "plugin.unregisteredType": "(unregistered)",

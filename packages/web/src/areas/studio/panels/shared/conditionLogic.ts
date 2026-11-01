@@ -20,6 +20,7 @@ import type { DraftField } from "../../draft/fields";
 import { flattenDraftFields } from "../../draft/fields";
 import { resolveDraftLocalizedText } from "../../draft/localized-text";
 import { t, type CatalogKey } from "../../catalog.js";
+import { fill, numberRepeats } from "./optionText";
 
 export interface OperandOption {
   value: string;
@@ -129,12 +130,6 @@ const CONTEXT_CLAUSE_LABELS: Record<string, CatalogKey> = {
 
 const CONTEXT_GROUPS = { instance: "case", actor: "person" } as const;
 
-/** Fill every `{slot}` in one pass. A function fills each slot, so a `$`
- * pattern or a `{slot}` inside a value prints as written. */
-function fill(template: string, slots: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (m, k: string) => slots[k] ?? m);
-}
-
 function fieldLabel(f: DraftField, locale: string, baseLocale: string): string {
   const label = f.label ? resolveDraftLocalizedText(f.label, locale, baseLocale) : undefined;
   return label || t("condition.unnamedField");
@@ -172,18 +167,15 @@ export function fieldOperand(f: DraftField, prefix: string, locale: string, base
  * a fully-required `FieldDef[]`, not a mid-edit draft's partial catalog.
  */
 function catalogOperands(fields: DraftField[] | undefined, locale: string, baseLocale: string): Operand[] {
-  // A second and later field sharing a label takes a count, in catalog order.
-  const seen = new Map<string, number>();
-  return flattenDraftFields(fields)
+  const operands = flattenDraftFields(fields)
     .filter((f) => f.type !== "group")
     .flatMap((f) => {
       const o = fieldOperand(f, "data", locale, baseLocale);
-      if (!o) return [];
-      const n = (seen.get(o.label) ?? 0) + 1;
-      seen.set(o.label, n);
-      const label = n === 1 ? o.label : fill(t("condition.duplicateLabel"), { label: o.label, n: String(n) });
-      return [{ ...o, label, group: "fields" as const }];
+      return o ? [o] : [];
     });
+  // A second and later field sharing a label takes a count, in catalog order.
+  const labels = numberRepeats(operands, (o) => o.label);
+  return operands.map((o, i) => ({ ...o, label: labels[i]!, group: "fields" as const }));
 }
 
 /** INSTANCE_SCHEMA + ACTOR_SCHEMA, read mechanically, minus the deny-list. */

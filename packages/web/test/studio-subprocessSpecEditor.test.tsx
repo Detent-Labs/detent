@@ -42,6 +42,7 @@ function render(spec: Parameters<typeof SubprocessSpecEditor>[0]["value"], local
       onChange={() => {}}
       processes={PROCESSES}
       contentLocale={locale}
+      baseLocale="en"
     />,
   );
 }
@@ -101,7 +102,7 @@ const CHILD_FIELDS = [
   { id: "fld_amount", key: "amount", label: "Amount" },
   { id: "fld_applicant", key: "applicant", label: "Applicant" },
 ];
-const PARENT_FIELDS = [{ id: "fld_parent_only", key: "parent_only", type: "string" }] as never;
+const PARENT_FIELDS = [{ id: "fld_parent_only", key: "parent_only", type: "string", label: { en: "Parent only" } }] as never;
 
 function renderWith(
   spec: Parameters<typeof SubprocessSpecEditor>[0]["value"],
@@ -115,6 +116,7 @@ function renderWith(
       onChange={() => {}}
       processes={PROCESSES}
       contentLocale="en"
+      baseLocale="en"
     />,
   );
 }
@@ -147,23 +149,40 @@ describe("the inputMapping editor", () => {
   const addDisabled = (html: string) =>
     new RegExp(`<button[^>]*disabled=""[^>]*>${addInput.replace(/\W/g, "\\$&")}</button>`).test(html);
 
-  it("offers the child's input field keys and none of the parent's", () => {
+  it("offers the child's input fields by label and none of the parent's", () => {
     const html = renderWith(
       { ...PINNED, inputMapping: { fld_amount: CEL("data.x") } as never },
       { status: "ready", fields: CHILD_FIELDS },
     );
-    expect(html).toContain('<option value="fld_amount" selected="">amount</option>');
-    expect(html).toContain('<option value="fld_applicant">applicant</option>');
+    expect(html).toContain('<option value="fld_amount" selected="">Amount</option>');
+    expect(html).toContain('<option value="fld_applicant">Applicant</option>');
+    expect(html).not.toContain(">amount</option>");
+    expect(html).not.toContain(">applicant</option>");
     const inputFieldset = html.slice(html.indexOf(inputLegend), html.indexOf(outputLegend));
     expect(inputFieldset).not.toContain("parent_only");
+    expect(inputFieldset).not.toContain("Parent only");
   });
 
-  it("keeps the parent's fields as the outputMapping targets", () => {
+  it("offers no group the child's contract names", () => {
+    const withGroup = [...CHILD_FIELDS, { id: "fld_group", key: "applicant_group", label: "Applicant details", type: "group" }];
+    const mapping = { fld_amount: CEL("a"), fld_applicant: CEL("b") } as never;
+    const html = renderWith({ ...PINNED, inputMapping: mapping }, { status: "ready", fields: withGroup });
+    const inputFieldset = html.slice(html.indexOf(inputLegend), html.indexOf(outputLegend));
+    expect(inputFieldset).not.toContain('value="fld_group"');
+    expect(inputFieldset).not.toContain("Applicant details");
+    // The note reads the same list: with the group left out, every field has a row.
+    expect(addDisabled(html)).toBe(true);
+    expect(html).toContain(studioCatalog.en["subprocess.noteAllMapped"]);
+  });
+
+  it("keeps the parent's fields as the outputMapping targets, by label", () => {
     const html = renderWith(
       { ...PINNED, outputMapping: { fld_parent_only: CEL("child.data.x") } as never },
       { status: "ready", fields: CHILD_FIELDS },
     );
-    expect(html.slice(html.indexOf(outputLegend))).toContain(">parent_only</option>");
+    const outputFieldset = html.slice(html.indexOf(outputLegend));
+    expect(outputFieldset).toContain(">Parent only</option>");
+    expect(outputFieldset).not.toContain(">parent_only</option>");
   });
 
   it("enables + add when the child is ready and lists a free field", () => {

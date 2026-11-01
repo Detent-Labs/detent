@@ -177,8 +177,10 @@ describe("a way out's heading sentence", () => {
     expect(rowHeading(render({ label: "A {step} $&" }))).toBe("A {step} $&amp; → Done");
   });
 
-  it("falls to the target's key where the target has no name", () => {
-    expect(rowHeading(render({ to: "step_a" }))).toBe("Approve → intake");
+  it("reads an unnamed target as unnamed, never by its key", () => {
+    const heading = rowHeading(render({ to: "step_a" }));
+    expect(heading).toBe("Approve → (unnamed step)");
+    expect(heading).not.toContain("intake");
   });
 
   it("says no step is chosen yet where the way out leads nowhere", () => {
@@ -217,5 +219,117 @@ describe("a way out's key", () => {
     expect(start).toBeGreaterThan(-1);
     expect(block).toContain("updatePath(index, { key: e.target.value })");
     expect(source.slice(0, start)).not.toContain("updatePath(index, { key: e.target.value })");
+  });
+});
+
+/** The options of the `<select>` that opens after `caption`, as [value, text] pairs. */
+function selectAfter(html: string, caption: string, from = 0): [string, string][] {
+  const at = html.indexOf(caption, from);
+  const sel = /<select\b[^>]*>([\s\S]*?)<\/select>/.exec(html.slice(at));
+  return [...(sel?.[1] ?? "").matchAll(/<option\b([^>]*)>([\s\S]*?)<\/option>/g)].map((m) => [
+    /value="([^"]*)"/.exec(m[1]!)?.[1] ?? "",
+    m[2]!.replace(/<!-- -->/g, ""),
+  ]);
+}
+
+function renderSteps(steps: DraftStep[], paths: Record<string, unknown>[]): string {
+  return renderToStaticMarkup(
+    <DraftContext.Provider value={context}>
+      <PathsPanel
+        paths={paths as unknown as DraftPath[]}
+        steps={steps}
+        fields={FIELDS}
+        stepId={steps[0]?.id}
+        onChange={() => {}}
+        contentLocale="en"
+        baseLocale="en"
+      />
+    </DraftContext.Provider>,
+  );
+}
+
+describe("the step selects list labels", () => {
+  const steps = [
+    { id: "step_1", key: "antrag", type: "task", label: { en: "Antrag" } },
+    { id: "step_2", key: "pr_fung", type: "task", label: { en: "Prüfung" } },
+    { id: "step_3", key: "abschluss", type: "task", label: { en: "Abschluss" } },
+    { id: "step_4", key: "review", type: "task", label: { en: "" } },
+  ] as unknown as DraftStep[];
+  const html = renderSteps(steps, [{ id: "path_1", key: "weiter", label: "Weiter", to: "step_2" }]);
+  const expected = ["Antrag", "Prüfung", "Abschluss", "(unnamed step)"];
+
+  it("offers each step by its label in \"Leads to\", never its key", () => {
+    const options = selectAfter(html, ">Leads to<");
+    expect(options.slice(1).map(([, text]) => text)).toEqual(expected);
+    expect(options.slice(1).map(([value]) => value)).toEqual(["step_1", "step_2", "step_3", "step_4"]);
+    expect(options.some(([, text]) => text === "pr_fung" || text === "review")).toBe(false);
+  });
+
+  it("offers each step by its label where the new way out leads", () => {
+    const options = selectAfter(html, ">Where the new way out leads<");
+    expect(options.slice(1).map(([, text]) => text)).toEqual(expected);
+  });
+
+  it("names an unnamed target as unnamed in the heading", () => {
+    const named = renderSteps(steps, [{ id: "path_1", key: "send", label: "Send", to: "step_4" }]);
+    expect(rowHeading(named)).toBe("Send → (unnamed step)");
+    expect(rowHeading(named)).not.toContain("review");
+  });
+});
+
+describe("two steps sharing a label", () => {
+  const steps = [
+    { id: "step_1", key: "antrag", type: "task", label: { en: "Antrag" } },
+    { id: "step_2", key: "review", type: "task", label: { en: "Review" } },
+    { id: "step_3", key: "done", type: "task", label: { en: "Done" } },
+    { id: "step_4", key: "archive", type: "task", label: { en: "Archive" } },
+    { id: "step_5", key: "close", type: "task", label: { en: "Close" } },
+    { id: "step_6", key: "review_2", type: "task", label: { en: "Review" } },
+  ] as unknown as DraftStep[];
+  const html = renderSteps(steps, [{ id: "path_1", key: "again", label: "Again", to: "step_6" }]);
+  const expected = ["Antrag", "Review (step 2)", "Done", "Archive", "Close", "Review (step 6)"];
+
+  it("carry their steps-rail numbers in both selects", () => {
+    expect(selectAfter(html, ">Leads to<").slice(1).map(([, text]) => text)).toEqual(expected);
+    expect(selectAfter(html, ">Where the new way out leads<").slice(1).map(([, text]) => text)).toEqual(expected);
+  });
+
+  it("name the second by its rail number in a way out's heading", () => {
+    expect(rowHeading(html)).toBe("Again → Review (step 6)");
+  });
+
+  it("name the target by its rail number once in a default label's heading", () => {
+    const plain = renderSteps(steps, [{ id: "path_1", key: "p", label: "Antrag → Review", to: "step_6" }]);
+    expect(rowHeading(plain)).toBe("Antrag → Review (step 6)");
+    const numbered = renderSteps(steps, [{ id: "path_1", key: "p", label: "Antrag → Review (step 6)", to: "step_6" }]);
+    expect(rowHeading(numbered)).toBe("Antrag → Review (step 6)");
+  });
+});
+
+describe("two unnamed steps", () => {
+  const steps = [
+    { id: "step_1", key: "antrag", type: "task", label: { en: "Antrag" } },
+    { id: "step_2", key: "x", type: "task", label: { en: "" } },
+    { id: "step_3", key: "y", type: "task", label: { en: "  " } },
+  ] as unknown as DraftStep[];
+  const html = renderSteps(steps, [{ id: "path_1", key: "go", label: "Go", to: "step_3" }]);
+
+  it("carry their steps-rail numbers in both selects", () => {
+    const expected = ["Antrag", "(unnamed step 2)", "(unnamed step 3)"];
+    expect(selectAfter(html, ">Leads to<").slice(1).map(([, text]) => text)).toEqual(expected);
+    expect(selectAfter(html, ">Where the new way out leads<").slice(1).map(([, text]) => text)).toEqual(expected);
+    expect(rowHeading(html)).toBe("Go → (unnamed step 3)");
+  });
+});
+
+describe("a default way-out label", () => {
+  const steps = [
+    { id: "step_1", key: "pruefung", type: "task", label: { en: "Prüfung" } },
+    { id: "step_2", key: "capture", type: "task", label: { en: "Capture" } },
+  ] as unknown as DraftStep[];
+
+  it("names its target once in the heading", () => {
+    const html = renderSteps(steps, [{ id: "path_1", key: "p", label: "Prüfung → Capture", to: "step_2" }]);
+    expect(rowHeading(html)).toBe("Prüfung → Capture");
   });
 });

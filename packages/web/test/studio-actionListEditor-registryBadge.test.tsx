@@ -72,7 +72,7 @@ function contextValue(validation: ValidationResult): DraftContextValue {
 function renderRow(action: DraftAction, validation: ValidationResult): string {
   return renderToStaticMarkup(
     <DraftContext.Provider value={contextValue(validation)}>
-      <ActionListEditor label="On entry" actions={[action]} onChange={() => {}} fields={[]} registryTypes={[]} />
+      <ActionListEditor label="On entry" actions={[action]} onChange={() => {}} fields={[]} contentLocale="en" baseLocale="en" registryTypes={[]} />
     </DraftContext.Provider>,
   );
 }
