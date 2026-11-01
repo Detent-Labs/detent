@@ -245,8 +245,9 @@ field with no label reads "(unnamed field)".
 
 A placed field's card SHALL print the field's label in the written face. It
 SHALL print the kind's icon and the kind's name. That name is the word the
-Fields tab's entity rail prints for the field. The card SHALL NOT print the field's
-`key` or its raw `type` string.
+Fields tab's entity rail prints for the field. The card SHALL NOT print the
+field's `key`. Some fields match no curated kind by type, format and
+control. Such a card prints that triple in mono, as the entity rail does.
 
 A group card's legend SHALL print the group's label. A note's card SHALL
 print its text and the kind word "Note".
