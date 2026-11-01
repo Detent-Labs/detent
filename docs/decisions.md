@@ -2143,6 +2143,25 @@ MAPLABELS tag is local to this section.
 - **MAPLABELS-10: the field matrix's row headers print keys alone.** The
   Catalog view prints labels beside them. This half of the archived "Show on
   the canvas" entry stays open. Change 11 owns the matrix's words.
+- **MAPLABELS-11: in a 60-unit gap a sentence can cover an arrowhead or a
+  handle.** Arrange leaves 60 units between columns. A straight way out across
+  that gap leaves no box that clears both the source's handle and the
+  target's arrowhead. The sentence then covers the smaller of the two, and the
+  handle still draws above it. Risk (Medium): on a tight map a mark hides part
+  of a word. A wider Arrange gap is the fix, and it changes auto layout.
+- **MAPLABELS-12: a manual way out shows no words on the Map.** A guardless
+  manual line, such as Approve or Reject, has no sentence. Its name
+  stands only in its accessible name. The design critique asked for the name
+  on the line. Risk (Medium): the Map does not say which choice a line is.
+  Showing every name trades for density, the owner's call.
+- **MAPLABELS-13: at fit zoom the Map's text draws small.** A sentence reads
+  about 8px and a stamp about 7px on a large draft at 1440 wide. At 420 wide
+  the handle's target falls under 24px. Risk (Low): the studio is a desktop
+  tool by decision, and zoom restores the size.
+- **MAPLABELS-14: a sentence's host widens Fit to view.** Each host stands 96
+  units tall, six lines, whatever the sentence holds. A short sentence at the
+  graph's edge then adds blank room to the frame. Risk (Low): the frame comes
+  out a little loose.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

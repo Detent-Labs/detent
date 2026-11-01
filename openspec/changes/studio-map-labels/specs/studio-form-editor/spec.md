@@ -23,7 +23,7 @@ It SHALL still draw the control. It SHALL print a line under the controls that
 names the path and its condition.
 
 The line reads the path's label, then the condition in the words the canvas
-edge uses. A guard the builder cannot read reads "a hand-written rule holds",
+way out's sentence uses. A guard the builder cannot read reads "a hand-written rule holds",
 and the line SHALL NOT print CEL source. A manual path with no guard SHALL get
 no line.
 

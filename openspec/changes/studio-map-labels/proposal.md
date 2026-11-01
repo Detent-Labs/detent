@@ -38,9 +38,10 @@ builds on change 4, which shipped on 2026-10-31.
   or more automatic ways out. Each guarded one then leads with its place in
   the order: "First, only if …". The guardless default reads "Otherwise". The
   number badge and the "else" marker go.
-- The sentence wraps over up to three lines and centres on the line's
-  midpoint. Text past three lines ends in an ellipsis, and the full sentence
-  rides as the hover title.
+- The sentence wraps over up to six lines and sits on its line. It centres
+  on the midpoint where the canvas is open. Elsewhere it slides and narrows
+  to clear nodes, stamps and other sentences. Text past six lines ends in an
+  ellipsis, and the full sentence rides as the hover title.
 - A condition the builder cannot read prints "a hand-written rule holds" on
   the canvas, never its CEL text. The form preview's note for a guarded way
   out reads the same words.
@@ -87,6 +88,8 @@ None.
   labels, connect handle, double-click, rename removal.
 - New `packages/web/src/areas/studio/canvas/mapWords.ts`: the pure words for
   stamps, way-out sentences and accessible names. It replaces `pathName.ts`.
+- New `packages/web/src/areas/studio/canvas/sentencePlacement.ts`: where each
+  sentence stands.
 - `packages/web/src/areas/studio/canvas/inlineRename.ts` and its test go.
 - `packages/web/src/areas/studio/panels/shared/conditionLogic.ts`,
   `draft/guarded-path-notes.ts`, `panels/FormPreview.tsx`: the condition in
@@ -96,8 +99,10 @@ None.
 - `packages/web/src/i18n/catalogs/studio.ts`: canvas keys added, renamed and
   removed. `fieldCatalog.showOnCanvas` reads "Show on the map".
 - Tests under `packages/web/test/`, `studio-processSurface.test.ts` and
-  `studio-formPreview.test.tsx` among them. Also `docs/authoring-guide.md`,
-  `docs/browser-checks.md`,
-  `docs/decisions.md` (SELECTS-4, SENTENCE-3 and the Show on the canvas
+  `studio-formPreview.test.tsx` among them.
+- Docs: `docs/authoring-guide.md`, `docs/browser-checks.md`,
+  `docs/decisions-archive.md`, `DESIGN.md` and
+  `.claude/rules/design-language.md`. One comment in `draft/guided-labels.ts`.
+  Also `docs/decisions.md` (SELECTS-4, SENTENCE-3 and the Show on the canvas
   entry close), `.claude/rules/ui-glossary.md` where it names the canvas's
   words, and `ROADMAP.md` stage 64.

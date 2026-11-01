@@ -841,7 +841,8 @@ The route SHALL carry the pointer over its whole length. The area a developer
 clicks SHALL follow the route. It SHALL NOT follow a straight line between the
 anchors.
 
-A way out's sentence SHALL centre on the route's own midpoint.
+A way out's sentence SHALL sit on its own route, by the placement rule this
+capability states for it.
 
 The connect handle SHALL stay at the source node's right-middle, whatever
 anchor a path leaving that node takes. The handle is a control an author
@@ -943,7 +944,8 @@ reset, and nothing stores what the route was before.
 <!-- The scenario name repeats the live spec's; a MODIFIED block cannot rename a scenario. -->
 #### Scenario: A guard label follows the route
 
-- **WHEN** a way out with a sentence renders under either style
+- **WHEN** a way out with a sentence renders under either style, over open
+  canvas
 - **THEN** its sentence centres on the midpoint of the route
 - **AND** it does not sit at the midpoint of a straight line between the
   anchors

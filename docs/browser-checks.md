@@ -6986,7 +6986,7 @@ out, or to empty space to add a new step." The cursor reads crosshair.
 Point at the handle of "Closed". Pass: the tooltip reads "An end has no way
 out.", and the cursor reads not-allowed.
 
-Zoom in until a node draws at least 180px wide. Press 10px above the centre of
+Zoom in until a node draws at least 180px wide. Press 10px right of the centre of
 the handle on "Manager Approval". Drag to "Finance Review". Pass: the connect
 gesture starts, and a new way out appears on release.
 

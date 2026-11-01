@@ -46,7 +46,12 @@ export interface SentenceInput {
   midpoint: Point;
 }
 
-/** The estimated advance of one character of the 12px body face. */
+/** The estimated advance of one character of the 12px body face.
+ *
+ * ponytail: the placement estimates text width per character and never
+ * measures the font, so a run of wide letters can need one line more than it
+ * reserves; the six-line host absorbs that. Measuring with a canvas 2D
+ * context in `placeSentences`' caller is the upgrade entry point. */
 export const SENTENCE_CHAR_WIDTH = 6.5;
 /** One sentence line's height. */
 export const SENTENCE_LINE_HEIGHT = 16;
