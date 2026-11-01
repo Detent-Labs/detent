@@ -57,14 +57,22 @@ export interface EditorIssue {
   /** The message is one whole sentence for a person, so a list prints it with
    * no source label. */
   plain?: true;
+  /** One sentence an author can act on (`draft/checkSentence.ts`). `runValidation`
+   * fills it for every issue; a hand-built issue may omit it. */
+  sentence?: string;
 }
 
-interface Token {
+/** The text a reader prints for an issue: its sentence, else its raw message. */
+export function issueText(issue: Pick<EditorIssue, "sentence" | "message">): string {
+  return issue.sentence ?? issue.message;
+}
+
+export interface Token {
   key: string;
   idx: number | undefined;
 }
 
-function tokenize(loc: string): Token[] {
+export function tokenize(loc: string): Token[] {
   return loc
     .split(".")
     .filter((s) => s.length > 0)

@@ -37,7 +37,7 @@ const LOC_SECTION: Record<string, SectionName> = {
 /** Every entity id under one step, mapped onto the section that owns it. The
  * step's own id is absent on purpose: a step-level issue routes through its
  * `loc` instead. */
-function sectionByEntityId(step: DraftStep): Map<string, SectionName> {
+export function sectionByEntityId(step: DraftStep): Map<string, SectionName> {
   const owners = new Map<string, SectionName>();
   const claim = (id: string | undefined, section: SectionName) => {
     if (id !== undefined) owners.set(id, section);
@@ -81,7 +81,7 @@ function locKeys(loc: string): string[] {
  */
 export function sectionOfIssue(
   step: DraftStep,
-  issue: EditorIssue,
+  issue: Pick<EditorIssue, "entityId" | "loc">,
   sections: readonly SectionName[],
   owners: Map<string, SectionName> = sectionByEntityId(step),
 ): SectionName | undefined {
@@ -94,6 +94,28 @@ export function sectionOfIssue(
       : undefined;
   const section = owned ?? named;
   return section !== undefined && sections.includes(section) ? section : undefined;
+}
+
+const OUTPUT_TARGET_UNKNOWN = /^action output targets unknown field: (.+)$/;
+
+/**
+ * The section of the action "action output targets unknown field" complains
+ * about. The engine locates that message on the step alone, so the field id in
+ * the message finds the action: the first whose `output` holds it, across the
+ * step's five positions. Answers `undefined` for any other message, and where no
+ * drawn action holds the id. As in `sectionByEntityId`, an end step draws its
+ * entry list alone.
+ */
+export function sectionOfOutputTarget(step: DraftStep, message: string): SectionName | undefined {
+  const fieldId = OUTPUT_TARGET_UNKNOWN.exec(message)?.[1];
+  if (fieldId === undefined) return undefined;
+  const holds = (actions: DraftStep["onEntry"]) => (actions ?? []).some((action) => action.output !== undefined && Object.hasOwn(action.output, fieldId));
+
+  if (holds(step.onEntry)) return "lifecycle";
+  if (step.terminal !== true && (holds(step.onExit) || holds(step.onCancel))) return "lifecycle";
+  if ((step.paths ?? []).some((path) => holds(path.onPath))) return "paths";
+  if ((step.timers ?? []).some((timer) => holds(timer.onFire?.actions))) return "timers";
+  return undefined;
 }
 
 /**
