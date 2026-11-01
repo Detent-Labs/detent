@@ -185,7 +185,19 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     const press = code.slice(code.indexOf("onPress={", at), code.indexOf("onSelect=", at));
 
     expect(label).toContain("onPointerDown={onPress}");
+    // The mouse press's default would move focus to the canvas svg after it.
+    expect(label).toContain("onMouseDown={(e) => e.preventDefault()}");
     expect(press).toContain('if (label.pathId !== undefined) moveFocus({ kind: "path", pathId: label.pathId, from: "source" })');
+  });
+
+  it("places no sentence while the Map tab is hidden, and places them when it shows", () => {
+    const code = stripComments(read(CANVAS));
+    const at = code.indexOf("const sentenceBoxes = useMemo(");
+    const memo = code.slice(at, code.indexOf("const [nodeDrag", at));
+
+    expect(at).toBeGreaterThan(-1);
+    expect(memo).toContain("if (!visible) return new Map<string, SentenceBox>();");
+    expect(memo).toMatch(/\}, \[visible, /);
   });
 
   it("leaves a pointer press on the canvas, so a set can still be built", () => {

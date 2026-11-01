@@ -39,8 +39,9 @@ export interface SentenceInput {
 export const SENTENCE_CHAR_WIDTH = 6.5;
 /** One sentence line's height. */
 export const SENTENCE_LINE_HEIGHT = 16;
-/** The room the estimate keeps around the text, each side. */
-export const SENTENCE_PADDING = 3;
+/** The text block's padding, each side: the drawn `paddingInline`, and the
+ * room the estimate keeps above and below the lines. */
+export const SENTENCE_PADDING = 4;
 /** The lines a sentence takes before its clamp cuts it. */
 export const SENTENCE_MAX_LINES = 6;
 /** The widths the placement tries, widest first, in user units. */
@@ -54,6 +55,23 @@ export const SENTENCE_SLIDE_MAX = 120;
 export const SENTENCE_LINE_KEEP = 4;
 /** How far a node's rectangle grows each side as an obstacle. */
 export const NODE_CLEARANCE = 2;
+/** The connect handle's dot, as an obstacle box: 14 across, centred on the
+ * node's right edge at half its height (`HANDLE_RADIUS` 7 in `CanvasView`). */
+export const HANDLE_BOX = 14;
+
+/**
+ * The narrowest width a sentence may take: its longest word at the estimate
+ * plus the padding, rounded up to the width grid, and never under
+ * `SENTENCE_MIN_WIDTH`. A word wider than `SENTENCE_MAX_WIDTH` leaves the cap
+ * as the only width, and `overflowWrap: anywhere` breaks that word.
+ */
+export function sentenceFloor(text: string): number {
+  const longest = Math.max(0, ...text.split(/\s+/).map((word) => word.length));
+  const needed = longest * SENTENCE_CHAR_WIDTH + 2 * SENTENCE_PADDING;
+  if (needed > SENTENCE_MAX_WIDTH) return SENTENCE_MAX_WIDTH;
+  const steps = Math.ceil(Math.max(0, needed - SENTENCE_MIN_WIDTH) / SENTENCE_WIDTH_STEP);
+  return SENTENCE_MIN_WIDTH + steps * SENTENCE_WIDTH_STEP;
+}
 
 /**
  * How many lines `text` takes at `width`: a greedy wrap at spaces, where a
@@ -85,6 +103,14 @@ export function nodeObstacle(at: Point): Rect {
     width: NODE_WIDTH + 2 * NODE_CLEARANCE,
     height: NODE_HEIGHT + 2 * NODE_CLEARANCE,
   };
+}
+
+/** A node's connect handle as an obstacle: the dot's box, grown by
+ * `NODE_CLEARANCE` each side. A sentence takes pointer events, so one over
+ * the dot would take the press that starts a connect drag. */
+export function handleObstacle(at: Point): Rect {
+  const side = HANDLE_BOX + 2 * NODE_CLEARANCE;
+  return { x: at.x + NODE_WIDTH - side / 2, y: at.y + NODE_HEIGHT / 2 - side / 2, width: side, height: side };
 }
 
 /** The rectangles a node's stamps take, in canvas units, as `NodeStamp` draws
@@ -179,7 +205,7 @@ function obstaclesNear(route: Point[], taken: Rect[]): Rect[] {
 /**
  * Places every sentence at once, in the order given, so the result is
  * deterministic. Each sentence tries widths from `SENTENCE_MAX_WIDTH` down to
- * `SENTENCE_MIN_WIDTH`. At each width it tries places along its route, the
+ * its `sentenceFloor`, so no width breaks a word the cap could hold. At each width it tries places along its route, the
  * midpoint first, then `SENTENCE_SLIDE_STEP` further either way, up to
  * `SENTENCE_SLIDE_MAX`. At each place it tries the box centred on the route,
  * then boxes shifted sideways across the route's segment by
@@ -204,7 +230,8 @@ export function placeSentences(sentences: SentenceInput[], obstacles: Rect[]): M
     const near = obstaclesNear(sentence.route, taken);
     let chosen: SentenceBox | undefined;
     let least: { box: SentenceBox; area: number; distance: number } | undefined;
-    for (let width = SENTENCE_MAX_WIDTH; width >= SENTENCE_MIN_WIDTH && !chosen; width -= SENTENCE_WIDTH_STEP) {
+    const floor = sentenceFloor(sentence.text);
+    for (let width = SENTENCE_MAX_WIDTH; width >= floor && !chosen; width -= SENTENCE_WIDTH_STEP) {
       const lines = Math.min(sentenceLines(sentence.text, width), SENTENCE_MAX_LINES);
       const height = lines * SENTENCE_LINE_HEIGHT + 2 * SENTENCE_PADDING;
       for (const slide of slides) {
@@ -234,7 +261,7 @@ export function placeSentences(sentences: SentenceInput[], obstacles: Rect[]): M
         if (chosen) break;
       }
     }
-    chosen ??= least?.box ?? boxAt(sentence.midpoint, SENTENCE_MIN_WIDTH, Math.min(sentenceLines(sentence.text, SENTENCE_MIN_WIDTH), SENTENCE_MAX_LINES));
+    chosen ??= least?.box ?? boxAt(sentence.midpoint, floor, Math.min(sentenceLines(sentence.text, floor), SENTENCE_MAX_LINES));
     placed.set(sentence.key, chosen);
     taken.push(chosen);
   }

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { NODE_HEIGHT, NODE_WIDTH, type Point } from "../src/areas/studio/canvas/geometry.js";
 import {
+  handleObstacle,
   nodeObstacle,
   placeSentences,
+  sentenceFloor,
   sentenceLines,
   stampObstacles,
   SENTENCE_LINE_KEEP,
@@ -123,10 +125,58 @@ describe("placeSentences", () => {
     expect(box.x + box.width).toBeGreaterThanOrEqual(682 + SENTENCE_LINE_KEEP);
   });
 
+  it("keeps a short sentence at least as wide as its longest word in a 60-unit gap", () => {
+    // "Otherwise" needs 9 × 6.5 + 2 × 4 = 66.5, so 72 on the width grid. The
+    // gap holds 56, so no box is clear, and the fallback still keeps 72.
+    expect(sentenceFloor("Otherwise")).toBe(72);
+    const placed = placeSentences(
+      [{ key: "p1", text: "Otherwise", route: [{ x: 180, y: 30 }, { x: 240, y: 30 }], midpoint: { x: 210, y: 30 } }],
+      [nodeObstacle(LEFT), nodeObstacle(RIGHT), handleObstacle(LEFT)],
+    );
+    const box = placed.get("p1");
+
+    expect(box).toBeDefined();
+    if (!box) return;
+    expect(box.width).toBeGreaterThanOrEqual(72);
+    expect(box.lines).toBe(1);
+  });
+
+  it("leaves the cap as the only width for a word wider than the cap", () => {
+    expect(sentenceFloor("x".repeat(40))).toBe(SENTENCE_MAX_WIDTH);
+    expect(sentenceFloor("First, only if Booking Status is Booked")).toBe(SENTENCE_MIN_WIDTH);
+  });
+
+  it("keeps a sentence off the connect handle of the step its way out leaves", () => {
+    // Tall columns either side of the 60-unit gap, and the left step's
+    // handle at (180, 30). The route leaves the handle and turns up the gap;
+    // its midpoint stands level with the handle.
+    const left = { x: -400, y: -400, width: 582, height: 1000 };
+    const right = { x: 238, y: -400, width: 400, height: 1000 };
+    const handle = handleObstacle(LEFT);
+    const input = [
+      {
+        key: "p1",
+        text: SENTENCE,
+        route: [{ x: 180, y: 30 }, { x: 210, y: 30 }, { x: 210, y: -60 }],
+        midpoint: { x: 210, y: 0 },
+      },
+    ];
+    expect(handle).toEqual({ x: 171, y: 21, width: 18, height: 18 });
+
+    const box = placeSentences(input, [left, right, handle]).get("p1");
+    // The positive control: with no handle obstacle the box covers it.
+    const unaware = placeSentences(input, [left, right]).get("p1");
+
+    expect(box && unaware).toBeDefined();
+    if (!box || !unaware) return;
+    expect(areaOver(unaware, [handle])).toBeGreaterThan(0);
+    expect(areaOver(box, [handle, left, right])).toBe(0);
+  });
+
   it("takes the box with the least overlap where none is clear", () => {
-    // A band 20 units tall along the route: a one-line box (22 tall) overlaps
-    // a unit above and below it, the least any box can. "Otherwise" takes one
-    // line from width 72 up, so 72 at the midpoint overlaps least: 144.
+    // A band 20 units tall along the route: a one-line box (24 tall) overlaps
+    // 2 units above and below it, the least any box can. "Otherwise" takes
+    // one line from width 72 up, so 72 at the midpoint overlaps least: 288.
     const above = { x: -1000, y: -1000, width: 3000, height: 990 };
     const below = { x: -1000, y: 10, width: 3000, height: 990 };
 
@@ -141,10 +191,10 @@ describe("placeSentences", () => {
     expect(box.width).toBe(72);
     expect(box.lines).toBe(1);
     expect(centre(box)).toEqual({ x: 300, y: 0 });
-    expect(areaOver(box, [above, below])).toBe(144);
+    expect(areaOver(box, [above, below])).toBe(288);
     // The old floor box, 56 wide at the midpoint over two lines, overlaps far more.
-    const floor = { x: 300 - SENTENCE_MIN_WIDTH / 2, y: -19, width: SENTENCE_MIN_WIDTH, height: 38 };
-    expect(areaOver(floor, [above, below])).toBeGreaterThan(144);
+    const floor = { x: 300 - SENTENCE_MIN_WIDTH / 2, y: -20, width: SENTENCE_MIN_WIDTH, height: 40 };
+    expect(areaOver(floor, [above, below])).toBeGreaterThan(288);
   });
 
   it("places each sentence the same way on every run", () => {

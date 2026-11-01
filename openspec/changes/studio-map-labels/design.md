@@ -194,18 +194,24 @@ A pure function, `placeSentences` in `canvas/sentencePlacement.ts`, places
 every sentence the canvas draws at once. It reads geometry and nothing else:
 
 - Its input is each sentence's text, its route points and its midpoint. It
-  also takes the node rectangles and the stamp rectangles.
+  also takes the node rectangles, the stamp rectangles and each node's
+  connect handle. The handle counts as a 14-unit box around its dot.
 - It estimates a block at 6.5 units per character and 16 units per line.
-  The text runs inside 3 units of padding a side, over at most six lines.
-- It tries widths from 200 down to 56 in steps of 8. At each width it tries
-  places along the route, the midpoint first. Then it steps 8 units at a
-  time, up to 120 units either way. Each place stays on the route.
+  The text runs inside 4 units of padding a side, the padding the block
+  draws, over at most six lines.
+- It tries widths from 200 down to 56 in steps of 8. Its narrowest width
+  holds the longest word and the padding, rounded up to that grid. No width
+  then breaks a word. A word wider than 200 leaves 200 as the only width.
+- At each width it tries places along the route, the midpoint first. Then
+  it steps 8 units at a time, up to 120 units either way. Each place stays
+  on the route.
 - At each place it tries the box centred on the route first. Then it shifts
   the box sideways across the segment there, 8 units at a time, nearest
   first. The place stays inside the box, at least 4 units from its edge, so
   the box still sits on its line.
-- It keeps the first box that meets no node, no stamp and no sentence it
-  already placed. Node rectangles grow by 2 units a side.
+- It keeps the first box that meets no node, no handle, no stamp and no
+  sentence it already placed. Node and handle boxes grow by 2 units a side.
+  A sentence takes pointer events, so one over a handle would take its drag.
 - Where no box is clear, the sentence takes the box it tried with the least
   area over those obstacles. A tie goes to the wider box, then to the box
   nearer the midpoint.
@@ -213,7 +219,9 @@ every sentence the canvas draws at once. It reads geometry and nothing else:
 The host `<foreignObject>` is the chosen width wide and 96 units high, six
 lines. It centres on the chosen place, and a flex box centres the text block
 inside it. A short estimate then never clips a line. The canvas memoizes the
-placement on its inputs, so a pointer move does not re-run it.
+placement on its inputs, so a pointer move does not re-run it. A hidden Map
+tab places nothing. Opening the tab places every sentence before its first
+paint.
 
 The host takes no pointer events. The text block takes them, so the empty
 host corners never swallow a press meant for a node. The text block carries

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { SENTENCE_MAX_LINES } from "../src/areas/studio/canvas/sentencePlacement.js";
+import { SENTENCE_MAX_LINES, SENTENCE_PADDING } from "../src/areas/studio/canvas/sentencePlacement.js";
 import { DraftProvider } from "../src/areas/studio/draft/store.js";
 import { CanvasView } from "../src/areas/studio/canvas/CanvasView.js";
 import { t } from "../src/areas/studio/catalog.js";
@@ -302,6 +302,8 @@ describe("the canvas node's accessibility markup", () => {
     const source = readFileSync(new URL("../src/areas/studio/canvas/CanvasView.tsx", import.meta.url), "utf8");
     const block = /\n {2}edgeLabel: \{([\s\S]*?)\n {2}\},/.exec(source)?.[1] ?? "";
     expect(block).toContain(`WebkitLineClamp: ${SENTENCE_MAX_LINES},`);
+    // The estimate's padding is the padding the block draws.
+    expect(block).toContain(`paddingInline: ${SENTENCE_PADDING},`);
   });
 
   // The defect: a connect handle with no word for its gesture.

@@ -41,7 +41,7 @@ import {
   STAMP_INSET,
   STAMP_LINE_HEIGHT,
 } from "./mapWords";
-import { nodeObstacle, placeSentences, stampObstacles, type Rect, type SentenceBox, type SentenceInput } from "./sentencePlacement";
+import { handleObstacle, nodeObstacle, placeSentences, stampObstacles, type Rect, type SentenceBox, type SentenceInput } from "./sentencePlacement";
 import { nextFocus, entryFocus, type ArrowKey, type Focus } from "./traversal";
 import { stepTextMap } from "../panels/shared/optionText";
 import { buildOperands } from "../panels/shared/conditionLogic";
@@ -403,7 +403,9 @@ const styles = stylex.create({
     textAlign: "center",
     color: colors.textMuted,
     backgroundColor: colors.surface,
-    paddingInline: space.s1,
+    // `SENTENCE_PADDING` in `sentencePlacement.ts`; StyleX cannot read an
+    // import, and a test pins the two together.
+    paddingInline: 4,
     display: "-webkit-box",
     WebkitBoxOrient: "vertical",
     WebkitLineClamp: 6,
@@ -609,6 +611,10 @@ function EdgeLabel({
           title={clipped ? text : undefined}
           // The press takes the roving stop, as a press on the line does.
           onPointerDown={onPress}
+          // The mouse press's default would move focus off the path the
+          // press just focused, to the canvas `<svg>`. Click, pointerup and
+          // double-click still fire.
+          onMouseDown={(e) => e.preventDefault()}
           onPointerUp={(e) => {
             e.stopPropagation();
             onSelect();
@@ -902,14 +908,17 @@ export function CanvasView({
   }, [steps, draft.fields, contentLocale, baseLocale, loadedChildren, waypoints, groups, positionsById, hidden]);
 
   // Where each sentence stands (design.md D5): clear of every drawn node, its
-  // stamps, every collapsed group's box and the sentences placed before it.
+  // connect handle and its stamps, every collapsed group's box and the
+  // sentences placed before it. A hidden Map tab places nothing and draws no
+  // sentence; the render that shows the tab places them all before it paints.
   const sentenceBoxes = useMemo(() => {
+    if (!visible) return new Map<string, SentenceBox>();
     const obstacles: Rect[] = [];
     for (const step of steps) {
       if (!step.id || hidden.has(step.id)) continue;
       const at = positionsById[step.id];
       if (!at) continue;
-      obstacles.push(nodeObstacle(at), ...stampObstacles(stampWords(step, initialStepId), at));
+      obstacles.push(nodeObstacle(at), handleObstacle(at), ...stampObstacles(stampWords(step, initialStepId), at));
     }
     for (const { group, box } of groupBoxes) {
       if (group.collapsed && box) obstacles.push(nodeObstacle(box));
@@ -925,7 +934,7 @@ export function CanvasView({
       });
     }
     return placeSentences(sentences, obstacles);
-  }, [drawnPaths, steps, hidden, positionsById, initialStepId, groupBoxes]);
+  }, [visible, drawnPaths, steps, hidden, positionsById, initialStepId, groupBoxes]);
 
   // `stepIds` is what the gesture moves; `stepId` is the node under the
   // pointer. The two differ whenever the press lands on a member of a
