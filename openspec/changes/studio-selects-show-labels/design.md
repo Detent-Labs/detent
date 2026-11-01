@@ -34,7 +34,7 @@ The brief marks each assumption.
    They also map a result into a field. Mode: Operate. The author knows the steps by the
    names in the steps rail and has never seen a key.
 2. **Outcome and proof.** Each option reads the way the rest of the page
-   names the same thing. A step reads as in the steps rail. A way out reads
+   names the same thing. A named step reads as in the steps rail. A way out reads
    as its row heading, "Approve → Done". A field reads as on the Fields
    tab. The author picks without translating. Proof: the seeded processes
    show no key in any of the six selects.
@@ -59,7 +59,7 @@ The brief marks each assumption.
    first and disabled.
 7. **Constraints.** Option text comes from the studio catalog and the
    author's own labels. A stored reference that no list holds keeps its raw
-   id. The "(no longer listed)" mark follows it, since nothing else names
+   id. The "(not in the list)" mark follows it, since nothing else names
    it.
 
 Web interface guidelines applied: every select keeps its `<label>`. An
@@ -81,6 +81,12 @@ of labelled targets from its caller instead of new locale props.
   because a migration maps instance data by key.
 - The Fields tab's data source select prints `ds.key ?? ds.id`. Change 11
   owns the Sources view.
+- Three places still fall back to a step's key for an unnamed step. They
+  are the steps rail (`StepsRail.tsx`), the step page's Previous and Next
+  labels, and the Checks narrowing label. The last two live in
+  `EditScreen.tsx`. Change 10
+  (`studio-step-accordion`) owns the rail and the page foot. Change 12
+  (`studio-checks-by-subject`) owns the Checks label.
 - The canvas node's accessible name carries the step key. Change 5 owns
   the canvas words.
 - No rewrite of keys already stored. A draft keyed `pr_fung` keeps it.
@@ -93,9 +99,10 @@ A new module, `panels/shared/optionText.ts`, holds three pure functions:
 
 - `stepText(step, contentLocale, baseLocale)`: the step's label at the
   content locale, trimmed, else "(unnamed step)" (`steps.unnamedStep`).
-- `numberRepeats(items, textOf)`: a map from each item's id to its text.
-  The second and later item sharing a text add a count, "Review (2)", in
-  list order. The count reads the catalog key `options.repeatedLabel`,
+- `numberRepeats(items, textOf)`: the items' texts as a `string[]`, in
+  list order. The second and later item sharing a text add a count,
+  "Review (2)". Draft ids are optional and an operand has none. So the
+  result is a list, and the caller zips it with its items. The count reads the catalog key `options.repeatedLabel`,
   "{label} ({n})".
 - `wayOutHeading(path, stepTexts)`: the way out's label, else "(unnamed
   way out)". An arrow follows, then the target's numbered step text, else
@@ -109,8 +116,8 @@ two keys drift.
 ### D2. The step selects
 
 Both step selects in `PathsPanel.tsx` list `numberRepeats(steps, stepText)`
-in draft order. The way-out heading calls `wayOutHeading` with the same
-map. "Review (2)" in a heading names the same step as "Review (2)" in the
+in draft order. The panel zips that list into a map from step id to text.
+The way-out heading calls `wayOutHeading` with the same map. "Review (2)" in a heading names the same step as "Review (2)" in the
 select beside it.
 
 ### D3. The time-limit select
@@ -131,13 +138,21 @@ each field's label at the content locale (else "(unnamed field)",
 
 - `ActionListEditor` and `SubprocessSpecEditor`'s output mapping pass
   `fieldTargets(fields, contentLocale, baseLocale)`. `ActionListEditor`
-  takes the two locales as props from its four callers.
-- The input mapping passes the child refs, whose `label` the child's own
-  base locale already resolved (`useTargetProcessCatalog.ts::fieldsToRefs`),
-  through `numberRepeats`.
+  takes the two locales as props from its five call sites. Three sit in
+  `StepPage.tsx`, one in `PathsPanel.tsx` and one in `TimersPanel.tsx`.
+  `SubprocessSpecEditor` gains a `baseLocale` prop from `StepPage.tsx`.
+- The input mapping passes `refTargets(childInputs.fields)`, a second
+  helper in `fieldExpressionMapLogic.ts`. It drops a ref whose `type` is
+  `group`, since a contract may name one, then numbers repeats. The child's
+  own base locale already resolved each ref's `label`
+  (`useTargetProcessCatalog.ts::fieldsToRefs`). The list keeps the
+  contract's order.
 
-`nextUnusedTarget` reads the same target list. A stored id outside the
-list keeps its option, printed as the raw id plus "(no longer listed)".
+`SubprocessSpecEditor` builds the input-mapping list once. The editor's
+`targets` and `childInputsNote`'s `nextUnusedTarget` call read that one
+list, so the note and "+ add" agree. A stored id outside the list keeps its
+option, printed as the raw id plus "(not in the list)"
+(`mapping.unlistedKey`).
 
 ### D5. Transliteration before the slug
 

@@ -40,42 +40,16 @@ disclosure, closed until opened, holding the way out's key input under
 
 ## ADDED Requirements
 
-### Requirement: Every step, way-out and field select on the step page lists labels
+### Requirement: Every step and way-out select on the step page lists labels
 
-A select on the step page can list steps, ways out or fields. Each such
-select SHALL print every option in the author's words. No option SHALL print a step key, a
-way-out key, a field key or an id, with one exception below. The rule covers
-six selects:
+Three selects on the step page list steps or ways out. They are "Leads to",
+"Where the new way out leads" and the time limit's way-out select. No option
+SHALL print a key or an id.
 
-- the way out's "Leads to" select and the select "Where the new way out
-  leads", which list steps;
-- the time limit's select "The way out it takes when it runs out", which
-  lists the step's own ways out;
-- the field-map selects of two output mappings, an action's and a called
-  process's, which list the calling process's fields;
-- the field-map select of a called process's input mapping, which lists the
-  called process's input fields.
-
-A step SHALL read its label at the content locale, else at the base locale.
-An empty one SHALL read "(unnamed step)". A way out SHALL read its row
-heading, such as "Approve → Done".
-
-A field of the calling process SHALL
-read its label the same way as a step. An empty one SHALL read "(unnamed
-field)". A called process's field SHALL read its label in that
-process's base locale. A group field SHALL appear in no field-map select.
-
-Two options in one select can share a text. The second and later SHALL then
-add a count, such as "Review (2)", in list order. The condition builder's operand
-picker follows the same count rule. A way-out heading SHALL name its target
-with the same counted text the step select prints.
-
-The options SHALL keep the draft's order. Each option SHALL still store the
-entity's `id`.
-
-A field-map row whose stored id names no listed field is the one exception.
-Its option SHALL print the stored id with the "(no longer listed)" mark,
-because no label names it.
+A step SHALL read its label at the content locale, else at the base locale,
+else "(unnamed step)". A way out SHALL read its row heading. A repeated text
+SHALL add a count in draft order, as in "Review (2)". A way-out heading SHALL
+name its target by that counted text.
 
 #### Scenario: "Leads to" lists step labels
 
@@ -110,6 +84,16 @@ because no label names it.
 - **THEN** the time limit's way-out select offers "Freigeben → Abschluss"
 - **AND** no option reads `pr-fung-abschluss`
 
+### Requirement: Every field-map select on the step page lists labels
+
+Three field-map selects on the step page list fields: two output mappings
+and a called process's input mapping. No option SHALL print a key.
+
+A field SHALL read its label at the content locale, else "(unnamed field)". A called
+process's field SHALL read its label in that process's base locale. No group
+SHALL appear. A repeated text SHALL add a count in list order. A stored id
+that no list holds SHALL print with the "(not in the list)" mark.
+
 #### Scenario: An action's output mapping lists field labels
 
 - **WHEN** an action on the step maps its result into the field labelled
@@ -127,40 +111,34 @@ because no label names it.
 
 - **WHEN** an output-mapping row stores the id of a field the catalog no
   longer declares
-- **THEN** the row's select shows that id with the "(no longer listed)" mark
+- **THEN** the row's select shows that id with the "(not in the list)" mark
+
+#### Scenario: A group the called process's contract names is not offered
+
+- **WHEN** the called process's `contract.inputFields` names a group field
+  and a field labelled "Amount"
+- **THEN** the input-mapping select offers "Amount" and not the group
+
+### Requirement: The operand picker and the selects share one count rule
+
+The condition builder's operand picker and every select this capability
+lists SHALL number a repeated text by one rule. The second and later item
+sharing a text SHALL read "{label} ({n})", in list order.
+
+#### Scenario: The picker and a select number a repeat alike
+
+- **WHEN** the catalog holds two fields labelled "Name"
+- **THEN** the operand picker offers "Name" and "Name (2)"
+- **AND** an output-mapping select offers "Name" and "Name (2)"
 
 ### Requirement: The inputMapping editor offers the child's input fields by label
 
 The `inputMapping` editor in "Which process it calls" SHALL offer the called
 process's `contract.inputFields` as its targets. It SHALL offer none of the
 calling process's own fields. Each option SHALL print the child field's label
-in the child's base locale and store the child field's `id`. No option SHALL
-print the child field's `key`.
+in the child's base locale. It SHALL store its `id` and never print its `key`.
 
-The step page SHALL read the child's contract from the body of the version the
-binding names. A `pinned` binding names its `pinnedVersion`. A
-`latest-at-spawn` binding names the newest version in the process list. The
-page SHALL read once per process and version, through the studio's existing
-version-body route.
-
-"+ add" SHALL pick the first child input field that no row holds. It SHALL
-stay disabled while the list is empty, exhausted, loading or failed. While the
-read loads or after it fails, a one-line note SHALL say so.
-
-A child with no
-`contract` or no `inputFields` SHALL get a note saying it declares no input
-fields. A child whose input fields all have a row SHALL get a note saying every
-input field has a row. The note region SHALL be a status region. The disabled
-"+ add" SHALL point at the note.
-
-The editor SHALL keep every stored key as stored. The loaded list of the
-child's input fields can lack a stored key. That key SHALL then appear as its
-own marked option, which prints the stored id. Before then, a stored key shows
-its id without the mark, because the list is unknown. The select therefore
-never shows another entry than the stored one.
-
-The author may remove that row or pick a listed field for it. The `outputMapping` editor keeps the calling
-process's fields as targets.
+The `outputMapping` editor keeps the calling process's fields.
 
 #### Scenario: A pinned binding lists the child's input fields
 
@@ -171,18 +149,33 @@ process's fields as targets.
 - **AND** no option prints `amount` or `applicant`
 - **AND** the select offers no field of the calling process
 
-#### Scenario: A latest-at-spawn binding reads the newest version
-
-- **WHEN** a subprocess step calls "Credit check" with `latest-at-spawn` and
-  the process list names version 5 as the newest
-- **THEN** the editor reads the contract of version 5
-
 #### Scenario: Opening a valid mapping shows the child field's label
 
 - **WHEN** an author opens a step whose `inputMapping` maps the child field
   labelled "Amount", and the child lists it
 - **THEN** the row's select shows "Amount"
 - **AND** the stored key stays as it was
+
+### Requirement: The inputMapping editor reads the child's contract from the bound version
+
+The page SHALL read the child's contract from the version the binding names.
+That is a `pinned` binding's `pinnedVersion`, or the newest listed version
+for `latest-at-spawn`. It SHALL read once per process and version, through
+the existing version-body route.
+
+#### Scenario: A latest-at-spawn binding reads the newest version
+
+- **WHEN** a subprocess step calls "Credit check" with `latest-at-spawn` and
+  the process list names version 5 as the newest
+- **THEN** the editor reads the contract of version 5
+
+### Requirement: The inputMapping editor's add control and note follow the child's list
+
+"+ add" SHALL pick the first child input field no row holds. It SHALL stay
+disabled while the list is empty, exhausted, loading or failed. A one-line
+note SHALL then say why: loading, failed, no input fields, or every field
+has a row. The note SHALL stand in a status region, and the disabled "+ add"
+SHALL point at it. Both SHALL read the list the select offers.
 
 #### Scenario: The read fails
 
@@ -191,17 +184,27 @@ process's fields as targets.
 - **AND** a note says the child's input fields could not load
 - **AND** every stored `inputMapping` row stays as stored
 
-#### Scenario: A stored key while the list loads
-
-- **WHEN** a row has a stored key and the child's version body is still loading
-- **THEN** the row's select shows the stored id without a mark
-
 #### Scenario: Every input field has a row
 
 - **WHEN** the child lists two input fields and the `inputMapping` has a row for
   each
 - **THEN** "+ add" stays disabled
 - **AND** a status note says every input field has a row
+
+### Requirement: The inputMapping editor keeps every stored key
+
+The editor SHALL keep every stored key as stored. The loaded list of the
+child's input fields can lack a stored key. That key SHALL then appear as its
+own marked option, which prints the stored id. Before then, a stored key shows
+its id without the mark, because the list is unknown. The select therefore
+never shows another entry than the stored one.
+
+The author may remove that row or pick a listed field for it.
+
+#### Scenario: A stored key while the list loads
+
+- **WHEN** a row has a stored key and the child's version body is still loading
+- **THEN** the row's select shows the stored id without a mark
 
 #### Scenario: A stored key the child no longer lists
 
@@ -215,4 +218,8 @@ process's fields as targets.
 
 **Reason**: Each option printed the child field's key, which principle 2 of stage 64 keeps behind the Developer view.
 
-**Migration**: The requirement "The inputMapping editor offers the child's input fields by label" replaces it. It keeps the same rules and prints labels.
+**Migration**: The requirement "The inputMapping editor offers the child's input fields by label" replaces it. Three more requirements keep its other rules:
+
+- "The inputMapping editor reads the child's contract from the bound version"
+- "The inputMapping editor's add control and note follow the child's list"
+- "The inputMapping editor keeps every stored key"

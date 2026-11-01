@@ -68,12 +68,17 @@ changes here.
 
 - `packages/web/src/areas/studio/draft/deriveKey.ts` (transliteration) and
   `draft/createPath.ts` (path slug, label fallback).
-- `panels/PathsPanel.tsx`, `panels/TimersPanel.tsx`,
+- `panels/PathsPanel.tsx`, `panels/TimersPanel.tsx`, `panels/StepPage.tsx`,
   `panels/shared/fieldExpressionMapLogic.ts`,
   `panels/shared/FieldExpressionMapEditor.tsx`, `panels/ActionListEditor.tsx`,
-  `panels/SubprocessSpecEditor.tsx`: option text.
-- One new shared helper for option text, with the studio catalog's
-  `{label} ({n})` pattern.
-- Tests under `test/` for derivation, option text and the panels.
+  `panels/SubprocessSpecEditor.tsx`, `panels/shared/useChildInputFields.ts`:
+  option text and the props it needs.
+- A new module, `panels/shared/optionText.ts`, with the catalog key
+  `options.repeatedLabel` in `i18n/catalogs/studio.ts`.
+  `panels/shared/conditionLogic.ts` moves onto it.
+- Tests under `packages/web/test` for derivation, option text and the
+  panels.
+- `docs/authoring-guide.md`, `docs/browser-checks.md` and
+  `docs/decisions.md`.
 - The migration plan form keeps its key and label choices. Its spec asks
   for both, because a migration maps instance data by key.

@@ -6,7 +6,7 @@
 - [ ] 1.2 Make `draft/createPath.ts::slugify` slug the `transliterate` result too, per D5.
 - [ ] 1.3 Drop the key fallback from `createPath.ts::sideText`, per D6, and rewrite its doc comment to match.
 - [ ] 1.4 Extend `studio-deriveKey.test.ts`: "Prüfung", "Prüfung der Änderung", "Café Straße", "Größe", decomposed "ä", "Ærø".
-- [ ] 1.5 Extend `studio-createPath.test.ts`: "Prüfung" to "Abschluss" keys `pruefung-abschluss`; a keyed unnamed step reads the placeholder.
+- [ ] 1.5 Rewrite the key-fallback case at `studio-createPath.test.ts:23` to the placeholder. Then extend the file: "Prüfung" to "Abschluss" keys `pruefung-abschluss`; a keyed unnamed step reads the placeholder.
 - [ ] 1.6 Grep `packages/web/test` for keys the old rule derived from non-ASCII labels, and fix each expectation.
 - [ ] 1.7 Run the full suite in the foreground and name any failing test.
 
@@ -27,13 +27,18 @@
 - [ ] 3.4 List the time limit's ways out by `wayOutHeading`, then `numberRepeats`, per design D3.
 - [ ] 3.5 Add `fieldTargets` to `fieldExpressionMapLogic.ts`, and make `targetsOf` callers read labelled targets, per D4.
 - [ ] 3.6 Change `FieldExpressionMapEditor`'s `fields` prop to `targets`, and read it in `nextUnusedTarget` too.
-- [ ] 3.7 Give `ActionListEditor` the props `contentLocale` and `baseLocale` from its four callers, and pass `fieldTargets`.
-- [ ] 3.8 In `SubprocessSpecEditor.tsx`, pass `fieldTargets` to the output mapping and numbered child refs to the input mapping.
+- [ ] 3.7 Give `ActionListEditor` the props `contentLocale` and `baseLocale` from its five call sites, and pass `fieldTargets`.
+- [ ] 3.7a Pass the two locales in `studio-actionListEditor-registryBadge.test.tsx`'s render, near line 75.
+- [ ] 3.8 Give `SubprocessSpecEditor` a `baseLocale` prop from `StepPage.tsx`. Pass `fieldTargets` to the output mapping.
+- [ ] 3.8a Add `refTargets` per D4. Build the input-mapping list once, for the editor and for `childInputsNote`.
 - [ ] 3.9 Rewrite `useChildInputFields.ts`'s doc comment: a ref carries the label the select prints.
-- [ ] 3.10 Extend `studio-pathsPanel-manualGuard.test.tsx` or a new panel test: label options, unnamed step, "Review (2)", heading.
+- [ ] 3.10 Rewrite "Approve → intake" at `studio-pathsPanel-manualGuard.test.tsx:179` to the label heading.
+- [ ] 3.10a Add a panel test: label options, unnamed step, "Review (2)" in both selects and in a heading.
 - [ ] 3.11 Add a TimersPanel render test: the way-out select offers "Freigeben → Abschluss" and no key.
-- [ ] 3.12 Extend `studio-fieldExpressionMapEditor.test.tsx`: labelled options, no group, the unlisted id keeps its mark.
-- [ ] 3.13 Extend `studio-subprocessSpecEditor.test.tsx`: the input mapping offers "Amount" and "Applicant", never `amount`.
+- [ ] 3.12 Move `studio-fieldExpressionMapEditor.test.tsx` to `targets`. Rewrite its key cases near lines 77 and 149.
+- [ ] 3.12a There, add: labelled options, no group, the unlisted id keeps its "(not in the list)" mark.
+- [ ] 3.13 Rewrite the key cases near lines 150 and 161 of `studio-subprocessSpecEditor.test.tsx` to labels.
+- [ ] 3.13a There, add: "Amount" and "Applicant" with no key, and no group the contract names.
 - [ ] 3.14 Run typecheck, then the full suite, both in the foreground. Name any failing test.
 
 ## 4. Docs and records

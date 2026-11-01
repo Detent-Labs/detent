@@ -32,7 +32,7 @@ empty `key` and an empty `label`. The method `newStep()` hardcodes the
 one, and its callers seed the other empty.
 
 That path's default SHALL come from the new step's own, likewise
-defaulted, key and label. It SHALL fall back to the "unnamed step"
+defaulted, label. It SHALL fall back to the "unnamed step"
 placeholder. An empty or arrow-only string SHALL NOT stand in its place.
 
 #### Scenario: A path dragged between two named steps gets a derived label
@@ -79,7 +79,7 @@ placeholder. An empty or arrow-only string SHALL NOT stand in its place.
 - **WHEN** a connect-handle drag from step A to empty canvas creates both a
   new step and a path to it
 - **THEN** `newPath()` derives the path's default `key` and `label` from
-  step A and the newly created step's own default key and label
+  step A and the newly created step's own default label
 
 #### Scenario: A path to a freshly created, unnamed step falls back to a placeholder
 
@@ -137,6 +137,10 @@ Derivation SHALL lower-case the label. It SHALL then transliterate. The
 letters "ä", "ö" and "ü" read "ae", "oe" and "ue", and "ß" reads "ss". The
 letters "æ" and "œ" read "ae" and "oe", "ø" reads "o" and "ł" reads "l".
 Every other letter SHALL lose its combining marks, so "é" reads "e".
+
+A base
+letter typed with a combining mark SHALL read as the letter they compose. So
+"u" plus a diaeresis reads "ue".
 
 After that, derivation SHALL collapse every run of
 characters outside `[a-z0-9]` to a single `_`. It SHALL trim a leading or
