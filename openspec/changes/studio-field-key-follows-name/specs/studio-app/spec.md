@@ -17,7 +17,7 @@ the stop. A label change rewrites the readers instead.
 - "A derived field key steps past a taken key"
 - "A field key never reads as a CEL literal"
 - "A published field's key stays when its label changes"
-- "A label that derives no key keeps a key that is read"
+- "A label that derives no key keeps a key that conditions read"
 
 ### Requirement: A field's key input commits on blur
 
@@ -285,7 +285,7 @@ another key."
 - **WHEN** the author types "Null" into a new field's label
 - **THEN** the field's key reads `null_2`
 
-#### Scenario: A literal word is refused
+#### Scenario: A literal word draws a refusal
 
 - **WHEN** the author commits `true` in a field's key input
 - **THEN** the draft still holds the old key
@@ -338,7 +338,7 @@ locked. A `group` field is outside the lock.
 - **THEN** the group's key reads `order_request`
 - **AND** the view entries that named `request` name `order_request`
 
-### Requirement: A label that derives no key keeps a key that is read
+### Requirement: A label that derives no key keeps a key that conditions read
 
 A label that derives an empty key SHALL leave the key as it stands while an
 expression reads it. Its readers would otherwise read `data.` with no name.
@@ -522,7 +522,7 @@ case shows its own sentence at the input:
 - A key another field carries: "{field} already uses this key.", with that
   field's label.
 
-#### Scenario: A key outside the grammar is refused
+#### Scenario: A key outside the grammar draws a refusal
 
 - **WHEN** the author types `Total Amount` into the key input and presses
   Enter
@@ -530,7 +530,7 @@ case shows its own sentence at the input:
 - **AND** the input still reads `Total Amount`
 - **AND** a sentence at the input says which characters a key holds
 
-#### Scenario: A key another field holds is refused
+#### Scenario: A key another field holds draws a refusal
 
 - **WHEN** another field, labelled "Status", carries the key `status`
 - **AND** the author commits `status` in this field's key input
