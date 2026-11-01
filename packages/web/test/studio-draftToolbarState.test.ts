@@ -368,6 +368,17 @@ describe("headerStateLine", () => {
     expect(headerStateLine(false, undefined, 3)).toEqual({ state: "saved", version: "v3" });
   });
 
+  it("NaN and 0 are no published version", () => {
+    expect(headerStateLine(false, undefined, Number.NaN)).toEqual({ state: "saved" });
+    expect(headerStateLine(false, undefined, 0)).toEqual({ state: "saved" });
+    expect(headerStateLine(true, undefined, 0)).toEqual({ state: "unsaved" });
+  });
+
+  it("a non-integer or negative base is no published version", () => {
+    expect(headerStateLine(false, undefined, 1.5)).toEqual({ state: "saved" });
+    expect(headerStateLine(false, undefined, -1)).toEqual({ state: "saved" });
+  });
+
   it("a clean draft after a save reads saved at its time", () => {
     expect(headerStateLine(false, "10:32", null)).toEqual({ state: "savedAt", time: "10:32" });
     expect(headerStateLine(false, "10:32", 2)).toEqual({ state: "savedAt", time: "10:32", version: "v2" });

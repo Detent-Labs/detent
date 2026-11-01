@@ -116,15 +116,16 @@ export interface HeaderStateLine {
  * The state line's parts (studio-canvas spec: "The header bar's state says
  * what holds for the draft"). A dirty draft is `unsaved`, whatever happened
  * before. A clean one is `savedAt` once `savedTime` exists, else `saved`.
- * `baseVersion` is the version the draft stands on; null or undefined means
- * nobody has published it, so the line carries no version.
+ * `baseVersion` is the version the draft stands on; null, undefined, 0 or a
+ * non-integer means nobody has published it, so the line carries no version.
  */
 export function headerStateLine(
   dirty: boolean,
   savedTime: string | undefined,
   baseVersion: number | null | undefined,
 ): HeaderStateLine {
-  const version = typeof baseVersion === "number" ? { version: `v${baseVersion}` } : {};
+  const published = typeof baseVersion === "number" && Number.isInteger(baseVersion) && baseVersion > 0;
+  const version = published ? { version: `v${baseVersion}` } : {};
   if (dirty) return { state: "unsaved", ...version };
   if (savedTime !== undefined) return { state: "savedAt", time: savedTime, ...version };
   return { state: "saved", ...version };

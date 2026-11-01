@@ -594,6 +594,9 @@ export const en = {
   "settings.developerView": "Developer view",
   "settings.key": "Key",
   "settings.processId": "Process id",
+  "settings.revision": "Revision",
+  "settings.publishedVersion": "Published version",
+  "settings.definitionHash": "Definition hash",
   "settings.manageGroups": "Manage assignment groups for this process",
 
   // The Forms tab: one plate per step that declares a view
