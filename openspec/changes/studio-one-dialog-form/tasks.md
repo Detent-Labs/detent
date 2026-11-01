@@ -60,7 +60,7 @@
 - [ ] 5.4 Update `docs/browser-checks.md`: the Tab and focus entries, and each hit of the pattern `native prompt|browser's confirm|accept the confirm|dialog-accept`. Admin's entries stay.
 - [ ] 5.4a Add an entry "One dialog form" there. It names what stays manual: the 420px gutter, the sticky footer at 1024 by 600, and the account menu's focus return.
 - [ ] 5.5 Move the closed entries of `docs/decisions.md` word for word to `docs/decisions-archive.md`. They are the keyboard hold, the presentation gaps, the six prompts, ACCORDION-17, HEADER-7, FIELDCARD-25, FIELDS-21, FIELDS-22 and NAMES-6.
-- [ ] 5.5a Narrow three entries to what stays: "The process list's literal strings", the `.btn-ghost` entry citing a dialog's Cancel, and HEADER-4's "native prompt". Record that `StepPage.tsx`'s two dialogs can still stand modal in a hidden tab body.
+- [ ] 5.5a Narrow three entries to what stays. They are "The process list's literal strings", the `.btn-ghost` entry citing a dialog's Cancel, and HEADER-4. Record that `StepPage.tsx`'s two dialogs can still stand modal in a hidden tab body.
 - [ ] 5.6 Rewrite the comments that name the old hook or the native prompt: `git grep -n -E "useConfirmDialog|native prompt|browser's own confirm|counts each kind of reach" -- packages/web/src packages/web/test` prints nothing that states a stale fact.
 - [ ] 5.7 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
 
@@ -76,7 +76,7 @@
 - [ ] 6.7a Confirm Restore, a template delete and a list discard, and read `document.activeElement` each time. Hide the Fields tab with browser Back under the kind dialog, and no modal stays.
 - [ ] 6.8 Press Tab through the Publish dialog with its Developer view closed, then open. Read every stop. No stop is `body`.
 - [ ] 6.9 At 420px, measure the gutter on a dialog. Below 30rem, facts stack. At 1024 by 600, the IT Offboarding group's removal keeps its heading and Cancel on screen. ArrowDown with Cancel focused moves `scrollTop`. A refusal under a long list scrolls into view.
-- [ ] 6.10 Leave a dirty draft by five routes: the area nav, the back control, the `⋮` menu's Versions, the account menu's profile entry, logout. Decline each: the focus returns. Confirm one.
+- [ ] 6.10 Leave a dirty draft by five routes. They are the area nav, the back control, the `⋮` menu's Versions, the account menu's profile entry and logout. Decline each: the focus returns. Confirm one.
 - [ ] 6.11 Run `/impeccable critique` and `/impeccable audit` on the dialogs. Run `impeccable detect --json` on the changed files, since the app's CSP blocks the overlay.
 - [ ] 6.12 Read `git grep -n "confirm(" -- packages/web/src/areas/studio`. Only comments and `onConfirm(` remain. A `git grep` of each key D7 and D8 retire prints nothing.
 

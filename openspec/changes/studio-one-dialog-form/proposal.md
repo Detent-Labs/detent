@@ -45,7 +45,7 @@ None.
 - `spa-accessibility`: a modal dialog holds the keyboard, returns the focus and states its name and description.
 - `environment-promotion`: the preview holds machine values in a closed Developer view.
 
-Section 8 of the concept names `studio-form-editor` too. The form editor raises no prompt and opens no dialog, and its spec says so, so no requirement of it changes.
+Section 8 of the concept names `studio-form-editor` too. The form editor raises no prompt and opens no dialog. Its spec already says so, and none of its requirements changes.
 
 ## Impact
 
