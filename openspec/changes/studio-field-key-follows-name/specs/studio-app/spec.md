@@ -517,9 +517,10 @@ more cases SHALL keep the typed text and write nothing. Each
 case shows its own sentence at the input:
 
 - Empty text: "Type a key, or press Escape to keep the current one."
-- Text outside the identifier grammar: "A key starts with a letter or _ and
-  holds only lower-case letters, digits and _."
-- A key another field carries: "Another field already uses this key."
+- Bad grammar: "A key starts with a letter or an underscore and holds only
+  lower-case letters, digits and underscores."
+- A key another field carries: "{field} already uses this key.", with that
+  field's label.
 
 #### Scenario: A key outside the grammar is refused
 
@@ -531,11 +532,18 @@ case shows its own sentence at the input:
 
 #### Scenario: A key another field holds is refused
 
-- **WHEN** another field carries the key `status`
+- **WHEN** another field, labelled "Status", carries the key `status`
 - **AND** the author commits `status` in this field's key input
 - **THEN** the draft still holds the old key
-- **AND** a sentence at the input reads "Another field already uses this
-  key."
+- **AND** a sentence at the input reads "Status already uses this key."
+
+#### Scenario: The taken refusal falls back for the other field's name
+
+- **WHEN** the field that carries `status` has no label at the content
+  locale
+- **THEN** the sentence names it by its label at the base locale
+- **AND** the sentence reads "(unnamed field) already uses this key." when
+  the base locale has no label either
 
 ### Requirement: A group's key commit keeps its own rule
 
@@ -562,9 +570,11 @@ condition reads this field."
 
 #### Scenario: A guard reads as its way out and its sentence
 
-- **WHEN** a way out "Approve → Book" carries the guard `data.amount > 1000.0`
+- **WHEN** a way out "Approve → Book" on the step "Review" carries the guard
+  `data.amount > 1000.0`
 - **AND** the field `amount` carries the label "Amount"
-- **THEN** the "Read by" zone of "Amount" holds a row "Way out Approve → Book"
+- **THEN** the "Read by" zone of "Amount" holds a row "On Review: way out
+  Approve → Book"
 - **AND** that row reads "Amount is greater than 1,000."
 
 #### Scenario: A field nothing reads says so
@@ -582,7 +592,8 @@ condition reads this field."
 
 A condition's place SHALL read:
 
-- a way out's condition: "Way out {way out}", with its row heading;
+- a way out's condition: "On {step}: way out {way out}", with the step it
+  leaves and its row heading;
 - a step form's conditions: "When {step} asks for {field}", "When {step}
   requires {field}", "When {field} is read-only on {step}";
 - a note's condition: "When {step} shows a note";

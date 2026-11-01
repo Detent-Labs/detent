@@ -3613,7 +3613,8 @@ follows the label until the first publish." Key reads `budget`.
 
 On the Steps tab, give a way out of the first step an "Only if" that reads
 Budget. Return to the Fields tab and choose Budget. Pass: the "Read by" zone
-holds one row that starts with "Way out", and a sentence about Budget under it.
+holds one row, "On {first step}: way out {way out}". A sentence about Budget
+stands under it.
 
 Change the label to `Total budget`. Pass: Key reads `total_budget`. The line
 under the label reads "Updated 1 condition." The way out still reads Budget
@@ -3636,16 +3637,17 @@ Type `other` into Key and press Escape. Pass: Key reads `qty` again.
 
 Type each of the following into Key and press Enter. Pass: Key keeps the typed
 text and the draft keeps `qty`. A warning callout stands under the input, and
-the input carries `aria-invalid`.
+the input carries `aria-invalid`. The callout carries `role="alert"`, so a
+screen reader reads it out on Enter and on Tab alike.
 
 - Nothing at all. The callout reads "Type a key, or press Escape to keep the
   current one."
-- `Total Amount`. The callout reads "A key starts with a letter or _ and holds
-  only lower-case letters, digits and _."
+- `Total Amount`. The callout reads "A key starts with a letter or an
+  underscore and holds only lower-case letters, digits and underscores."
 - `true`. The callout reads "Conditions read this word as a value. Pick
   another key."
-- The key of another field, such as `unit_price`. The callout reads "Another
-  field already uses this key."
+- The key of another field, such as `unit_price`. The callout reads "Unit
+  Price already uses this key."
 
 Type one more character. Pass: the callout goes. Press Escape to put `qty`
 back.

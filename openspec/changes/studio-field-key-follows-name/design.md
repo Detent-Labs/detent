@@ -42,8 +42,8 @@ pre-approved every decision for stage 64 and asked for none.
    sentence says how many. Proof: the guard
    `data.amount > 1000.0` on "Approve → Book" survives a rename of
    "Amount" to "Total amount". The rewrite line reads "Updated 1 condition."
-   The "Read by" zone lists "Way out Approve → Book" with "Total amount is
-   greater than 1,000."
+   The "Read by" zone lists "On Review: way out Approve → Book" with "Total
+   amount is greater than 1,000."
 3. **Selected direction.** The established register world (`DESIGN.md`).
    Thesis: the name is the field's identity, and the key follows quietly
    behind a Developer view. The rewrite line is ink in the written face, the
@@ -121,7 +121,9 @@ pre-approved every decision for stage 64 and asked for none.
 
 `rewriteKeyReaders` returns 0 and writes nothing while a field other than
 `fieldId` carries `from`, before or after the key moves. The readers may belong to that field (`studio-app`: "A shared old
-key keeps its readers").
+key keeps its readers"). It also returns 0 and writes nothing while a field
+other than `fieldId` carries `to`. Such a move would merge two fields'
+readers. `rewriteFieldRead` answers `src` unchanged for an empty `to`.
 
 Alternative: a text replace over all sources. Rejected: it rewrites string
 literals and `child.data.amount`, which the reader count does not count.
@@ -183,12 +185,18 @@ Alternative: a store that returns recipe results. Rejected: it changes
 
 ### 3. The rewrite line is component state
 
-`FieldEditor` holds `rewritten: number | undefined`. A write that rewrote at
-least one expression sets it. A write that rewrote none leaves it.
+`FieldEditor` holds `{ count: number | undefined; write: number }`. A write
+that rewrote at least one expression sets the count and adds 1 to `write`
+(`nextRewriteLine`). A write that rewrote none leaves both.
 `FieldEditor` mounts once per field id (`key={field.id}`), so opening
 another field clears it. The line renders inside an always-present
 `<p role="status" aria-live="polite">`. The region exists before its text
 does, so a screen reader announces the first count.
+
+The text sits in a `<span>` keyed on `write`. Each rewrite replaces that
+text node, so a second rewrite with the same count announces too. The line
+takes `space.s2` below it, so it reads with the label above and not as the
+description's caption.
 
 ### 4. "Read by" rows come from reader sites
 
@@ -234,13 +242,24 @@ The zone memoizes rows on `[draft, field.key, contentLocale]`.
 
 ### 5. The key input moves into a Developer view
 
-The `<details>` uses the existing `studioDevview` and `studioDevviewSummary`
-styles and `fieldCatalog.developerView`. It sits after the description, in
-"What this field asks". The input keeps its blur and Enter commit.
-`keyInputStep` gains an `escape` event, which clears the typed text. A
-commit first asks `keyCommitProblem`. A problem keeps the typed text and
-shows its sentence under the input, with `aria-invalid="true"`. The next
-keystroke clears the refusal.
+The `<details>` takes the look of the condition input's Developer view
+(`shared/ConditionInput.tsx`'s `developer` and `developerSummary`). Its
+`studioDevview` and `studioDevviewSummary` styles copy those values: a
+hairline above, and an 11px uppercase tracked summary in the written face.
+The plugin-type Developer view uses the same two styles. The summary reads
+`fieldCatalog.developerView`.
+
+The Developer view sits after the description, in "What this field asks".
+The input keeps its blur and Enter commit. `keyInputStep` gains an `escape`
+event, which clears the typed text. A commit first asks `keyCommitProblem`.
+A problem keeps the typed text and shows its sentence under the input, in
+the warning callout, with `aria-invalid="true"`. The sentence carries
+`role="alert"`, so a blur commit announces it after focus has left.
+
+The next keystroke clears the refusal. The taken refusal names the other
+field through `keyHolderName`. That name is the field's label at the content
+locale, else at the base locale, else "(unnamed field)". The commit fixes
+the sentence, so it names the field that held the key then.
 
 The notice keys change. The two reader keys go: `fieldCatalog.keyReadByOne`
 and `keyReadByMany`. The key `fieldCatalog.keyPublished` stays. The key
@@ -249,6 +268,9 @@ and `keyReadByMany`. The key `fieldCatalog.keyPublished` stays. The key
 undefined`, where `undefined` means the base version has not loaded. It
 answers `keyPublished`, `keyFollows` or `keyByHand`. It answers `undefined`
 for an empty key and while the base version loads.
+
+The notice prints as a plain muted note (`studioNote`), with no advisory
+rule. Only a refusal takes the warning callout.
 
 A check on the key stands in "What this field asks", per the zone rule in
 `studio-app`. While one stands,
@@ -261,15 +283,15 @@ plugin-typed field keeps its second Developer view in "What kind of field".
 |---|---|
 | `fieldCatalog.keyFollows` | The key follows the label until the first publish. |
 | `fieldCatalog.keyEmpty` | Type a key, or press Escape to keep the current one. |
-| `fieldCatalog.keyGrammar` | A key starts with a letter or _ and holds only lower-case letters, digits and _. |
+| `fieldCatalog.keyGrammar` | A key starts with a letter or an underscore and holds only lower-case letters, digits and underscores. |
 | `fieldCatalog.keyLiteral` | Conditions read this word as a value. Pick another key. |
-| `fieldCatalog.keyTaken` | Another field already uses this key. |
+| `fieldCatalog.keyTaken` | {field} already uses this key. |
 | `fieldCatalog.keyByHand` | The label no longer sets this key. |
 | `fieldCatalog.rewroteOne` | Updated 1 condition. |
 | `fieldCatalog.rewroteMany` | Updated {count} conditions. |
 | `fieldCatalog.readByHeading` | Read by |
 | `fieldCatalog.readByEmpty` | No condition reads this field. |
-| `readBy.wayOut` | Way out {wayOut} |
+| `readBy.wayOut` | On {step}: way out {wayOut} |
 | `readBy.asked` | When {step} asks for {field} |
 | `readBy.required` | When {step} requires {field} |
 | `readBy.readonly` | When {field} is read-only on {step} |
