@@ -9,16 +9,23 @@ import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import { DraftContext, type DraftContextValue, type Mutate } from "../src/areas/studio/draft/store.js";
 import { updateInDraftArray } from "../src/areas/studio/draft/draft-array-crud.js";
 import { StepPage } from "../src/areas/studio/panels/StepPage.js";
+import { RemoveStepDialog } from "../src/areas/studio/panels/RemoveStepDialog.js";
+import type { StepRemovalReach } from "../src/areas/studio/draft/stepRemoval.js";
 
 /**
  * The Steps tab's wide page (`studio-step-page`: "The step page names its
- * step and keeps its key in the Developer view", "The step page stands its sections open in
- * two columns", "The step page walks to the previous and the next step", "The
- * step page carries a Developer view of the step").
+ * step and keeps its key in the Developer view", "The step page folds its
+ * sections into one accordion", "A step's kind decides its sections", "A
+ * section header carries a summary and its state", "The page opens on the
+ * section that needs the author", "Removing a step confirms first", "The
+ * step page walks to the previous and the next step", "The step page carries
+ * a Developer view of the step").
  *
  * `development-toolchain`'s split rule sends these to assertions: the section
- * set, the headings, the walk controls' names and refusals, and the closed
- * disclosure are all properties of the rendered string.
+ * set and its order, the header markup, the open state on first render, the
+ * marks, the walk controls' names and refusals, and the closed disclosure are
+ * all properties of the rendered string. A press needs a DOM, so the open
+ * state after one is `nextOpenSection`'s, in `studio-stepSummaries.test.ts`.
  */
 
 type DraftStep = DraftOf<Step>;
@@ -81,6 +88,7 @@ interface Over {
   stepNumber?: number;
   previous?: { id: string; label: string };
   next?: { id: string; label: string };
+  selectedPathId?: string;
 }
 
 function render(over: Over = {}): string {
@@ -96,6 +104,7 @@ function render(over: Over = {}): string {
         next={over.next}
         onSelectStep={() => {}}
         onRemoveStep={() => {}}
+        selectedPathId={over.selectedPathId}
         navigate={() => {}}
         processes={[]}
       />
@@ -108,6 +117,39 @@ function buttonTags(html: string): string[] {
   return html.match(/<button[^>]*>/g) ?? [];
 }
 
+/** One rendered section: its header button's open tag, the button's inner
+ * markup, and its body region's own markup. */
+interface RenderedSection {
+  name: string;
+  button: string;
+  header: string;
+  body: string;
+}
+
+/** Every section in DOM order. A section's markup runs from its `<section>`
+ * to the next one, or to the page's terminal note or walk. */
+function sections(html: string): RenderedSection[] {
+  const parts = html.split("<section").slice(1);
+  return parts.map((part) => {
+    const end = part.indexOf("</section>");
+    const own = part.slice(0, end);
+    const button = /<button[^>]*>/.exec(own)![0];
+    const header = own.slice(own.indexOf(button) + button.length, own.indexOf("</button></h3>"));
+    const name = /<span[^>]*>([^<]*)<\/span>/.exec(header)![1]!;
+    const body = own.slice(own.indexOf("</h3>") + "</h3>".length);
+    return { name, button, header, body };
+  });
+}
+
+const names = (html: string) => sections(html).map((s) => s.name);
+const section = (html: string, name: string) => sections(html).find((s) => s.name === name)!;
+const openNames = (html: string) => sections(html).filter((s) => s.button.includes('aria-expanded="true"')).map((s) => s.name);
+
+const ASSIGNED = {
+  ...TASK_STEP,
+  assignment: { strategy: { type: "org.group-members", config: { groupId: "g" } } },
+} as unknown as DraftStep;
+
 describe("The step page's masthead", () => {
   it("opens with a kicker naming the step's number and its kind", () => {
     const html = render({ stepNumber: 3 });
@@ -116,10 +158,20 @@ describe("The step page's masthead", () => {
     expect(html).toContain("A step someone works");
   });
 
+  it("makes the kicker the page's h2, so the section headings nest under the step", () => {
+    const html = render({ stepNumber: 3 });
+    const kicker = /<h2 class="kicker">([\s\S]*?)<\/h2>/.exec(html);
+
+    expect(kicker).not.toBeNull();
+    expect(kicker![1]).toContain("Step 3");
+    expect(kicker![1]).toContain("A step someone works");
+    expect(html.indexOf("<h2")).toBeLessThan(html.indexOf("<h3"));
+  });
+
   it("carries the step's label as a writable line, and keeps its key in the Developer view", () => {
     const html = render();
-    // The step's own disclosure stands at the page foot, after the way-out
-    // rows' own Developer views and their guards'.
+    // The step's own disclosure stands last in More, after the way-out rows'
+    // own Developer views and their guards'.
     const developer = html.slice(html.lastIndexOf("<details"));
 
     expect(html).toContain('value="Intake"');
@@ -142,68 +194,286 @@ describe("The step page's masthead", () => {
     expect(html).toContain("Set as the process&#x27;s first step");
   });
 
-  it("carries one control that removes the step", () => {
-    expect(render()).toContain("Remove this step");
+  it("carries one control that removes the step, in the destructive outline", () => {
+    const html = render();
+
+    expect(html.match(/Remove this step/g)).toHaveLength(1);
+    expect(html).toMatch(/<button type="button" class="btn btn-secondary btn-destructive">Remove this step<\/button>/);
+  });
+
+  it("mounts no removal dialog until the control is pressed", () => {
+    expect(render()).not.toContain("<dialog");
   });
 });
 
 describe("The step page's section set", () => {
-  it("gives a task step Ways out, Who acts, Cancellable, When entered, When left, Time limit, Form and Collaboration", () => {
-    const html = render();
-
-    for (const heading of ["Ways out", "Who acts", "Cancellable", "When entered", "When left", "Time limit", "Form", "Collaboration"]) {
-      expect(html).toContain(`>${heading}<`);
-    }
-    expect(html).not.toContain(">Which process it calls<");
+  it("gives a task step six sections, in reading order", () => {
+    expect(names(render())).toEqual(["Who acts", "Form", "Ways out", "Time limit", "When entered or left", "More"]);
   });
 
-  it("gives an end step How the case ends, and no way out", () => {
+  it("leads a subprocess step with the process it calls", () => {
+    const calls = { ...TASK_STEP, type: "subprocess" } as unknown as DraftStep;
+
+    expect(names(render({ step: calls }))).toEqual(["Which process it calls", "Ways out", "Time limit", "When entered or left", "More"]);
+  });
+
+  it("gives an end step How the case ends, When entered, and no way out", () => {
     const ends = { ...TASK_STEP, terminal: true, paths: undefined } as unknown as DraftStep;
     const html = render({ step: ends });
 
-    expect(html).toContain(">How the case ends<");
-    expect(html).not.toContain(">Ways out<");
-    expect(html).not.toContain(">When left<");
-    expect(html).not.toContain(">Time limit<");
+    expect(names(html)).toEqual(["Who acts", "Form", "How the case ends", "When entered", "More"]);
     expect(html).toContain("A step that ends the process has no way out and no time limit.");
-    // An end step still resolves an InstanceView and its collaboration field,
-    // so its Collaboration section stays (design.md).
-    expect(html).toContain(">Collaboration<");
   });
 
-  it("gives a subprocess step Which process it calls, and no Who acts or form section", () => {
-    const calls = { ...TASK_STEP, type: "subprocess" } as unknown as DraftStep;
-    const html = render({ step: calls });
-
-    expect(html).toContain(">Which process it calls<");
-    expect(html).not.toContain(">Who acts<");
-    expect(html).not.toContain(">Form<");
+  it("prints no section header in the contract's words", () => {
+    for (const name of names(render())) {
+      expect(["Path to", "Assignment", "On entry", "On exit", "Cancellable"]).not.toContain(name);
+    }
   });
 
-  it("gives a subprocess step no Collaboration section", () => {
-    // A subprocess step is an automatic wait-state with no
-    // participant-facing task screen for the setting to govern
-    // (`studio-step-page`).
-    const calls = { ...TASK_STEP, type: "subprocess" } as unknown as DraftStep;
-    const html = render({ step: calls });
-
-    expect(html).not.toContain(">Collaboration<");
-  });
-
-  it("stands every section open, so none carries a disclosure of its own", () => {
-    // A collapsible register would carry `aria-expanded` on each heading.
-    // Disclosures labelled "Developer view" sit elsewhere on the page: the
-    // native `<details>` over the step's key and read-only JSON, one
-    // `<details>` per way-out row over its key, and one `<details>` per
-    // way out's guard over its CEL, which `ConditionInput.tsx` builds.
-    const headings = render().match(/<h3[^>]*>/g) ?? [];
-
-    expect(headings.length).toBeGreaterThan(0);
-    for (const heading of headings) expect(heading).not.toContain("aria-expanded");
+  it("stands the sections in one group, labelled for the page", () => {
+    expect(render()).toContain('<div aria-label="Step settings" role="group"><section');
   });
 });
 
-describe("The step page's Cancellable section", () => {
+describe("The step page's section headers", () => {
+  it("makes each header a button inside an h3, naming its body", () => {
+    const html = render();
+
+    expect(html.match(/<h3[^>]*><button type="button"/g)).toHaveLength(6);
+    for (const { button } of sections(html)) {
+      const id = /\sid="([^"]+)"/.exec(button)![1]!;
+      const controls = /aria-controls="([^"]+)"/.exec(button)![1]!;
+
+      expect(button).toMatch(/aria-expanded="(true|false)"/);
+      expect(html).toContain(`<div id="${controls}" role="region" aria-labelledby="${id}"`);
+    }
+  });
+
+  it("stands exactly one section open", () => {
+    expect(render().match(/aria-expanded="true"/g)).toHaveLength(1);
+  });
+
+  it("hides every closed body, and keeps it mounted", () => {
+    const all = sections(render());
+
+    for (const { button, body } of all) {
+      const open = button.includes('aria-expanded="true"');
+      const tag = /^<div[^>]*>/.exec(body)![0];
+
+      expect(tag.includes(" hidden")).toBe(!open);
+    }
+    // The closed Ways out body still holds its row.
+    expect(all.find((s) => s.name === "Ways out")!.body).toContain("<h4");
+  });
+});
+
+describe("The step page opens on the section that needs the author", () => {
+  it("opens Who acts on an unassigned task step with no check", () => {
+    expect(openNames(render())).toEqual(["Who acts"]);
+  });
+
+  it("opens the first section on a complete step", () => {
+    expect(openNames(render({ step: ASSIGNED }))).toEqual(["Who acts"]);
+  });
+
+  it("opens the first section still to do", () => {
+    const noWayOut = { ...ASSIGNED, paths: undefined } as unknown as DraftStep;
+
+    expect(openNames(render({ step: noWayOut }))).toEqual(["Ways out"]);
+  });
+
+  it("opens the first section carrying a check", () => {
+    const timed = { ...TASK_STEP, timers: [{ id: "timer_1", duration: "P1D" }] } as unknown as DraftStep;
+    const issues: EditorIssue[] = [{ entityType: "timer", entityId: "timer_1", message: "too long", source: "duration", loc: "" }];
+
+    expect(openNames(render({ step: timed, issues }))).toEqual(["Time limit"]);
+  });
+
+  it("opens Ways out where a way out is selected", () => {
+    expect(openNames(render({ selectedPathId: "path_1" }))).toEqual(["Ways out"]);
+  });
+
+  it("opens an unassigned step whose ways out all happen by themselves on Who acts only as the first section", () => {
+    const automatic = {
+      ...TASK_STEP,
+      paths: [
+        { id: "path_1", to: "step_b", trigger: "automatic", priority: 1, guard: { lang: "cel", src: "data.ok" } },
+        { id: "path_2", to: "step_b", trigger: "automatic", priority: 2 },
+      ],
+    } as unknown as DraftStep;
+    const html = render({ step: automatic });
+
+    expect(section(html, "Who acts").header).not.toContain("To do");
+    expect(openNames(html)).toEqual(["Who acts"]);
+  });
+});
+
+describe("The open section header", () => {
+  it("carries the current mark and prints its name in ink, and no closed header does", () => {
+    const all = sections(render());
+
+    for (const { name, button, header } of all) {
+      const open = button.includes('aria-expanded="true"');
+
+      expect(`${name}: ${button.includes("sectionHeaderOpen")}`).toBe(`${name}: ${open}`);
+      expect(`${name}: ${header.includes("sectionNameOpen")}`).toBe(`${name}: ${open}`);
+    }
+    expect(all.filter((s) => s.button.includes("sectionHeaderOpen"))).toHaveLength(1);
+  });
+
+  it("draws the current mark as a 3px accent rule in the page's inline padding", () => {
+    const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
+    const open = /sectionHeaderOpen: \{\s*"::before": \{([\s\S]*?)\n {4}\},/.exec(source);
+
+    expect(open).not.toBeNull();
+    expect(open![1]).toContain("width: 3,");
+    expect(open![1]).toContain("backgroundColor: colors.accent,");
+    expect(open![1]).toContain("left: `calc(-1 * max(${space.s3}, ${focus.reach}))`,");
+    expect(source).toMatch(/sectionNameOpen: \{\s*color: colors\.text,\s*\}/);
+  });
+});
+
+describe("A section header's summary and mark", () => {
+  it("names the assignment in words and marks Who acts done", () => {
+    const { header } = section(render({ step: ASSIGNED }), "Who acts");
+
+    expect(header).toContain("Everyone in a group");
+    expect(header).toContain('title="Done"');
+    expect(header).toContain(">Done</span>");
+    expect(header).toContain("<svg");
+  });
+
+  it("reads both way-out headings", () => {
+    const twoWays = {
+      ...TASK_STEP,
+      paths: [
+        { id: "path_1", label: "Approve", to: "step_b" },
+        { id: "path_2", label: "Reject", to: "step_c" },
+      ],
+    } as unknown as DraftStep;
+    const draft = {
+      baseLocale: "en",
+      workflow: {
+        initialStep: "step_a",
+        steps: [twoWays, { id: "step_b", key: "done", label: { en: "Done" } }, { id: "step_c", key: "rework", label: { en: "Rework" } }],
+      },
+    } as unknown as Draft;
+    const { header } = section(render({ step: twoWays, draft }), "Ways out");
+
+    expect(header).toContain("Approve → Done, Reject → Rework");
+    expect(header).toContain('title="Done"');
+  });
+
+  it("says what is missing and reads To do on an empty section the step needs", () => {
+    const { header } = section(render({ step: { ...TASK_STEP, paths: undefined } as unknown as DraftStep }), "Ways out");
+
+    expect(header).toContain("No way out yet");
+    expect(header).toContain('class="todoMark markPlace">To do</span>');
+    expect(header).not.toContain('title="Done"');
+    expect(header).not.toContain("open issue");
+  });
+
+  it("reads To do on Who acts on an unassigned task step with a manual way out", () => {
+    expect(section(render(), "Who acts").header).toContain(">To do</span>");
+  });
+
+  it("carries no mark on an empty section the step works without", () => {
+    const { header } = section(render(), "Time limit");
+
+    expect(header).not.toContain("To do");
+    expect(header).not.toContain('title="Done"');
+    expect(header).not.toContain("open issue");
+  });
+
+  it("counts a check in the badge, in place of the Done mark", () => {
+    const issues: EditorIssue[] = [
+      { entityType: "step", entityId: "step_a", message: "no such group", source: "structural", loc: "workflow.steps[0].assignment.strategy.config.groupId" },
+    ];
+    const { header } = section(render({ step: ASSIGNED, issues }), "Who acts");
+
+    expect(header).toMatch(/aria-label="1 open issue"[^>]*>1<\/span>/);
+    expect(header).not.toContain('title="Done"');
+  });
+
+  it("summarizes More as following the process settings where the step overrides nothing", () => {
+    expect(section(render(), "More").header).toContain("Follows the process settings");
+  });
+
+  it("prints an end step's outcome in its summary", () => {
+    const ends = { ...TASK_STEP, terminal: true, paths: undefined, outcome: "approved" } as unknown as DraftStep;
+
+    expect(section(render({ step: ends }), "How the case ends").header).toContain(">approved</span>");
+  });
+});
+
+describe("The step page's Who acts section", () => {
+  it("leads its body with the strategy's note, and leaves the name to the header", () => {
+    const { header, body } = section(render({ step: ASSIGNED }), "Who acts");
+    const note = "Whoever is in the group when an instance enters the step can act on it.";
+
+    expect(header).toContain("Everyone in a group");
+    expect(body).toContain(note);
+    // The type picker still offers the name as an option; no paragraph
+    // repeats it.
+    expect(body).not.toMatch(/<p[^>]*>Everyone in a group<\/p>/);
+    expect(body.indexOf(note)).toBeLessThan(body.indexOf("Who can act on this step"));
+  });
+});
+
+describe("The step page's More section", () => {
+  it("holds the cancelling control, the two collaboration controls, then the Developer view last", () => {
+    const { body } = section(render(), "More");
+    const cancelling = body.indexOf("Cancelling the case here");
+    const comment = body.indexOf('aria-label="Comment"');
+    const attachments = body.indexOf('aria-label="Attachments"');
+    const developer = body.indexOf("<details");
+
+    expect(cancelling).toBeGreaterThan(-1);
+    expect(comment).toBeGreaterThan(cancelling);
+    expect(attachments).toBeGreaterThan(comment);
+    expect(developer).toBeGreaterThan(attachments);
+    expect(body.slice(body.indexOf("</details>") + "</details>".length)).toBe("</div>");
+  });
+
+  it("carries no cancelling control on an end step", () => {
+    const ends = { ...TASK_STEP, terminal: true, paths: undefined } as unknown as DraftStep;
+    const { body } = section(render({ step: ends }), "More");
+
+    expect(body).not.toContain("Cancelling the case here");
+    expect(body).toContain('aria-label="Comment"');
+  });
+
+  it("carries no collaboration control on a subprocess step", () => {
+    const calls = { ...TASK_STEP, type: "subprocess" } as unknown as DraftStep;
+    const { body } = section(render({ step: calls }), "More");
+
+    expect(body).toContain("Cancelling the case here");
+    expect(body).not.toContain('aria-label="Comment"');
+    expect(body).not.toContain('aria-label="Attachments"');
+  });
+});
+
+describe("The step page's When entered or left section", () => {
+  it("holds the entry, exit and cancel lists on a task step", () => {
+    const { body } = section(render(), "When entered or left");
+
+    expect(body).toContain("What happens when entered");
+    expect(body).toContain("What happens when left");
+    expect(body).toContain("What happens when cancelled");
+  });
+
+  it("holds the entry list alone on an end step", () => {
+    const ends = { ...TASK_STEP, terminal: true, paths: undefined } as unknown as DraftStep;
+    const { body } = section(render({ step: ends }), "When entered");
+
+    expect(body).toContain("What happens when entered");
+    expect(body).not.toContain("What happens when left");
+    expect(body).not.toContain("What happens when cancelled");
+  });
+});
+
+describe("More's cancelling control", () => {
   /**
    * The Cancellable <select>'s onChange writes through a local `updateStep`
    * closure over `updateInDraftArray` — not exported, so not directly
@@ -247,7 +517,7 @@ describe("The step page's Cancellable section", () => {
   });
 });
 
-describe("The step page's Collaboration section", () => {
+describe("More's collaboration controls", () => {
   it("gives a three-state control for Comment and one for Attachments, both starting on Default", () => {
     const html = render();
 
@@ -278,7 +548,7 @@ describe("The step page's Collaboration section", () => {
 });
 
 describe("A step page section's own open issues", () => {
-  it("prints an issue about the assignment beside the Who acts heading", () => {
+  it("prints an issue about the assignment once, inside the Who acts body", () => {
     const issues: EditorIssue[] = [
       {
         entityType: "step",
@@ -289,13 +559,16 @@ describe("A step page section's own open issues", () => {
       },
     ];
     const html = render({ issues });
+    const { body } = section(html, "Who acts");
 
-    expect(html).toContain("no such group");
-    // One print, at one section — never a second copy at another heading.
+    // One print, at one section — never a second copy at another section.
     expect(html.match(/no such group/g)).toHaveLength(1);
+    expect(body).toContain("no such group");
+    // Above the section's own controls.
+    expect(body.indexOf("no such group")).toBeLessThan(body.indexOf("Who can act on this step"));
   });
 
-  it("prints an issue about the form beside the Form heading", () => {
+  it("prints an issue about the form once, inside the Form body", () => {
     const issues: EditorIssue[] = [
       {
         entityType: "step",
@@ -305,26 +578,47 @@ describe("A step page section's own open issues", () => {
         loc: "workflow.steps[0].view.fields[0].required",
       },
     ];
+    const html = render({ issues });
 
-    expect(render({ issues }).match(/required but hidden/g)).toHaveLength(1);
+    expect(html.match(/required but hidden/g)).toHaveLength(1);
+    expect(section(html, "Form").body).toContain("required but hidden");
   });
 
-  it("keeps a step-level issue no section claims on the masthead", () => {
+  it("draws an advisory badge in slate, a blocker in refusal", () => {
+    // The test runner's StyleX stub resolves a style to its own key
+    // (`test/preload-stylex.ts`), so the class names the tone's style, and
+    // the module's source binds each style to its role.
+    const view: EditorIssue = { entityType: "step", entityId: "step_a", message: "a", source: "view", loc: "workflow.steps[0].view.fields[0].required" };
+    const cel: EditorIssue = { ...view, message: "b", source: "cel" };
+    const badge = (issues: EditorIssue[]) => /<span class="([^"]+)" aria-label="1 open issue"/.exec(section(render({ issues }), "Form").header)![1];
+    const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
+
+    expect(badge([view])).toBe("badge badgeAdvisory markPlace");
+    expect(badge([cel])).toBe("badge badgeBlocker markPlace");
+    expect(source).toMatch(/badgeBlocker: \{\s*color: colors\.refusal,\s*\}/);
+    expect(source).toMatch(/badgeAdvisory: \{\s*color: colors\.textMuted,\s*\}/);
+  });
+
+  it("keeps a step-level issue no section claims on the masthead, and no header counts it", () => {
     const issues: EditorIssue[] = [
       { entityType: "step", entityId: "step_a", message: "key is not a slug", source: "zod", loc: "workflow.steps[0].key" },
     ];
+    const html = render({ issues });
 
-    expect(render({ issues }).match(/key is not a slug/g)).toHaveLength(1);
+    expect(html.match(/key is not a slug/g)).toHaveLength(1);
+    expect(html).not.toContain("open issue");
   });
 
-  it("leaves a path's own issue to the row that names it, inside Ways out", () => {
-    // `PathsPanel` mounts an `IssueList` per path row, so the heading would
-    // otherwise say the same sentence twice, two inches apart.
+  it("leaves a path's own issue to the row that names it, and counts it on Ways out once", () => {
+    // `PathsPanel` mounts an `IssueList` per path row, so the body's top
+    // would otherwise say the same sentence twice.
     const issues: EditorIssue[] = [
       { entityType: "path", entityId: "path_1", message: "this path leads nowhere", source: "cel", loc: "" },
     ];
+    const html = render({ issues });
 
-    expect(render({ issues }).match(/this path leads nowhere/g)).toHaveLength(1);
+    expect(html.match(/this path leads nowhere/g)).toHaveLength(1);
+    expect(section(html, "Ways out").header).toMatch(/aria-label="1 open issue"[^>]*>1<\/span>/);
   });
 });
 
@@ -334,6 +628,19 @@ describe("The step page's walk", () => {
 
     expect(html).toContain("Previous: Intake");
     expect(html).toContain("Next: Credit check");
+  });
+
+  it("fills a $ pattern in a neighbour's label as written", () => {
+    const html = render({ previous: { id: "step_z", label: "Pay $& now" }, next: { id: "step_b", label: "Owe $1" } });
+
+    expect(html).toContain("Previous: Pay $&amp; now");
+    expect(html).toContain("Next: Owe $1");
+  });
+
+  it("reads the placeholder for an unnamed neighbour", () => {
+    const html = render({ next: { id: "step_b", label: "(unnamed step)" } });
+
+    expect(html).toContain("Next: (unnamed step)");
   });
 
   it("refuses the press at each end of the walk", () => {
@@ -354,6 +661,17 @@ describe("The step page's walk", () => {
 });
 
 describe("The step page's Developer view", () => {
+  it("stands inside the last section's body", () => {
+    const all = sections(render());
+
+    // A way-out row keeps a Developer view of its own; the step's is the one
+    // holding the read-only JSON.
+    expect(all.at(-1)!.name).toBe("More");
+    expect(all.at(-1)!.body).toContain(">Developer view</summary>");
+    expect(all.at(-1)!.body).toContain("<pre");
+    for (const { body } of all.slice(0, -1)) expect(body).not.toContain("<pre");
+  });
+
   it("stands closed until an author opens it", () => {
     const html = render();
 
@@ -393,28 +711,23 @@ describe("The step page's Developer view", () => {
   });
 });
 
-describe("The step page's two columns", () => {
-  it("falls to one column at the breakpoint the steps rail and the tab both use", () => {
-    const breakpoint = '"@media (max-width: 64rem)"';
-
-    for (const file of ["panels/StepPage.tsx", "panels/StepsRail.tsx", "screens/EditScreen.tsx", "panels/EntityTabs.tsx"]) {
-      expect(readFileSync(SRC + file, "utf8")).toContain(breakpoint);
-    }
-  });
-});
-
 /**
  * The Form section (`studio-step-page`: "The Form section states the form's
- * size in words", "The Form section opens the step's form"). It counts field
- * entries as a Forms card counts them, and its control reads the card's own
- * words.
+ * size in words", "The Form section opens the step's form"). Its header
+ * counts field entries as a Forms card counts them, and its body's one
+ * control reads the card's own words.
  */
 describe("The step page's Form section", () => {
   const field = (n: number) => ({ id: `field_${n}`, key: `f${n}`, label: { en: `F${n}` }, type: "string" }) as unknown as DraftField;
   const fields = [1, 2, 3, 4].map(field);
   const withView = (entries: unknown[]) => ({ ...TASK_STEP, view: { fields: entries } }) as unknown as DraftStep;
-  /** The section's sentence and its control, side by side. */
-  const summary = (html: string) => /<span>([^<]*)<\/span><button type="button" class="btn btn-secondary">([^<]*)<\/button>/.exec(html)?.slice(1);
+  /** The header's size sentence and the body's control. */
+  const summary = (html: string) => {
+    const form = section(html, "Form");
+    const sentence = /<span[^>]*>([^<]*)<\/span>/g;
+    sentence.exec(form.header);
+    return [sentence.exec(form.header)![1], /<button type="button" class="btn btn-secondary">([^<]*)<\/button>/.exec(form.body)![1]];
+  };
 
   it("states four fields, one required, and offers to open the form", () => {
     const step = withView([{ ref: "field_1", required: true }, { ref: "field_2" }, { ref: "field_3" }, { ref: "field_4" }]);
@@ -444,5 +757,74 @@ describe("The step page's Form section", () => {
 
     expect(html).not.toContain("/ 4");
     expect(html).not.toContain("fields configured");
+  });
+});
+
+/**
+ * The Remove this step confirmation (`studio-step-page`: "Removing a step
+ * confirms first", "The removal dialog counts what the removal reaches"). The
+ * web package has no DOM harness, so the dialog renders unconditionally, as
+ * `KindSwitchDialog`'s test does.
+ */
+describe("The removal dialog", () => {
+  const renderDialog = (reach: StepRemovalReach, label = "Review") =>
+    renderToStaticMarkup(<RemoveStepDialog label={label} reach={reach} triggerRef={{ current: null }} onCancel={() => {}} onConfirm={() => {}} />);
+  const factRows = (html: string) => [...html.matchAll(/<dt[^>]*>([^<]*)<\/dt><dd[^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], m[2]]);
+  const none: StepRemovalReach = { incomingPaths: 0, formFields: 0, isInitial: false };
+
+  it("names the step in its heading and its first fact row", () => {
+    const html = renderDialog(none);
+
+    expect(html).toContain("Remove “Review”?");
+    expect(factRows(html)).toEqual([["Step", "Review"]]);
+  });
+
+  it("fills the heading as written where the label holds a $ pattern", () => {
+    expect(renderDialog(none, "Pay $& now")).toContain("Remove “Pay $&amp; now”?");
+  });
+
+  it("counts two ways out leading here, and says they stay", () => {
+    const html = renderDialog({ incomingPaths: 2, formFields: 3, isInitial: false });
+
+    expect(factRows(html)).toEqual([
+      ["Step", "Review"],
+      ["Ways out leading here", "2"],
+      ["Fields on its form", "3"],
+    ]);
+    expect(html).toContain("The ways out leading here stay, and the checks report them.");
+  });
+
+  it("shows no row for ways out leading here where none does", () => {
+    const html = renderDialog(none);
+
+    expect(html).not.toContain("Ways out leading here");
+    expect(html).not.toContain("The ways out leading here stay");
+  });
+
+  it("says the first remaining step takes the first step's place", () => {
+    expect(renderDialog({ ...none, isInitial: true })).toContain("The first remaining step takes its place.");
+    expect(renderDialog(none)).not.toContain("The first remaining step takes its place.");
+  });
+
+  it("states that the studio has no undo, whatever the reach", () => {
+    expect(renderDialog(none)).toContain("The studio has no undo.");
+  });
+
+  it("holds the initial focus on Cancel, and keeps the confirming control outlined", () => {
+    const tags = buttonTags(renderDialog(none));
+
+    expect(tags).toHaveLength(2);
+    expect(tags[0]).toContain("btn-secondary btn-destructive");
+    expect(tags[0]).not.toContain("autofocus");
+    expect(tags[1]).toContain("autofocus");
+    expect(renderDialog(none)).toContain(">Remove the step</button>");
+  });
+
+  it("names the dialog by its heading and describes it by the facts and the notes", () => {
+    const html = renderDialog(none);
+
+    expect(html).toContain('aria-labelledby="remove-step-confirm-heading"');
+    expect(html).toContain('id="remove-step-confirm-heading"');
+    expect(html).toContain('aria-describedby="remove-step-confirm-facts remove-step-confirm-notes"');
   });
 });

@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
+import { Check } from "lucide-react";
 import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
@@ -14,6 +15,7 @@ import { assignmentWord, isCuratedAssignmentStrategy, stepKindPhrase, assignment
 import { ActionListEditor } from "./ActionListEditor";
 import { SubprocessSpecEditor } from "./SubprocessSpecEditor";
 import { KindSwitchDialog } from "./KindSwitchDialog";
+import { RemoveStepDialog } from "./RemoveStepDialog";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { useRegistry } from "./shared/useRegistry.js";
 import { useChildInputFields } from "./shared/useChildInputFields";
@@ -25,15 +27,26 @@ import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { parseChildProcessJson } from "../draft/io";
 import { missingTranslationWarning } from "../draft/localized-text";
 import { nextStepKey, nextCollaborationOverride } from "./stepsPanelLogic.js";
-import { formCounts, formSizeText } from "./formCardRows.js";
-import { sectionColumns, sectionsFor, type SectionName } from "./sectionsFor.js";
-import { headingIssues, sectionOfIssue } from "./sectionIssues.js";
+import { formCounts } from "./formCardRows.js";
+import { sectionLabel, sectionsFor, type SectionName } from "./sectionsFor.js";
+import { headingIssues, issuesBySection, sectionOfIssue } from "./sectionIssues.js";
+import {
+  defaultOpenSection,
+  nextOpenSection,
+  openSectionFor,
+  sectionSummary,
+  type SectionState,
+  type SectionSummary,
+} from "./stepSummaries.js";
+import { stepRemovalReach } from "../draft/stepRemoval.js";
+import { fill, stepText } from "./shared/optionText.js";
+import type { EditorIssue } from "../draft/issues.js";
 
 type DraftStep = DraftOf<Step>;
 
-/** The width below which two columns are too narrow. The page falls to one,
- * and the gutter rule goes with the second column. The steps rail turns at
- * this same width (design.md). */
+/** The width below which the steps rail stands above the page. The page
+ * then scrolls with the tab body rather than on its own. The steps rail turns
+ * at this same width (design.md). */
 const NARROW = "@media (max-width: 64rem)";
 
 const styles = stylex.create({
@@ -42,10 +55,13 @@ const styles = stylex.create({
     flexDirection: "column",
     minWidth: 0,
     minHeight: 0,
-    overflowY: "auto",
+    // Below 64rem the rail stands above the page, and the tab body scrolls
+    // both. The page then takes its content's height and has no scroll box of
+    // its own.
+    overflowY: { default: "auto", [NARROW]: "visible" },
     overscrollBehavior: "contain",
     // The box sets no block padding of its own: the masthead's and the
-    // Developer view's own padding clear the ring at either end instead
+    // walk's own padding clear the ring at either end instead
     // (`studio-focus-ring-clipping`, design.md's Outcome). Adding a block
     // padding here would stack on top of theirs and move content that
     // already clears the ring. `space.s3` (12px) on the inline axis already
@@ -56,6 +72,15 @@ const styles = stylex.create({
     // Mid-scroll, a focus scroll would align a control flush with the edge
     // and clip its ring.
     scrollPaddingBlock: focus.reach,
+  },
+  // The one reading column: the masthead, the sections and the walk, flush
+  // left and capped at 52rem.
+  column: {
+    display: "flex",
+    flexDirection: "column",
+    width: "100%",
+    maxWidth: "52rem",
+    minWidth: 0,
   },
   empty: {
     color: colors.textMuted,
@@ -84,14 +109,21 @@ const styles = stylex.create({
     flexWrap: "wrap",
   },
   // The kicker: the step's place in the walk and its kind, over the name
-  // line. The number aligns with the rail's own, so it takes mono.
+  // line. The number aligns with the rail's own, so it takes mono. It is the
+  // page's `h2`, so the section headings nest under the step. `shell/global.css`
+  // gives every `h2` the heading face, a size, a weight and margins; the
+  // first four declarations reset them, and the compiled class outranks that
+  // element selector.
   kicker: {
+    margin: 0,
+    fontFamily: fonts.body,
+    fontSize: 11,
+    fontWeight: 400,
     display: "flex",
     alignItems: "baseline",
     gap: space.s2,
     flex: "1 1 auto",
     minWidth: 0,
-    fontSize: 11,
     textTransform: "uppercase",
     letterSpacing: "0.1em",
     color: colors.textMuted,
@@ -216,70 +248,155 @@ const styles = stylex.create({
     color: colors.accent,
     boxShadow: `inset 0 -2px 0 ${colors.accent}`,
   },
-  // The two columns. The leading one takes about three fifths: it carries
-  // Ways out and Who acts, the pair an author reads first and changes most.
-  // The 1px track between them is the ledger rule (design.md).
-  columns: {
-    display: "grid",
-    gridTemplateColumns: { default: "minmax(0, 3fr) 1px minmax(0, 2fr)", [NARROW]: "minmax(0, 1fr)" },
-    columnGap: space.s4,
-    alignItems: "stretch",
-  },
-  column: {
-    display: "flex",
-    flexDirection: "column",
-    minWidth: 0,
-  },
-  // Drawn only where the two columns stand. Below the breakpoint the page
-  // holds one column, so the gutter separates nothing.
-  gutter: {
-    display: { default: "block", [NARROW]: "none" },
-    backgroundColor: colors.border,
-  },
-  // The 2px divider between sections down each column, the structural rule.
+  // The 2px divider under each section, the structural rule.
   section: {
-    paddingBlock: space.s3,
-    paddingInline: 0,
     borderBottomWidth: 2,
     borderBottomStyle: "solid",
     borderBottomColor: colors.divider,
   },
-  sectionHead: {
-    display: "flex",
-    alignItems: "baseline",
-    flexWrap: "wrap",
-    gap: space.s2,
-    paddingBottom: space.s2,
-  },
   sectionHeading: {
-    flex: "none",
     margin: 0,
+    fontSize: "inherit",
+    fontWeight: 400,
+  },
+  // The header: one button filling the row, flush left. The name, the
+  // summary and the mark stand in three columns, so every summary down the
+  // page starts at one edge, as a register's column does. A name too long
+  // for its column wraps inside it. Below the breakpoint the name stands
+  // above the summary, and the mark keeps the trailing edge of both rows.
+  sectionHeader: {
+    display: "grid",
+    gridTemplateColumns: { default: "minmax(0, 11rem) minmax(0, 1fr) auto", [NARROW]: "minmax(0, 1fr) auto" },
+    alignItems: "baseline",
+    columnGap: space.s3,
+    width: "100%",
+    // The visually hidden "Done" positions against the header.
+    position: "relative",
+    paddingBlock: space.s3,
+    paddingInline: 0,
+    // `background: none` leaves the UA's own `buttonface` plate standing, so
+    // each longhand clears the UA button.
+    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
+    color: colors.text,
+    borderWidth: 0,
+    borderStyle: "none",
+    font: "inherit",
+    textAlign: "start",
+    cursor: "pointer",
+  },
+  // The open header takes the current mark the steps rail's current row
+  // draws (`DESIGN.md`'s Shapes). Picked in code from the same flag that
+  // sets `aria-expanded`. The header's text stands flush left, so the mark
+  // stands in the page's inline padding instead of over the name: `left`
+  // mirrors the `page` style's `paddingInline`, and the header's own
+  // `position: relative` anchors it.
+  sectionHeaderOpen: {
+    "::before": {
+      content: '""',
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: `calc(-1 * max(${space.s3}, ${focus.reach}))`,
+      width: 3,
+      backgroundColor: colors.accent,
+    },
+  },
+  // The Legend style (`DESIGN.md`'s Typography).
+  sectionName: {
     fontFamily: fonts.body,
-    fontSize: "11px",
+    fontSize: 11,
+    fontWeight: 400,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+    overflowWrap: "anywhere",
+  },
+  // The open section's name prints in ink; the closed ones stay in slate.
+  sectionNameOpen: {
+    color: colors.text,
+  },
+  // The summary takes the body text, and wraps after one line; nothing clips.
+  // Below the breakpoint it takes the first column's second row, under the
+  // name.
+  sectionSummary: {
+    gridColumn: { default: "auto", [NARROW]: "1" },
+    minWidth: 0,
+    overflowWrap: "anywhere",
+    color: colors.textMuted,
+  },
+  sectionSummaryDone: {
+    color: colors.text,
+  },
+  // A machine value takes the mono face at the size around it.
+  sectionSummaryMono: {
+    fontFamily: fonts.mono,
+  },
+  // The check badge the steps rail draws (`DESIGN.md`'s The Check Badge).
+  badge: {
+    alignSelf: "center",
+    fontFamily: fonts.mono,
+    fontVariantNumeric: "tabular-nums",
+    fontSize: 11,
+    fontWeight: 600,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "currentcolor",
+    paddingBlock: 0,
+    paddingInline: space.s1,
+  },
+  badgeBlocker: {
+    color: colors.refusal,
+  },
+  badgeAdvisory: {
+    color: colors.textMuted,
+  },
+  doneMark: {
+    alignSelf: "center",
+    display: "inline-flex",
+    color: colors.textMuted,
+  },
+  // A section still to do says so in the Legend style.
+  todoMark: {
+    fontFamily: fonts.body,
+    fontSize: 11,
     fontWeight: 400,
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     color: colors.textMuted,
   },
-  sectionIssues: {
-    flex: "1 1 12rem",
-    minWidth: 0,
-    marginBlock: 0,
+  // Below the breakpoint the mark stands in the second column across both
+  // rows, beside the name and the summary under it.
+  markPlace: {
+    gridColumn: { default: "auto", [NARROW]: "2" },
+    gridRow: { default: "auto", [NARROW]: "1 / span 2" },
   },
-  // The one word the Who acts section leads with. Mono only where it falls
-  // back to a registry type, which is a value the engine matches.
-  plainWord: {
-    marginBlock: 0,
+  // Off screen, never `display: none`, so the word stays in the header's
+  // accessible name.
+  visuallyHidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
   },
-  monoWord: {
-    fontFamily: fonts.mono,
-    fontSize: "0.8rem",
-    marginBlock: 0,
+  // The open body stands clear of its header at the top. The hidden style
+  // below still wins while the section is closed.
+  sectionBody: {
+    paddingBlockStart: space.s3,
+    paddingBlockEnd: space.s3,
   },
-  formSummary: {
-    display: "flex",
-    alignItems: "baseline",
-    gap: space.s3,
+  // `hidden` alone would lose against a compiled `display`, so the closed
+  // state picks its own named style from the same flag the element carries.
+  sectionBodyHidden: {
+    display: "none",
+  },
+  bodyIssues: {
+    marginBlockStart: 0,
+    marginBlockEnd: space.s2,
   },
   errorText: {
     color: colors.refusal,
@@ -289,17 +406,14 @@ const styles = stylex.create({
     display: "flex",
     alignItems: "center",
     gap: space.s3,
-    paddingBlock: space.s3,
-  },
-  developer: {
-    // Only the bottom edge faces the page box's own bottom edge; the top
-    // edge sits against the divider above, not that edge, and keeps the
-    // literal token.
+    // Only the bottom edge faces the page box's own bottom edge, so it clears
+    // the ring there; the top edge keeps the literal token.
     paddingBlockStart: space.s3,
     paddingBlockEnd: `max(${space.s3}, ${focus.reach})`,
-    borderTopWidth: 2,
-    borderTopStyle: "solid",
-    borderTopColor: colors.divider,
+  },
+  // Last in More's body. More's own section rule and padding frame it.
+  developer: {
+    marginBlockStart: space.s3,
   },
   developerSummary: {
     cursor: "pointer",
@@ -333,19 +447,6 @@ const styles = stylex.create({
   },
 });
 
-const SECTION_LABEL: Record<SectionName, CatalogKey> = {
-  entry: "stepSections.entry",
-  assignment: "stepSections.assignment",
-  cancellable: "stepSections.cancellable",
-  form: "stepSections.form",
-  paths: "stepSections.paths",
-  timers: "stepSections.timers",
-  exit: "stepSections.exit",
-  subprocess: "stepSections.subprocess",
-  howItEnds: "stepSections.howItEnds",
-  collaboration: "stepSections.collaboration",
-};
-
 const PERFORMED_BY_OPTIONS: PerformedBy[] = ["participant", "subprocess", "terminal"];
 
 /** The word one registered assignment strategy reads as in the envelope
@@ -355,7 +456,7 @@ function strategyOptionLabel(type: string): string {
   return isCuratedAssignmentStrategy(type) ? assignmentStrategyLabel(type).name : type;
 }
 
-/** The Collaboration section's per-field three-state control
+/** More's per-field three-state collaboration control
  * (`studio-step-page`: "The Collaboration section offers a three-state
  * control per field"). `undefined` reads as Default, inheriting the
  * process-wide value at once, including any later change to it. */
@@ -415,6 +516,34 @@ function CollaborationControl({
   );
 }
 
+/** A header's closing mark. The check badge where the section counts open
+ * issues; else the check mark where it is done; else the word To do where
+ * the step still needs it; else nothing. The badge prints in refusal where
+ * any counted issue blocks a publish. */
+function SectionMark({ issues, state }: { issues: readonly EditorIssue[]; state: SectionState }) {
+  if (issues.length > 0) {
+    const blocker = issues.some((i) => i.source !== "view");
+    return (
+      <span
+        {...stylex.props(styles.badge, blocker ? styles.badgeBlocker : styles.badgeAdvisory, styles.markPlace)}
+        aria-label={`${issues.length} ${t(issues.length === 1 ? "stepsRail.issueMarkOne" : "stepsRail.issueMark")}`}
+      >
+        {issues.length}
+      </span>
+    );
+  }
+  if (state === "todo") return <span {...stylex.props(styles.todoMark, styles.markPlace)}>{t("stepPage.sectionTodo")}</span>;
+  if (state !== "done") return null;
+  // The icon stands in for the word beside the name: the word stays its
+  // tooltip and part of the header's accessible name.
+  return (
+    <span {...stylex.props(styles.doneMark, styles.markPlace)} title={t("stepPage.sectionDone")}>
+      <Check size={18} strokeWidth={1.75} aria-hidden="true" />
+      <span {...stylex.props(styles.visuallyHidden)}>{t("stepPage.sectionDone")}</span>
+    </span>
+  );
+}
+
 /** One end of the walk: the step a previous or next control opens, already
  * resolved to a label so this page reads no locale for it. */
 export interface WalkNeighbour {
@@ -443,14 +572,15 @@ interface Props {
 }
 
 /**
- * The Steps tab's wide page (`studio-step-page`). One step, whole: a
- * masthead, every section its kind declares standing open in two columns, the
- * walk to the previous and next step, and a Developer view holding the
- * writable key input and the read-only JSON.
+ * The Steps tab's wide page (`studio-step-page`). One step, in one column: a
+ * masthead, the sections its kind declares folded into an accordion, and the
+ * walk to the previous and next step. Each header names its section, sums up
+ * what it holds and marks its state; one section stands open at a time. More,
+ * the last section, holds the Developer view with the writable key input and
+ * the read-only JSON.
  *
- * The section bodies are the configuration pane's own, reparented. The
- * collapse chrome and the runtime ordering go: two columns cannot carry one
- * runtime order, so the page groups by subject instead (design.md).
+ * Every body stays mounted, and `hidden` folds the closed ones, so a body
+ * keeps its half-typed state across a fold.
  */
 export function StepPage({
   fields,
@@ -474,8 +604,43 @@ export function StepPage({
   // opened it. The edit does not remount that button, so focus returns to it.
   const [pendingKind, setPendingKind] = useState<PerformedBy | null>(null);
   const kindTriggerRef = useRef<HTMLButtonElement | null>(null);
+  // Whether the removal dialog stands open, and the control that opened it.
+  const [removing, setRemoving] = useState(false);
+  const removeTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const index = steps.findIndex((s) => s.id === step?.id);
+
+  // The page remounts per step through its `key`, so these derive from the
+  // step it opens on. A missing step stands no section.
+  const stepKind = step ? performedByFor(step.type, step.terminal) : undefined;
+  const sections = stepKind ? sectionsFor(stepKind) : [];
+  // Every issue a section owns, row issues included: the header counts them.
+  const counted = step ? issuesBySection(step, validation.issues, sections) : new Map<SectionName, EditorIssue[]>();
+  const summaries = new Map<SectionName, SectionSummary>(
+    step
+      ? sections.map((section) => [
+          section,
+          sectionSummary(section, { step, draft, fields, steps, processes, contentLocale, baseLocale }),
+        ])
+      : [],
+  );
+  const opening = () =>
+    defaultOpenSection(
+      sections,
+      new Map(sections.map((s) => [s, counted.get(s)?.length ?? 0])),
+      new Map(sections.map((s) => [s, summaries.get(s)!.state])),
+      selectedPathId,
+    );
+  const [openSection, setOpenSection] = useState<SectionName | undefined>(opening);
+  // A kind switch keeps the page mounted, and can drop the open section from
+  // the new kind's list. The page's opening section then stands open instead.
+  const shownOpen = openSectionFor(openSection, sections, opening());
+  // A way out selected on the canvas opens Ways out, where its row carries
+  // the current mark.
+  const holdsPaths = sections.includes("paths");
+  useEffect(() => {
+    if (selectedPathId !== undefined && holdsPaths) setOpenSection("paths");
+  }, [selectedPathId, holdsPaths]);
 
   // The page remounts for the step it opens, which drops the focus the pressed
   // walk button held. One animation frame later the new page's control in the
@@ -525,8 +690,8 @@ export function StepPage({
   }
 
   const performedBy = performedByFor(step.type, step.terminal);
-  const sections = sectionsFor(performedBy);
-  const columns = sectionColumns(sections);
+  // The step-level issues, printed at the top of their section's body. A
+  // row's own issue stays at its row.
   const bySection = headingIssues(step, validation.issues, sections);
   // What the masthead keeps: a step-level issue no section claims, a Zod
   // issue on the step's own `key` among them. Every other issue prints at
@@ -542,31 +707,43 @@ export function StepPage({
   const showAssignmentWarning = step.terminal !== true && step.assignment === undefined;
   // One word for the step's assignment, read by both the section and the rail
   // row, so the two cannot name it differently (`studio-guided-vocabulary`).
+  // The body reads its note alone; the header's summary names it.
   const assignment = assignmentWord(step.assignment?.strategy);
+
+  const actionList = (label: CatalogKey, list: "onEntry" | "onExit" | "onCancel") => (
+    <ActionListEditor
+      label={t(label)}
+      actions={step[list]}
+      fields={fields}
+      contentLocale={contentLocale}
+      baseLocale={baseLocale}
+      registryTypes={registry?.actionTypes}
+      registrySchemas={registry?.actionSchemas}
+      onChange={(actions) => updateStep({ [list]: actions })}
+    />
+  );
 
   const sectionBody = (section: SectionName) => {
     switch (section) {
-      case "entry":
-        return (
-          <ActionListEditor
-            label={t("steps.onEntryLegend")}
-            actions={step.onEntry}
-            fields={fields}
-            contentLocale={contentLocale}
-            baseLocale={baseLocale}
-            registryTypes={registry?.actionTypes}
-            registrySchemas={registry?.actionSchemas}
-            onChange={(onEntry) => updateStep({ onEntry })}
-          />
-        );
-      case "assignment":
-        // The plain name and its note stand above the envelope editor, so the
-        // section says who ends up able to act on the step before it says how
-        // (`studio-guided-vocabulary`). A registered type the curated table
-        // misses reads as its registry type, in mono.
+      case "lifecycle":
+        // An end step is never left, so it carries the entry list alone.
         return (
           <>
-            <p {...stylex.props(assignment.mono ? styles.monoWord : styles.plainWord)}>{assignment.text}</p>
+            {actionList("steps.onEntryLegend", "onEntry")}
+            {performedBy !== "terminal" && (
+              <>
+                {actionList("steps.onExitLegend", "onExit")}
+                {actionList("steps.onCancelLegend", "onCancel")}
+              </>
+            )}
+          </>
+        );
+      case "assignment":
+        // The header's summary names the strategy, and its note leads the
+        // body above the envelope editor, so the section says who ends up able
+        // to act on the step before it says how (`studio-guided-vocabulary`).
+        return (
+          <>
             {assignment.note !== undefined && <p {...stylex.props(styles.hint)}>{assignment.note}</p>}
             <PluginEnvelopeEditor
               label={t("steps.assignmentLabel")}
@@ -579,66 +756,19 @@ export function StepPage({
             {showAssignmentWarning && <p {...stylex.props(styles.warning)}>{t("stepSections.noAssignmentWarning")}</p>}
           </>
         );
-      case "cancellable": {
-        // Three states over one optional key: unset reads as "inherit", so the
-        // draft's step carries no `cancellable` key until an author picks an
-        // explicit state (`studio-step-page`).
-        const cancellableValue = step.cancellable === undefined ? "inherit" : String(step.cancellable);
-        const processDefault = draft.cancellable ?? true;
-        return (
-          <label {...stylex.props(styles.fieldLabel)}>
-            <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.cancellableField")}</span>
-            <select
-              value={cancellableValue}
-              onChange={(e) => {
-                const selected = e.target.value;
-                updateStep({ cancellable: selected === "inherit" ? undefined : selected === "true" });
-              }}
-            >
-              <option value="inherit">{t("stepSections.cancellableInherit")}</option>
-              <option value="true">{t("stepSections.cancellableYes")}</option>
-              <option value="false">{t("stepSections.cancellableNo")}</option>
-            </select>
-            {cancellableValue === "inherit" && (
-              <span {...stylex.props(styles.hint)}>
-                {t(processDefault ? "stepSections.cancellableResolvesYes" : "stepSections.cancellableResolvesNo")}
-              </span>
-            )}
-          </label>
-        );
-      }
       case "form": {
-        // The form's size in the Forms card's words, and one control. The
-        // editor itself stands in this tab's body once opened, so nothing
-        // here mounts it.
-        const { fieldCount, requiredCount } = formCounts(step, fields);
-        const sizeText = formSizeText(fieldCount, requiredCount);
+        // The header already states the form's size in the Forms card's
+        // words, so the body holds the one control. The editor itself stands
+        // in this tab's body once opened, so nothing here mounts it.
+        const { fieldCount } = formCounts(step, fields);
         return (
-          <div {...stylex.props(styles.formSummary)}>
-            <span>{sizeText ?? t("formsTab.miniatureEmpty")}</span>
-            <button type="button" className="btn btn-secondary" onClick={() => navigate(step.id!)}>
-              {t(sizeText === undefined ? "formsTab.startForm" : "formsTab.openForm")}
-            </button>
-          </div>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate(step.id!)}>
+            {t(fieldCount === 0 ? "formsTab.startForm" : "formsTab.openForm")}
+          </button>
         );
       }
-      case "collaboration":
-        return (
-          <>
-            <CollaborationControl
-              legend="collaboration.commentLegend"
-              value={step.collaboration?.comments}
-              resolvedDefault={draft.collaboration?.comments ?? true}
-              onChange={(comments) => updateStep({ collaboration: nextCollaborationOverride(step.collaboration, "comments", comments) })}
-            />
-            <CollaborationControl
-              legend="collaboration.attachmentsLegend"
-              value={step.collaboration?.attachments}
-              resolvedDefault={draft.collaboration?.attachments ?? true}
-              onChange={(attachments) => updateStep({ collaboration: nextCollaborationOverride(step.collaboration, "attachments", attachments) })}
-            />
-          </>
-        );
+      case "more":
+        return moreBody();
       case "paths":
         return (
           <PathsPanel
@@ -669,34 +799,8 @@ export function StepPage({
             baseLocale={baseLocale}
           />
         );
-      case "exit":
-        return (
-          <>
-            <ActionListEditor
-              label={t("steps.onExitLegend")}
-              actions={step.onExit}
-              fields={fields}
-              contentLocale={contentLocale}
-              baseLocale={baseLocale}
-              registryTypes={registry?.actionTypes}
-              registrySchemas={registry?.actionSchemas}
-              onChange={(onExit) => updateStep({ onExit })}
-            />
-            <ActionListEditor
-              label={t("steps.onCancelLegend")}
-              actions={step.onCancel}
-              fields={fields}
-              contentLocale={contentLocale}
-              baseLocale={baseLocale}
-              registryTypes={registry?.actionTypes}
-              registrySchemas={registry?.actionSchemas}
-              onChange={(onCancel) => updateStep({ onCancel })}
-            />
-          </>
-        );
       case "howItEnds":
         // An end step declares its outcome on departure (`studio-canvas`).
-        // It stood inside Exit while a terminal step still carried one.
         return (
           <label {...stylex.props(styles.fieldLabel)}>
             <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.outcomeField")}</span>
@@ -751,173 +855,279 @@ export function StepPage({
     }
   };
 
-  /** One section, standing open. Its own open issues print beside its
-   * heading, and each issue stands at exactly one section
-   * (`studio-step-page`). */
-  const renderSection = (section: SectionName) => (
-    <section key={section} {...stylex.props(styles.section)} aria-labelledby={`step-section-${section}`}>
-      <div {...stylex.props(styles.sectionHead)}>
-        <h3 {...stylex.props(styles.sectionHeading)} id={`step-section-${section}`}>
-          {t(SECTION_LABEL[section])}
+  /** More's body, in order: the cancelling control where the kind carries
+   * `cancellable` (task and subprocess), the two collaboration controls where
+   * it carries them (task and end), then the Developer view last. */
+  const moreBody = () => {
+    // Three states over one optional key: unset reads as "inherit", so the
+    // draft's step carries no `cancellable` key until an author picks an
+    // explicit state (`studio-step-page`).
+    const cancellableValue = step.cancellable === undefined ? "inherit" : String(step.cancellable);
+    const processDefault = draft.cancellable ?? true;
+    return (
+      <>
+        {performedBy !== "terminal" && (
+          <label {...stylex.props(styles.fieldLabel)}>
+            <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.cancellableField")}</span>
+            <select
+              value={cancellableValue}
+              onChange={(e) => {
+                const selected = e.target.value;
+                updateStep({ cancellable: selected === "inherit" ? undefined : selected === "true" });
+              }}
+            >
+              <option value="inherit">{t("stepSections.cancellableInherit")}</option>
+              <option value="true">{t("stepSections.cancellableYes")}</option>
+              <option value="false">{t("stepSections.cancellableNo")}</option>
+            </select>
+            {cancellableValue === "inherit" && (
+              <span {...stylex.props(styles.hint)}>
+                {t(processDefault ? "stepSections.cancellableResolvesYes" : "stepSections.cancellableResolvesNo")}
+              </span>
+            )}
+          </label>
+        )}
+        {performedBy !== "subprocess" && (
+          <>
+            <CollaborationControl
+              legend="collaboration.commentLegend"
+              value={step.collaboration?.comments}
+              resolvedDefault={draft.collaboration?.comments ?? true}
+              onChange={(comments) => updateStep({ collaboration: nextCollaborationOverride(step.collaboration, "comments", comments) })}
+            />
+            <CollaborationControl
+              legend="collaboration.attachmentsLegend"
+              value={step.collaboration?.attachments}
+              resolvedDefault={draft.collaboration?.attachments ?? true}
+              onChange={(attachments) => updateStep({ collaboration: nextCollaborationOverride(step.collaboration, "attachments", attachments) })}
+            />
+          </>
+        )}
+
+        {/* The step's key and its own JSON. The key input is the one writable
+            control here, and the JSON re-renders from the draft as it changes.
+            A `<pre>` accepts no typing, so the JSON surface stays the one place
+            for hand-authoring a definition (`studio-step-page`). The disclosure
+            stands closed until an author opens it, which is `<details>`'s own
+            default. */}
+        <details {...stylex.props(styles.developer)}>
+          <summary {...stylex.props(styles.developerSummary)}>{t("stepPage.developerView")}</summary>
+          <label {...stylex.props(styles.fieldLabel, styles.developerKey)}>
+            <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.keyField")}</span>
+            <input
+              type="text"
+              {...stylex.props(styles.monoInput)}
+              value={step.key ?? ""}
+              onChange={(e) => updateStep({ key: e.target.value })}
+            />
+          </label>
+          <p {...stylex.props(styles.developerId)}>
+            {t("stepSections.idField")} {step.id}
+          </p>
+          <pre {...stylex.props(styles.rawJson)}>{JSON.stringify(step, null, 2)}</pre>
+          <p {...stylex.props(styles.hint)}>{t("stepPage.developerViewNote")}</p>
+        </details>
+      </>
+    );
+  };
+
+  /** One section of the accordion: a header button over a body region. The
+   * header names the section, sums up what it holds and closes on its mark;
+   * the body prints the section's step-level issues above its controls. Every
+   * body renders, and a closed one carries `hidden` (`studio-step-page`). */
+  const renderSection = (section: SectionName) => {
+    const summary = summaries.get(section)!;
+    const open = shownOpen === section;
+    const headerId = `step-section-${section}`;
+    const bodyId = `${headerId}-body`;
+    return (
+      <section key={section} {...stylex.props(styles.section)}>
+        <h3 {...stylex.props(styles.sectionHeading)}>
+          <button
+            type="button"
+            id={headerId}
+            aria-expanded={open}
+            aria-controls={bodyId}
+            {...stylex.props(styles.sectionHeader, open && styles.sectionHeaderOpen)}
+            onClick={() => setOpenSection(nextOpenSection(shownOpen, section))}
+          >
+            <span {...stylex.props(styles.sectionName, open && styles.sectionNameOpen)}>{t(sectionLabel(section, performedBy))}</span>
+            <span
+              {...stylex.props(
+                styles.sectionSummary,
+                summary.state === "done" && styles.sectionSummaryDone,
+                summary.mono && styles.sectionSummaryMono,
+              )}
+            >
+              {summary.text}
+            </span>
+            <SectionMark issues={counted.get(section) ?? []} state={summary.state} />
+          </button>
         </h3>
-        <IssueItems issues={bySection.get(section) ?? []} style={styles.sectionIssues} />
-      </div>
-      {sectionBody(section)}
-    </section>
-  );
+        <div
+          id={bodyId}
+          role="region"
+          aria-labelledby={headerId}
+          hidden={!open}
+          {...stylex.props(styles.sectionBody, !open && styles.sectionBodyHidden)}
+        >
+          <IssueItems issues={bySection.get(section) ?? []} style={styles.bodyIssues} />
+          {sectionBody(section)}
+        </div>
+      </section>
+    );
+  };
+
+  const label = stepText(step, contentLocale, baseLocale);
 
   return (
     <div {...stylex.props(styles.page)}>
-      <div {...stylex.props(styles.masthead)}>
-        <div {...stylex.props(styles.mastheadTop)}>
-          <span {...stylex.props(styles.kicker)}>
-            <span {...stylex.props(styles.kickerNumber)}>
-              {t("stepPage.stepNumber").replace("{number}", String(stepNumber))}
-            </span>
-            <span>{stepKindPhrase(performedBy)}</span>
-          </span>
-          {isInitialStep && <span {...stylex.props(styles.firstStep)}>{t("stepRole.initial")}</span>}
-          <button type="button" className="btn btn-secondary" onClick={() => step.id !== undefined && onRemoveStep(step.id)}>
-            {t("stepPage.removeStep")}
-          </button>
+      <div {...stylex.props(styles.column)}>
+        <div {...stylex.props(styles.masthead)}>
+          <div {...stylex.props(styles.mastheadTop)}>
+            <h2 {...stylex.props(styles.kicker)}>
+              <span {...stylex.props(styles.kickerNumber)}>
+                {t("stepPage.stepNumber").replace("{number}", String(stepNumber))}
+              </span>
+              <span>{stepKindPhrase(performedBy)}</span>
+            </h2>
+            {isInitialStep && <span {...stylex.props(styles.firstStep)}>{t("stepRole.initial")}</span>}
+            <button
+              ref={removeTriggerRef}
+              type="button"
+              className="btn btn-secondary btn-destructive"
+              onClick={() => setRemoving(true)}
+            >
+              {t("stepPage.removeStep")}
+            </button>
+          </div>
+          {removing && (
+            <RemoveStepDialog
+              label={label}
+              reach={stepRemovalReach(draft, step.id!, fields)}
+              triggerRef={removeTriggerRef}
+              onCancel={() => setRemoving(false)}
+              onConfirm={() => {
+                // The page remounts on the next step, so the trigger the
+                // dialog's cleanup would focus is detached by then, and
+                // `onRemoveStep` hands focus to the rail's current row.
+                if (step.id !== undefined) onRemoveStep(step.id);
+                setRemoving(false);
+              }}
+            />
+          )}
+
+          {/* The name line takes the page's full width. The step's key stands
+              in the Developer view, inside More. */}
+          <label {...stylex.props(styles.fieldLabel)}>
+            <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.labelField")}</span>
+            <LocalizedTextInput value={step.label} onChange={updateStepLabel} />
+          </label>
+          {/* Sibling of the label, never nested inside it: a <label> takes
+              phrasing content, and the design language keeps a field's own
+              messages beside the label. */}
+          {missingTranslationWarning(step.label, contentLocale, draft.baseLocale) && (
+            <p {...stylex.props(styles.warning)}>{missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}</p>
+          )}
+
+          <label {...stylex.props(styles.fieldLabel)}>
+            <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.descriptionField")}</span>
+            <LocalizedTextInput value={step.description} onChange={(description) => updateStep({ description })} />
+          </label>
+          {missingTranslationWarning(step.description, contentLocale, draft.baseLocale) && (
+            <p {...stylex.props(styles.warning)}>{missingTranslationWarning(step.description, contentLocale, draft.baseLocale)}</p>
+          )}
+
+          {/* The step's kind: a three-option restyle of the type/terminal
+              controls (`studio-canvas`). Sets the same two fields; adds nothing
+              new. It governs which sections stand below. The model keeps its
+              `performedBy` name; only the printed phrases changed. */}
+          <fieldset {...stylex.props(styles.segmented)} aria-label={t("stepKind.legend")}>
+            <legend {...stylex.props(styles.segmentedLegend)}>{t("stepKind.legend")}</legend>
+            {PERFORMED_BY_OPTIONS.map((option, optionIndex) => (
+              <button
+                key={option}
+                type="button"
+                {...stylex.props(
+                  styles.segmentedOption,
+                  optionIndex > 0 && styles.segmentedOptionAfterFirst,
+                  performedBy === option && styles.segmentedOptionPressed,
+                )}
+                aria-pressed={performedBy === option}
+                onClick={(e) => {
+                  if (pressDecision(step, option) === "apply") {
+                    updateStep(performedByEdit(step, option) as Partial<DraftStep>);
+                    return;
+                  }
+                  kindTriggerRef.current = e.currentTarget;
+                  setPendingKind(option);
+                }}
+              >
+                {stepKindPhrase(option)}
+              </button>
+            ))}
+          </fieldset>
+          {pendingKind && (
+            <KindSwitchDialog
+              kind={pendingKind}
+              reach={performedByReach(step, pendingKind)}
+              triggerRef={kindTriggerRef}
+              onCancel={() => setPendingKind(null)}
+              onConfirm={() => {
+                updateStep(performedByEdit(step, pendingKind) as Partial<DraftStep>);
+                setPendingKind(null);
+              }}
+            />
+          )}
+
+          {isInitialStep ? (
+            <p {...stylex.props(styles.note)}>{t("stepSections.isInitialStep")}</p>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() =>
+                mutate((d) => {
+                  d.workflow ??= {};
+                  d.workflow.initialStep = step.id as DraftStep["id"];
+                })
+              }
+            >
+              {t("stepSections.setInitialStep")}
+            </button>
+          )}
+
+          <IssueItems issues={mastheadIssues} />
         </div>
 
-        {/* The name line takes the page's full width. The step's key stands
-            in the Developer view at the page foot. */}
-        <label {...stylex.props(styles.fieldLabel)}>
-          <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.labelField")}</span>
-          <LocalizedTextInput value={step.label} onChange={updateStepLabel} />
-        </label>
-        {/* Sibling of the label, never nested inside it: a <label> takes
-            phrasing content, and the design language keeps a field's own
-            messages beside the label. */}
-        {missingTranslationWarning(step.label, contentLocale, draft.baseLocale) && (
-          <p {...stylex.props(styles.warning)}>{missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}</p>
-        )}
+        <div aria-label={t("stepPage.sectionsLabel")} role="group">
+          {sections.map(renderSection)}
+        </div>
 
-        <label {...stylex.props(styles.fieldLabel)}>
-          <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.descriptionField")}</span>
-          <LocalizedTextInput value={step.description} onChange={(description) => updateStep({ description })} />
-        </label>
-        {missingTranslationWarning(step.description, contentLocale, draft.baseLocale) && (
-          <p {...stylex.props(styles.warning)}>{missingTranslationWarning(step.description, contentLocale, draft.baseLocale)}</p>
-        )}
+        {/* Where Ways out and Time limit stand on a step that is not an end. */}
+        {performedBy === "terminal" && <p {...stylex.props(styles.note)}>{t("stepSections.terminalNoPathsOrTimers")}</p>}
 
-        {/* The step's kind: a three-option restyle of the type/terminal
-            controls (`studio-canvas`). Sets the same two fields; adds nothing
-            new. It governs which sections stand below. The model keeps its
-            `performedBy` name; only the printed phrases changed. */}
-        <fieldset {...stylex.props(styles.segmented)} aria-label={t("stepKind.legend")}>
-          <legend {...stylex.props(styles.segmentedLegend)}>{t("stepKind.legend")}</legend>
-          {PERFORMED_BY_OPTIONS.map((option, optionIndex) => (
-            <button
-              key={option}
-              type="button"
-              {...stylex.props(
-                styles.segmentedOption,
-                optionIndex > 0 && styles.segmentedOptionAfterFirst,
-                performedBy === option && styles.segmentedOptionPressed,
-              )}
-              aria-pressed={performedBy === option}
-              onClick={(e) => {
-                if (pressDecision(step, option) === "apply") {
-                  updateStep(performedByEdit(step, option) as Partial<DraftStep>);
-                  return;
-                }
-                kindTriggerRef.current = e.currentTarget;
-                setPendingKind(option);
-              }}
-            >
-              {stepKindPhrase(option)}
-            </button>
-          ))}
-        </fieldset>
-        {pendingKind && (
-          <KindSwitchDialog
-            kind={pendingKind}
-            reach={performedByReach(step, pendingKind)}
-            triggerRef={kindTriggerRef}
-            onCancel={() => setPendingKind(null)}
-            onConfirm={() => {
-              updateStep(performedByEdit(step, pendingKind) as Partial<DraftStep>);
-              setPendingKind(null);
-            }}
-          />
-        )}
-
-        {isInitialStep ? (
-          <p {...stylex.props(styles.note)}>{t("stepSections.isInitialStep")}</p>
-        ) : (
+        <nav {...stylex.props(styles.walk)} aria-label={t("stepPage.walkLabel")}>
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={() =>
-              mutate((d) => {
-                d.workflow ??= {};
-                d.workflow.initialStep = step.id as DraftStep["id"];
-              })
-            }
+            id={STEP_WALK_PREVIOUS_ID}
+            disabled={previous === undefined}
+            onClick={() => previous !== undefined && walkTo(previous.id, "previous")}
           >
-            {t("stepSections.setInitialStep")}
+            {previous === undefined ? t("stepPage.previousNone") : fill(t("stepPage.previous"), { step: previous.label })}
           </button>
-        )}
-
-        <IssueItems issues={mastheadIssues} />
+          <button
+            type="button"
+            className="btn btn-secondary"
+            id={STEP_WALK_NEXT_ID}
+            disabled={next === undefined}
+            onClick={() => next !== undefined && walkTo(next.id, "next")}
+          >
+            {next === undefined ? t("stepPage.nextNone") : fill(t("stepPage.next"), { step: next.label })}
+          </button>
+        </nav>
       </div>
-
-      <div {...stylex.props(styles.columns)} aria-label={t("stepPage.sectionsLabel")} role="group">
-        <div {...stylex.props(styles.column)}>{columns.leading.map(renderSection)}</div>
-        <div {...stylex.props(styles.gutter)} aria-hidden="true" />
-        <div {...stylex.props(styles.column)}>{columns.trailing.map(renderSection)}</div>
-      </div>
-
-      {/* Where Ways out and Time limit stand on a step that is not an end. */}
-      {performedBy === "terminal" && <p {...stylex.props(styles.note)}>{t("stepSections.terminalNoPathsOrTimers")}</p>}
-
-      <nav {...stylex.props(styles.walk)} aria-label={t("stepPage.walkLabel")}>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          id={STEP_WALK_PREVIOUS_ID}
-          disabled={previous === undefined}
-          onClick={() => previous !== undefined && walkTo(previous.id, "previous")}
-        >
-          {previous === undefined ? t("stepPage.previousNone") : t("stepPage.previous").replace("{step}", previous.label)}
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          id={STEP_WALK_NEXT_ID}
-          disabled={next === undefined}
-          onClick={() => next !== undefined && walkTo(next.id, "next")}
-        >
-          {next === undefined ? t("stepPage.nextNone") : t("stepPage.next").replace("{step}", next.label)}
-        </button>
-      </nav>
-
-      {/* The step's key and its own JSON. The key input is the one writable
-          control here, and the JSON re-renders from the draft as it changes.
-          A `<pre>` accepts no typing, so the JSON surface stays the one place
-          for hand-authoring a definition (`studio-step-page`). The disclosure
-          stands closed until an author opens it, which is `<details>`'s own
-          default. */}
-      <details {...stylex.props(styles.developer)}>
-        <summary {...stylex.props(styles.developerSummary)}>{t("stepPage.developerView")}</summary>
-        <label {...stylex.props(styles.fieldLabel, styles.developerKey)}>
-          <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.keyField")}</span>
-          <input
-            type="text"
-            {...stylex.props(styles.monoInput)}
-            value={step.key ?? ""}
-            onChange={(e) => updateStep({ key: e.target.value })}
-          />
-        </label>
-        <p {...stylex.props(styles.developerId)}>
-          {t("stepSections.idField")} {step.id}
-        </p>
-        <pre {...stylex.props(styles.rawJson)}>{JSON.stringify(step, null, 2)}</pre>
-        <p {...stylex.props(styles.hint)}>{t("stepPage.developerViewNote")}</p>
-      </details>
     </div>
   );
 }

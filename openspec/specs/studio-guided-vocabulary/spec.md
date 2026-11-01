@@ -165,8 +165,10 @@ heading or a property word either.
 #### Scenario: The step page's sections read the table
 
 - **WHEN** an author opens a task step on the step page
-- **THEN** its sections read Ways out, Who acts, When entered and When left
-- **AND** no section heading reads Path to, Assignment, On entry or On exit
+- **THEN** its sections read Who acts, Form, Ways out, Time limit, When
+  entered or left and More
+- **AND** no section heading reads Path to, Assignment, On entry, On exit or
+  Cancellable
 
 #### Scenario: A way out's controls read the table
 

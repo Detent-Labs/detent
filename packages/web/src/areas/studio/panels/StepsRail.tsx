@@ -4,8 +4,8 @@ import { GripVertical } from "lucide-react";
 import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
-import { resolveDraftLocalizedText } from "../draft/localized-text.js";
 import type { StepKind } from "../draft/createStep.js";
+import { stepText } from "./shared/optionText.js";
 import { railRowIssues, STEPS_RAIL_ADD_FIRST_ID, STEPS_RAIL_CURRENT_ID } from "./stepRailRow.js";
 
 /** The width below which the Steps tab stands one column, so the rail gives
@@ -246,7 +246,7 @@ export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Pr
           {ordered.map((step, i) => {
             const issues = railRowIssues(validation.issues, step);
             const current = step.id !== undefined && step.id === currentStepId;
-            const label = resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep");
+            const label = stepText(step, contentLocale, baseLocale);
             const gripDisabled = step.id === undefined || ordered.length <= 1;
             const dropBefore = dragging && dropGap === i;
             const dropAfter = dragging && dropGap === ordered.length && i === ordered.length - 1;

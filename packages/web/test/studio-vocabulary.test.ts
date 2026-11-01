@@ -20,8 +20,9 @@ describe("step page vocabulary", () => {
     expectRows([
       ["stepSections.paths", "Ways out"],
       ["stepSections.assignment", "Who acts"],
-      ["stepSections.entry", "When entered"],
-      ["stepSections.exit", "When left"],
+      ["stepSections.lifecycle", "When entered or left"],
+      ["stepSections.lifecycleEntryOnly", "When entered"],
+      ["stepSections.more", "More"],
       ["stepSections.form", "Form"],
       ["stepSections.labelField", "Name"],
       ["stepSections.keyField", "Key"],

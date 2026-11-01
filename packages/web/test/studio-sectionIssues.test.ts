@@ -47,14 +47,25 @@ describe("sectionOfIssue routes by the entity an issue resolved to", () => {
   });
 
   it("lands an action at the list that holds it", () => {
-    expect(sectionOfIssue(step, issue("action", "act_entry"), PARTICIPANT)).toBe("entry");
-    expect(sectionOfIssue(step, issue("action", "act_exit"), PARTICIPANT)).toBe("exit");
-    expect(sectionOfIssue(step, issue("action", "act_cancel"), PARTICIPANT)).toBe("exit");
+    expect(sectionOfIssue(step, issue("action", "act_entry"), PARTICIPANT)).toBe("lifecycle");
+    expect(sectionOfIssue(step, issue("action", "act_exit"), PARTICIPANT)).toBe("lifecycle");
+    expect(sectionOfIssue(step, issue("action", "act_cancel"), PARTICIPANT)).toBe("lifecycle");
     expect(sectionOfIssue(step, issue("action", "act_path"), PARTICIPANT)).toBe("paths");
   });
 
   it("names no section for an issue belonging to another step", () => {
     expect(sectionOfIssue(step, issue("path", "path_elsewhere"), PARTICIPANT)).toBeUndefined();
+  });
+
+  it("lands an onExit or onCancel action issue on an end step at no section", () => {
+    // An end step's When entered section draws the entry list alone, so a
+    // left list's action row prints nowhere there.
+    const ends = ds({ id: "step_a", terminal: true, onEntry: [{ id: "act_entry" }], onExit: [{ id: "act_exit" }], onCancel: [{ id: "act_cancel" }] });
+    const terminal = sectionsFor("terminal");
+
+    expect(sectionOfIssue(ends, issue("action", "act_exit"), terminal)).toBeUndefined();
+    expect(sectionOfIssue(ends, issue("action", "act_cancel"), terminal)).toBeUndefined();
+    expect(sectionOfIssue(ends, issue("action", "act_entry"), terminal)).toBe("lifecycle");
   });
 });
 
@@ -85,6 +96,19 @@ describe("sectionOfIssue routes a step-level issue by its loc", () => {
     expect(sectionOfIssue(ends, at, sectionsFor("terminal"))).toBe("howItEnds");
   });
 
+  it("stands an onEntry, onExit and onCancel issue at When entered or left", () => {
+    for (const list of ["onEntry", "onExit", "onCancel"]) {
+      const at = issue("step", "step_a", `workflow.steps[0].${list}[0].type`);
+
+      expect(`${list}: ${sectionOfIssue(step, at, PARTICIPANT)}`).toBe(`${list}: lifecycle`);
+    }
+  });
+
+  it("stands a cancellable issue and a collaboration issue at More", () => {
+    expect(sectionOfIssue(step, issue("step", "step_a", "workflow.steps[0].cancellable"), PARTICIPANT)).toBe("more");
+    expect(sectionOfIssue(step, issue("step", "step_a", "workflow.steps[0].collaboration.comments"), PARTICIPANT)).toBe("more");
+  });
+
   it("names no section for a step-level issue whose loc names none", () => {
     const at = issue("step", "step_a", "workflow.steps[0].key");
 
@@ -92,10 +116,10 @@ describe("sectionOfIssue routes a step-level issue by its loc", () => {
   });
 
   it("names no section a step's own kind does not stand", () => {
-    // An end step carries no When left section, so an `onExit` issue on one
+    // An end step carries no Time limit section, so a `timers` issue on one
     // lands nowhere rather than at a heading the page does not draw.
     const ends = ds({ id: "step_a", terminal: true });
-    const at = issue("step", "step_a", "workflow.steps[0].onExit[0].type");
+    const at = issue("step", "step_a", "workflow.steps[0].timers[0].duration");
 
     expect(sectionOfIssue(ends, at, sectionsFor("terminal"))).toBeUndefined();
   });
@@ -122,7 +146,7 @@ describe("issuesBySection", () => {
 
     expect(bySection.get("paths")).toHaveLength(1);
     expect(bySection.get("form")).toBeUndefined();
-    expect(bySection.get("entry")).toBeUndefined();
+    expect(bySection.get("lifecycle")).toBeUndefined();
   });
 
   it("holds every issue the step owns across its sections", () => {

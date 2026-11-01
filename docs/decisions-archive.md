@@ -962,3 +962,41 @@ system that resulted; this file explains why it took that shape.
   revert, a refusal under the input and a "Read by" zone. Every key change
   rewrites the readers and says how many. The pending hint stays open as
   KEYFOLLOW-1 in `docs/decisions.md`.
+- **RAIL-6: the desktop rail is narrower than the phone rail.** The Steps tab
+  gives the rail 18rem beside the step page, in `EditScreen.tsx`. Below 64rem
+  the rail takes the full width and caps its height at 20rem.
+
+  Resolved by `studio-step-accordion`: the rail beside the step page widened
+  to 22rem.
+- **RAIL-7: below 64rem the Steps tab nests three scroll boxes.** The rail
+  stands over the step page, and the step page scrolls on its own
+  (`panels/StepPage.tsx:45`). The tab body scrolls around both. Measured
+  2026-09-24 at 400x800: the tab body scrolls 161px and the rail 352px. The
+  step page scrolls 2698px inside a box 244px tall. Risk (Medium): a wheel
+  or a swipe moves whichever box sits under it, and the step page shows
+  244px at a time.
+
+  Resolved by `studio-step-accordion`: below 64rem the step page gives up its
+  own scroll box and scrolls with the tab body. Two scroll boxes remain, the
+  rail and the tab body.
+- **SENTENCE-7: a row wraps at 1440px.** The field select sizes to its
+  longest label, so the value drops to a second line in the two-column step
+  page. The joiner also indents every row after the first. Change 10's
+  single column gives the row its width back.
+
+  Resolved by `studio-step-accordion`: the step page stands in a single
+  column, so a condition row takes the page's full width.
+- **SELECTS-1: the steps rail still falls back to a step key.** An unnamed
+  step reads its key in the rail. The step selects read "(unnamed step)".
+  Change 10 (`studio-step-accordion`) owns the rail.
+
+  Resolved by `studio-step-accordion`: the rail row reads `stepText`, so an
+  unnamed step reads "(unnamed step)" there too.
+- **SELECTS-2: the Previous and Next labels still fall back to a step key.**
+  The step page foot prints the key of an unnamed neighbor. The Checks
+  narrowing label does the same. Both live in `EditScreen.tsx`. Change 10 owns
+  the page foot. Change 12 (`studio-checks-by-subject`) owns the Checks label.
+
+  Resolved by `studio-step-accordion`, except the Checks label: the walk's
+  Previous and Next read `stepText`. The Checks narrowing label stays open as
+  ACCORDION-4 in `docs/decisions.md`.

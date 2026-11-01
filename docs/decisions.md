@@ -874,16 +874,6 @@ recorded rather than fixed. The RAIL tags are local to this section.
   the refusal ink and an advisory the muted ink, in `StepsRail.tsx`. The
   label behind the count omits the severity. Risk (Medium): colour is the
   only carrier, which WCAG 1.4.1 refuses.
-- **RAIL-6: the desktop rail is narrower than the phone rail.** The Steps tab
-  gives the rail 18rem beside the step page, in `EditScreen.tsx`. Below 64rem
-  the rail takes the full width and caps its height at 20rem.
-- **RAIL-7: below 64rem the Steps tab nests three scroll boxes.** The rail
-  stands over the step page, and the step page scrolls on its own
-  (`panels/StepPage.tsx:45`). The tab body scrolls around both. Measured
-  2026-09-24 at 400x800: the tab body scrolls 161px and the rail 352px. The
-  step page scrolls 2698px inside a box 244px tall. Risk (Medium): a wheel
-  or a swipe moves whichever box sits under it, and the step page shows
-  244px at a time.
 - **DRAFT-1 (behaviour bug, own OpenSpec change): the header bar's Discard
   draft does nothing.** Choose it on a
   draft's process surface, then choose the dialog's own Discard draft: the
@@ -963,6 +953,10 @@ recorded rather than fixed. The RAIL tags are local to this section.
   a destructive action stay outlined in the accent. The field catalog's
   trigger also reads "Remove field" on every entity, group included; its own
   dialog a moment later reads "Remove group".
+
+  Resolved in part by `studio-step-accordion`: Remove this step now draws
+  outlined in the accent and opens a confirmation dialog first. The field
+  catalog's Remove field trigger stays open.
 - **A span-1 card's label collapses to zero width in a two-column form.**
   Measured at 1440x900 on the form editor canvas: `cost_center` draws eleven
   letters down one column. The member row spends about 315px on Move up, Move
@@ -1843,10 +1837,6 @@ last six. The SENTENCE tag is local to this section.
   Developer view's CEL box stands empty. An author who builds a row then
   replaces conditions they cannot read. Change 11's field card can list
   each step's condition as a sentence.
-- **SENTENCE-7: a row wraps at 1440px.** The field select sizes to its
-  longest label, so the value drops to a second line in the two-column step
-  page. The joiner also indents every row after the first. Change 10's
-  single column gives the row its width back.
 - **SENTENCE-8: the unparseable notice does not name the fault.** It says
   the condition cannot show as rows and points to the Developer view. The
   parse message itself never shows, and "+ Add row" goes with the rows.
@@ -1902,13 +1892,6 @@ transliterate umlauts. It left sixteen points to later changes. The final
 review and the design audit raised SELECTS-7 to SELECTS-16. The SELECTS tag is
 local to this section.
 
-- **SELECTS-1: the steps rail still falls back to a step key.** An unnamed
-  step reads its key in the rail. The step selects read "(unnamed step)".
-  Change 10 (`studio-step-accordion`) owns the rail.
-- **SELECTS-2: the Previous and Next labels still fall back to a step key.**
-  The step page foot prints the key of an unnamed neighbor. The Checks
-  narrowing label does the same. Both live in `EditScreen.tsx`. Change 10 owns
-  the page foot. Change 12 (`studio-checks-by-subject`) owns the Checks label.
 - **SELECTS-3: the Fields tab's data source select prints `ds.key ?? ds.id`.**
   The select shows a key where the step selects show a label. Change 11 owns
   the Sources view and can settle the wording.
@@ -1931,10 +1914,11 @@ local to this section.
   the letter map.
 - **SELECTS-9: the time-limit and mapping rows keep unstyled literal classes.**
   The class names `timer-row` and `mapping-row` have no rule. Their captions
-  stand beside the controls. Change 10 owns the step page's sections.
+  stand beside the controls. Change 11 (`studio-field-card`) owns them, since
+  change 10 left the section bodies as they were.
 - **SELECTS-10: CEL inputs stand beside the field-map selects.** They sit
-  outside a Developer view. These are stage 27's low-code sites. Change 10 or
-  change 11 settles them.
+  outside a Developer view. These are stage 27's low-code sites. Change 11
+  (`studio-field-card`) settles them.
 - **SELECTS-11: the field border contrast already has an entry.** The audit
   measured 1.33:1 again. The 2026-09-11 design audits section holds the entry,
   "A field's border reads 1.32:1 in light and 1.64:1 in dark".
@@ -2047,6 +2031,85 @@ raised the last four.
 
   Upgrade entry: changes 10 and 11 own the stacked layout, as `RAIL-7` records
   for the Steps tab.
+
+  Resolved for the Steps tab by `studio-step-accordion`: below 64rem the step
+  page scrolls with the tab body. The entry RAIL-7 now stands in
+  `docs/decisions-archive.md`. The Fields tab half stays with change 11
+  (`studio-field-card`).
+
+## Open from studio-step-accordion (needs its own OpenSpec change)
+
+The change folded the step page's sections into one accordion. Its task
+reviews, its browser check, its design critique and its technical audit left
+the points below. Each one falls outside the change's scope. The ACCORDION
+tag is local to this section.
+
+- **ACCORDION-1: choosing the selected way out again on the canvas leaves
+  Ways out closed.** The effect keys on `selectedPathId`, which does not move. Risk
+  (Low): an author who closed Ways out must open it by hand.
+- **ACCORDION-2: the check badge names itself on a span with no role.** Its
+  `aria-label` sits on a generic element in `StepsRail.tsx` and `StepPage.tsx`
+  alike. Risk (Medium): ARIA 1.2 prohibits that name, and a screen reader may
+  drop it.
+- **ACCORDION-3: the badge style and the blocker rule live in two places.**
+  `StepsRail.tsx` with `stepRailRow.ts`, and `StepPage.tsx`, each keep a copy.
+  Risk (Low): a fix to one copy leaves the other behind.
+- **ACCORDION-4: the Checks narrowing label still falls back to a step key.**
+  It lives in `EditScreen.tsx`. SELECTS-2's second half, now archived, said so.
+  Risk (Low): an unnamed step reads its key there. Change 12 (`studio-checks-by-subject`)
+  owns it.
+- **ACCORDION-5: a kind switch can bring back a hidden open section.** The page
+  stores the open section across the switch. Risk (Low): the section shows
+  again when the author switches back.
+- **ACCORDION-6: a way out whose target step is gone heads its row "(no step
+  yet)".** Its Leads to select still displays the first step, and picking
+  that step writes nothing. The code lives in `panels/PathsPanel.tsx` and is
+  older than this change. Risk (Medium): the select shows a target the draft
+  lacks.
+- **ACCORDION-7: the header's hover wash runs flush to the text.** The header
+  sets `paddingInline: 0`. Risk (Low): the wash reads as clipped at the text's
+  edge.
+- **ACCORDION-8: the Who acts body is the inline form of
+  `PluginEnvelopeEditor`.** It prints schema-key labels, "Edit as JSON" and a
+  "Settings (JSON)" box outside a Developer view. Change 11 or a follow-up of
+  its own takes it. Risk (Medium): an author meets machine words where the
+  guided vocabulary promises plain ones.
+- **ACCORDION-9: a step-level check prints the validator's own text under a
+  "ZOD" label.** A just-added step's name check lands on the masthead rather
+  than under Name. Focus stays in the steps rail after "Add a step". Change 12
+  owns the sentences. Risk (Medium): the first check a new step meets reads as
+  machine output.
+- **ACCORDION-10: the masthead stands about 300px tall before the first
+  header at 1440x900.** "Set as the process's first step" shows on every step
+  but the first, end steps included. Change 14 owns the header rows. Risk
+  (Low): the sections start a third of the way down the window.
+- **ACCORDION-11: below 64rem the capped steps rail never scrolls to the
+  current row.** Its `overscroll-behavior: contain` also keeps a wheel over it
+  from reaching the page at its end. The rule comes from `DESIGN.md`. Risk
+  (Medium): the current row can sit out of view, and the page stops scrolling
+  under the pointer.
+- **ACCORDION-12: the no-assignment warning draws a 2px rule in the refusal
+  role.** The warning callout in `DESIGN.md` names a 3px rule in Advisory. The
+  site is the `warning` style in `StepPage.tsx`, older than this change. Risk
+  (Low): the warning reads as a refusal.
+- **ACCORDION-13: Ways out opens every way out at once.** Whether its rows fold
+  one at a time is an owner question. Risk (Low): a step with many ways out
+  stands long when open.
+- **ACCORDION-14: two unnamed steps both read "(unnamed step)".** That holds in
+  the steps rail, the walk and the removal dialog, while the selects number
+  them. Risk (Low): an author cannot tell the two apart there.
+- **ACCORDION-15: the steps rail reorders only by drag or Alt+Arrow.** No
+  press-to-move control stands in for the drag (WCAG 2.5.7), and the grip
+  measures 26px. Both are older than this change. Risk (Medium): a pointer
+  user who cannot drag has no way to reorder.
+- **ACCORDION-16: at 1366x768 and 1100x800 the Steps tab nests three scroll
+  boxes.** The cause is the `minHeight: 36rem` that `stepsTab` keeps, older
+  than this change. Risk (Low): a wheel scrolls the wrong box first.
+- **ACCORDION-17: the removal dialog's heading uppercases the step's name.**
+  The global `h2` style does it. Its counts print outside mono, and labels and
+  values share no baseline. The two dialogs it copies share all three. Change
+  13 owns the one dialog. Risk (Low): the dialog reads unlike the register it
+  confirms.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

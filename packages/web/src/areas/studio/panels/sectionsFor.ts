@@ -1,51 +1,30 @@
 import type { PerformedBy } from "../draft/performedBy.js";
+import type { CatalogKey } from "../catalog.js";
 
 /**
- * The step page's sections (`studio-step-page`'s "The step page stands its
- * sections open in two columns"). Ten names, grouped by subject rather than
- * by runtime order: two columns cannot carry one order, since an author
- * reading side by side reads neither.
+ * The step page's sections (`studio-step-page`: "A step's kind decides its
+ * sections"). Eight names; a step stands six at most, folded into one
+ * accordion in reading order.
  *
- * `howItEnds` is the end step's own section. It carries the outcome an end
- * step declares on departure, which stood inside Exit while a terminal step
- * still had one.
+ * `lifecycle` holds what happens when the step is entered or left: the
+ * `onEntry`, `onExit` and `onCancel` lists. `more` holds the step's
+ * overrides of the process settings, cancelling and collaboration, and the
+ * Developer view. `howItEnds` is the end step's own section, over the outcome
+ * it declares.
  */
-export type SectionName =
-  | "paths"
-  | "assignment"
-  | "cancellable"
-  | "subprocess"
-  | "howItEnds"
-  | "entry"
-  | "exit"
-  | "timers"
-  | "form"
-  | "collaboration";
+export type SectionName = "assignment" | "form" | "subprocess" | "paths" | "howItEnds" | "timers" | "lifecycle" | "more";
 
-/** The leading column, in reading order. It takes about three fifths of the
- * page: Ways out and Who acts carry the routing and the actor, the pair an
- * author reads first and changes most (design.md). */
-const LEADING: SectionName[] = ["paths", "assignment", "cancellable", "subprocess", "howItEnds"];
-
-/** The trailing column, in reading order. Five narrower sections. */
-const TRAILING: SectionName[] = ["entry", "exit", "timers", "form", "collaboration"];
-
-const PARTICIPANT: SectionName[] = ["paths", "assignment", "cancellable", "entry", "exit", "timers", "form", "collaboration"];
-const TERMINAL: SectionName[] = ["howItEnds", "assignment", "entry", "form", "collaboration"];
-const SUBPROCESS: SectionName[] = ["paths", "cancellable", "subprocess", "entry", "exit", "timers"];
+const PARTICIPANT: SectionName[] = ["assignment", "form", "paths", "timers", "lifecycle", "more"];
+const SUBPROCESS: SectionName[] = ["subprocess", "paths", "timers", "lifecycle", "more"];
+const TERMINAL: SectionName[] = ["assignment", "form", "howItEnds", "lifecycle", "more"];
 
 /**
- * Which sections stand for a performed-by value (`studio-step-page`: "A
- * section SHALL stand only where the step's kind declares it").
+ * Which sections stand for a performed-by value, in reading order.
  *
- * An end step carries How the case ends, and no outgoing path: it therefore
- * carries neither When left nor Time limit, nor Cancellable — an instance
- * resting on a terminal step has already left the running state that field
- * governs. A subprocess step drops Who acts and Form and gains
- * Which process it calls, since it is a wait-state with no participant form.
- * A subprocess step carries no Collaboration section either: it is an
- * automatic wait-state with no participant-facing task screen for the
- * setting to govern.
+ * An end step carries How the case ends and no outgoing path, so it carries
+ * neither Ways out nor Time limit. A subprocess step drops Who acts and Form
+ * and leads with Which process it calls, since it is a wait-state with no
+ * participant form.
  *
  * The returned array is fresh on every call, so a caller may sort or slice it
  * without reaching the module's own lists.
@@ -61,17 +40,20 @@ export function sectionsFor(performedBy: PerformedBy): SectionName[] {
   }
 }
 
-/**
- * One section set, split into the page's two columns. A section the set omits
- * appears in neither, so the columns of an end step are shorter than a task
- * step's rather than carrying a blank.
- */
-export function sectionColumns(sections: readonly SectionName[]): {
-  leading: SectionName[];
-  trailing: SectionName[];
-} {
-  return {
-    leading: LEADING.filter((s) => sections.includes(s)),
-    trailing: TRAILING.filter((s) => sections.includes(s)),
-  };
+const SECTION_LABEL: Record<SectionName, CatalogKey> = {
+  assignment: "stepSections.assignment",
+  form: "stepSections.form",
+  subprocess: "stepSections.subprocess",
+  paths: "stepSections.paths",
+  howItEnds: "stepSections.howItEnds",
+  timers: "stepSections.timers",
+  lifecycle: "stepSections.lifecycle",
+  more: "stepSections.more",
+};
+
+/** The catalog key a section's header reads. An end step is never left, so
+ * its `lifecycle` header reads When entered alone. */
+export function sectionLabel(section: SectionName, performedBy: PerformedBy): CatalogKey {
+  if (section === "lifecycle" && performedBy === "terminal") return "stepSections.lifecycleEntryOnly";
+  return SECTION_LABEL[section];
 }

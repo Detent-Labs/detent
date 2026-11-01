@@ -80,6 +80,24 @@ describe("the steps rail scrolls, not the document", () => {
   });
 });
 
+describe("the Steps tab holds two scroll boxes below the breakpoint", () => {
+  it("lets the step page's height follow its content under NARROW", () => {
+    const block = styleBlock(stripComments(read(GUIDED[1]!)), "page");
+
+    expect(block).toMatch(/overflowY: \{ default: "auto", \[NARROW\]: "visible" \}/);
+  });
+
+  it("sets the rail's column at 22rem and stacks the rail over the page in auto rows", () => {
+    const block = styleBlock(stripComments(read(SURFACE)), "stepsTab");
+
+    expect(block).toContain('"22rem minmax(0, 1fr)"');
+    expect(block).toMatch(/\[NARROW\]: "auto auto"/);
+    // Below the breakpoint the grid takes its content's height instead of a
+    // shrunk cell its content spills out of.
+    expect(block).toMatch(/flexShrink: \{ default: 1, \[NARROW\]: 0 \}/);
+  });
+});
+
 describe("the field matrix grid takes the tab body's height", () => {
   const FIELD_MATRIX_PANEL = "src/areas/studio/panels/FieldMatrixPanel.tsx";
   const FIELD_MATRIX_GRID = "src/areas/studio/panels/FieldMatrixGrid.tsx";

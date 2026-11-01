@@ -448,7 +448,8 @@ A selection mark is a separate class of rule, drawn in the accent:
 
 - **Open mark:** a 2px accent rule under an open tab or a pressed option.
 - **Current mark:** a 3px accent rule on the leading edge of the current row.
-  A selected path row and a selected form editor card take it too.
+  A selected path row and a selected form editor card take it too. An open
+  step page section header takes it too.
 
 One shape breaks the rectangle. The register tab cuts its trailing edge with
 `clip-path: polygon(0 0, 100% 0, calc(100% - 0.4rem) 100%, 0 100%)`. It reads
@@ -524,7 +525,9 @@ such row. The accent there stays with the open tab.
 ### The Check Badge
 
 The badge counts a row's open check results, and it prints smaller than a
-stamp. The steps rail and the form card carry it.
+stamp. The steps rail, the form card and the step page's section headers
+carry it. A section header still to do carries the word To do instead, in
+the Legend style. A done one carries a check icon named Done.
 
 - **Shape:** a 2px `currentcolor` border, 0 by 4px padding, mono at 11px,
   weight 600, tabular figures, no uppercase.

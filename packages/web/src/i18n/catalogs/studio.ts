@@ -697,14 +697,16 @@ export const en = {
   "fieldMatrix.bulkClearRow": "Clears this flag from field {name}. Cells it writes: {total}.",
   "fieldMatrix.technicalRowMark": "Technical",
 
-  // The step page's nine section headings (`studio-step-page`). "Time
+  // The step page's eight section headers (`studio-step-page`). "Time
   // limit" is the word for a timer everywhere an author reads one; the
-  // contract's own `deadline` key stays in the step's raw JSON.
-  "stepSections.entry": "When entered",
+  // contract's own `deadline` key stays in the step's raw JSON. An end step
+  // is never left, so its lifecycle header reads `lifecycleEntryOnly`.
   "stepSections.assignment": "Who acts",
-  "stepSections.cancellable": "Cancellable",
-  // The Cancellable section's own field label reads words, like the other
-  // field captions below.
+  "stepSections.lifecycle": "When entered or left",
+  "stepSections.lifecycleEntryOnly": "When entered",
+  "stepSections.more": "More",
+  // The cancelling control's own field label, inside More, reads words like
+  // the other field captions below.
   "stepSections.cancellableField": "Cancelling the case here",
   "stepSections.cancellableInherit": "Inherit from process",
   "stepSections.cancellableYes": "Cancellable",
@@ -714,9 +716,7 @@ export const en = {
   "stepSections.form": "Form",
   "stepSections.paths": "Ways out",
   "stepSections.timers": "Time limit",
-  "stepSections.exit": "When left",
   "stepSections.howItEnds": "How the case ends",
-  "stepSections.collaboration": "Collaboration",
   "stepSections.terminalNoPathsOrTimers": "A step that ends the process has no way out and no time limit.",
   "stepSections.noAssignmentWarning":
     "Nobody is set to act on this step. Only the starter or an admin can act on it, and it stays out of everyone's My-tasks inbox. Publishing still works.",
@@ -735,7 +735,40 @@ export const en = {
   "stepSections.outcomeField": "How it ended",
   "stepSections.outcomeHint": "The name counts only when another process calls this one.",
 
-  // The Collaboration section's per-field three-state control
+  // A section header's one-line summary (`studio-step-page`: "A section
+  // header carries a summary and its state"). Each is one whole sentence or
+  // phrase; the lifecycle counts print as numerals, so one key carries the
+  // full sentence. More joins the override words with ", ", one per set
+  // override.
+  "stepSummary.pathsNone": "No way out yet",
+  "stepSummary.timersNone": "No time limit",
+  "stepSummary.timersOne": "1 time limit",
+  "stepSummary.timersMany": "{count} time limits",
+  "stepSummary.actionsNone": "No actions yet",
+  "stepSummary.actions": "{entered} when entered, {left} when left",
+  "stepSummary.actionsEntryOnly": "{entered} when entered",
+  "stepSummary.outcomeNone": "No outcome yet",
+  "stepSummary.processNone": "No process chosen yet",
+  "stepSummary.moreDefaults": "Follows the process settings",
+  "stepSummary.cancellableYes": "Cancellable here",
+  "stepSummary.cancellableNo": "Not cancellable here",
+  "stepSummary.commentsOn": "Comments on",
+  "stepSummary.commentsOff": "Comments off",
+  "stepSummary.attachmentsOn": "Attachments on",
+  "stepSummary.attachmentsOff": "Attachments off",
+
+  // The Remove this step confirmation (`studio-step-page`: "Removing a step
+  // confirms first"). Cancel reuses `fieldCatalog.removeDialogCancel`.
+  "removeStep.heading": "Remove “{step}”?",
+  "removeStep.stepTerm": "Step",
+  "removeStep.incomingTerm": "Ways out leading here",
+  "removeStep.formFieldsTerm": "Fields on its form",
+  "removeStep.firstStepNote": "This is the process's first step. The first remaining step takes its place.",
+  "removeStep.incomingNote": "The ways out leading here stay, and the checks report them.",
+  "removeStep.noUndo": "The studio has no undo.",
+  "removeStep.confirm": "Remove the step",
+
+  // The More section's per-field three-state control
   // (`studio-step-page`: "The Collaboration section offers a three-state
   // control per field"). `commentLegend`/`attachmentsLegend` keep their own
   // key rather than the header bar checkboxes' identical words, following
@@ -774,6 +807,11 @@ export const en = {
   "stepPage.previousNone": "Previous step",
   "stepPage.next": "Next: {step}",
   "stepPage.nextNone": "Next step",
+  // The visually hidden word beside a done section's check mark, and its
+  // tooltip.
+  "stepPage.sectionDone": "Done",
+  // The mark a section header carries while the step still needs it.
+  "stepPage.sectionTodo": "To do",
   "stepPage.developerView": "Developer view",
   "stepPage.developerViewNote":
     "The JSON is read-only here. The JSON surface stays the one place for hand-authoring a definition.",
