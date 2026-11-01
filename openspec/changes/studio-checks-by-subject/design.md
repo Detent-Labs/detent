@@ -275,7 +275,7 @@ The rail's frame keeps its box. Inside, a column caps at 52rem. A group's headin
 | Process, duplicate source name | Fields, Where values come from | the Fields tab |
 | Any rule whose sentence names the JSON surface | the JSON surface opens | the JSON input |
 
-`sectionOfIssue` decides for a step's subject. `LOC_SECTION` gains `key: "more"`, so a step's key check stands in More. More's Developer view opens by itself while a key check stands, as the field card's does. Its summary stays a native toggle, and a manual close holds until the check clears.
+`sectionOfIssue` decides for a step's subject. `LOC_SECTION` gains `key: "more"`, so a step's key check stands in More. More's Developer view opens by itself while a key check stands, as the field card's does. Its summary stays a native toggle, and a manual close holds until the check clears. A Fix on that check reopens it.
 
 **Mechanics.** `EditScreen` holds `sectionRequest`, `{ stepId, section }`, passed to `StepPage`. An effect in `StepPage` opens that section when the ids match, then calls `onSectionOpened`, which clears the request. This is the shape `openMoreFor` already has.
 
