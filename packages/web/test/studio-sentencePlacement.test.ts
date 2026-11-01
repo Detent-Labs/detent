@@ -1,7 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { NODE_HEIGHT, NODE_WIDTH, type Point } from "../src/areas/studio/canvas/geometry.js";
+import * as placement from "../src/areas/studio/canvas/sentencePlacement.js";
 import {
-  handleObstacle,
+  COVER_WEIGHT,
+  labelObstacle,
   nodeObstacle,
   placeSentences,
   sentenceFloor,
@@ -131,7 +133,7 @@ describe("placeSentences", () => {
     expect(sentenceFloor("Otherwise")).toBe(72);
     const placed = placeSentences(
       [{ key: "p1", text: "Otherwise", route: [{ x: 180, y: 30 }, { x: 240, y: 30 }], midpoint: { x: 210, y: 30 } }],
-      [nodeObstacle(LEFT), nodeObstacle(RIGHT), handleObstacle(LEFT)],
+      [nodeObstacle(LEFT), nodeObstacle(RIGHT)],
     );
     const box = placed.get("p1");
 
@@ -146,31 +148,38 @@ describe("placeSentences", () => {
     expect(sentenceFloor("First, only if Booking Status is Booked")).toBe(SENTENCE_MIN_WIDTH);
   });
 
-  it("keeps a sentence off the connect handle of the step its way out leaves", () => {
-    // Tall columns either side of the 60-unit gap, and the left step's
-    // handle at (180, 30). The route leaves the handle and turns up the gap;
-    // its midpoint stands level with the handle.
-    const left = { x: -400, y: -400, width: 582, height: 1000 };
-    const right = { x: 238, y: -400, width: 400, height: 1000 };
-    const handle = handleObstacle(LEFT);
-    const input = [
-      {
-        key: "p1",
-        text: SENTENCE,
-        route: [{ x: 180, y: 30 }, { x: 210, y: 30 }, { x: 210, y: -60 }],
-        midpoint: { x: 210, y: 0 },
-      },
-    ];
-    expect(handle).toEqual({ x: 171, y: 21, width: 18, height: 18 });
+  it("weighs no connect handle: the handles draw above every sentence", () => {
+    expect("handleObstacle" in placement).toBe(false);
+    expect("HANDLE_BOX" in placement).toBe(false);
+  });
 
-    const box = placeSentences(input, [left, right, handle]).get("p1");
-    // The positive control: with no handle obstacle the box covers it.
-    const unaware = placeSentences(input, [left, right]).get("p1");
+  it("prefers a node's border band over its label area where no box is clear", () => {
+    // The route runs down the node's right band, 160 units in, beside a wall
+    // at x 200. Every box meets the node. Unweighted, a box over 22 units of
+    // the label ties with one over the band and the wall, and the tie goes
+    // to the one nearer the midpoint, over the label. Weighted, the label
+    // costs ten times as much, so the box keeps to the band.
+    const node = { x: 0, y: 0 };
+    const wall = { x: 200, y: -2, width: 400, height: 64 };
+    const label = labelObstacle(node);
+    const input = [{ key: "p1", text: "Otherwise", route: [{ x: 160, y: 0 }, { x: 160, y: 60 }], midpoint: { x: 160, y: 30 } }];
+    expect(label).toEqual({ x: 10, y: 0, width: 144, height: 60, weight: COVER_WEIGHT - 1, blocks: false });
 
-    expect(box && unaware).toBeDefined();
-    if (!box || !unaware) return;
-    expect(areaOver(unaware, [handle])).toBeGreaterThan(0);
-    expect(areaOver(box, [handle, left, right])).toBe(0);
+    const weighted = placeSentences(input, [nodeObstacle(node), label, wall]).get("p1");
+    const unweighted = placeSentences(input, [nodeObstacle(node), wall]).get("p1");
+
+    expect(weighted && unweighted).toBeDefined();
+    if (!weighted || !unweighted) return;
+    // The positive control: with no label weight the box covers the label.
+    expect(areaOver(unweighted, [label])).toBeGreaterThan(0);
+    expect(areaOver(weighted, [label])).toBe(0);
+    expect(areaOver(weighted, [nodeObstacle(node)])).toBeGreaterThan(0);
+  });
+
+  it("counts a stamp ten times its area", () => {
+    const [stamp] = stampObstacles({ start: "Start" }, LEFT);
+    expect(stamp.weight).toBe(COVER_WEIGHT);
+    expect(COVER_WEIGHT).toBe(10);
   });
 
   it("takes the box with the least overlap where none is clear", () => {
@@ -221,7 +230,7 @@ describe("stampObstacles", () => {
     const [start, end] = stampObstacles({ start: "Start", end: "End" }, { x: 100, y: 200 });
 
     // Two stamps share the 164-unit cap, 80 each.
-    expect(start).toEqual({ x: 108, y: 200 + 8 - 19, width: 80, height: 19 });
-    expect(end).toEqual({ x: 100 + NODE_WIDTH - 8 - 80, y: 200 + 8 - 19, width: 80, height: 19 });
+    expect(start).toEqual({ x: 108, y: 200 + 8 - 19, width: 80, height: 19, weight: COVER_WEIGHT });
+    expect(end).toEqual({ x: 100 + NODE_WIDTH - 8 - 80, y: 200 + 8 - 19, width: 80, height: 19, weight: COVER_WEIGHT });
   });
 });

@@ -194,8 +194,8 @@ A pure function, `placeSentences` in `canvas/sentencePlacement.ts`, places
 every sentence the canvas draws at once. It reads geometry and nothing else:
 
 - Its input is each sentence's text, its route points and its midpoint. It
-  also takes the node rectangles, the stamp rectangles and each node's
-  connect handle. The handle counts as a 14-unit box around its dot.
+  also takes the node rectangles, each node's label host and the stamp
+  rectangles.
 - It estimates a block at 6.5 units per character and 16 units per line.
   The text runs inside 4 units of padding a side, the padding the block
   draws, over at most six lines.
@@ -209,12 +209,14 @@ every sentence the canvas draws at once. It reads geometry and nothing else:
   the box sideways across the segment there, 8 units at a time, nearest
   first. The place stays inside the box, at least 4 units from its edge, so
   the box still sits on its line.
-- It keeps the first box that meets no node, no handle, no stamp and no
-  sentence it already placed. Node and handle boxes grow by 2 units a side.
-  A sentence takes pointer events, so one over a handle would take its drag.
+- It keeps the first box that meets no node, no stamp and no sentence it
+  already placed. Node rectangles grow by 2 units a side.
 - Where no box is clear, the sentence takes the box it tried with the least
-  area over those obstacles. A tie goes to the wider box, then to the box
-  nearer the midpoint.
+  weighted overlap. A unit of area over a node's label host counts 10. So
+  does a unit over a stamp or an earlier sentence. A unit over the rest of
+  a node counts 1. The label host spans the node's full height. It runs
+  from 10 units inside the left edge to 26 inside the right.
+- A tie goes to the wider box, then to the box nearer the midpoint.
 
 The host `<foreignObject>` is the chosen width wide and 96 units high, six
 lines. It centres on the chosen place, and a flex box centres the text block
@@ -236,6 +238,12 @@ A transparent circle of radius 12 sits over the 7-unit dot and carries the
 pointer handlers, the cursor and a `<title>`. A transparent fill counts as
 painted, so it takes the press. The dot drops its pointer events. The title
 reads `canvas.connectHandle`, or `canvas.connectHandleEnd` on an end step.
+
+The dot and the circle draw in a late pass. It follows the sentences and
+the waypoint handles, and the group disclosures follow it. A sentence takes pointer
+events, so a handle under one would lose its drag. The handle follows the
+node's drag preview, and its double-click opens the step, as the node's
+does. Its group carries `aria-hidden`, since the node's name names the step.
 
 ### D7. Double-click opens the step
 

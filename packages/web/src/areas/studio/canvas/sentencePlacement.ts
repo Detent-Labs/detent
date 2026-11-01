@@ -20,6 +20,16 @@ export interface Rect {
   height: number;
 }
 
+/**
+ * A rectangle the placement weighs. A `blocks` rectangle (the default) keeps
+ * a box out in the first-fit search. Every rectangle counts in the fallback's
+ * score at `weight` (default 1) per unit of area it shares with a box.
+ */
+export interface Obstacle extends Rect {
+  weight?: number;
+  blocks?: boolean;
+}
+
 /** A placed sentence: its box, and the lines the estimate gave it. */
 export interface SentenceBox extends Rect {
   lines: number;
@@ -55,9 +65,13 @@ export const SENTENCE_SLIDE_MAX = 120;
 export const SENTENCE_LINE_KEEP = 4;
 /** How far a node's rectangle grows each side as an obstacle. */
 export const NODE_CLEARANCE = 2;
-/** The connect handle's dot, as an obstacle box: 14 across, centred on the
- * node's right edge at half its height (`HANDLE_RADIUS` 7 in `CanvasView`). */
-export const HANDLE_BOX = 14;
+/** What a unit of area over a node's label, a stamp or an earlier sentence
+ * counts in the fallback, against 1 over the rest of a node. */
+export const COVER_WEIGHT = 10;
+/** The node label's host: from `LABEL_INSET` in from the left edge to
+ * `LABEL_END_INSET` in from the right, the whole node high. */
+export const LABEL_INSET = 10;
+export const LABEL_END_INSET = 26;
 
 /**
  * The narrowest width a sentence may take: its longest word at the estimate
@@ -105,22 +119,28 @@ export function nodeObstacle(at: Point): Rect {
   };
 }
 
-/** A node's connect handle as an obstacle: the dot's box, grown by
- * `NODE_CLEARANCE` each side. A sentence takes pointer events, so one over
- * the dot would take the press that starts a connect drag. */
-export function handleObstacle(at: Point): Rect {
-  const side = HANDLE_BOX + 2 * NODE_CLEARANCE;
-  return { x: at.x + NODE_WIDTH - side / 2, y: at.y + NODE_HEIGHT / 2 - side / 2, width: side, height: side };
+/** A node's label host, as the fallback weighs it. It sits inside the node's
+ * own obstacle, so it blocks nothing more; its weight tops the node's 1 up to
+ * `COVER_WEIGHT`. */
+export function labelObstacle(at: Point): Obstacle {
+  return {
+    x: at.x + LABEL_INSET,
+    y: at.y,
+    width: NODE_WIDTH - LABEL_INSET - LABEL_END_INSET,
+    height: NODE_HEIGHT,
+    weight: COVER_WEIGHT - 1,
+    blocks: false,
+  };
 }
 
 /** The rectangles a node's stamps take, in canvas units, as `NodeStamp` draws
  * them: each host ends `STAMP_INSET` below the node's top edge. */
-export function stampObstacles(words: StampWords, at: Point): Rect[] {
+export function stampObstacles(words: StampWords, at: Point): Obstacle[] {
   const width = stampWidth(words);
-  const rects: Rect[] = [];
+  const rects: Obstacle[] = [];
   const push = (text: string, x: number) => {
     const height = stampLines(text, width) * STAMP_LINE_HEIGHT + STAMP_CHROME_HEIGHT;
-    rects.push({ x: at.x + x, y: at.y + STAMP_INSET - height, width, height });
+    rects.push({ x: at.x + x, y: at.y + STAMP_INSET - height, width, height, weight: COVER_WEIGHT });
   };
   if (words.start !== undefined) push(words.start, STAMP_INSET);
   if (words.end !== undefined) push(words.end, NODE_WIDTH - STAMP_INSET - width);
@@ -189,7 +209,7 @@ function boxAt(centre: Point, width: number, lines: number): SentenceBox {
 
 /** The rectangles that can touch any box placed for `route`: those within a
  * slide and a whole box of its bounds. */
-function obstaclesNear(route: Point[], taken: Rect[]): Rect[] {
+function obstaclesNear(route: Point[], taken: Obstacle[]): Obstacle[] {
   const reach = SENTENCE_SLIDE_MAX + SENTENCE_MAX_WIDTH;
   const xs = route.map((p) => p.x);
   const ys = route.map((p) => p.y);
@@ -205,25 +225,27 @@ function obstaclesNear(route: Point[], taken: Rect[]): Rect[] {
 /**
  * Places every sentence at once, in the order given, so the result is
  * deterministic. Each sentence tries widths from `SENTENCE_MAX_WIDTH` down to
- * its `sentenceFloor`, so no width breaks a word the cap could hold. At each width it tries places along its route, the
- * midpoint first, then `SENTENCE_SLIDE_STEP` further either way, up to
+ * its `sentenceFloor`, so no width breaks a word the cap could hold. At each
+ * width it tries places along its route, the midpoint first, then
+ * `SENTENCE_SLIDE_STEP` further either way, up to
  * `SENTENCE_SLIDE_MAX`. At each place it tries the box centred on the route,
  * then boxes shifted sideways across the route's segment by
  * `SENTENCE_SLIDE_STEP` either way, nearest first. A shift keeps the place
  * inside the box, `SENTENCE_LINE_KEEP` units clear of its edge, so the box
- * still sits on its line. The first box that meets no obstacle and no
- * sentence placed before it wins.
+ * still sits on its line. The first box that meets no blocking obstacle and
+ * no sentence placed before it wins.
  *
  * Where no box is clear, the sentence takes the box it tried with the least
- * area over obstacles and earlier sentences. A tie goes to the wider box,
- * then to the one nearer the midpoint.
+ * weighted overlap: each obstacle's shared area times its weight, and an
+ * earlier sentence's times `COVER_WEIGHT`. A tie goes to the wider box, then
+ * to the one nearer the midpoint.
  *
  * A box holds at most `SENTENCE_MAX_LINES` lines; past them the clamp cuts
  * the text and the hover title carries it whole.
  */
-export function placeSentences(sentences: SentenceInput[], obstacles: Rect[]): Map<string, SentenceBox> {
+export function placeSentences(sentences: SentenceInput[], obstacles: Obstacle[]): Map<string, SentenceBox> {
   const placed = new Map<string, SentenceBox>();
-  const taken: Rect[] = [...obstacles];
+  const taken: Obstacle[] = [...obstacles];
   const slides = offsetsUpTo(SENTENCE_SLIDE_MAX, SENTENCE_SLIDE_STEP);
   for (const sentence of sentences) {
     const { total, at } = measure(sentence.route, sentence.midpoint);
@@ -246,8 +268,14 @@ export function placeSentences(sentences: SentenceInput[], obstacles: Rect[]): M
           const centre = place.across ? { x: point.x, y: point.y + shift } : { x: point.x + shift, y: point.y };
           const candidate = boxAt(centre, width, lines);
           let area = 0;
-          for (const rect of near) area += overlapArea(candidate, rect);
-          if (area === 0) {
+          let blocked = false;
+          for (const rect of near) {
+            const shared = overlapArea(candidate, rect);
+            if (shared === 0) continue;
+            area += shared * (rect.weight ?? 1);
+            if (rect.blocks !== false) blocked = true;
+          }
+          if (!blocked) {
             chosen = candidate;
             break;
           }
@@ -263,7 +291,7 @@ export function placeSentences(sentences: SentenceInput[], obstacles: Rect[]): M
     }
     chosen ??= least?.box ?? boxAt(sentence.midpoint, floor, Math.min(sentenceLines(sentence.text, floor), SENTENCE_MAX_LINES));
     placed.set(sentence.key, chosen);
-    taken.push(chosen);
+    taken.push({ ...chosen, weight: COVER_WEIGHT });
   }
   return placed;
 }

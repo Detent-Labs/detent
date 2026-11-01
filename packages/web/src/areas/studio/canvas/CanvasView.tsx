@@ -41,7 +41,7 @@ import {
   STAMP_INSET,
   STAMP_LINE_HEIGHT,
 } from "./mapWords";
-import { handleObstacle, nodeObstacle, placeSentences, stampObstacles, type Rect, type SentenceBox, type SentenceInput } from "./sentencePlacement";
+import { labelObstacle, nodeObstacle, placeSentences, stampObstacles, type Obstacle, type SentenceBox, type SentenceInput } from "./sentencePlacement";
 import { nextFocus, entryFocus, type ArrowKey, type Focus } from "./traversal";
 import { stepTextMap } from "../panels/shared/optionText";
 import { buildOperands } from "../panels/shared/conditionLogic";
@@ -908,20 +908,21 @@ export function CanvasView({
   }, [steps, draft.fields, contentLocale, baseLocale, loadedChildren, waypoints, groups, positionsById, hidden]);
 
   // Where each sentence stands (design.md D5): clear of every drawn node, its
-  // connect handle and its stamps, every collapsed group's box and the
-  // sentences placed before it. A hidden Map tab places nothing and draws no
+  // label and its stamps, every collapsed group's box and the sentences placed
+  // before it. The connect handles need no room: they draw above every
+  // sentence. A hidden Map tab places nothing and draws no
   // sentence; the render that shows the tab places them all before it paints.
   const sentenceBoxes = useMemo(() => {
     if (!visible) return new Map<string, SentenceBox>();
-    const obstacles: Rect[] = [];
+    const obstacles: Obstacle[] = [];
     for (const step of steps) {
       if (!step.id || hidden.has(step.id)) continue;
       const at = positionsById[step.id];
       if (!at) continue;
-      obstacles.push(nodeObstacle(at), handleObstacle(at), ...stampObstacles(stampWords(step, initialStepId), at));
+      obstacles.push(nodeObstacle(at), labelObstacle(at), ...stampObstacles(stampWords(step, initialStepId), at));
     }
     for (const { group, box } of groupBoxes) {
-      if (group.collapsed && box) obstacles.push(nodeObstacle(box));
+      if (group.collapsed && box) obstacles.push(nodeObstacle(box), labelObstacle(box));
     }
     const sentences: SentenceInput[] = [];
     for (const drawnPath of drawnPaths) {
@@ -1385,6 +1386,11 @@ export function CanvasView({
     insertAt?: number;
   }> = [];
 
+  // The connect handles ride the late pass too, after the sentences and the
+  // waypoint handles, so no sentence covers a handle and takes its press. A
+  // sentence may stand over a node's right edge where the room runs out.
+  const connectHandles: Array<{ stepId: string; x: number; y: number; isTerminal: boolean }> = [];
+
   // The disclosure buttons ride the same late pass, and they need it most: a
   // sentence's text block is up to 200 wide and carries its own pointer
   // handler, and it lands wherever its route has room, so it can cover a
@@ -1421,6 +1427,9 @@ export function CanvasView({
     const isTerminal = step.terminal === true;
     const stamps = stampWords(step, initialStepId);
     const widthOfStamps = stampWidth(stamps);
+    // The connect handle draws in the late pass, above every sentence, at the
+    // node's right edge where the node draws now, drag preview included.
+    connectHandles.push({ stepId: step.id, x: x + NODE_WIDTH, y: y + NODE_HEIGHT / 2, isTerminal });
 
     return (
       <g
@@ -1462,19 +1471,6 @@ export function CanvasView({
         </foreignObject>
         {stamps.start !== undefined && <NodeStamp text={stamps.start} corner="start" width={widthOfStamps} />}
         {stamps.end !== undefined && <NodeStamp text={stamps.end} corner="end" width={widthOfStamps} />}
-        <circle cx={NODE_WIDTH} cy={NODE_HEIGHT / 2} r={HANDLE_RADIUS} {...stylex.props(styles.connectHandle, isTerminal && styles.connectHandleTerminal)} />
-        {/* The handle's pointer target, over the dot. It carries the press,
-            the cursor and the tooltip naming the gesture. */}
-        <circle
-          cx={NODE_WIDTH}
-          cy={NODE_HEIGHT / 2}
-          r={HANDLE_HIT_RADIUS}
-          {...stylex.props(styles.connectHandleHit, isTerminal && styles.connectHandleHitTerminal)}
-          onPointerDown={(e) => onHandlePointerDown(e, step.id as string)}
-          onPointerUp={onHandlePointerUp}
-        >
-          <title>{t(isTerminal ? "canvas.connectHandleEnd" : "canvas.connectHandle")}</title>
-        </circle>
         {/* Last, so nothing the node draws paints over it. A CSS outline does
             not follow an SVG shape, so the ring is an element; the stroke keeps
             its 2px under the canvas zoom, while the offset scales with the
@@ -1776,7 +1772,36 @@ export function CanvasView({
           );
         })}
 
-        {/* Last of all, so no route, node, sentence or waypoint handle can
+        {connectHandles.map((h) => (
+          // Out of the accessibility tree, as it was inside the node, whose
+          // own name already names the step. The `<title>` still shows on
+          // hover. `panzoom-exclude`, or Panzoom takes the press and pans.
+          <g key={h.stepId} className="panzoom-exclude" data-connect-step-id={h.stepId} aria-hidden="true">
+            <circle cx={h.x} cy={h.y} r={HANDLE_RADIUS} {...stylex.props(styles.connectHandle, h.isTerminal && styles.connectHandleTerminal)} />
+            {/* The handle's pointer target, over the dot. It carries the
+                press, the cursor and the tooltip naming the gesture. */}
+            <circle
+              cx={h.x}
+              cy={h.y}
+              r={HANDLE_HIT_RADIUS}
+              {...stylex.props(styles.connectHandleHit, h.isTerminal && styles.connectHandleHitTerminal)}
+              onPointerDown={(e) => onHandlePointerDown(e, h.stepId)}
+              onPointerUp={onHandlePointerUp}
+              // The handle belongs to its node: a double-click opens the step,
+              // as it did while the handle drew inside the node's group.
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                onSelectStep(h.stepId);
+                onOpenStepPage?.(h.stepId);
+              }}
+            >
+              <title>{t(h.isTerminal ? "canvas.connectHandleEnd" : "canvas.connectHandle")}</title>
+            </circle>
+          </g>
+        ))}
+
+        {/* Last of all, so no route, node, sentence, waypoint handle or
+            connect handle can
             take a press meant for a disclosure. A sentence's text block is up
             to 200 wide, carries its own pointer handler, and lands wherever its
             route has room. Each button is a sibling of its box

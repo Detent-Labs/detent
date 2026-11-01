@@ -130,10 +130,10 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     expect(enterAt).toBeGreaterThan(-1);
     expect(binding).toContain("onOpenStepPage?.(focus.stepId)");
     expect(binding).toContain("onOpenStepPage?.(owner.id, focus.pathId)");
-    // Two from Enter, and one from each of the four double-click routes: the
-    // node, the edge group, the sentence and the midpoint handle. A seventh
-    // would mean a single press reached it too.
-    expect(code.match(/onOpenStepPage\?\.\(/g)).toHaveLength(6);
+    // Two from Enter, and one from each of the five double-click routes: the
+    // node, its connect handle, the edge group, the sentence and the midpoint
+    // handle. An eighth would mean a single press reached it too.
+    expect(code.match(/onOpenStepPage\?\.\(/g)).toHaveLength(7);
   });
 
   it("opens the step from a double-click on its node", () => {
@@ -188,6 +188,20 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     // The mouse press's default would move focus to the canvas svg after it.
     expect(label).toContain("onMouseDown={(e) => e.preventDefault()}");
     expect(press).toContain('if (label.pathId !== undefined) moveFocus({ kind: "path", pathId: label.pathId, from: "source" })');
+  });
+
+  it("opens the step from a double-click on its connect handle, which draws outside the node", () => {
+    const code = stripComments(read(CANVAS));
+    const handles = code.slice(code.indexOf("{connectHandles.map("));
+    const handler = handles.slice(handles.indexOf("onDoubleClick={(e) => {"), handles.indexOf("}}"));
+
+    expect(handler).toContain("onSelectStep(h.stepId)");
+    expect(handler).toContain("onOpenStepPage?.(h.stepId)");
+    // The sentences need no room for a handle: it draws above them.
+    expect(code).not.toContain("handleObstacle");
+    expect(code.indexOf("{connectHandles.map(")).toBeGreaterThan(code.indexOf("{edgeLabels.map("));
+    expect(code.indexOf("{connectHandles.map(")).toBeGreaterThan(code.indexOf("{waypointHandles.map("));
+    expect(code.indexOf("{disclosures.map(")).toBeGreaterThan(code.indexOf("{connectHandles.map("));
   });
 
   it("places no sentence while the Map tab is hidden, and places them when it shows", () => {

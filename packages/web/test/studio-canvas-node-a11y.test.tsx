@@ -172,6 +172,7 @@ const CANVAS = elementsOf(HTML, (openTag) => isTag(openTag, "svg", "svg"))[0];
 
 const NODES = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "g", "canvas-node"));
 const EDGES = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "g", "edgeGroup"));
+const HANDLES = elementsOf(CANVAS.inner, (openTag) => openTag.startsWith("<g ") && attr(openTag, "data-connect-step-id") !== undefined);
 const DISCLOSURES = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "button", "groupDisclosure"));
 
 describe("the canvas node's accessibility markup", () => {
@@ -309,14 +310,38 @@ describe("the canvas node's accessibility markup", () => {
   // The defect: a connect handle with no word for its gesture.
   it("titles each connect handle with its gesture, and an end's with why it has none", () => {
     const titleOf = (stepId: string) => {
-      const node = NODES.find((n) => attr(n.open, "data-step-id") === stepId);
-      return elementsOf(node?.inner ?? "", (openTag) => openTag.startsWith("<title")).map((title) => title.inner);
+      const handle = HANDLES.find((h) => attr(h.open, "data-connect-step-id") === stepId);
+      return elementsOf(handle?.inner ?? "", (openTag) => openTag.startsWith("<title")).map((title) => title.inner);
     };
     expect(titleOf("step_capture")).toEqual([t("canvas.connectHandle")]);
     expect(titleOf("step_review")).toEqual([t("canvas.connectHandle")]);
     expect(titleOf("step_reject")).toEqual([t("canvas.connectHandleEnd")]);
     expect(t("canvas.connectHandle")).toBe("Drag to a step to add a way out, or to empty space to add a new step.");
     expect(t("canvas.connectHandleEnd")).toBe("An end has no way out.");
+  });
+
+  // The defect: a sentence drawn over a connect handle, which took the press
+  // that starts a connect drag. Each handle now draws after every sentence
+  // and every node, and before the disclosures, which stay last.
+  it("draws each connect handle above every sentence, at its node's right edge", () => {
+    expect(HANDLES.map((h) => attr(h.open, "data-connect-step-id"))).toEqual(["step_capture", "step_review", "step_reject"]);
+    for (const node of NODES) expect(node.inner).not.toContain("<circle");
+    const firstHandle = CANVAS.inner.indexOf("data-connect-step-id=");
+    const lastSentence = CANVAS.inner.lastIndexOf("edgeLabel");
+    const firstDisclosure = CANVAS.inner.indexOf("groupDisclosure");
+    expect(lastSentence).toBeGreaterThan(-1);
+    expect(firstHandle).toBeGreaterThan(lastSentence);
+    expect(firstDisclosure).toBeGreaterThan(CANVAS.inner.lastIndexOf("data-connect-step-id="));
+    for (const handle of HANDLES) {
+      expect(attr(handle.open, "aria-hidden")).toBe("true");
+      expect((attr(handle.open, "class") ?? "").split(" ")).toContain("panzoom-exclude");
+    }
+    // step_review stands at (240, 0): its handle sits at (420, 30).
+    const review = HANDLES.find((h) => attr(h.open, "data-connect-step-id") === "step_review");
+    const circles = elementsOf(review?.inner ?? "", (openTag) => openTag.startsWith("<circle"));
+    expect(circles.length).toBe(2);
+    expect(review?.inner).toContain('cx="420" cy="30" r="7"');
+    expect(review?.inner).toContain('cx="420" cy="30" r="12"');
   });
 
   // The defect: a disclosure reporting one state in both, so the author never
