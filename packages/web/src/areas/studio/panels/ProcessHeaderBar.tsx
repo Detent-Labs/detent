@@ -7,6 +7,7 @@ import { useDraft } from "../draft/store.js";
 import { collectUsedLocales, missingTranslationWarning, nameInputPlaceholder, resolveDraftLocalizedText } from "../draft/localized-text";
 import { deriveKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput.js";
+import { PROCESS_HEADER_NAME_ID } from "../draft/process-tabs.js";
 import { IssueList } from "./shared/IssueList.js";
 import { useConfirmDialog } from "./shared/confirmDialog.js";
 import { localeOptionLabel } from "./shared/ContentLocaleSwitcher.js";
@@ -894,6 +895,7 @@ export function ProcessHeaderBar({
             it satisfies "not reachable" while still showing the current value. */}
         <h1 {...stylex.props(styles.headerBarName)}>
           <LocalizedTextInput
+            id={PROCESS_HEADER_NAME_ID}
             value={draft.label}
             ariaLabel={t("headerBar.nameLabel")}
             placeholder={nameInputPlaceholder(draft.label, draft.baseLocale, t("headerBar.unnamedProcess"))}

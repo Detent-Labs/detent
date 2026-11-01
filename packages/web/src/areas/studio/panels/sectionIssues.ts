@@ -17,7 +17,7 @@ type DraftStep = DraftOf<Step>;
  * the body key it names is the section it belongs to.
  *
  * An issue naming neither this step nor anything under it belongs to no
- * section here. So does one whose `loc` names no section, a step's own `key`
+ * section here. So does one whose `loc` names no section, a step's own name
  * among them. Both still stand on the masthead and on the Checks tab.
  */
 const LOC_SECTION: Record<string, SectionName> = {
@@ -30,6 +30,7 @@ const LOC_SECTION: Record<string, SectionName> = {
   onCancel: "lifecycle",
   cancellable: "more",
   collaboration: "more",
+  key: "more",
   paths: "paths",
   timers: "timers",
 };
@@ -81,16 +82,17 @@ function locKeys(loc: string): string[] {
  */
 export function sectionOfIssue(
   step: DraftStep,
-  issue: Pick<EditorIssue, "entityId" | "loc">,
+  issue: Pick<EditorIssue, "entityId" | "loc" | "message">,
   sections: readonly SectionName[],
   owners: Map<string, SectionName> = sectionByEntityId(step),
 ): SectionName | undefined {
   const owned = owners.get(issue.entityId);
   const named =
     issue.entityId === step.id
-      ? locKeys(issue.loc)
+      ? (sectionOfOutputTarget(step, issue.message) ??
+        locKeys(issue.loc)
           .map((key) => (Object.hasOwn(LOC_SECTION, key) ? LOC_SECTION[key] : undefined))
-          .find((section) => section !== undefined)
+          .find((section) => section !== undefined))
       : undefined;
   const section = owned ?? named;
   return section !== undefined && sections.includes(section) ? section : undefined;
@@ -116,6 +118,42 @@ export function sectionOfOutputTarget(step: DraftStep, message: string): Section
   if ((step.paths ?? []).some((path) => holds(path.onPath))) return "paths";
   if ((step.timers ?? []).some((timer) => holds(timer.onFire?.actions))) return "timers";
   return undefined;
+}
+
+/** The step's own property a `loc` names: `label` for
+ * `workflow.steps[0].label.en`, nothing for a `loc` outside a step. */
+function stepProperty(loc: string): string | undefined {
+  const keys = locKeys(loc);
+  const anchor = keys.indexOf("steps");
+  return anchor === -1 ? undefined : keys[anchor + 1];
+}
+
+/** Whether a check's `loc` names the step's own key. More's Developer view
+ * opens while such a check stands, so the key input shows beside it. */
+export function namesStepKey(loc: string): boolean {
+  return stepProperty(loc) === "key";
+}
+
+/**
+ * The step-level issues no section claims, by where the masthead prints them:
+ * a name check directly under Name, a description check directly under
+ * Description, and the rest at the masthead's end.
+ */
+export function mastheadIssues(
+  step: DraftStep,
+  issues: readonly EditorIssue[],
+  sections: readonly SectionName[],
+): { name: EditorIssue[]; description: EditorIssue[]; end: EditorIssue[] } {
+  const own = issues.filter((i) => i.entityId === step.id && sectionOfIssue(step, i, sections) === undefined);
+  const named = (property: string) => own.filter((i) => stepProperty(i.loc) === property);
+  return {
+    name: named("label"),
+    description: named("description"),
+    end: own.filter((i) => {
+      const property = stepProperty(i.loc);
+      return property !== "label" && property !== "description";
+    }),
+  };
 }
 
 /**

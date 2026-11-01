@@ -1,25 +1,18 @@
 import type { DraftField } from "./fields";
 import type { DraftViewEntry } from "./view-layout";
-import type { EditorIssue } from "./issues";
+import { tokenize, type EditorIssue } from "./issues";
 import { flattenRailFields } from "./panel-rail";
+import type { Draft } from "./types";
+import { checkPlace, checkStep, type CheckSite } from "./checkSentence";
 import type { ProcessTab, TabTarget } from "../routing";
+import { fieldCheckZone, type FieldCheckZone } from "../panels/fieldCheckZone";
 import type { OutsidePlace } from "../panels/readByRows";
+import type { SectionName } from "../panels/sectionsFor";
 
-/** An action as the Checks hand-off reads it: its id alone. */
-interface TabCountAction {
-  id?: string;
-}
-
-/** The step shape the tab counts and the Checks hand-off read. Every id is
- * optional, as on any draft: a half-built entity may carry none yet. */
+/** The step shape the tab counts read. */
 export interface TabCountStep {
   id?: string;
   view?: { fields?: DraftViewEntry[] };
-  paths?: { id?: string; onPath?: TabCountAction[] }[];
-  timers?: { id?: string; onFire?: { actions?: TabCountAction[] } }[];
-  onEntry?: TabCountAction[];
-  onExit?: TabCountAction[];
-  onCancel?: TabCountAction[];
 }
 
 /** The draft shape the tab counts read. Structural, not `Draft`, so a unit
@@ -51,66 +44,86 @@ export function processTabCounts(draft: TabCountDraft, issues: readonly EditorIs
   };
 }
 
-/** Where a press on a Checks row lands: the tab, its view, and the step and
- * the way out the tab selects. */
+/** The step page's name input, a Fix's landing and a new step's. */
+export const STEP_PAGE_NAME_ID = "step-page-name";
+/** The process's name input in the header bar. */
+export const PROCESS_HEADER_NAME_ID = "process-header-name";
+/** The JSON surface's input. */
+export const JSON_SURFACE_INPUT_ID = "json-surface-input";
+
+/** The DOM id of one section's header on the step page. */
+export function sectionHeaderId(section: SectionName): string {
+  return `step-section-${section}`;
+}
+
+/** Where a press on a Checks row lands: the tab, its view, what the tab selects
+ * and opens there, and what takes focus. A target naming no finer place hands
+ * focus to its tab. */
 export interface CheckTarget extends TabTarget {
   stepId?: string;
   pathId?: string;
+  section?: SectionName;
+  fieldId?: string;
+  zone?: FieldCheckZone;
+  dataSourceId?: string;
+  focusId?: string;
+  json?: true;
 }
 
-/** A step's actions in all five positions: `onEntry`, `onExit`, `onCancel`,
- * each path's `onPath` and each timer's `onFire.actions`. */
-function stepActions(step: TabCountStep): TabCountAction[] {
-  return [
-    ...(step.onEntry ?? []),
-    ...(step.onExit ?? []),
-    ...(step.onCancel ?? []),
-    ...(step.paths ?? []).flatMap((path) => path.onPath ?? []),
-    ...(step.timers ?? []).flatMap((timer) => timer.onFire?.actions ?? []),
-  ];
-}
+/** What the Fields tab selects for a Fix, since its selection lives there. */
+export type FixRequest = Pick<CheckTarget, "fieldId" | "zone" | "dataSourceId">;
 
-/** The Steps tab on the step `owns` picks, or on no step where none does. */
-function onOwningStep(steps: readonly TabCountStep[], owns: (step: TabCountStep) => boolean): CheckTarget {
-  const stepId = steps.find(owns)?.id;
-  return stepId === undefined ? { tab: "steps" } : { tab: "steps", stepId };
+/** A step's own place, or the Steps tab alone where the draft no longer holds
+ * the step. */
+function onStepPage(issue: CheckSite, body: Draft, place: SectionName | "page"): CheckTarget {
+  const stepId = checkStep(body, issue)?.id;
+  if (stepId === undefined) return { tab: "steps" };
+  if (place === "page") return { tab: "steps", stepId, focusId: STEP_PAGE_NAME_ID };
+  const target: CheckTarget = { tab: "steps", stepId, section: place, focusId: sectionHeaderId(place) };
+  return issue.entityType === "path" ? { ...target, pathId: issue.entityId } : target;
 }
 
 /**
- * The place that owns an issue's subject, for a press on a Checks row
- * (`studio-process-tabs`: "A check opens the tab that owns its subject").
+ * The place one check's Fix control lands on (`studio-process-tabs`, design.md
+ * D7). `checkPlace` decides first, so a sentence and its landing cannot
+ * disagree.
  *
- * A timer, an action and a path all hang off a step, so each sends the author
- * to the step that carries it. A path also names itself, so the step page's
- * Ways out section marks its row. A subject the draft no longer holds lands
- * on the Steps tab with no step. A process-level issue has no owning tab: the
- * header bar carries it on every tab, so the press leaves the author on
- * Checks.
+ * `fields` and `sources` serve a field's or a source's own rule and the
+ * process's duplicate-key rules alike, so the entity tells them apart: only an
+ * entity the rail lists gets selected. Only a process-wide fallback and a
+ * subject the draft no longer holds answer no place. The process's `key` and
+ * `baseLocale` then read from the location.
  */
-export function checkTarget(
-  issue: Pick<EditorIssue, "entityType" | "entityId">,
-  steps: readonly TabCountStep[],
-): CheckTarget {
-  const id = issue.entityId;
-  switch (issue.entityType) {
-    case "step":
-      return onOwningStep(steps, (step) => step.id === id);
-    case "timer":
-      return onOwningStep(steps, (step) => (step.timers ?? []).some((timer) => timer.id === id));
-    case "action":
-      return onOwningStep(steps, (step) => stepActions(step).some((action) => action.id === id));
-    case "path": {
-      const owner = steps.find((step) => (step.paths ?? []).some((path) => path.id === id));
-      return owner?.id === undefined ? { tab: "steps" } : { tab: "steps", stepId: owner.id, pathId: id };
-    }
-    case "field":
-      return { tab: "fields", view: "catalog" };
-    case "dataSource":
-      return { tab: "fields", view: "sources" };
+export function checkTarget(issue: CheckSite, body: Draft): CheckTarget {
+  const place = checkPlace(body, issue);
+  switch (place) {
+    case "json":
+      return { tab: "checks", json: true, focusId: JSON_SURFACE_INPUT_ID };
+    case "name":
+      return { tab: "checks", focusId: PROCESS_HEADER_NAME_ID };
+    case "steps":
+      return { tab: "steps" };
+    case "settings":
+      return { tab: "settings", view: "process" };
     case "contract":
       return { tab: "settings", view: "contract" };
-    case "process":
-      return { tab: "checks" };
+    case "fields": {
+      const target: CheckTarget = { tab: "fields", view: "catalog" };
+      if (issue.entityType !== "field" || !flattenRailFields(body.fields).some((row) => row.id === issue.entityId)) return target;
+      return { ...target, fieldId: issue.entityId, zone: fieldCheckZone(issue.loc) };
+    }
+    case "sources": {
+      const target: CheckTarget = { tab: "fields", view: "sources" };
+      if (issue.entityType !== "dataSource" || !body.dataSources?.some((source) => source.id === issue.entityId)) return target;
+      return { ...target, dataSourceId: issue.entityId };
+    }
+    case undefined: {
+      if (issue.entityType !== "process") return { tab: "steps" };
+      const first = tokenize(issue.loc)[0]?.key;
+      return first === "key" || first === "baseLocale" ? { tab: "settings", view: "process" } : { tab: "checks" };
+    }
+    default:
+      return onStepPage(issue, body, place);
   }
 }
 

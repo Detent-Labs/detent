@@ -54,7 +54,8 @@ import {
   type KeyCommitProblem,
   type RewriteLineState,
 } from "./fieldCatalogLogic.js";
-import { fieldCheckZone, namesFieldKey, namesFieldTechnical, type FieldCheckZone } from "./fieldCheckZone.js";
+import { fieldCheckZone, namesFieldKey, namesFieldSource, namesFieldTechnical, type FieldCheckZone } from "./fieldCheckZone.js";
+import { fieldCheckAnchorId } from "./fixLanding.js";
 import { fieldKindLabel } from "../draft/field-type-labels";
 import {
   applyRequiredOverride,
@@ -755,11 +756,13 @@ export function MoveFieldControl({ fieldId, fields, contentLocale, baseLocale, o
 function CardSection({
   heading,
   issues,
+  anchorId,
   ruled = true,
   children,
 }: {
   heading: string;
   issues: EditorIssue[];
+  anchorId?: string;
   /** False for Kind alone, which follows the Name inputs with no rule. */
   ruled?: boolean;
   children: ReactNode;
@@ -771,7 +774,7 @@ function CardSection({
       <FlaggedHeading as="h4" id={headingId} failed={failed}>
         {heading}
       </FlaggedHeading>
-      <IssueItems issues={issues} style={styles.zoneIssueList} />
+      <IssueItems issues={issues} style={styles.zoneIssueList} anchorId={anchorId} />
       {children}
     </section>
   );
@@ -807,14 +810,14 @@ function FlaggedHeading({
 
 /** One part of More: a sub-heading in the Legend style, its checks, then its
  * controls. */
-function MorePart({ heading, issues, children }: { heading: string; issues: EditorIssue[]; children: ReactNode }) {
+function MorePart({ heading, issues, anchorId, children }: { heading: string; issues: EditorIssue[]; anchorId?: string; children: ReactNode }) {
   const failed = issues.length > 0;
   return (
     <div {...stylex.props(styles.morePart)}>
       <h5 {...stylex.props(styles.subHeading, failed && styles.headingFailed)} data-checked={failed ? "failed" : undefined}>
         {heading}
       </h5>
-      <IssueItems issues={issues} style={styles.zoneIssueList} />
+      <IssueItems issues={issues} style={styles.zoneIssueList} anchorId={anchorId} />
       {children}
     </div>
   );
@@ -1030,11 +1033,13 @@ function FieldEditor({
   const mappingIssues = zoned("columnMapping");
   // A check on the key opens More and its Developer view, so the key input
   // shows. A check on the Technical marker prints under Kind and opens More,
-  // where the checkbox stands. The author's own toggle holds otherwise.
+  // where the checkbox stands. A check on the data source opens More, where
+  // its select stands. The author's own toggle holds otherwise.
   const keyChecked = zoned("asks").some((i) => namesFieldKey(i.loc));
   const technicalCheckedIssue = zoned("kind").some((i) => namesFieldTechnical(i.loc));
   const moreFailed = defaultIssues.length + validationIssues.length + mappingIssues.length > 0;
-  const moreChecked = moreFailed || keyChecked || technicalCheckedIssue;
+  const sourceChecked = fieldIssues.some((i) => namesFieldSource(i.loc));
+  const moreChecked = moreFailed || keyChecked || technicalCheckedIssue || sourceChecked;
   const [moreOpen, setMoreOpen] = useState(false);
   const [keyViewOpen, setKeyViewOpen] = useState(false);
 
@@ -1066,7 +1071,7 @@ function FieldEditor({
       <FlaggedHeading as="h3" id={nameLineId} failed={nameFailed}>
         {label}
       </FlaggedHeading>
-      <IssueItems issues={[...unplaced, ...zoned("asks")]} style={styles.zoneIssueList} />
+      <IssueItems issues={[...unplaced, ...zoned("asks")]} style={styles.zoneIssueList} anchorId={fieldCheckAnchorId("asks")} />
 
       <div {...stylex.props(styles.fieldLabelRow)}>
         <label {...stylex.props(styles.fieldRowLabel, styles.fieldLabelRowLabel)}>
@@ -1100,12 +1105,12 @@ function FieldEditor({
         <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(field.description, contentLocale, draft.baseLocale)}</p>
       )}
 
-      <CardSection heading={t("fieldCard.kindHeading")} issues={zoned("kind")} ruled={false}>
+      <CardSection heading={t("fieldCard.kindHeading")} issues={zoned("kind")} anchorId={fieldCheckAnchorId("kind")} ruled={false}>
         <KindPicker field={field} onChange={onChange} />
       </CardSection>
 
       {choicesShown && (
-        <CardSection heading={t("fieldCard.choicesHeading")} issues={zoned("values")}>
+        <CardSection heading={t("fieldCard.choicesHeading")} issues={zoned("values")} anchorId={fieldCheckAnchorId("values")}>
           {hasDataSource ? (
             <>
               <p {...stylex.props(styles.studioEmpty)}>{fill(t("fieldCard.choicesFromSource"), { source: sourceName(boundSource) })}</p>
@@ -1313,7 +1318,11 @@ function FieldEditor({
           {/* A column-mapping check on a field the mapping editor no longer
               shows (no source, or no string field) stands on this part, so
               no check goes unshown while More opens for it. */}
-          <MorePart heading={t("fieldCatalog.whereValuesHeading")} issues={showsColumnMapping(field, dataSources) ? [] : mappingIssues}>
+          <MorePart
+            heading={t("fieldCatalog.whereValuesHeading")}
+            issues={showsColumnMapping(field, dataSources) ? [] : mappingIssues}
+            anchorId={fieldCheckAnchorId("columnMapping")}
+          >
             <label {...stylex.props(styles.fieldRowLabel)}>
               {t("fieldCatalog.dataSourceLabel")}
               <select
@@ -1332,7 +1341,7 @@ function FieldEditor({
             {/* A column mapping writes into other fields, so it stands beside
                 the source it reads. Its absence draws no rule of its own. */}
             {showsColumnMapping(field, dataSources) && (
-              <MorePart heading={t("columnMapping.heading")} issues={mappingIssues}>
+              <MorePart heading={t("columnMapping.heading")} issues={mappingIssues} anchorId={fieldCheckAnchorId("columnMapping")}>
                 {columns.length === 0 ? (
                   <p {...stylex.props(styles.studioNote)}>{t("columnMapping.noColumns")}</p>
                 ) : (
@@ -1376,11 +1385,11 @@ function FieldEditor({
             )}
           </MorePart>
 
-          <MorePart heading={t("defaultValue.heading")} issues={defaultIssues}>
+          <MorePart heading={t("defaultValue.heading")} issues={defaultIssues} anchorId={fieldCheckAnchorId("default")}>
             <DefaultValueEditor field={field} onChange={(next) => onChange({ default: next })} />
           </MorePart>
 
-          <MorePart heading={t("fieldCatalog.validationHeading")} issues={validationIssues}>
+          <MorePart heading={t("fieldCatalog.validationHeading")} issues={validationIssues} anchorId={fieldCheckAnchorId("validation")}>
             <FieldValidationEditor field={field} validation={field.validation} onChange={(next) => onChange({ validation: next })} />
           </MorePart>
 

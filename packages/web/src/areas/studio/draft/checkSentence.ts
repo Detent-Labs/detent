@@ -588,6 +588,11 @@ export function checkSentence(body: Draft, check: CheckSite): string {
   return checkAnswer(body, check).sentence;
 }
 
+/** The step a check stands on, by its location, else by the entity it names. */
+export function checkStep(body: Draft, check: CheckSite): DraftStep | undefined {
+  return readSite(body, check).step;
+}
+
 /** Where the sentence sends the author, so a sentence and its landing agree. */
 export function checkPlace(body: Draft, check: CheckSite): CheckPlace | undefined {
   return checkAnswer(body, check).place;

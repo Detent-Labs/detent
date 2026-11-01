@@ -2,6 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { focus } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { HeldDraft } from "../draft/held-while-hidden.js";
+import type { FixRequest } from "../draft/process-tabs.js";
 import type { FieldsView, TabView } from "../routing.js";
 import { DataSourcesTab, FieldsTab } from "./EntityTabs.js";
 import type { OutsidePlace } from "./readByRows.js";
@@ -51,6 +52,9 @@ interface Props {
   onOpenForm: (stepId: string) => void;
   /** A Read by row's "Open" for a way out, a step or a form (design.md D4). */
   onOpenPlace: (target: OutsidePlace) => void;
+  /** A Fix's field or source, until `onFixLanded` clears it. */
+  fixRequest?: FixRequest;
+  onFixLanded?: () => void;
 }
 
 /**
@@ -63,7 +67,7 @@ interface Props {
  * The matrix derives from the whole draft. While hidden it reads the draft it
  * last drew, so typing in the catalog skips it (`studio-app`).
  */
-export function FieldsTabViews({ view, onOpenView, token, visible, onShowStep, onOpenForm, onOpenPlace }: Props) {
+export function FieldsTabViews({ view, onOpenView, token, visible, onShowStep, onOpenForm, onOpenPlace, fixRequest, onFixLanded }: Props) {
   const catalogHidden = view !== "catalog";
   const matrixHidden = view !== "matrix";
   const sourcesHidden = view !== "sources";
@@ -93,6 +97,8 @@ export function FieldsTabViews({ view, onOpenView, token, visible, onShowStep, o
           onShowStep={onShowStep}
           onOpenForm={onOpenForm}
           onOpenPlace={onOpenPlace}
+          fixRequest={fixRequest}
+          onFixLanded={onFixLanded}
         />
       </div>
       <div
@@ -113,7 +119,7 @@ export function FieldsTabViews({ view, onOpenView, token, visible, onShowStep, o
         hidden={sourcesHidden}
         {...stylex.props(styles.view, sourcesHidden && styles.viewHidden)}
       >
-        <DataSourcesTab token={token} visible={visible && view === "sources"} />
+        <DataSourcesTab token={token} visible={visible && view === "sources"} fixRequest={fixRequest} onFixLanded={onFixLanded} />
       </div>
     </div>
   );

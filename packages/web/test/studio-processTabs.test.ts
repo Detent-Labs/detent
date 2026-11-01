@@ -1,8 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { checkTarget, formEditorReturnTab, placeAction, processTabCounts, surfaceTab, type TabCountStep } from "../src/areas/studio/draft/process-tabs.js";
+import { checkTarget, formEditorReturnTab, placeAction, processTabCounts, sectionHeaderId, surfaceTab } from "../src/areas/studio/draft/process-tabs.js";
 import * as processTabs from "../src/areas/studio/draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
 import type { EditorIssue, EntityType } from "../src/areas/studio/draft/issues.js";
+import type { Draft } from "../src/areas/studio/draft/types.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import { PROCESS_TABS, TAB_VIEWS } from "../src/areas/studio/routing.js";
 
@@ -71,72 +72,173 @@ describe("processTabCounts", () => {
 });
 
 /** Three steps carrying every position an action, a timer or a path can
- * hold, so each lookup below has one right answer and two wrong ones. */
-const STEPS: TabCountStep[] = [
-  { id: "step_a", onEntry: [{ id: "act_entry" }], onExit: [{ id: "act_exit" }] },
-  {
-    id: "step_b",
-    onCancel: [{ id: "act_cancel" }],
-    paths: [{ id: "path_b1", onPath: [{ id: "act_path" }] }],
-    timers: [{ id: "timer_b1", onFire: { actions: [{ id: "act_fire" }] } }],
+ * hold, so each lookup below has one right answer and two wrong ones. Each
+ * carries a `type`: the section lookup reads the step's kind. */
+const BODY = {
+  baseLocale: "en",
+  fields: [
+    { id: "field_a", key: "amount", type: "string", label: { en: "Amount" } },
+    { id: "field_g", key: "group", type: "group", label: { en: "Group" }, fields: [{ id: "field_c", key: "city", type: "string", label: { en: "City" } }] },
+  ],
+  dataSources: [{ id: "ds_1", key: "countries", type: "static" }],
+  contract: { outcomes: ["done"] },
+  workflow: {
+    steps: [
+      { id: "step_a", type: "task", label: { en: "A" }, onEntry: [{ id: "act_entry" }], onExit: [{ id: "act_exit" }] },
+      {
+        id: "step_b",
+        type: "task",
+        label: { en: "B" },
+        onCancel: [{ id: "act_cancel" }],
+        paths: [{ id: "path_b1", label: "Go", onPath: [{ id: "act_path" }] }],
+        timers: [{ id: "timer_b1", onFire: { actions: [{ id: "act_fire" }] } }],
+      },
+      { id: "step_c", type: "task", label: { en: "C" }, paths: [{ id: "path_c1", label: "On" }], timers: [{ id: "timer_c1" }] },
+    ],
   },
-  { id: "step_c", paths: [{ id: "path_c1" }], timers: [{ id: "timer_c1" }] },
-];
+} as unknown as Draft;
 
-const target = (entityType: EntityType, entityId: string) => checkTarget({ entityType, entityId }, STEPS);
+/** A message no rule knows, so the entity's own fallback answers. */
+const UNKNOWN = "no rule knows this";
+const MISSING = "missing baseLocale ('en') entry";
+const BUILT_IN = "Invalid input: expected string, received object";
+
+const at = (entityType: EntityType, entityId: string, loc = "", message = UNKNOWN) => checkTarget({ entityType, entityId, loc, message }, BODY);
 
 describe("checkTarget", () => {
-  it("opens the Steps tab on the step a step issue names", () => {
-    expect(target("step", "step_b")).toEqual({ tab: "steps", stepId: "step_b" });
+  describe("on a step", () => {
+    it("opens the section that owns a step's check, with focus on its header", () => {
+      expect(at("step", "step_a", "workflow.steps[0].assignment.strategy", BUILT_IN)).toEqual({
+        tab: "steps",
+        stepId: "step_a",
+        section: "assignment",
+        focusId: "step-section-assignment",
+      });
+    });
+
+    it("opens More for a check on the step's key", () => {
+      expect(at("step", "step_a", "workflow.steps[0].key", BUILT_IN)).toMatchObject({ stepId: "step_a", section: "more" });
+    });
+
+    it("opens the step alone for its name, its description and its kind, with focus on Name", () => {
+      const onName = { tab: "steps", stepId: "step_a", focusId: "step-page-name" } as const;
+
+      expect(at("step", "step_a", "workflow.steps[0].label", MISSING)).toEqual(onName);
+      expect(at("step", "step_a", "workflow.steps[0].description", MISSING)).toEqual(onName);
+      expect(at("step", "step_a", "workflow.steps[0].type", BUILT_IN)).toEqual(onName);
+    });
+
+    it("opens Ways out on the step a path leaves, and marks the path", () => {
+      expect(at("path", "path_c1", "workflow.steps[2].paths[0].label", BUILT_IN)).toEqual({
+        tab: "steps",
+        stepId: "step_c",
+        pathId: "path_c1",
+        section: "paths",
+        focusId: "step-section-paths",
+      });
+    });
+
+    it("opens Time limit on the step that carries a timer", () => {
+      expect(at("timer", "timer_b1")).toEqual({ tab: "steps", stepId: "step_b", section: "timers", focusId: "step-section-timers" });
+      expect(at("timer", "timer_c1")).toMatchObject({ stepId: "step_c", section: "timers" });
+    });
+
+    it("opens the section that owns an action, at each of the five positions", () => {
+      expect(at("action", "act_entry")).toMatchObject({ stepId: "step_a", section: "lifecycle" });
+      expect(at("action", "act_exit")).toMatchObject({ stepId: "step_a", section: "lifecycle" });
+      expect(at("action", "act_cancel")).toMatchObject({ stepId: "step_b", section: "lifecycle" });
+      expect(at("action", "act_path")).toMatchObject({ stepId: "step_b", section: "paths" });
+      expect(at("action", "act_fire")).toMatchObject({ stepId: "step_b", section: "timers" });
+    });
+
+    it("opens the Steps tab alone for a subject the draft no longer holds", () => {
+      for (const entityType of ["step", "timer", "action", "path"] as const) {
+        expect(at(entityType, "gone")).toEqual({ tab: "steps" });
+      }
+    });
+
+    it("opens the Steps tab alone for the check that no step comes first", () => {
+      expect(at("process", "process", "workflow.initialStep", "initialStep does not resolve: step_x")).toEqual({ tab: "steps" });
+    });
   });
 
-  it("opens the Steps tab on the step that carries a timer", () => {
-    expect(target("timer", "timer_b1")).toEqual({ tab: "steps", stepId: "step_b" });
-    expect(target("timer", "timer_c1")).toEqual({ tab: "steps", stepId: "step_c" });
+  describe("on a field or a source", () => {
+    it("selects a field in the Catalog view, and names the zone its check stands in", () => {
+      expect(at("field", "field_a", "fields[0].validation.pattern", BUILT_IN)).toEqual({
+        tab: "fields",
+        view: "catalog",
+        fieldId: "field_a",
+        zone: "validation",
+      });
+    });
+
+    it("selects a field inside a group", () => {
+      expect(at("field", "field_c", "fields[1].fields[0].default", BUILT_IN)).toMatchObject({ fieldId: "field_c", zone: "default" });
+    });
+
+    it("sets no focus of its own on a field, since the Fields tab owns that", () => {
+      expect(at("field", "field_a", "fields[0].label", MISSING).focusId).toBeUndefined();
+    });
+
+    it("selects a data source in the Where values come from view", () => {
+      expect(at("dataSource", "ds_1", "dataSources[0].key", BUILT_IN)).toEqual({ tab: "fields", view: "sources", dataSourceId: "ds_1" });
+    });
+
+    it("selects nothing the rail would not list, so the focus pass cannot wait for ever", () => {
+      expect(at("field", "gone")).toEqual({ tab: "fields", view: "catalog" });
+      expect(at("dataSource", "gone")).toEqual({ tab: "fields", view: "sources" });
+    });
+
+    it("tells a duplicate field id from a duplicate field key", () => {
+      // Both sit at `fields`: only the rule's place separates them.
+      expect(at("process", "process", "fields", "duplicate field ids")).toEqual({ tab: "checks", json: true, focusId: "json-surface-input" });
+      expect(at("process", "process", "fields", "duplicate field keys")).toEqual({ tab: "fields", view: "catalog" });
+    });
+
+    it("opens Where values come from for a duplicate source name, with no source selected", () => {
+      expect(at("process", "process", "dataSources", "duplicate data source keys")).toEqual({ tab: "fields", view: "sources" });
+    });
   });
 
-  it("opens the Steps tab on the step that carries an action, at each of the five positions", () => {
-    expect(target("action", "act_entry")).toEqual({ tab: "steps", stepId: "step_a" });
-    expect(target("action", "act_exit")).toEqual({ tab: "steps", stepId: "step_a" });
-    expect(target("action", "act_cancel")).toEqual({ tab: "steps", stepId: "step_b" });
-    expect(target("action", "act_path")).toEqual({ tab: "steps", stepId: "step_b" });
-    expect(target("action", "act_fire")).toEqual({ tab: "steps", stepId: "step_b" });
-  });
+  describe("on the process", () => {
+    it("opens What it takes in and gives back for a contract check", () => {
+      expect(at("contract", "contract", "contract.outcomes", BUILT_IN)).toEqual({ tab: "settings", view: "contract" });
+    });
 
-  it("opens the Steps tab on the step a path leaves, naming the path", () => {
-    expect(target("path", "path_c1")).toEqual({ tab: "steps", stepId: "step_c", pathId: "path_c1" });
-  });
+    it("stays put for the process's name, with focus on the header bar's input", () => {
+      expect(at("process", "process", "label", MISSING)).toEqual({ tab: "checks", focusId: "process-header-name" });
+    });
 
-  it("opens the Steps tab alone for a subject the draft no longer holds", () => {
-    for (const entityType of ["step", "timer", "action", "path"] as const) {
-      expect(target(entityType, "gone")).toEqual({ tab: "steps" });
-    }
-  });
+    it("opens the Process view for the process's key and base language, whichever tier answers", () => {
+      const process = { tab: "settings", view: "process" } as const;
 
-  it("opens the Fields tab's Catalog view for a field issue", () => {
-    expect(target("field", FIELD)).toEqual({ tab: "fields", view: "catalog" });
-  });
+      expect(at("process", "process", "key", BUILT_IN)).toEqual(process);
+      expect(at("process", "process", "baseLocale", BUILT_IN)).toEqual(process);
+      expect(at("process", "process", "key", UNKNOWN)).toEqual(process);
+      expect(at("process", "process", "baseLocale", UNKNOWN)).toEqual(process);
+    });
 
-  it("opens the Settings tab's sources view for a data source issue", () => {
-    expect(target("dataSource", "ds_1")).toEqual({ tab: "fields", view: "sources" });
-  });
+    it("stays on Checks for a process check with no place, whose sentence sends the author there", () => {
+      expect(at("process", "process", "somewhere", UNKNOWN)).toEqual({ tab: "checks" });
+    });
 
-  it("opens the Settings tab's contract view for a contract issue", () => {
-    expect(target("contract", "contract")).toEqual({ tab: "settings", view: "contract" });
-  });
-
-  it("leaves a process-level issue on Checks, since the header bar carries it on every tab", () => {
-    expect(target("process", "process")).toEqual({ tab: "checks" });
+    it("opens the JSON surface for a check whose sentence names it", () => {
+      expect(at("step", "step_a", "workflow.steps[0].id", BUILT_IN)).toEqual({ tab: "checks", json: true, focusId: "json-surface-input" });
+    });
   });
 
   it("names a tab the row holds and a view that tab holds, for every entity type", () => {
     const every: EntityType[] = ["process", "field", "dataSource", "step", "path", "timer", "action", "contract"];
 
     for (const entityType of every) {
-      const found = target(entityType, "x");
+      const found = at(entityType, "x");
       expect(PROCESS_TABS).toContain(found.tab);
       if (found.view !== undefined) expect(TAB_VIEWS[found.tab]).toContain(found.view);
     }
+  });
+
+  it("builds a section's focus target from the id its header carries", () => {
+    expect(sectionHeaderId("timers")).toBe("step-section-timers");
   });
 
   it("leaves the retired hand-offs out of the module", () => {

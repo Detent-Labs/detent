@@ -180,8 +180,79 @@ describe("the process surface's frame around the header bar", () => {
 
     expect(opener).toContain('leaveFormEditorFor("settings")');
     expect(opener).toContain('goToTab("settings", "process")');
-    expect(opener).toContain('focusTabButton("settings")');
-    expect(opener).toContain('setPendingTabFocus("settings")');
+    expect(opener).toContain('setPendingFocus({ tab: "settings" })');
+  });
+});
+
+/**
+ * A Fix control's landing (`studio-process-tabs`, design.md D7). The shape that
+ * keeps it working is one batch and one effect, read off the source; the focus
+ * itself is walked in the browser.
+ */
+describe("the Fix control's landing", () => {
+  const body = () => stripComments(read(SURFACE));
+  const slice = (code: string, from: string, to: string) => code.slice(code.indexOf(from), code.indexOf(to, code.indexOf(from)));
+
+  it("points the rail's Fix at fixCheck, over the draft", () => {
+    expect(body()).toContain("onFix={(issue) => fixCheck(checkTarget(issue, draft))}");
+  });
+
+  it("keeps openTabFromRow for a Read by row, with focus on the tab", () => {
+    const code = body();
+    const row = slice(code, "const openTabFromRow = ", "const fixCheck = ");
+
+    expect(code).toContain("else openTabFromRow(action.target);");
+    expect(row).toContain("setPendingFocus({ tab: target.tab })");
+  });
+
+  it("opens the JSON surface and asks for focus in one batch", () => {
+    const fix = slice(body(), "const fixCheck = ", "useEffect(");
+
+    expect(fix).toContain("if (target.json) setJsonOpen(true);");
+    expect(fix).toContain("setPendingFocus({ tab: target.tab, elementId: target.focusId })");
+  });
+
+  it("leaves a field's and a source's focus to the Fields tab", () => {
+    const fix = slice(body(), "const fixCheck = ", "useEffect(");
+    const request = fix.indexOf("setFixRequest(");
+
+    expect(request).toBeGreaterThan(-1);
+    expect(fix.slice(request)).toContain("return;");
+    expect(fix.slice(request).indexOf("return;")).toBeLessThan(fix.indexOf("setPendingFocus("));
+  });
+
+  it("keys the focus effect on the tab and the request, acts on its own tab alone, and clears", () => {
+    const code = body();
+    const effect = slice(code, "if (pendingFocus === undefined || pendingFocus.tab !== openTab) return;", "}, [openTab, pendingFocus]);");
+
+    expect(code).toContain("}, [openTab, pendingFocus]);");
+    expect(effect).toContain("if (element === null) focusTabButton(openTab);");
+    expect(effect).toContain("setPendingFocus(undefined);");
+  });
+
+  it("names no retired focus state", () => {
+    expect(read(SURFACE)).not.toContain("PendingTabFocus");
+  });
+
+  it("focuses a new step's Name, in the batch that selects it", () => {
+    const add = slice(body(), "const onAddStep = ", "const onCanvasBarDrop = ");
+
+    expect(add.indexOf("onSelectStep(created.id)")).toBeGreaterThan(-1);
+    expect(add).toContain('setPendingFocus({ tab: "steps", elementId: STEP_PAGE_NAME_ID })');
+  });
+
+  it("passes the section request to the page, and the field request to the Fields tab", () => {
+    const code = body();
+
+    expect(code).toContain("sectionRequest={sectionRequest}");
+    expect(code).toContain("onSectionOpened={clearSectionRequest}");
+    expect(code).toContain("fixRequest={fixRequest}");
+    expect(code).toContain("onFixLanded={clearFixRequest}");
+  });
+
+  it("carries the two header ids on their existing inputs", () => {
+    expect(read("src/areas/studio/panels/ProcessHeaderBar.tsx")).toContain("id={PROCESS_HEADER_NAME_ID}");
+    expect(read("src/areas/studio/panels/JsonView.tsx")).toContain("id={JSON_SURFACE_INPUT_ID}");
   });
 });
 

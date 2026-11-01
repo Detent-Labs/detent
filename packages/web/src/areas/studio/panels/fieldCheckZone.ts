@@ -71,6 +71,14 @@ export function namesFieldTechnical(loc: string): boolean {
   return segmentsAfterAnchor(loc)[0] === "technical";
 }
 
+/**
+ * Whether a check's `loc` names the field's own data source. A removed source's
+ * check opens More, where the field's source select stands.
+ */
+export function namesFieldSource(loc: string): boolean {
+  return segmentsAfterAnchor(loc)[0] === "dataSource";
+}
+
 /** The `loc` segments after its last `fields` token, index suffixes dropped,
  * or none for a `loc` with no such token. */
 function segmentsAfterAnchor(loc: string): string[] {

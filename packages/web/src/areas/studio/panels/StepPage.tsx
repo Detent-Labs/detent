@@ -29,12 +29,15 @@ import { missingTranslationWarning } from "../draft/localized-text";
 import { nextStepKey, nextCollaborationOverride } from "./stepsPanelLogic.js";
 import { formCounts } from "./formCardRows.js";
 import { sectionLabel, sectionsFor, type SectionName } from "./sectionsFor.js";
-import { headingIssues, issuesBySection, sectionOfIssue } from "./sectionIssues.js";
+import { headingIssues, issuesBySection, mastheadIssues, namesStepKey } from "./sectionIssues.js";
+import { sectionHeaderId, STEP_PAGE_NAME_ID } from "../draft/process-tabs.js";
 import {
   defaultOpenSection,
   nextOpenSection,
   openSectionFor,
+  sectionForRequest,
   sectionSummary,
+  type SectionRequest,
   type SectionState,
   type SectionSummary,
 } from "./stepSummaries.js";
@@ -447,6 +450,8 @@ const styles = stylex.create({
   },
 });
 
+const NOOP = () => {};
+
 const PERFORMED_BY_OPTIONS: PerformedBy[] = ["participant", "subprocess", "terminal"];
 
 /** The word one registered assignment strategy reads as in the envelope
@@ -567,6 +572,12 @@ interface Props {
   /** Bumps on every canvas request to open a way out. A new value reopens Ways
    * out, even for the way out already selected. */
   waysOutRequest?: number;
+  /** A Fix's request to open one section. It does nothing on another step's
+   * page. */
+  sectionRequest?: SectionRequest;
+  /** Called once the page took `sectionRequest`, which clears it, so a later
+   * visit to the step does not reopen the section. */
+  onSectionOpened?: () => void;
   /** Opens the form editor for a step: the Form section's control. */
   navigate: (stepId: string) => void;
   /** The processes a subprocess step may call. Empty until the fetch
@@ -596,6 +607,8 @@ export function StepPage({
   onRemoveStep,
   selectedPathId,
   waysOutRequest,
+  sectionRequest,
+  onSectionOpened = NOOP,
   navigate,
   processes,
 }: Props) {
@@ -611,6 +624,8 @@ export function StepPage({
   // Whether the removal dialog stands open, and the control that opened it.
   const [removing, setRemoving] = useState(false);
   const removeTriggerRef = useRef<HTMLButtonElement | null>(null);
+  // The author's own toggle of More's Developer view. A key check opens it too.
+  const [developerOpen, setDeveloperOpen] = useState(false);
 
   const index = steps.findIndex((s) => s.id === step?.id);
 
@@ -635,7 +650,8 @@ export function StepPage({
       new Map(sections.map((s) => [s, summaries.get(s)!.state])),
       selectedPathId,
     );
-  const [openSection, setOpenSection] = useState<SectionName | undefined>(opening);
+  const requestedSection = sectionForRequest(sectionRequest, step?.id, sections);
+  const [openSection, setOpenSection] = useState<SectionName | undefined>(() => requestedSection ?? opening());
   // A kind switch keeps the page mounted, and can drop the open section from
   // the new kind's list. The page's opening section then stands open instead.
   const shownOpen = openSectionFor(openSection, sections, opening());
@@ -645,6 +661,14 @@ export function StepPage({
   useEffect(() => {
     if (selectedPathId !== undefined && holdsPaths) setOpenSection("paths");
   }, [selectedPathId, holdsPaths, waysOutRequest]);
+  // A Fix opens its section on the page already mounted too. Taking the request
+  // clears it, and a request for another step waits untouched.
+  const requestHere = sectionRequest !== undefined && sectionRequest.stepId === step?.id;
+  useEffect(() => {
+    if (!requestHere) return;
+    if (requestedSection !== undefined) setOpenSection(requestedSection);
+    onSectionOpened();
+  }, [requestHere, requestedSection, sectionRequest, onSectionOpened]);
 
   // The page remounts for the step it opens, which drops the focus the pressed
   // walk button held. One animation frame later the new page's control in the
@@ -697,12 +721,11 @@ export function StepPage({
   // The step-level issues, printed at the top of their section's body. A
   // row's own issue stays at its row.
   const bySection = headingIssues(step, validation.issues, sections);
-  // What the masthead keeps: a step-level issue no section claims, a Zod
-  // issue on the step's own `key` among them. Every other issue prints at
-  // exactly one place below, so the page never says one sentence twice.
-  const mastheadIssues = validation.issues.filter(
-    (i) => i.entityId === step.id && sectionOfIssue(step, i, sections) === undefined,
-  );
+  // What the masthead keeps: a step-level issue no section claims. Every other
+  // issue prints at exactly one place below, so the page never says one sentence
+  // twice.
+  const masthead = mastheadIssues(step, validation.issues, sections);
+  const keyChecked = validation.issues.some((i) => i.entityId === step.id && namesStepKey(i.loc));
   const isInitialStep = draft.workflow?.initialStep === step.id;
   // A step with no assignment still works: the assignment-less floor in
   // `submitAndTransition` is starter-or-`system:admin`. That is not thereby an
@@ -912,9 +935,14 @@ export function StepPage({
             control here, and the JSON re-renders from the draft as it changes.
             A `<pre>` accepts no typing, so the JSON surface stays the one place
             for hand-authoring a definition (`studio-step-page`). The disclosure
-            stands closed until an author opens it, which is `<details>`'s own
-            default. */}
-        <details {...stylex.props(styles.developer)}>
+            stands closed until an author opens it or a check names the key. Its
+            summary stays a native toggle: a press closes it under the check, and
+            the `open` prop holds still until the check clears. */}
+        <details
+          {...stylex.props(styles.developer)}
+          open={developerOpen || keyChecked}
+          onToggle={(e) => setDeveloperOpen(e.currentTarget.open)}
+        >
           <summary {...stylex.props(styles.developerSummary)}>{t("stepPage.developerView")}</summary>
           <label {...stylex.props(styles.fieldLabel, styles.developerKey)}>
             <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.keyField")}</span>
@@ -942,7 +970,7 @@ export function StepPage({
   const renderSection = (section: SectionName) => {
     const summary = summaries.get(section)!;
     const open = shownOpen === section;
-    const headerId = `step-section-${section}`;
+    const headerId = sectionHeaderId(section);
     const bodyId = `${headerId}-body`;
     return (
       <section key={section} {...stylex.props(styles.section)}>
@@ -1025,11 +1053,12 @@ export function StepPage({
               in the Developer view, inside More. */}
           <label {...stylex.props(styles.fieldLabel)}>
             <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.labelField")}</span>
-            <LocalizedTextInput value={step.label} onChange={updateStepLabel} />
+            <LocalizedTextInput id={STEP_PAGE_NAME_ID} value={step.label} onChange={updateStepLabel} />
           </label>
           {/* Sibling of the label, never nested inside it: a <label> takes
               phrasing content, and the design language keeps a field's own
               messages beside the label. */}
+          <IssueItems issues={masthead.name} />
           {missingTranslationWarning(step.label, contentLocale, draft.baseLocale) && (
             <p {...stylex.props(styles.warning)}>{missingTranslationWarning(step.label, contentLocale, draft.baseLocale)}</p>
           )}
@@ -1038,6 +1067,7 @@ export function StepPage({
             <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.descriptionField")}</span>
             <LocalizedTextInput value={step.description} onChange={(description) => updateStep({ description })} />
           </label>
+          <IssueItems issues={masthead.description} />
           {missingTranslationWarning(step.description, contentLocale, draft.baseLocale) && (
             <p {...stylex.props(styles.warning)}>{missingTranslationWarning(step.description, contentLocale, draft.baseLocale)}</p>
           )}
@@ -1101,7 +1131,7 @@ export function StepPage({
             </button>
           )}
 
-          <IssueItems issues={mastheadIssues} />
+          <IssueItems issues={masthead.end} />
         </div>
 
         <div aria-label={t("stepPage.sectionsLabel")} role="group">

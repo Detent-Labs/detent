@@ -166,6 +166,22 @@ export function openSectionFor(
   return open !== undefined && !sections.includes(open) ? fallback : open;
 }
 
+/** A Fix's request to open one section of one step's page. */
+export interface SectionRequest {
+  stepId: string;
+  section: SectionName;
+}
+
+/** The section a request opens on this page, or `undefined` where it names
+ * another step or a section this step's kind does not stand. */
+export function sectionForRequest(
+  request: SectionRequest | undefined,
+  stepId: string | undefined,
+  sections: readonly SectionName[],
+): SectionName | undefined {
+  return request !== undefined && request.stepId === stepId && sections.includes(request.section) ? request.section : undefined;
+}
+
 /** The open section after a header press: pressing the open header closes
  * it, and any other opens in its place. */
 export function nextOpenSection(open: SectionName | undefined, pressed: SectionName): SectionName | undefined {

@@ -25,7 +25,7 @@ import { useFetchOnce } from "../panels/shared/useFetchOnce.js";
 import { stepText } from "../panels/shared/optionText.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
 import { DEFAULT_TAB, FIELDS_VIEWS, SETTINGS_VIEWS, type ProcessTab, type Route, type TabView } from "../routing.js";
-import { checkTarget, formEditorReturnTab, placeAction, processTabCounts, surfaceTab, type CheckTarget } from "../draft/process-tabs.js";
+import { checkTarget, formEditorReturnTab, placeAction, processTabCounts, STEP_PAGE_NAME_ID, surfaceTab, type CheckTarget, type FixRequest } from "../draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { showsStructuralBanner } from "../draft/startGaps.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
@@ -54,6 +54,7 @@ import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import { scrollKeyboardFocusIntoView } from "../focusScroll.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
+import type { SectionRequest } from "../panels/stepSummaries.js";
 import type { NavigateOptions } from "../../../shell/routing.js";
 
 /** The width below which the Steps tab stands one column. `EntityTabs`
@@ -307,6 +308,12 @@ interface EditScreenProps {
   onDirtyChange?: (dirty: boolean) => void;
 }
 
+/** A focus hand-off waiting for its tab's commit. */
+interface PendingFocus {
+  tab: ProcessTab;
+  elementId?: string;
+}
+
 interface ProcessSurfaceProps {
   processId: string;
   formStepId?: string;
@@ -387,6 +394,15 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // page keys its Ways out effect on it too, so the section reopens even where
   // the same way out stays selected.
   const [waysOutRequest, setWaysOutRequest] = useState(0);
+  // A Fix's section on the step page, until the page takes it.
+  const [sectionRequest, setSectionRequest] = useState<SectionRequest | undefined>(undefined);
+  const clearSectionRequest = useCallback(() => setSectionRequest(undefined), []);
+  // A Fix's field or source, until the Fields tab lands on it.
+  const [fixRequest, setFixRequest] = useState<FixRequest | undefined>(undefined);
+  const clearFixRequest = useCallback(() => setFixRequest(undefined), []);
+  // Where focus goes once the commit that opens `tab` has run: the element
+  // named, else that tab's button. The effect under `fixCheck` consumes it.
+  const [pendingFocus, setPendingFocus] = useState<PendingFocus | undefined>(undefined);
   // The path an edit-rail drag currently sits over, resolved the same way the
   // drop itself resolves one (design.md: "The rail reports its moving
   // position"). Drives the drop-target render in `CanvasView`; not the
@@ -787,7 +803,9 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   const onAddStep = (kind: StepKind) => {
     const created = newStep(kind, seedLocalizedText(contentLocale));
     appendStep(created);
-    if (created.id) onSelectStep(created.id);
+    if (!created.id) return;
+    onSelectStep(created.id);
+    setPendingFocus({ tab: "steps", elementId: STEP_PAGE_NAME_ID });
   };
 
   /** The canvas bar's own drag-to-place, through that same creation path.
@@ -930,34 +948,39 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
         : { name: "edit", processId, tab: target, view: targetView },
     );
   };
-  // The pending focus target for `openTabFromRow` below: the tab a Checks row
-  // asked to open, until the effect below moves focus there.
-  const [pendingTabFocus, setPendingTabFocus] = useState<ProcessTab | undefined>(undefined);
-  // A Checks row hands focus to the tab it opens (`studio-process-tabs`).
-  // A target already open takes focus at once and records nothing: the
-  // effect below only fires on a tab switch, and this target's tab is not
-  // switching. Any other target goes through `goToTab` and becomes the
-  // pending focus. `openTab` follows the route on a later render, and the
-  // effect waits for that render, so focus lands on a tab button that
-  // already carries `aria-selected="true"` rather than on one still
-  // unselected. A target naming a step selects it, and the way out it names,
-  // so the step page opens on that step with that row marked.
+  // A Read by row hands focus to the tab it opens. A target naming a step
+  // selects it, and the way out it names, so the step page opens on that step
+  // with that row marked.
   const openTabFromRow = (target: CheckTarget) => {
-    if (target.tab === openTab) {
-      focusTabButton(target.tab);
-    } else {
-      goToTab(target.tab, target.view);
-      setPendingTabFocus(target.tab);
-    }
+    if (target.tab !== openTab) goToTab(target.tab, target.view);
+    setPendingFocus({ tab: target.tab });
     if (target.stepId !== undefined) onSelectStep(target.stepId, target.pathId);
   };
-  // Moves focus onto the open tab only while it is the pending target, and
-  // clears the pending value either way, so a stale value never pulls focus
-  // on a later, unrelated tab switch.
+  // A Fix control's landing (design.md D7). Everything here batches with the
+  // route's own update, so one commit opens the place, and the effect below
+  // finds it. A field or a source sets no pending focus: selection lives in the
+  // Fields tab, which focuses the sentence once its card reads the request.
+  const fixCheck = (target: CheckTarget) => {
+    if (target.json) setJsonOpen(true);
+    if (target.tab !== openTab) goToTab(target.tab, target.view);
+    if (target.stepId !== undefined) onSelectStep(target.stepId, target.pathId);
+    if (target.stepId !== undefined && target.section !== undefined) setSectionRequest({ stepId: target.stepId, section: target.section });
+    if (target.fieldId !== undefined || target.dataSourceId !== undefined) {
+      setFixRequest({ fieldId: target.fieldId, zone: target.zone, dataSourceId: target.dataSourceId });
+      return;
+    }
+    setPendingFocus({ tab: target.tab, elementId: target.focusId });
+  };
+  // Keyed on `pendingFocus` as well as the tab, so a request on the open tab
+  // lands too. It acts once its tab stands open, on the commit that holds the
+  // element, and clears, so a later tab switch pulls no focus.
   useEffect(() => {
-    if (pendingTabFocus === openTab) focusTabButton(openTab);
-    setPendingTabFocus(undefined);
-  }, [openTab]);
+    if (pendingFocus === undefined || pendingFocus.tab !== openTab) return;
+    const element = pendingFocus.elementId === undefined ? null : document.getElementById(pendingFocus.elementId);
+    if (element === null) focusTabButton(openTab);
+    else element.focus();
+    setPendingFocus(undefined);
+  }, [openTab, pendingFocus]);
   // What the Checks tab narrows to, resolved from the step the badge named.
   // A step the draft no longer holds narrows nothing: the filter drops rather
   // than showing an empty list nobody can widen back by pressing a badge.
@@ -981,14 +1004,10 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     navigate({ name: "edit", processId, formStepId: target });
   };
   /** Leaves the form editor for `target` and hands the focus to that tab's
-   * button, since the control that left unmounts with the editor. A target
-   * already open takes the focus at once: the pending-focus effect fires
-   * only on an `openTab` change, and leaving for the origin tab changes
-   * nothing there. */
+   * button, since the control that left unmounts with the editor. */
   const leaveFormEditorFor = (target: ProcessTab) => {
     goToTab(target);
-    if (target === openTab) focusTabButton(target);
-    else setPendingTabFocus(target);
+    setPendingFocus({ tab: target });
   };
   /** The header bar's "Editing" note: the Settings tab's Process view, with the
    * focus on the Settings tab. `openTabFromRow` keeps the open view, and an
@@ -999,8 +1018,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
       return;
     }
     goToTab("settings", "process");
-    if (openTab === "settings") focusTabButton("settings");
-    else setPendingTabFocus("settings");
+    setPendingFocus({ tab: "settings" });
   };
   /** Leaves the form editor for the tab it stands in. */
   const leaveFormEditor = () => leaveFormEditorFor(formEditorReturnTab(formOrigin));
@@ -1190,6 +1208,8 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                 onRemoveStep={onRemoveStep}
                 selectedPathId={selectedPathId}
                 waysOutRequest={waysOutRequest}
+                sectionRequest={sectionRequest}
+                onSectionOpened={clearSectionRequest}
                 navigate={(target) => openFormEditor(target, "steps")}
                 processes={processes ?? []}
               />
@@ -1214,6 +1234,8 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                 if (action.kind === "form") openFormEditor(action.stepId, "steps");
                 else openTabFromRow(action.target);
               }}
+              fixRequest={fixRequest}
+              onFixLanded={clearFixRequest}
             />,
           )}
           {/* The Forms tab: one plate per step that declares a view
@@ -1229,8 +1251,8 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
               }}
             />,
           )}
-          {/* The one place the full grouped rail stands. A row opens the tab
-              that owns its subject (`studio-process-tabs`). */}
+          {/* The one place the full rail stands. A row's Fix control lands on the
+              place its sentence names (`studio-process-tabs`). */}
           {tabPanel(
             "checks",
             <ChecksRail
@@ -1238,7 +1260,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
               canPublish={canPublish}
               narrowedTo={checksNarrowedTo}
               onShowEvery={() => setChecksStepId(undefined)}
-              onFix={(issue) => openTabFromRow(checkTarget(issue, steps))}
+              onFix={(issue) => fixCheck(checkTarget(issue, draft))}
             />,
           )}
           {/* The Settings tab: the process's own settings, its contract and

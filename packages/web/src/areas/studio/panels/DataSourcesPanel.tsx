@@ -13,6 +13,7 @@ import { IssueList } from "./shared/IssueList";
 import { DB_LIST_TYPE, keyOptions, listKeyOf, unknownListKeyWarning } from "./dataListKeysLogic.js";
 import { INSTANCE_QUERY_TYPE } from "./instanceQueryTypeLogic.js";
 import { removeDataSourceControlId } from "./dataSourceRailLogic.js";
+import { SOURCE_CHECK_ANCHOR_ID } from "./fixLanding.js";
 import { InstanceQueryForm } from "./shared/InstanceQueryForm.js";
 import { fieldsToRefs, type TargetRef } from "./shared/useTargetProcessCatalog.js";
 import type { ConfigFieldDescriptor } from "../api/types.js";
@@ -105,7 +106,7 @@ export function DataSourceRow({ ds, listKeys, registryTypes, registrySchemas, to
         </label>
       )}
       {warning && <p {...stylex.props(styles.studioWarning)}>{warning}</p>}
-      <IssueList entityId={ds.id} />
+      <IssueList entityId={ds.id} anchorId={SOURCE_CHECK_ANCHOR_ID} />
       <button
         id={ds.id === undefined ? undefined : removeDataSourceControlId(ds.id)}
         type="button"

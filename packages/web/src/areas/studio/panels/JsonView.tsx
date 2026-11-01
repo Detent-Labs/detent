@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Draft } from "../draft/types";
 import { t } from "../catalog.js";
+import { JSON_SURFACE_INPUT_ID } from "../draft/process-tabs";
 import { parseDraftText, formatDraftText } from "./draftJsonLogic";
 
 const styles = stylex.create({
@@ -63,6 +64,7 @@ export function JsonView({ draft, onApply }: JsonViewProps) {
       <label>
         {t("jsonView.label")}
         <textarea
+          id={JSON_SURFACE_INPUT_ID}
           {...stylex.props(styles.studioJsonEditor)}
           rows={24}
           value={text}
