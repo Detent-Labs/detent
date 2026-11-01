@@ -17,7 +17,7 @@
 export type FieldCheckZone = "asks" | "kind" | "values" | "default" | "validation" | "columnMapping";
 
 /** The field-declaration key each zone owns. A key absent here names no zone,
- * which is the top-of-half fallback rather than a gap. */
+ * which is the card's top fallback rather than a gap. */
 const ZONE_BY_KEY: Record<string, FieldCheckZone> = {
   key: "asks",
   label: "asks",

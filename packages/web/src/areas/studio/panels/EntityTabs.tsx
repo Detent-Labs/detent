@@ -257,7 +257,7 @@ interface PanelsRailFieldRowProps {
 /**
  * A Fields rail row: the kind icon, the resolved label, and the issue mark,
  * in one button. The row prints no `key` and no visible kind word; the key
- * stays in the definition half once an author selects that field. The kind
+ * stays in the card's Developer view once an author selects that field. The kind
  * name is the icon's tooltip, and it stays in the button's accessible name
  * as hidden text (design.md, decision: "The kind name stays inside the
  * button, visually hidden"). A nested entry's button also names the group
@@ -628,8 +628,8 @@ export function FieldsTab({
             const rowIssues = issueCountForEntityId(validation.issues, row.id);
             const field = fieldsById.get(row.id);
             const label = field ? resolveDraftLocalizedText(field.label, contentLocale, baseLocale) : undefined;
-            // The kind, not the base type: the same word the definition half's
-            // kind picker shows for this field.
+            // The kind, not the base type: the same word the card's kind
+            // picker shows for this field.
             const typeLabel = field ? fieldKindWord(field) : undefined;
             const kindIcon = field ? fieldKindIcon(field) : undefined;
             // The field that holds this one, at any depth. A field past the

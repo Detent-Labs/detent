@@ -126,12 +126,12 @@ export const en = {
   "fieldCatalog.conditionLiteralNote": "This replaces a literal condition on: {steps}.",
   "fieldCatalog.whereValuesHeading": "Where values come from",
   "fieldCatalog.validationHeading": "Validation",
-  // The five control labels of the definition half. They read as words rather
-  // than as the JSON members they write, because the zone headings around them
-  // are plain questions and a raw `dataSource` beside "Where values come from"
-  // put two vocabularies in one zone. The JSON view stays the place that
-  // spells the member names (design.md: the developer's vocabulary no longer
-  // leads). Each one is a word an author reads, so none is mono.
+  // The field card's control labels. They read as words rather than as the
+  // JSON members they write, because the section headings around them are
+  // plain words and a raw `dataSource` beside "Where values come from" put two
+  // vocabularies in one section. The JSON view stays the place that spells the
+  // member names (design.md: the developer's vocabulary no longer leads). Each
+  // one is a word an author reads, so none is mono.
   "fieldCatalog.kindLabel": "Kind",
   "fieldCatalog.descriptionLabel": "Description",
   "fieldCatalog.keyLabel": "Key",

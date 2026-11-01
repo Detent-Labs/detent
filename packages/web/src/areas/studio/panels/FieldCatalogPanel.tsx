@@ -1282,7 +1282,10 @@ function FieldEditor({
           </FlaggedHeading>
         </summary>
         <div {...stylex.props(styles.moreBody)}>
-          <MorePart heading={t("fieldCatalog.whereValuesHeading")} issues={[]}>
+          {/* A column-mapping check on a field the mapping editor no longer
+              shows (no source, or no string field) stands on this part, so
+              no check goes unshown while More opens for it. */}
+          <MorePart heading={t("fieldCatalog.whereValuesHeading")} issues={showsColumnMapping(field, dataSources) ? [] : mappingIssues}>
             <label {...stylex.props(styles.fieldRowLabel)}>
               {t("fieldCatalog.dataSourceLabel")}
               <select

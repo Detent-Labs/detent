@@ -568,6 +568,21 @@ describe("More", () => {
     expect(html.indexOf("check on fields[0].options[0].value")).toBeLessThan(html.indexOf(`id="${fieldLabelInputId("field_a")}"`));
   });
 
+  // `src/schema/compile.ts` raises a `columnMapping` check exactly when the
+  // mapping editor stays out: no source, or no string field.
+  it("prints a column-mapping check inside More on a field the mapping editor no longer shows", () => {
+    const html = renderPanel(draftOf([fld("field_a", "a", { columnMapping: { price: "field_b" } })]), "field_a", {
+      issues: [issue("fields[0].columnMapping")],
+    });
+    const more = moreBody(html);
+
+    expect(moreDetails(html)).toContain('open=""');
+    expect(more).not.toContain(">Column mapping<");
+    expect(more).toMatch(/data-checked="failed"[^>]*>Where values come from</);
+    expect(more.indexOf("check on fields[0].columnMapping")).toBeGreaterThan(more.indexOf(">Where values come from<"));
+    expect(more.indexOf("check on fields[0].columnMapping")).toBeLessThan(more.indexOf(">Default value<"));
+  });
+
   // `studio-app`: "A group's child row keeps its own list".
   it("stands a nested field's check in its own card, and none in its group's card", () => {
     const draft = draftOf([grp("field_g", "g", [fld("field_c", "c")])]);
