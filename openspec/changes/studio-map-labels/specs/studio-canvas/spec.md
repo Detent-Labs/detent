@@ -155,14 +155,14 @@ SHALL open nothing.
 
 ### Requirement: The midpoint handle opens its way out on a double-click
 
-The selected way out's midpoint handle stands over its sentence. A
+The selected way out's midpoint handle can stand over its sentence. A
 double-click on that handle SHALL open the way out, as a double-click on its
 line does. It SHALL NOT add a waypoint.
 
 #### Scenario: The midpoint handle passes a double-click on
 
-- **WHEN** the author selected a way out, so its midpoint handle stands over
-  its sentence
+- **WHEN** the author selected a way out whose sentence sits at its
+  midpoint, under the midpoint handle
 - **AND** the author double-clicks that handle
 - **THEN** the step page opens on the way out's source step, with Ways out
   open
