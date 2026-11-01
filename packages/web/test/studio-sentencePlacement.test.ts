@@ -5,6 +5,7 @@ import {
   placeSentences,
   sentenceLines,
   stampObstacles,
+  SENTENCE_LINE_KEEP,
   SENTENCE_MAX_WIDTH,
   SENTENCE_MIN_WIDTH,
   type Rect,
@@ -22,6 +23,13 @@ const overlaps = (a: Rect, b: Rect): boolean =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 const centre = (r: Rect): Point => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
+
+const areaOver = (box: Rect, rects: Rect[]): number =>
+  rects.reduce((sum, r) => {
+    const w = Math.min(box.x + box.width, r.x + r.width) - Math.max(box.x, r.x);
+    const h = Math.min(box.y + box.height, r.y + r.height) - Math.max(box.y, r.y);
+    return sum + (w > 0 && h > 0 ? w * h : 0);
+  }, 0);
 
 // Two steps side by side, the 60-unit gap Arrange leaves between them.
 const LEFT = { x: 0, y: 0 };
@@ -75,10 +83,8 @@ describe("placeSentences", () => {
     for (const box of [first, second]) {
       for (const node of [LEFT, RIGHT, BELOW_RIGHT]) expect(overlaps(box, nodeRect(node))).toBe(false);
     }
-    // The second slid along its own route: its centre left the midpoint and
-    // still stands on the vertical run.
-    expect(centre(second).x).toBe(210);
-    expect(centre(second).y).not.toBe(90);
+    // The second left its midpoint, where the first already stands.
+    expect(centre(second)).not.toEqual({ x: 210, y: 90 });
   });
 
   it("centres a sentence on its midpoint over open canvas, at most 200 wide", () => {
@@ -95,19 +101,50 @@ describe("placeSentences", () => {
     expect(box.width).toBe(SENTENCE_MAX_WIDTH);
   });
 
-  it("takes the floor width at the midpoint where no box fits", () => {
-    const everywhere = { x: -1000, y: -1000, width: 3000, height: 3000 };
+  it("shifts a box sideways across an off-centre route until it clears the gap", () => {
+    // Two columns of steps, tall enough that no box clears them above or
+    // below, with the 60-unit gap between them. The route runs down the gap
+    // 22 units from the left column, so a 56-wide box centred on it meets
+    // that column. Shifted 8 units right, it stands clear.
+    const left = { x: 478, y: -400, width: 184, height: 1000 };
+    const right = { x: 718, y: -400, width: 184, height: 1000 };
+    const route = [{ x: 682, y: 0 }, { x: 682, y: 200 }];
+
+    const placed = placeSentences([{ key: "p1", text: SENTENCE, route, midpoint: { x: 682, y: 100 } }], [left, right]);
+    const box = placed.get("p1");
+
+    expect(box).toBeDefined();
+    if (!box) return;
+    expect(areaOver(box, [left, right])).toBe(0);
+    expect(box.width).toBe(SENTENCE_MIN_WIDTH);
+    expect(centre(box)).toEqual({ x: 690, y: 100 });
+    // The line still runs through the box, at least 4 units inside it.
+    expect(box.x).toBeLessThanOrEqual(682 - SENTENCE_LINE_KEEP);
+    expect(box.x + box.width).toBeGreaterThanOrEqual(682 + SENTENCE_LINE_KEEP);
+  });
+
+  it("takes the box with the least overlap where none is clear", () => {
+    // A band 20 units tall along the route: a one-line box (22 tall) overlaps
+    // a unit above and below it, the least any box can. "Otherwise" takes one
+    // line from width 72 up, so 72 at the midpoint overlaps least: 144.
+    const above = { x: -1000, y: -1000, width: 3000, height: 990 };
+    const below = { x: -1000, y: 10, width: 3000, height: 990 };
 
     const placed = placeSentences(
-      [{ key: "p1", text: SENTENCE, route: [{ x: 0, y: 0 }, { x: 600, y: 0 }], midpoint: { x: 300, y: 0 } }],
-      [everywhere],
+      [{ key: "p1", text: "Otherwise", route: [{ x: 0, y: 0 }, { x: 600, y: 0 }], midpoint: { x: 300, y: 0 } }],
+      [above, below],
     );
     const box = placed.get("p1");
 
     expect(box).toBeDefined();
     if (!box) return;
-    expect(box.width).toBe(SENTENCE_MIN_WIDTH);
+    expect(box.width).toBe(72);
+    expect(box.lines).toBe(1);
     expect(centre(box)).toEqual({ x: 300, y: 0 });
+    expect(areaOver(box, [above, below])).toBe(144);
+    // The old floor box, 56 wide at the midpoint over two lines, overlaps far more.
+    const floor = { x: 300 - SENTENCE_MIN_WIDTH / 2, y: -19, width: SENTENCE_MIN_WIDTH, height: 38 };
+    expect(areaOver(floor, [above, below])).toBeGreaterThan(144);
   });
 
   it("places each sentence the same way on every run", () => {

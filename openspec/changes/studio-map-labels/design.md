@@ -200,9 +200,15 @@ every sentence the canvas draws at once. It reads geometry and nothing else:
 - It tries widths from 200 down to 56 in steps of 8. At each width it tries
   places along the route, the midpoint first. Then it steps 8 units at a
   time, up to 120 units either way. Each place stays on the route.
+- At each place it tries the box centred on the route first. Then it shifts
+  the box sideways across the segment there, 8 units at a time, nearest
+  first. The place stays inside the box, at least 4 units from its edge, so
+  the box still sits on its line.
 - It keeps the first box that meets no node, no stamp and no sentence it
   already placed. Node rectangles grow by 2 units a side.
-- Where no box fits, the sentence takes the floor width at the midpoint.
+- Where no box is clear, the sentence takes the box it tried with the least
+  area over those obstacles. A tie goes to the wider box, then to the box
+  nearer the midpoint.
 
 The host `<foreignObject>` is the chosen width wide and 96 units high, six
 lines. It centres on the chosen place, and a flex box centres the text block

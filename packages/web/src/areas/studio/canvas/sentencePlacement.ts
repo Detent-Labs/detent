@@ -50,6 +50,8 @@ export const SENTENCE_WIDTH_STEP = 8;
 /** How far a sentence slides along its route, per try and at most, each way. */
 export const SENTENCE_SLIDE_STEP = 8;
 export const SENTENCE_SLIDE_MAX = 120;
+/** How far inside a sideways-shifted box its place on the route stays. */
+export const SENTENCE_LINE_KEEP = 4;
 /** How far a node's rectangle grows each side as an obstacle. */
 export const NODE_CLEARANCE = 2;
 
@@ -99,25 +101,34 @@ export function stampObstacles(words: StampWords, at: Point): Rect[] {
   return rects;
 }
 
-/** Whether two rectangles share area. Touching edges share none. */
-function overlaps(a: Rect, b: Rect): boolean {
-  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+/** The area two rectangles share. Touching edges share none. */
+function overlapArea(a: Rect, b: Rect): number {
+  const w = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+  const h = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+  return w > 0 && h > 0 ? w * h : 0;
 }
 
-/** The point `distance` units along `route` from its first point. */
-function pointAlong(route: Point[], distance: number): Point {
+/** A place on the route: the point, and whether its segment runs across
+ * (`x` changes) or down (`y` changes). A zero-length route counts as across. */
+interface Place {
+  point: Point;
+  across: boolean;
+}
+
+/** The place `distance` units along `route` from its first point. */
+function placeAlong(route: Point[], distance: number): Place {
   let travelled = 0;
   for (let i = 1; i < route.length; i++) {
     const a = route[i - 1];
     const b = route[i];
     const length = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
-    if (travelled + length >= distance) {
-      const ratio = length === 0 ? 0 : (distance - travelled) / length;
-      return { x: a.x + (b.x - a.x) * ratio, y: a.y + (b.y - a.y) * ratio };
+    if (length > 0 && travelled + length >= distance) {
+      const ratio = (distance - travelled) / length;
+      return { point: { x: a.x + (b.x - a.x) * ratio, y: a.y + (b.y - a.y) * ratio }, across: a.y === b.y };
     }
     travelled += length;
   }
-  return route[route.length - 1];
+  return { point: route[route.length - 1], across: true };
 }
 
 /** The route's length, and how far along it `point` stands. The midpoint
@@ -138,10 +149,10 @@ function measure(route: Point[], point: Point): { total: number; at: number } {
   return { total, at: at ?? total / 2 };
 }
 
-/** The slide offsets, nearest first: 0, then +8 and -8, then +16 and -16. */
-function slideOffsets(): number[] {
+/** Offsets nearest first: 0, then +step and -step, and on up to `max`. */
+function offsetsUpTo(max: number, step: number): number[] {
   const offsets = [0];
-  for (let d = SENTENCE_SLIDE_STEP; d <= SENTENCE_SLIDE_MAX; d += SENTENCE_SLIDE_STEP) offsets.push(d, -d);
+  for (let d = step; d <= max; d += step) offsets.push(d, -d);
   return offsets;
 }
 
@@ -150,46 +161,80 @@ function boxAt(centre: Point, width: number, lines: number): SentenceBox {
   return { x: centre.x - width / 2, y: centre.y - height / 2, width, height, lines };
 }
 
+/** The rectangles that can touch any box placed for `route`: those within a
+ * slide and a whole box of its bounds. */
+function obstaclesNear(route: Point[], taken: Rect[]): Rect[] {
+  const reach = SENTENCE_SLIDE_MAX + SENTENCE_MAX_WIDTH;
+  const xs = route.map((p) => p.x);
+  const ys = route.map((p) => p.y);
+  const area = {
+    x: Math.min(...xs) - reach,
+    y: Math.min(...ys) - reach,
+    width: Math.max(...xs) - Math.min(...xs) + 2 * reach,
+    height: Math.max(...ys) - Math.min(...ys) + 2 * reach,
+  };
+  return taken.filter((rect) => overlapArea(area, rect) > 0);
+}
+
 /**
  * Places every sentence at once, in the order given, so the result is
  * deterministic. Each sentence tries widths from `SENTENCE_MAX_WIDTH` down to
  * `SENTENCE_MIN_WIDTH`. At each width it tries places along its route, the
  * midpoint first, then `SENTENCE_SLIDE_STEP` further either way, up to
- * `SENTENCE_SLIDE_MAX`. It keeps the first box that meets no obstacle and no
- * sentence placed before it.
+ * `SENTENCE_SLIDE_MAX`. At each place it tries the box centred on the route,
+ * then boxes shifted sideways across the route's segment by
+ * `SENTENCE_SLIDE_STEP` either way, nearest first. A shift keeps the place
+ * inside the box, `SENTENCE_LINE_KEEP` units clear of its edge, so the box
+ * still sits on its line. The first box that meets no obstacle and no
+ * sentence placed before it wins.
+ *
+ * Where no box is clear, the sentence takes the box it tried with the least
+ * area over obstacles and earlier sentences. A tie goes to the wider box,
+ * then to the one nearer the midpoint.
  *
  * A box holds at most `SENTENCE_MAX_LINES` lines; past them the clamp cuts
- * the text and the hover title carries it whole. Where no box fits, the
- * sentence takes the floor width at its midpoint.
+ * the text and the hover title carries it whole.
  */
 export function placeSentences(sentences: SentenceInput[], obstacles: Rect[]): Map<string, SentenceBox> {
   const placed = new Map<string, SentenceBox>();
   const taken: Rect[] = [...obstacles];
-  const offsets = slideOffsets();
+  const slides = offsetsUpTo(SENTENCE_SLIDE_MAX, SENTENCE_SLIDE_STEP);
   for (const sentence of sentences) {
     const { total, at } = measure(sentence.route, sentence.midpoint);
+    const near = obstaclesNear(sentence.route, taken);
     let chosen: SentenceBox | undefined;
+    let least: { box: SentenceBox; area: number; distance: number } | undefined;
     for (let width = SENTENCE_MAX_WIDTH; width >= SENTENCE_MIN_WIDTH && !chosen; width -= SENTENCE_WIDTH_STEP) {
-      const lines = sentenceLines(sentence.text, width);
-      for (const offset of offsets) {
-        const distance = at + offset;
+      const lines = Math.min(sentenceLines(sentence.text, width), SENTENCE_MAX_LINES);
+      const height = lines * SENTENCE_LINE_HEIGHT + 2 * SENTENCE_PADDING;
+      for (const slide of slides) {
+        const distance = at + slide;
         if (distance < 0 || distance > total) continue;
-        const candidate = boxAt(
-          offset === 0 ? sentence.midpoint : pointAlong(sentence.route, distance),
-          width,
-          Math.min(lines, SENTENCE_MAX_LINES),
-        );
-        if (!taken.some((rect) => overlaps(candidate, rect))) {
-          chosen = candidate;
-          break;
+        const place = placeAlong(sentence.route, distance);
+        const point = slide === 0 ? sentence.midpoint : place.point;
+        // Across a segment that runs across, the box shifts up or down;
+        // across one that runs down, it shifts left or right.
+        const room = (place.across ? height : width) / 2 - SENTENCE_LINE_KEEP;
+        for (const shift of offsetsUpTo(room, SENTENCE_SLIDE_STEP)) {
+          const centre = place.across ? { x: point.x, y: point.y + shift } : { x: point.x + shift, y: point.y };
+          const candidate = boxAt(centre, width, lines);
+          let area = 0;
+          for (const rect of near) area += overlapArea(candidate, rect);
+          if (area === 0) {
+            chosen = candidate;
+            break;
+          }
+          const fromMid = Math.hypot(centre.x - sentence.midpoint.x, centre.y - sentence.midpoint.y);
+          // Widths run widest first, so a tie on area keeps the wider box
+          // already held; within one width the nearer box wins.
+          if (!least || area < least.area || (area === least.area && width === least.box.width && fromMid < least.distance)) {
+            least = { box: candidate, area, distance: fromMid };
+          }
         }
+        if (chosen) break;
       }
     }
-    chosen ??= boxAt(
-      sentence.midpoint,
-      SENTENCE_MIN_WIDTH,
-      Math.min(sentenceLines(sentence.text, SENTENCE_MIN_WIDTH), SENTENCE_MAX_LINES),
-    );
+    chosen ??= least?.box ?? boxAt(sentence.midpoint, SENTENCE_MIN_WIDTH, Math.min(sentenceLines(sentence.text, SENTENCE_MIN_WIDTH), SENTENCE_MAX_LINES));
     placed.set(sentence.key, chosen);
     taken.push(chosen);
   }
