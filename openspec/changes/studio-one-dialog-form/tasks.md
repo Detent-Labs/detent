@@ -7,13 +7,13 @@
 - [x] 1.1 Add `panels/shared/btn.ts` with `btn` and `ghost` per design D10. Move `ChangeList.tsx`, `FormTabStrip.tsx`, `FormEditorScreen.tsx` and `EditScreen.tsx` onto it. Check with the typecheck.
 - [x] 1.2 Give `ToolsScreen.tsx`, `PlayerScreen.tsx`, `VersionsScreen.tsx` and `MigrationPlanScreen.tsx` the helper on their back controls, per D10.
 - [x] 1.2a A source test pins that no studio file writes a literal `.btn` beside `stylex.props`, across line breaks too.
-- [ ] 1.3 Add `panels/shared/dialogFocus.ts` with `wrapTarget`, `dialogFocusables` and `activeControl` per D3 and D4.
-- [ ] 1.3a Add `packages/web/test/studio-dialogFocus.test.ts` for `wrapTarget` at both ends, from outside the list, and with an empty list.
-- [ ] 1.4 Add `panels/shared/StudioDialog.tsx` with the parts of D1, the layout of D2, and the hook of D3 and D4. Its scroll padding satisfies `studio-scrollBoxRingRoom.test.ts`.
-- [ ] 1.5 Add the catalog keys `dialog.cancel` and `dialog.noUndo`.
-- [ ] 1.6 Add `packages/web/test/studio-studioDialog.test.tsx`. Assert the label, the description, the `autofocus` on Cancel and the order of the parts.
-- [ ] 1.6a In that file, assert a count in mono, a mono fact printing 0 and no row at zero. Assert no `dl` with no row, an array of zero counts included. Assert the refusal renders after the body closes.
-- [ ] 1.7 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
+- [x] 1.3 Add `panels/shared/dialogFocus.ts` with `wrapTarget`, `dialogFocusables` and `activeControl` per D3 and D4.
+- [x] 1.3a Add `packages/web/test/studio-dialogFocus.test.ts` for `wrapTarget` at both ends, from outside the list, and with an empty list.
+- [x] 1.4 Add `panels/shared/StudioDialog.tsx` with the parts of D1, the layout of D2, and the hook of D3 and D4. Its scroll padding satisfies `studio-scrollBoxRingRoom.test.ts`.
+- [x] 1.5 Add the catalog keys `dialog.cancel` and `dialog.noUndo`.
+- [x] 1.6 Add `packages/web/test/studio-studioDialog.test.tsx`. Assert the label, the description, the `autofocus` on Cancel and the order of the parts.
+- [x] 1.6a In that file, assert a count in mono, a mono fact printing 0 and no row at zero. Assert no `dl` with no row, an array of zero counts included. Assert the refusal renders after the body closes.
+- [x] 1.7 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
 
 ## 2. The dialogs that exist (studio-app, studio-publish, environment-promotion)
 

@@ -22,6 +22,10 @@ export const en = {
   "app.screenLoading": "Loading the screen…",
   "app.processLegend": "Process",
 
+  // The one dialog form's own words (`panels/shared/StudioDialog.tsx`).
+  "dialog.cancel": "Cancel",
+  "dialog.noUndo": "The studio has no undo.",
+
   "draftToolbar.save": "Save",
   "draftToolbar.saving": "Saving…",
   "draftToolbar.discard": "Discard draft",
