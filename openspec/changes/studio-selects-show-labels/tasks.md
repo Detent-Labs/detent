@@ -62,14 +62,14 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `bun run typecheck` and report its last lines.
-- [ ] 6.2 Run `bun run build` and report its last lines.
-- [ ] 6.3 Run `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test` and report pass, skip and fail.
-- [ ] 6.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and report its exit code.
-- [ ] 6.5 On the host, run the same pipe with `whitespace.sh` and report its exit code.
-- [ ] 6.6 Browser check on the production build: the six selects, a heading, a new step "Prüfung" and its key.
-- [ ] 6.7 Run `/impeccable critique` and `/impeccable audit` on the Steps tab, plus `impeccable detect --json`.
-- [ ] 6.8 Fix every P0 and P1 the audit reports, then rerun 6.1 to 6.3.
+- [x] 6.1 Run `bun run typecheck` and report its last lines.
+- [x] 6.2 Run `bun run build` and report its last lines.
+- [x] 6.3 Run `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test` and report pass, skip and fail.
+- [x] 6.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and report its exit code.
+- [x] 6.5 On the host, run the same pipe with `whitespace.sh` and report its exit code.
+- [x] 6.6 Browser check on the production build: the six selects, a heading, a new step "Prüfung" and its key.
+- [x] 6.7 Run `/impeccable critique` and `/impeccable audit` on the Steps tab, plus `impeccable detect --json`.
+- [x] 6.8 Fix every P0 and P1 the audit reports, then rerun 6.1 to 6.3.
 
 ## Workflow follow-up
 
