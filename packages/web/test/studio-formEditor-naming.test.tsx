@@ -6,7 +6,13 @@ import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 import { draftFields } from "../src/areas/studio/draft/fields.js";
 import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/store.js";
-import { FormEditorScreen, formCardBodyId, formCardNameInputId } from "../src/areas/studio/screens/FormEditorScreen.js";
+import {
+  FormEditorScreen,
+  cardShowsNameInput,
+  formCardBodyId,
+  formCardNameInputId,
+  namingAfterKey,
+} from "../src/areas/studio/screens/FormEditorScreen.js";
 
 /**
  * The form editor's names (`studio-form-editor`): a card prints its field's
@@ -381,6 +387,42 @@ describe("The editor's controls keep their shared button classes", () => {
 
   it("lets the heading take the focus the editor hands it on open", () => {
     expect(headerHtml(html)).toMatch(/<h2 id="form-editor-heading" tabindex="-1"/);
+  });
+});
+
+/** The naming decision a key event drives. A keystroke after Enter on an
+ * unnamed card must still land in the input, so the naming holds until the
+ * label has text (`studio-form-editor`: "An unnamed field keeps its input"). */
+describe("When the naming ends", () => {
+  it("keeps the naming when Enter or Escape meets an empty label", () => {
+    expect(namingAfterKey("Enter", "fld_a", "fld_a", { en: "" }, "en", "en")).toBe("fld_a");
+    expect(namingAfterKey("Escape", "fld_a", "fld_a", { de: "", en: "" }, "de", "en")).toBe("fld_a");
+    expect(namingAfterKey("Enter", "fld_a", undefined, undefined, "en", "en")).toBe("fld_a");
+  });
+
+  it("ends the naming when Enter or Escape meets a label", () => {
+    expect(namingAfterKey("Enter", "fld_a", "fld_a", { en: "Amount" }, "en", "en")).toBeUndefined();
+    expect(namingAfterKey("Escape", "fld_a", "fld_a", { en: "Amount" }, "en", "en")).toBeUndefined();
+    expect(namingAfterKey("Enter", "fld_a", "fld_a", { de: "", en: "Amount" }, "de", "en")).toBeUndefined();
+  });
+
+  it("leaves the naming alone on any other key", () => {
+    expect(namingAfterKey("a", "fld_a", "fld_a", { en: "" }, "en", "en")).toBe("fld_a");
+    expect(namingAfterKey("Tab", "fld_a", undefined, { en: "Amount" }, "en", "en")).toBeUndefined();
+  });
+
+  it("keeps the input on an empty card, typed into after Enter, until the next Enter", () => {
+    const afterEnter = namingAfterKey("Enter", "fld_a", "fld_a", { en: "" }, "en", "en");
+    expect(cardShowsNameInput("fld_a", afterEnter, { en: "A" }, "en", "en")).toBe(true);
+    const afterSecondEnter = namingAfterKey("Enter", "fld_a", afterEnter, { en: "Amount" }, "en", "en");
+    expect(cardShowsNameInput("fld_a", afterSecondEnter, { en: "Amount" }, "en", "en")).toBe(false);
+  });
+
+  it("shows the card's own control for a label in the base locale alone", () => {
+    expect(cardShowsNameInput("fld_a", undefined, { de: "", en: "Amount" }, "de", "en")).toBe(false);
+    expect(cardShowsNameInput("fld_a", undefined, { de: "", en: "" }, "de", "en")).toBe(true);
+    expect(cardShowsNameInput("fld_a", "fld_a", { en: "Amount" }, "en", "en")).toBe(true);
+    expect(cardShowsNameInput("fld_a", "fld_b", { en: "Amount" }, "en", "en")).toBe(false);
   });
 });
 

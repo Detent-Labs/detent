@@ -5149,7 +5149,7 @@ async (page) => {
 
 Source: `studio-narrow-widths` tasks 5.18 and 5.19. The test
 `studio-narrowWidths.test.ts` pins the 80rem query in both files, and it lays
-out no grid. This entry reads the turn and a key's line count in a browser.
+out no grid. This entry reads the turn and a label's line count in a browser.
 
 See this file's "Before you start" section for the build and the address.
 Seed the database and sign in as `demo-superuser@example.test`, password
@@ -5160,18 +5160,19 @@ Exit Notification", choose "Open the form". Under `playwright-cli`, pass
 
 The function below reads the form editor at 1300, 1280 and 1100px wide. Per
 width it returns the grid's column tracks, the preview's place and its
-divider. It also compares the height of the `full_name` key's box with the
-key's computed line height, as `keyLines`.
+divider. It also reads the label "First and last name" on the `full_name`
+card. It divides the label's box height by its line height, as `labelLines`.
+The card prints no key.
 
 1. Read the result for 1300px. Pass: `columns` lists three tracks, and
    `previewBeside` reads true. Three columns stand, with the preview beside
-   the canvas. Pass: `keyLines` reads 1.
+   the canvas. Pass: `labelLines` reads 1.
 2. Read the result for 1280px. Pass: `columns` lists two tracks, and
    `previewUnder` reads true. The preview stands under both columns. Pass:
    `divider` reads `0px` left and `2px` top, on its top edge alone. Pass:
-   `keyLines` reads 1.
+   `labelLines` reads 1.
 3. Read the result for 1100px. Pass: the three pass lines of step 2 hold
-   here too. The key holds one line at this width as well.
+   here too. The label holds one line at this width as well.
 4. Choose the breadcrumb's first crumb, Forms, then "← Back to processes". Choose
    "Discard draft" on the "IT Offboarding" row and accept the browser's confirm.
    Under `playwright-cli`, `dialog-accept` answers it. The header bar's own
@@ -5183,21 +5184,21 @@ async (page) => {
     const palette = document.querySelector('nav[aria-label="Catalog fields not on this form"]');
     const canvas = document.querySelector('ol[aria-label="Form layout"]');
     const preview = document.querySelector('aside[aria-label="What a participant meets"]');
-    const key = [...canvas.querySelectorAll("span")].find((el) => el.textContent === "full_name");
+    const label = [...canvas.querySelectorAll("span")].find((el) => el.textContent === "First and last name");
     const p = palette.getBoundingClientRect();
     const c = canvas.getBoundingClientRect();
     const v = preview.getBoundingClientRect();
     const ps = getComputedStyle(preview);
-    const keyHeight = key.getBoundingClientRect().height;
-    const lineHeight = parseFloat(getComputedStyle(key).lineHeight);
+    const labelHeight = label.getBoundingClientRect().height;
+    const lineHeight = parseFloat(getComputedStyle(label).lineHeight);
     return {
       columns: getComputedStyle(preview.parentElement).gridTemplateColumns,
       previewBeside: v.left >= c.right - 1 && v.top < c.bottom,
       previewUnder: v.top >= Math.max(p.bottom, c.bottom) - 1,
       divider: { left: ps.borderLeftWidth, top: ps.borderTopWidth },
-      keyHeight,
+      labelHeight,
       lineHeight,
-      keyLines: Math.round(keyHeight / lineHeight),
+      labelLines: Math.round(labelHeight / lineHeight),
     };
   };
   const result = {};
@@ -5698,12 +5699,16 @@ dragged "Ticket no. (Fabrikam)" onto the placed `full_name` card to confirm
 it. Clicking a palette entry still places it in a new group at the end.
 This check clicked "Handover type" to confirm that.
 
-The "Add a field to the process" section below stays the same. "Text",
-"Choice", "Date", "File" and "Section" still print as plain text, without
-icons. The placed field cards on the canvas keep their old look too. The
-`full_name` card under "Personal details" still shows the raw `key` in the
-mono face. It still carries required/span/type marks and Move up/Move
-down/Remove controls.
+The "Add a field to the process" section below lists the sixteen field
+kinds. Each row shows the kind's Lucide icon and its name, such as "Text",
+"Long text" or "Date and time". The change `studio-form-editor-names-fields`
+rewrote this entry on 2026-11-01.
+
+A placed field's card shows its label and, under it, the kind's icon and
+name. The `full_name` card under "Personal
+details" reads "First and last name" over "Text", with no `key` on it. It
+keeps its Move up, Move down and Remove controls. A Required or Read-only
+mark shows only where the step sets one.
 
 The Fields tab's entity rail renders the same "Processing (Fabrikam)" /
 "Ticket no. (Fabrikam)" pair. It uses the same icon, the same label text and

@@ -1876,7 +1876,7 @@ last six. The SENTENCE tag is local to this section.
 ## Open from studio-form-editor-names-fields (needs its own OpenSpec change)
 
 The change named fields on the form editor's cards and stood the editor under
-the tab row. It left two points to later changes. The NAMES tag is local to
+the tab row. It left seven points to later changes. The NAMES tag is local to
 this section.
 
 - **NAMES-1: the Forms tab's legend says "Section" and the palette says
@@ -1888,6 +1888,24 @@ this section.
   with an empty label keeps its name input and offers no strip. The input says
   what to do, and the Fields tab still edits the field. Change 11's field card
   may answer whether such a card can take a selection.
+- **NAMES-4: a minted key can stay its kind's name.** The key lock counts a
+  base version that has not loaded as published, and a failed fetch never
+  loads. On such a process, naming a new field "Amount" keeps the key
+  `number`. The Fields tab's own add mints an empty key and still derives one.
+- **NAMES-5: naming in a non-base content locale leaves the base label.** A
+  name typed in German lands in `de` alone. The base-locale label keeps the
+  kind's name, so an English participant reads "Date". No translation warning
+  fires, since the base entry has text.
+- **NAMES-6: three screens still lose their `.btn` look.** Tools, Player and
+  Versions write a literal `.btn` class beside `stylex.props`. The compiled
+  class replaces it, so their back controls differ from the process surface's.
+- **NAMES-7: "Put this field on a step" leaves the editor onto Steps.** The
+  form editor opens on the Steps tab, and leaving it lands on the step page.
+  The author reaches the Fields tab's open field again only by hand.
+- **NAMES-8: browser Back out of the form editor drops the focus.** The
+  breadcrumb and a tab press move the focus. The browser's own Back moves
+  none, so the focus falls to the page body. The archived NAMES-3 fix covers
+  only the first two exits.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

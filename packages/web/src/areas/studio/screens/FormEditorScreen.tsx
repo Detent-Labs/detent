@@ -630,6 +630,37 @@ function hasLabelText(label: DraftLocalizedText, contentLocale: string, baseLoca
   return !!label?.[contentLocale] || !!label?.[baseLocale];
 }
 
+/** Whether a field's card shows its name input in place of its own control:
+ * while it is naming, or while neither the content locale nor the base locale
+ * holds a label (`studio-form-editor`: "A card whose field has no label ...
+ * SHALL keep the input"). */
+export function cardShowsNameInput(
+  fieldId: string,
+  naming: string | undefined,
+  label: DraftLocalizedText,
+  contentLocale: string,
+  baseLocale: string,
+): boolean {
+  return naming === fieldId || !hasLabelText(label, contentLocale, baseLocale);
+}
+
+/** The naming state after a key in a card's name input. Enter or Escape ends
+ * the naming once the label holds text in the content locale or the base
+ * locale. A label without text keeps it, so the card keeps its input through
+ * the next keystroke instead of swapping it out from under the focus. Any
+ * other key leaves the state as it is. */
+export function namingAfterKey<T extends string>(
+  key: string,
+  fieldId: T,
+  naming: T | undefined,
+  label: DraftLocalizedText,
+  contentLocale: string,
+  baseLocale: string,
+): T | undefined {
+  if (key !== "Enter" && key !== "Escape") return naming;
+  return hasLabelText(label, contentLocale, baseLocale) ? undefined : fieldId;
+}
+
 /** A label for display: the content locale's text, else the base locale's.
  * Unlike `resolveDraftLocalizedText`, a cleared translation falls through to
  * the base locale. */
@@ -1172,12 +1203,14 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
 
   /** Enter or Escape ends the naming, and the focus moves onto the card's own
    * control on the next frame, once the card has drawn it. A card still
-   * without a label keeps its input, so no such control exists and the focus
-   * stays in the input. */
+   * without a label keeps its input and its naming (`namingAfterKey`), so the
+   * focus stays in the input and the next keystroke lands there too. */
   const nameKeyDown = (fieldId: FieldId) => (e: KeyboardEvent) => {
     if (e.key !== "Enter" && e.key !== "Escape") return;
     e.preventDefault();
-    setNaming(undefined);
+    const next = namingAfterKey(e.key, fieldId, naming, fieldFor(fieldId)?.label, contentLocale, baseLocale);
+    setNaming(next);
+    if (next !== undefined) return;
     requestAnimationFrame(() => document.getElementById(formCardBodyId(fieldId))?.focus());
   };
   /** Focus on a card's name input starts the naming, so a card whose label is
@@ -1239,12 +1272,9 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
   /** A field's label for display, never its key. */
   const labelFor = (ref_: FieldId | undefined) =>
     displayLabel(fieldFor(ref_)?.label, contentLocale, baseLocale) ?? t("formEditor.unnamedField");
-  /** Whether a field's card shows its name input in place of its own
-   * control: while it is naming, or while neither the content locale nor the
-   * base locale holds a label (`studio-form-editor`: "A card whose field has
-   * no label ... SHALL keep the input"). */
+  /** `cardShowsNameInput` for a card's field, if it has an id. */
   const showsNameInput = (field: DraftField | undefined): field is DraftField & { id: string } =>
-    field?.id !== undefined && (naming === field.id || !hasLabelText(field.label, contentLocale, baseLocale));
+    field?.id !== undefined && cardShowsNameInput(field.id, naming, field.label, contentLocale, baseLocale);
   /** A group's card always draws at the form's full width and `form-ui` reads
    * no `span` on it, so the canvas draws it that way and the strip offers no
    * span control for it. A note names no catalog field, so it is never a
