@@ -12,9 +12,9 @@
 
 ## 2. Save point routes and client
 
-- [ ] 2.1 Add the four handlers to `src/http/studio-routes.ts` and dispatch them in `src/http/server.ts` per D9. Pass: `test/draft-save-points.http.test.ts` covers 200, 201, 204, 400, 401, 403, 404 and 409, plus the admin and Developer-list cases.
-- [ ] 2.2 Add the four calls to `api/client.ts` and their types to `api/types.ts`. A 409 answers `undefined`, as `saveDraft` does. Pass: a client test covers the 409 and the success shapes.
-- [ ] 2.3 Export `SAVE_TIMEOUT_MS` from `api/client.ts`. Pass `signal: AbortSignal.timeout(SAVE_TIMEOUT_MS)` in `saveDraft` and the three save point write calls. Pass: a client test reads a timed-out call as the `network` error.
+- [x] 2.1 Add the four handlers to `src/http/studio-routes.ts` and dispatch them in `src/http/server.ts` per D9. Pass: `test/draft-save-points.http.test.ts` covers 200, 201, 204, 400, 401, 403, 404 and 409, plus the admin and Developer-list cases.
+- [x] 2.2 Add the four calls to `api/client.ts` and their types to `api/types.ts`. A 409 answers `undefined`, as `saveDraft` does. Pass: a client test covers the 409 and the success shapes.
+- [x] 2.3 Export `SAVE_TIMEOUT_MS` from `api/client.ts`. Pass `signal: AbortSignal.timeout(SAVE_TIMEOUT_MS)` in `saveDraft` and the three save point write calls. Pass: a client test reads a timed-out call as the `network` error.
 
 ## 3. The autosave core
 

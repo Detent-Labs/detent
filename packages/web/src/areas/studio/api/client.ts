@@ -1,6 +1,9 @@
 import type {
   DraftRecord,
   DraftSummary,
+  SavePointList,
+  SavePointSummary,
+  RestoredDraft,
   ProcessSummary,
   VersionSummary,
   PublishResult,
@@ -88,6 +91,13 @@ export interface SaveDraftInput {
   baseVersion?: number;
 }
 
+/**
+ * How long a draft write waits before the call fails as the `network` error.
+ * A hung request would otherwise hold the autosave's `held` state for good, so
+ * a timed-out write takes the retry path a dropped connection takes.
+ */
+export const SAVE_TIMEOUT_MS = 30_000;
+
 /** `undefined` on a 409 — a save conflict is expected, resolved by the caller via reload, never a thrown control-flow error. */
 export async function saveDraft(processId: string, input: SaveDraftInput, token: string): Promise<DraftRecord | undefined> {
   try {
@@ -95,12 +105,70 @@ export async function saveDraft(processId: string, input: SaveDraftInput, token:
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(input),
+      signal: AbortSignal.timeout(SAVE_TIMEOUT_MS),
     });
     return (await res.json()) as DraftRecord;
   } catch (err) {
     if (err instanceof AppClientError && err.error.type === "draft-conflict") return undefined;
     throw err;
   }
+}
+
+/** A draft's save points, newest first, with the bound the server states. */
+export function listSavePoints(processId: string, token: string): Promise<SavePointList> {
+  return getJson(`/drafts/${encodeURIComponent(processId)}/save-points`, token);
+}
+
+/** `undefined` on a 409: the draft moved past `revision`. The caller reloads, as it does for `saveDraft`. */
+export async function createSavePoint(
+  processId: string,
+  input: { name: string; revision: number },
+  token: string,
+): Promise<SavePointSummary | undefined> {
+  try {
+    const res = await request(`/drafts/${encodeURIComponent(processId)}/save-points`, token, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(SAVE_TIMEOUT_MS),
+    });
+    return (await res.json()) as SavePointSummary;
+  } catch (err) {
+    if (err instanceof AppClientError && err.error.type === "draft-conflict") return undefined;
+    throw err;
+  }
+}
+
+/** `undefined` on a 409, as `createSavePoint`. The answer is the saved draft without the permission flags. */
+export async function restoreSavePoint(
+  processId: string,
+  savePointId: string,
+  input: { revision: number; keepName: string },
+  token: string,
+): Promise<RestoredDraft | undefined> {
+  try {
+    const res = await request(
+      `/drafts/${encodeURIComponent(processId)}/save-points/${encodeURIComponent(savePointId)}/restore`,
+      token,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(SAVE_TIMEOUT_MS),
+      },
+    );
+    return (await res.json()) as RestoredDraft;
+  } catch (err) {
+    if (err instanceof AppClientError && err.error.type === "draft-conflict") return undefined;
+    throw err;
+  }
+}
+
+export async function removeSavePoint(processId: string, savePointId: string, token: string): Promise<void> {
+  await request(`/drafts/${encodeURIComponent(processId)}/save-points/${encodeURIComponent(savePointId)}`, token, {
+    method: "DELETE",
+    signal: AbortSignal.timeout(SAVE_TIMEOUT_MS),
+  });
 }
 
 export async function deleteDraft(processId: string, token: string): Promise<void> {

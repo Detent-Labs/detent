@@ -35,6 +35,27 @@ export interface DraftRecord {
   canPublish: boolean;
 }
 
+/** The restore route's answer: the saved draft, without the per-request permission flags `GET /drafts/:processId` adds. */
+export type RestoredDraft = Omit<DraftRecord, "canPlanMigration" | "canPublish">;
+
+/** Mirrors src/http/studio-routes.ts::SavePointListEntry. */
+export interface SavePointSummary {
+  savePointId: string;
+  processId: string;
+  name: string;
+  revision: number;
+  createdBy: string;
+  createdAt: string;
+  /** Absent from a create answer, which resolves no name. */
+  createdByDisplayName?: string | null;
+}
+
+/** `GET /drafts/:processId/save-points`. `limit` is the server's bound on one draft's points. */
+export interface SavePointList {
+  items: (SavePointSummary & { createdByDisplayName: string | null })[];
+  limit: number;
+}
+
 /** Mirrors src/http/studio-routes.ts::DraftListEntry, without the body. */
 export interface DraftSummary {
   processId: string;
