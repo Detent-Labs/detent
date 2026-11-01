@@ -552,6 +552,8 @@ export function StepPage({
             label={t("steps.onEntryLegend")}
             actions={step.onEntry}
             fields={fields}
+            contentLocale={contentLocale}
+            baseLocale={baseLocale}
             registryTypes={registry?.actionTypes}
             registrySchemas={registry?.actionSchemas}
             onChange={(onEntry) => updateStep({ onEntry })}
@@ -658,10 +660,13 @@ export function StepPage({
           <TimersPanel
             timers={step.timers}
             paths={step.paths ?? []}
+            steps={steps}
             fields={fields}
             onChange={(timers) => updateStep({ timers })}
             registryTypes={registry?.actionTypes}
             registrySchemas={registry?.actionSchemas}
+            contentLocale={contentLocale}
+            baseLocale={baseLocale}
           />
         );
       case "exit":
@@ -671,6 +676,8 @@ export function StepPage({
               label={t("steps.onExitLegend")}
               actions={step.onExit}
               fields={fields}
+              contentLocale={contentLocale}
+              baseLocale={baseLocale}
               registryTypes={registry?.actionTypes}
               registrySchemas={registry?.actionSchemas}
               onChange={(onExit) => updateStep({ onExit })}
@@ -679,6 +686,8 @@ export function StepPage({
               label={t("steps.onCancelLegend")}
               actions={step.onCancel}
               fields={fields}
+              contentLocale={contentLocale}
+              baseLocale={baseLocale}
               registryTypes={registry?.actionTypes}
               registrySchemas={registry?.actionSchemas}
               onChange={(onCancel) => updateStep({ onCancel })}
@@ -716,6 +725,7 @@ export function StepPage({
               onChange={(subprocess) => updateStep({ subprocess })}
               processes={[...processes]}
               contentLocale={contentLocale}
+              baseLocale={baseLocale}
             />
             {/* The only route to a loaded child body in the whole studio.
                 checkSubprocessChildRefs runs against nothing without it. */}

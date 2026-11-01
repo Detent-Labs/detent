@@ -11,7 +11,7 @@ import { t } from "../catalog.js";
 import { processLabel } from "../draft/guided-labels.js";
 import { specForProcess } from "../draft/subprocessSpec";
 import { FieldExpressionMapEditor } from "./shared/FieldExpressionMapEditor";
-import { nextUnusedTarget } from "./shared/fieldExpressionMapLogic";
+import { fieldTargets, nextUnusedTarget, refTargets, type MapTarget } from "./shared/fieldExpressionMapLogic";
 import type { ChildInputFields } from "./shared/useChildInputFields";
 
 type DraftSpec = DraftOf<SubprocessSpec>;
@@ -44,18 +44,24 @@ interface Props {
   /** The locale the studio is displaying authored content in, so a picker
    * entry reads the process's own label in that locale. */
   contentLocale: string;
+  /** The draft's base locale: an output-mapping field label falls back to it. */
+  baseLocale: string;
 }
 
-/** The note under the `inputMapping` editor, when "+ add" is disabled or the child's fields are not a usable list. */
-function childInputsNote(childInputs: ChildInputFields, mappedKeys: readonly string[]) {
+/**
+ * The note under the `inputMapping` editor, when "+ add" is disabled or the
+ * child's fields are not a usable list. `targets` is the list the editor's
+ * select offers, so the note and "+ add" agree.
+ */
+function childInputsNote(childInputs: ChildInputFields, targets: readonly MapTarget[], mappedKeys: readonly string[]) {
   switch (childInputs.status) {
     case "loading":
       return t("subprocess.childInputsLoading");
     case "failed":
       return t("subprocess.childInputsFailed");
     case "ready":
-      if (childInputs.fields.length === 0) return t("subprocess.childInputsNone");
-      return nextUnusedTarget(childInputs.fields, mappedKeys) === undefined ? t("subprocess.noteAllMapped") : undefined;
+      if (targets.length === 0) return t("subprocess.childInputsNone");
+      return nextUnusedTarget(targets, mappedKeys) === undefined ? t("subprocess.noteAllMapped") : undefined;
     default:
       return undefined;
   }
@@ -65,7 +71,7 @@ function childInputsNote(childInputs: ChildInputFields, mappedKeys: readonly str
  * Call-and-return subprocess wiring on a `subprocess`-type step (design.md,
  * .claude/rules/process-contract.md "Subprocesses").
  */
-export function SubprocessSpecEditor({ value, fields, childInputs, onChange, processes, contentLocale }: Props) {
+export function SubprocessSpecEditor({ value, fields, childInputs, onChange, processes, contentLocale, baseLocale }: Props) {
   const noteId = useId();
   const processId = value?.processId ?? "";
   // A stored id the list does not carry still has to keep its place in the
@@ -114,7 +120,8 @@ export function SubprocessSpecEditor({ value, fields, childInputs, onChange, pro
   const binding = value.versionBinding ?? "pinned";
   const updateMapping = (kind: MappingKind, next: Partial<Record<FieldId, DraftOf<Expression>>>) =>
     update({ [kind]: next } as Partial<DraftSpec>);
-  const note = childInputsNote(childInputs, Object.keys(value.inputMapping ?? {}));
+  const inputTargets = refTargets(childInputs.fields);
+  const note = childInputsNote(childInputs, inputTargets, Object.keys(value.inputMapping ?? {}));
 
   return (
     <fieldset className="subprocess-spec">
@@ -162,8 +169,8 @@ export function SubprocessSpecEditor({ value, fields, childInputs, onChange, pro
         addLabel={t("subprocess.addInputMapping")}
         removeLabel={t("subprocess.removeMappingEntry")}
         mapping={value.inputMapping}
-        fields={childInputs.fields}
-        addDisabled={childInputs.status !== "ready" || childInputs.fields.length === 0}
+        targets={inputTargets}
+        addDisabled={childInputs.status !== "ready" || inputTargets.length === 0}
         addDescribedBy={note ? noteId : undefined}
         targetsKnown={childInputs.status === "ready"}
         onChange={(next) => updateMapping("inputMapping", next)}
@@ -177,7 +184,7 @@ export function SubprocessSpecEditor({ value, fields, childInputs, onChange, pro
         addLabel={t("subprocess.addOutputMapping")}
         removeLabel={t("subprocess.removeMappingEntry")}
         mapping={value.outputMapping}
-        fields={fields}
+        targets={fieldTargets(fields, contentLocale, baseLocale)}
         onChange={(next) => updateMapping("outputMapping", next)}
       />
     </fieldset>

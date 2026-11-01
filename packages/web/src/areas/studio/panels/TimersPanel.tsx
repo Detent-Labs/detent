@@ -1,7 +1,7 @@
 import { useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
-import type { Path, PathId, Timer } from "workflow-engine/schema";
+import type { Path, PathId, Step, Timer } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { mintId } from "../draft/ids";
@@ -10,12 +10,14 @@ import { deadlinePatch } from "../draft/timer-deadline.js";
 import { maxTimeLimitCount, timeLimitDuration, timeLimitInRange, timeLimitParts, type TimeLimitUnit } from "../draft/time-limit.js";
 import { t, type CatalogKey } from "../catalog.js";
 import { ExpressionInput } from "./shared/ExpressionInput";
+import { numberRepeats, stepText, wayOutHeading } from "./shared/optionText";
 import { IssueList } from "./shared/IssueList";
 import { ActionListEditor } from "./ActionListEditor";
 import type { ConfigFieldDescriptor } from "../api/types.js";
 
 type DraftTimer = DraftOf<Timer>;
 type DraftPath = DraftOf<Path>;
+type DraftStep = DraftOf<Step>;
 
 const styles = stylex.create({
   timeLimit: {
@@ -138,8 +140,13 @@ function TimeLimitInput({ value, onChange }: { value: string | undefined; onChan
 interface Props {
   timers: DraftTimer[] | undefined;
   paths: DraftPath[];
+  /** Every step of the draft: a way out's option names its target step. */
+  steps: DraftStep[];
   fields: DraftField[];
   onChange: (next: DraftTimer[]) => void;
+  /** The studio's content locale and the draft's base locale, for step and field labels. */
+  contentLocale: string;
+  baseLocale: string;
   /** The action registry's live type names and config-schema descriptions (GET /registry), for `onFire.actions`. */
   registryTypes?: string[];
   registrySchemas?: Record<string, ConfigFieldDescriptor[]>;
@@ -151,8 +158,28 @@ function modeOf(timer: DraftTimer): DurationMode {
   return timer.deadline !== undefined ? "deadline" : "duration";
 }
 
-export function TimersPanel({ timers, paths, fields, onChange, registryTypes, registrySchemas }: Props) {
+export function TimersPanel({
+  timers,
+  paths,
+  steps,
+  fields,
+  onChange,
+  registryTypes,
+  registrySchemas,
+  contentLocale,
+  baseLocale,
+}: Props) {
   const list = timers ?? [];
+
+  // A way out reads as its row heading in the Ways out section, counted when
+  // two headings match. The step texts are counted over the whole draft first,
+  // so a heading names its target exactly as "Leads to" does.
+  const stepOptionTexts = numberRepeats(steps, (s) => stepText(s, contentLocale, baseLocale));
+  const stepTexts = new Map<string, string>();
+  steps.forEach((s, i) => {
+    if (s.id !== undefined) stepTexts.set(s.id, stepOptionTexts[i] ?? "");
+  });
+  const pathTexts = numberRepeats(paths, (p) => wayOutHeading(p, stepTexts));
 
   const addTimer = () => {
     const next: DraftTimer = { id: mintId("timer"), duration: "PT1H", onFire: {} };
@@ -215,9 +242,9 @@ export function TimersPanel({ timers, paths, fields, onChange, registryTypes, re
                 }
               >
                 <option value="">{t("timers.reminderOption")}</option>
-                {paths.map((p) => (
+                {paths.map((p, i) => (
                   <option key={p.id} value={p.id}>
-                    {p.key ?? p.id}
+                    {pathTexts[i]}
                   </option>
                 ))}
               </select>
@@ -228,6 +255,8 @@ export function TimersPanel({ timers, paths, fields, onChange, registryTypes, re
               actions={timer.onFire?.actions}
               onChange={(actions) => updateTimer(index, { onFire: { ...timer.onFire, actions } })}
               fields={fields}
+              contentLocale={contentLocale}
+              baseLocale={baseLocale}
               registryTypes={registryTypes}
               registrySchemas={registrySchemas}
             />

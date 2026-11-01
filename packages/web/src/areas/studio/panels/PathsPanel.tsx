@@ -7,8 +7,8 @@ import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { newPath, pathWithTrigger, triggerForNewPath } from "../draft/createPath";
 import { removeAt, replaceAt, updateAt } from "../draft/list-ops";
-import { resolveDraftLocalizedText } from "../draft/localized-text";
 import { t } from "../catalog.js";
+import { numberRepeats, stepText, wayOutHeading } from "./shared/optionText";
 import { ConditionInput } from "./shared/ConditionInput";
 import { IssueList } from "./shared/IssueList";
 import { ActionListEditor } from "./ActionListEditor";
@@ -254,26 +254,19 @@ export function PathsPanel({
   const sourceStep = steps.find((s) => s.id === stepId);
   const targetStep = steps.find((s) => s.id === newPathTarget);
 
+  // One text per step, counted in draft order: the step selects and every
+  // row heading read the same map, so "Review (2)" names one step everywhere.
+  const stepOptionTexts = numberRepeats(steps, (s) => stepText(s, contentLocale, baseLocale));
+  const stepTexts = new Map<string, string>();
+  steps.forEach((s, i) => {
+    if (s.id !== undefined) stepTexts.set(s.id, stepOptionTexts[i] ?? "");
+  });
+
   const addPath = () => {
     if (!sourceStep || !targetStep?.id) return;
     const trigger = triggerForNewPath(sourceStep);
     onChange([...list, newPath(sourceStep, targetStep, targetStep.id, trigger, contentLocale, baseLocale, t("steps.unnamedStep"))]);
     setNewPathTarget("");
-  };
-
-  /** The row's heading sentence (design.md D4). The target reads its label in
-   * the content locale, then its key, then its id, the way the select prints
-   * a step. */
-  const rowHeading = (path: DraftPath): string => {
-    const pathLabel = path.label?.trim() ? path.label : t("paths.unnamedPath");
-    const target = path.to === undefined || path.to === "" ? undefined : steps.find((s) => s.id === path.to);
-    const targetLabel =
-      target === undefined
-        ? t("paths.noTargetYet")
-        : resolveDraftLocalizedText(target.label, contentLocale, baseLocale)?.trim() || target.key || target.id || t("paths.noTargetYet");
-    // One pass over both placeholders: a label holding `{step}` or `$&`
-    // passes through literally.
-    return t("paths.rowHeading").replace(/\{(path|step)\}/g, (_, k: string) => (k === "path" ? pathLabel : targetLabel));
   };
 
   const removePath = (index: number) => onChange(removeAt(list, index));
@@ -291,7 +284,7 @@ export function PathsPanel({
           key={path.id ?? index}
         >
           {/* An h4: the step page's section heading above is an h3. */}
-          <h4 {...stylex.props(styles.rowHeading)}>{rowHeading(path)}</h4>
+          <h4 {...stylex.props(styles.rowHeading)}>{wayOutHeading(path, stepTexts)}</h4>
           <label {...stylex.props(styles.fieldLabel, styles.nameLabel)}>
             <span {...stylex.props(styles.fieldLabelText)}>
               {t("paths.labelCaption")}
@@ -315,9 +308,9 @@ export function PathsPanel({
                 <option value="" disabled>
                   {t("paths.selectTargetStep")}
                 </option>
-                {steps.map((s) => (
+                {steps.map((s, i) => (
                   <option key={s.id} value={s.id}>
-                    {s.key ?? s.id}
+                    {stepOptionTexts[i]}
                   </option>
                 ))}
               </select>
@@ -393,6 +386,8 @@ export function PathsPanel({
             actions={path.onPath}
             onChange={(onPath) => updatePath(index, { onPath })}
             fields={fields}
+            contentLocale={contentLocale}
+            baseLocale={baseLocale}
             registryTypes={registryTypes}
             registrySchemas={registrySchemas}
           />
@@ -429,9 +424,9 @@ export function PathsPanel({
             <option value="" disabled>
               {t("paths.selectTargetStep")}
             </option>
-            {steps.map((s) => (
+            {steps.map((s, i) => (
               <option key={s.id} value={s.id}>
-                {s.key ?? s.id}
+                {stepOptionTexts[i]}
               </option>
             ))}
           </select>

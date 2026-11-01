@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getVersionBody } from "../../api/client.js";
 import { fieldsToRefs, type TargetRef } from "./useTargetProcessCatalog";
 
-/** One input field of the called process: the id the mapping stores and the key it prints. */
+/** One input field of the called process: the id the mapping stores and the label the select prints, read in the child's base locale. */
 export type ChildInputRef = TargetRef;
 
 /**
