@@ -19,6 +19,14 @@ export function resolveDraftLocalizedText(
   return value?.[locale] ?? value?.[baseLocale];
 }
 
+/** The process-name input's placeholder: the base-language name while the
+ * edited language has none, so an author translating sees what to translate.
+ * With no base-language name either, `unnamed`. */
+export function nameInputPlaceholder(label: DraftLocalizedText, baseLocale: string | undefined, unnamed: string): string {
+  const base = baseLocale ?? "en";
+  return resolveDraftLocalizedText(label, base, base) || unnamed;
+}
+
 /** Writes `text` into `value`'s entry for `locale` only, leaving every
  * other locale entry untouched — the merge `LocalizedTextInput` performs on
  * every keystroke, extracted so it's directly testable without simulating

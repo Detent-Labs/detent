@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { FileJson, History, MoreVertical, Play } from "lucide-react";
+import { FileJson, History, MoreVertical, Play, Trash2 } from "lucide-react";
 import { colors, focus, fonts, space, shadow } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
-import { missingTranslationWarning, resolveDraftLocalizedText } from "../draft/localized-text";
+import { collectUsedLocales, missingTranslationWarning, nameInputPlaceholder, resolveDraftLocalizedText } from "../draft/localized-text";
 import { deriveKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
-import { ContentLocaleBadge } from "./shared/ContentLocaleSwitcher.js";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput.js";
 import { IssueList } from "./shared/IssueList.js";
 import { useConfirmDialog } from "./shared/confirmDialog.js";
+import { localeOptionLabel } from "./shared/ContentLocaleSwitcher.js";
 import { PublishChanges } from "./PublishChanges.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
-import { publishAvailability, nextVersionLabel } from "../screens/draftToolbarState.js";
+import { editingLocaleNote, formatSavedTime, headerStateLine, nextVersionLabel, publishAvailability, saveFocusTarget } from "../screens/draftToolbarState.js";
 import type { DraftToolbarActions } from "./DraftToolbar.js";
 import type { ValidationResult } from "../draft/validation.js";
 import type { PublishResult } from "../api/types.js";
@@ -31,8 +31,30 @@ const styles = stylex.create({
     borderBottomColor: colors.divider,
     marginBottom: space.s3,
   },
+  // Back, name, issue sentence, state, Save, the note and the Versions
+  // offer. It takes the row's free space from a zero basis and wraps inside
+  // itself, so a control appearing here moves nothing in the trailing cluster.
+  // The minimum basis keeps the name readable: where the row cannot give the
+  // group that much beside the cluster, the cluster wraps under it.
+  leading: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    gap: space.s3,
+    flex: "1 1 0",
+    minWidth: "min(24rem, 100%)",
+  },
+  backControl: {
+    paddingLeft: 0,
+    whiteSpace: "nowrap",
+  },
+  // The cap sits here, on the shrink-to-fit parent, so a long name leaves no
+  // empty width between the input and the state line. The input inherits the
+  // font, so `ch` reads the same on both.
   headerBarName: {
     margin: 0,
+    minWidth: 0,
+    maxWidth: "min(40ch, 100%)",
     fontFamily: fonts.heading,
     fontWeight: fonts.headingWeight,
     fontSize: "1rem",
@@ -58,35 +80,33 @@ const styles = stylex.create({
     color: "inherit",
     width: "auto",
     minWidth: "8ch",
+    // Sizes to its text up to the `h1`'s cap. A browser with no `field-sizing`
+    // keeps the input's default width.
+    fieldSizing: "content",
+    maxWidth: "100%",
   },
   warning: {
+    margin: 0,
+    marginBlockEnd: space.s3,
     color: colors.refusal,
     borderLeftWidth: 3,
     borderLeftStyle: "solid",
     borderLeftColor: colors.advisory,
     paddingLeft: space.s2,
   },
-  headerBarKey: {
-    fontFamily: fonts.mono,
+  // The state line's own ground is the muted tone. Dirty words and a fresh
+  // version each pick their own (`studio-canvas`, `studio-publish`).
+  stateLine: {
     color: colors.textMuted,
   },
-  headerBarBadge: {
-    fontFamily: fonts.mono,
-    color: colors.textMuted,
-  },
-  headerBarDirty: {
+  stateDirty: {
     color: colors.refusal,
   },
-  headerBarSaved: {
-    color: colors.textMuted,
-  },
-  headerBarTimestamp: {
-    fontFamily: fonts.mono,
-    color: colors.textMuted,
-  },
-  headerBarPublished: {
-    fontFamily: fonts.mono,
+  stateJustPublished: {
     color: colors.text,
+  },
+  stateVersion: {
+    fontFamily: fonts.mono,
   },
   // Wraps the button group and the `⋮` menu as one flex item within
   // `headerBar`, so `headerBar`'s own wrap never splits them onto separate
@@ -102,6 +122,7 @@ const styles = stylex.create({
     alignItems: "center",
     justifyContent: "flex-end",
     gap: space.s2,
+    flex: "0 1 auto",
     marginLeft: "auto",
   },
   draftActions: {
@@ -175,6 +196,26 @@ const styles = stylex.create({
     minWidth: 0,
     overflowWrap: "anywhere",
   },
+  dialogLanguages: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+  },
+  // The machine values stand in a closed disclosure under the facts, in the
+  // shape the Settings tab's Developer view takes.
+  dialogDeveloper: {
+    marginBlock: space.s3,
+  },
+  dialogDeveloperSummary: {
+    cursor: "pointer",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
+  },
+  dialogMono: {
+    fontFamily: fonts.mono,
+  },
   dialogNote: {
     color: colors.textMuted,
     fontSize: "0.9rem",
@@ -200,7 +241,9 @@ const styles = stylex.create({
     position: "absolute",
     right: 0,
     top: `calc(100% + ${space.s1})`,
-    zIndex: 1,
+    // Above the field matrix's sticky headers, at 2 and 3, so a press on an
+    // entry reaches that entry.
+    zIndex: 4,
     minWidth: "16rem",
     display: "flex",
     flexDirection: "column",
@@ -211,8 +254,9 @@ const styles = stylex.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  // The menu's one group. No top border: the panel's own border already
-  // divides it from whatever is above the menu.
+  // One group of the menu. No top border: the label and the panel's gap divide
+  // the two groups, and the panel's own border divides the first from whatever
+  // is above the menu.
   headerBarMenuGroup: {
     display: "flex",
     flexDirection: "column",
@@ -237,6 +281,11 @@ const styles = stylex.create({
     // without this, since text-align governs a flex item's own inline
     // content independently of the row's justify-content.
     textAlign: "left",
+  },
+  // A publish's findings, a block under the bar with the banners' own rhythm.
+  findings: {
+    marginBlockStart: 0,
+    marginBlockEnd: space.s3,
   },
   // `.studio-edit-screen > *` used to zero every direct child's own
   // top margin, since a flex column does not collapse adjacent ones the
@@ -437,6 +486,7 @@ function PublishConfirmDialog({
 }) {
   const { ref, declineRef } = useConfirmDialog(triggerRef);
   const dialogProps = stylex.props(styles.dialog);
+  const languages = collectUsedLocales(draft);
 
   return (
     <dialog
@@ -450,16 +500,10 @@ function PublishConfirmDialog({
       <dl {...stylex.props(styles.dialogFacts)}>
         <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogProcess")}</dt>
         <dd {...stylex.props(styles.dialogFactsDd)}>{processLabel}</dd>
-        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogProcessId")}</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>
-          <code>{processId}</code>
-        </dd>
-        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogRevision")}</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>{revision}</dd>
         {/* "Next version", not "Version": the engine assigns the number, and
             another environment can promote one between this load and this
-            publish. The header's own published stamp reports what the engine
-            actually assigned. */}
+            publish. The header bar's state reports what the engine actually
+            assigned. */}
         <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.publishDialogNextVersion")}</dt>
         <dd {...stylex.props(styles.dialogFactsDd)}>
           <code>{nextVersion}</code>
@@ -468,8 +512,37 @@ function PublishConfirmDialog({
             so the dialog and the control can never disagree. */}
         <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.publishDialogOpenIssues")}</dt>
         <dd {...stylex.props(styles.dialogFactsDd)}>{openIssues}</dd>
+        {/* A draft in one language has no language to name. Each language
+            reads as the content-locale select's option does. */}
+        {languages.length > 1 && (
+          <>
+            <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogLanguages")}</dt>
+            <dd {...stylex.props(styles.dialogFactsDd)}>
+              <ul {...stylex.props(styles.dialogLanguages)}>
+                {languages.map((code) => (
+                  <li key={code}>{localeOptionLabel(draft, code)}</li>
+                ))}
+              </ul>
+            </dd>
+          </>
+        )}
         <PublishChanges processId={processId} token={token} baseVersion={baseVersion} draft={draft} contentLocale={contentLocale} />
       </dl>
+      <details {...stylex.props(styles.dialogDeveloper)}>
+        <summary {...stylex.props(styles.dialogDeveloperSummary)}>{t("draftToolbar.dialogDeveloperView")}</summary>
+        <dl {...stylex.props(styles.dialogFacts)}>
+          {draft.key && (
+            <>
+              <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogKey")}</dt>
+              <dd {...stylex.props(styles.dialogFactsDd, styles.dialogMono)}>{draft.key}</dd>
+            </>
+          )}
+          <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogProcessId")}</dt>
+          <dd {...stylex.props(styles.dialogFactsDd, styles.dialogMono)}>{processId}</dd>
+          <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogRevision")}</dt>
+          <dd {...stylex.props(styles.dialogFactsDd, styles.dialogMono)}>{revision}</dd>
+        </dl>
+      </details>
       {blocked && <p {...stylex.props(styles.dialogBlocked)}>{t("draftToolbar.publishDialogBlocked")}</p>}
       {dirty && <p {...stylex.props(styles.dialogNote)}>{t("draftToolbar.publishDialogUnsaved")}</p>}
       <p {...stylex.props(styles.dialogNote)}>{t("draftToolbar.publishDialogImmutable")}</p>
@@ -558,10 +631,61 @@ function DiscardConfirmDialog({
   );
 }
 
+/**
+ * The header bar's state (studio-canvas: "The header bar's state says what
+ * holds for the draft"). `headerStateLine` picks the parts. One `role="status"`
+ * span prints them, so a screen reader hears "Saved" when Save vanishes. Every
+ * control beside the state stands after this span, never inside it.
+ *
+ * `tabIndex={-1}` lets the focus land here when a save's answer removes the
+ * button that held it. Nothing else moves the focus here.
+ */
+function DraftStateLine({
+  ref,
+  dirty,
+  lastSavedAt,
+  baseVersion,
+  justPublished,
+}: {
+  ref: RefObject<HTMLSpanElement | null>;
+  dirty: boolean;
+  lastSavedAt: Date | undefined;
+  baseVersion: number | null;
+  justPublished: boolean;
+}) {
+  const line = headerStateLine(dirty, lastSavedAt && formatSavedTime(lastSavedAt), baseVersion);
+  const words =
+    line.state === "unsaved"
+      ? t("headerBar.unsaved")
+      : line.state === "savedAt"
+        ? t("headerBar.savedAt").replace("{time}", () => line.time ?? "")
+        : t("headerBar.saved");
+  // One catalog sentence around a mono version.
+  const [beforeVersion, afterVersion] = t("headerBar.versionPublished").split("{version}");
+  return (
+    <span ref={ref} role="status" tabIndex={-1} {...stylex.props(styles.stateLine)}>
+      <span {...stylex.props(dirty && styles.stateDirty)}>{words}</span>
+      {line.version !== undefined && (
+        <>
+          {" · "}
+          <span {...stylex.props(justPublished && styles.stateJustPublished)}>
+            {beforeVersion}
+            <span {...stylex.props(styles.stateVersion)} translate="no">
+              {line.version}
+            </span>
+            {afterVersion}
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
 interface Props {
   revision: number;
   isDirty: boolean;
   lastSavedAt: Date | undefined;
+  /** The last publish's answer in this session. The bar prints its findings. */
   publishResult: PublishResult | null;
   /** `saveState.conflict` — the caller already owns `saveState`, so this
    * stays a plain pass-through rather than a second copy. Drives the conflict
@@ -572,14 +696,14 @@ interface Props {
   /** `useDraftToolbarActions`'s own return value, lifted by the caller the
    * same way `saveState` already is. The header bar reads it fully now: the
    * failure state for the banner below, and `save`/`discard`/`publish`/
-   * `pendingDialog`/`resolveDialog` for the button group and its two
-   * dialogs. */
+   * `pendingDialog`/`resolveDialog` for the controls and the two dialogs. */
   actions: DraftToolbarActions;
   /** Gates the Publish control and names the reason when unavailable
    * (`studio-publish`). */
   canPublish: boolean;
-  /** The published version the draft sits on. The publish dialog names the
-   * version a publish would mint from it, and compares the draft with it. */
+  /** The published version the draft sits on. The state line prints it. The
+   * publish dialog names the version a publish would mint from it, and compares
+   * the draft with it. */
   baseVersion: number | null;
   /** Feeds the publish dialog's open-issue count and its blocked state — the
    * same groups the area nav's Checks control reads, so the two can never
@@ -589,15 +713,22 @@ interface Props {
    * dialogs. */
   processLabel: string;
   /** True while a tab stands open, false while the JSON surface does. It
-   * picks the JSON entry's label, and disables the process label input:
-   * `studio-json-view` requires every draft-body-mutating control stay
-   * unreachable while the JSON surface is open. The content-locale badge
-   * mutates nothing that surface edits, so it renders either way. */
+   * picks the JSON entry's label, disables the process label input and hides
+   * the "Editing" note: `studio-json-view` requires every draft-body-mutating
+   * control stay unreachable while the JSON surface is open, and that surface
+   * reads no content locale. */
   structureActive: boolean;
   /** The open process's id, named in the publish dialog. */
   processId: string;
   /** The session token the publish dialog's base-body read sends. */
   token: string;
+  /** True from a successful publish until the draft next changes. It takes the
+   * version to the ink tone and raises the Versions offer (`studio-publish`). */
+  justPublished: boolean;
+  /** Leaves for the process list, through the leave guard. */
+  onBack: () => void;
+  /** Opens the Settings tab's Process view, from the "Editing" note. */
+  onOpenSettings: () => void;
   /** Flips the JSON surface. `ProcessTabRow` keeps its own `jsonOpen` prop —
    * this menu derives the same fact from `structureActive` (`= !jsonOpen`)
    * instead of taking a second, redundant copy. */
@@ -607,19 +738,28 @@ interface Props {
 }
 
 /**
- * The process-identity header bar (studio-canvas: "A process-identity
- * header bar shows draft and publish status"). The name, the revision
- * badge, the dirty/saved state, the last-saved time and the published
- * version stay a read-only pass-through of state the process surface owns —
- * no logic of their own.
+ * The process-identity header bar (studio-canvas: "The header bar holds back,
+ * name, state, Test, Publish and the menu"). Two groups share the row. The
+ * `leading` group holds the back control, the name, the state and whatever
+ * stands beside the state. The trailing cluster holds Test, Publish and the
+ * `⋮` trigger. No key, id, revision or hash prints here: those stand in the
+ * Settings tab's Developer view.
  *
- * The `⋮` menu carries one group, "Views": the JSON surface toggle,
- * Versions and Player, navigation to other views of this process that stays
- * reachable whichever surface is active. The process settings stand on the
- * Settings tab. The menu carries no Save, no Discard and no Publish — those three stand
- * in this row instead, right-aligned ahead of the menu trigger
- * (`studio-process-tabs`). The studio's area nav carries no draft control:
- * the Checks tab's own count reports that state instead.
+ * Save stands beside the state while the draft is dirty (`studio-process-tabs`).
+ * While a save runs it reads "Saving…" and carries `aria-disabled` with a press
+ * guard, so the button keeps the focus. A native `disabled` would blur it. When
+ * the answer removes the button, the focus moves to the state line, not the
+ * body. A ref set by the press limits that to this case.
+ *
+ * The Versions offer stands while `justPublished` does. The "Editing" note stands
+ * while `editingLocaleNote` names a language. Both are controls after the state,
+ * and neither moves the trailing cluster.
+ *
+ * The `⋮` menu carries two groups. "Views" holds the JSON surface toggle, Versions
+ * and Player, navigation to other views of this process. "Draft" holds Discard
+ * draft. The menu stays reachable whichever surface is active. The process
+ * settings stand on the Settings tab. The studio's area nav carries no draft
+ * control: the Checks tab's own count reports that state instead.
  *
  * The panel implements no arrow-key navigation, so it carries no
  * `role="menu"`; the trigger's `aria-haspopup="true"` names a plain
@@ -629,22 +769,21 @@ interface Props {
  *
  * Save, Discard draft and Publish are wired to the same `actions`
  * (`useDraftToolbarActions`, called once by `EditScreen.tsx`) the error
- * banner below already reads. Both confirmation dialogs render here too, so
- * focus returns to the pressed button when either closes: Publish names the
- * process, its id, the revision, the next version, the open issue count and
- * the changes since the base version;
- * Discard names the process, the revision and the last-saved time.
+ * banner below already reads. Both confirmation dialogs render here too. Publish
+ * returns the focus to its own control. Discard draft's entry unmounts when the
+ * menu closes, so its dialog returns the focus to the `⋮` trigger. Publish names
+ * the process, its id, the revision, the next version, the open issue count and
+ * the changes since the base version; Discard names the process, the revision
+ * and the last-saved time.
  *
- * `DraftToolbar`'s error message and its save-conflict banner render as
- * alert banners after the header row, and its publish-success confirmation
- * (the published summary field above) stays in the row. All three sit outside
- * the menu — a closed menu must never hide the one moment a conflict most
- * needs attention (design.md).
+ * A publish's findings, the action error and the save-conflict banner all render
+ * after the header row as block siblings. A closed menu must never hide the one
+ * moment a conflict most needs attention.
  *
- * The process label's own `LocalizedTextInput` and missing-translation
- * warning stay in the header row's own `<h1>` (studio-app: "Every inline
- * missing-translation warning SHALL survive the move ... the process label,
- * which stays on the screen").
+ * The process label's own `LocalizedTextInput` stays in the header row's own
+ * `<h1>`, and its missing-translation warning stands after the header as a
+ * block sibling (studio-app: "Every inline missing-translation warning SHALL
+ * survive the move ... the process label, which stays on the screen").
  */
 export function ProcessHeaderBar({
   revision,
@@ -660,6 +799,9 @@ export function ProcessHeaderBar({
   structureActive,
   processId,
   token,
+  justPublished,
+  onBack,
+  onOpenSettings,
   onToggleJson,
   onVersions,
   onPlayer,
@@ -669,7 +811,9 @@ export function ProcessHeaderBar({
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const publishTriggerRef = useRef<HTMLButtonElement>(null);
-  const discardTriggerRef = useRef<HTMLButtonElement>(null);
+  const stateLineRef = useRef<HTMLSpanElement>(null);
+  // Set by a press on Save, cleared once that save answers.
+  const savePressedRef = useRef(false);
 
   // The blocking verdict the publish dialog states, from the same groups the
   // area nav's Checks control reads. The `view` group holds the studio's own
@@ -698,6 +842,16 @@ export function ProcessHeaderBar({
     };
   }, [menuOpen]);
 
+  // A save's answer can unmount the button that holds the focus, which drops the
+  // focus to the body. `saveFocusTarget` rules on it once the save has answered.
+  useEffect(() => {
+    if (actions.saving) return;
+    const pressed = savePressedRef.current;
+    savePressedRef.current = false;
+    const target = saveFocusTarget({ pressed, clean: !isDirty, focusOnBody: document.activeElement === document.body });
+    if (target === "stateLine") stateLineRef.current?.focus();
+  }, [actions.saving, isDirty]);
+
   const runMenuAction = (action: () => void) => {
     setMenuOpen(false);
     action();
@@ -707,89 +861,99 @@ export function ProcessHeaderBar({
 
   const headerBarNameInputProps = stylex.props(styles.headerBarNameInput);
   const headerBarMenuLinkProps = stylex.props(styles.headerBarMenuLink);
+  const backControlProps = stylex.props(styles.backControl);
+  const editingLanguage = editingLocaleNote(contentLocale, draft.baseLocale, !structureActive);
+  const nameWarning = missingTranslationWarning(draft.label, contentLocale, draft.baseLocale);
 
   return (
     <>
     <header {...stylex.props(styles.headerBar)}>
-      {/* The one h1 this route renders (task 5.1 removed the screen's old
-          generic "Process Studio" <h1>, the duplicate-status pair
-          proposal.md names as the problem this change fixes): every other
-          studio screen's own h1 already names that screen's specific
-          content the same way (Player, Versions, Tools), and this names the
-          loaded process.
+      <div {...stylex.props(styles.leading)}>
+        <button
+          type="button"
+          className={`btn btn-ghost ${backControlProps.className}`}
+          style={backControlProps.style}
+          aria-label={t("headerBar.backLabel")}
+          onClick={onBack}
+        >
+          {t("headerBar.back")}
+        </button>
+        {/* The one h1 this route renders. Every other studio screen's own h1
+            names that screen's content the same way (Player, Versions, Tools),
+            and this names the loaded process.
 
-          Editable, not read-only text: studio-app's "canvas-primary
-          surface" requirement lists the process label as one of six
-          LocalizedTextInput sites and requires it "stays on the screen" —
-          unlike a step's label or a field's label, which move into a
-          disclosure or the shared modal. The old ProcessHeader fieldset's
-          label input lives here now, inline, never behind the ⋮ menu.
+            Editable: studio-app's "canvas-primary surface" requirement lists the
+            process label as one of six LocalizedTextInput sites and requires it
+            "stays on the screen".
 
-          `disabled` while the JSON surface is active, not conditionally
-          rendered: this header renders on both surfaces (DraftToolbar and
-          the content-locale switcher both "remain visible and usable
-          regardless of which surface is active", studio-json-view), but the
-          process header itself is explicitly named there as one of the
-          draft-body-mutating components that SHALL NOT stay reachable while
-          JSON is active — unlike those two, this field does call
-          `mutate()`. A disabled input drops out of the tab order and fires
-          no onChange, so it satisfies "not reachable" while still showing
-          the current value. */}
-      <h1 {...stylex.props(styles.headerBarName)}>
-        <LocalizedTextInput
-          value={draft.label}
-          placeholder={t("headerBar.unnamedProcess")}
-          disabled={!structureActive}
-          className={headerBarNameInputProps.className}
-          style={headerBarNameInputProps.style}
-          onChange={(next) => {
-            const baseLocale = draft.baseLocale ?? "en";
-            const priorDerivedKey = deriveKey(resolveDraftLocalizedText(draft.label, baseLocale, baseLocale) ?? "");
-            const deriveNextKey = shouldAutoDeriveKey(draft.key ?? "", priorDerivedKey);
-            mutate((d) => {
-              d.label = next;
-              if (deriveNextKey) {
-                d.key = deriveKey(resolveDraftLocalizedText(next, baseLocale, baseLocale) ?? "");
-              }
-            });
-          }}
+            `disabled` while the JSON surface is active, not conditionally
+            rendered: this header renders on both surfaces, but `studio-json-view`
+            names the process header among the draft-body-mutating components
+            that SHALL NOT stay reachable there, and this field calls `mutate()`.
+            A disabled input drops out of the tab order and fires no onChange, so
+            it satisfies "not reachable" while still showing the current value. */}
+        <h1 {...stylex.props(styles.headerBarName)}>
+          <LocalizedTextInput
+            value={draft.label}
+            ariaLabel={t("headerBar.nameLabel")}
+            placeholder={nameInputPlaceholder(draft.label, draft.baseLocale, t("headerBar.unnamedProcess"))}
+            disabled={!structureActive}
+            className={headerBarNameInputProps.className}
+            style={headerBarNameInputProps.style}
+            onChange={(next) => {
+              const baseLocale = draft.baseLocale ?? "en";
+              const priorDerivedKey = deriveKey(resolveDraftLocalizedText(draft.label, baseLocale, baseLocale) ?? "");
+              const deriveNextKey = shouldAutoDeriveKey(draft.key ?? "", priorDerivedKey);
+              mutate((d) => {
+                d.label = next;
+                if (deriveNextKey) {
+                  d.key = deriveKey(resolveDraftLocalizedText(next, baseLocale, baseLocale) ?? "");
+                }
+              });
+            }}
+          />
+        </h1>
+        <IssueList entityId="process" />
+        <DraftStateLine
+          ref={stateLineRef}
+          dirty={isDirty}
+          lastSavedAt={lastSavedAt}
+          baseVersion={baseVersion}
+          justPublished={justPublished}
         />
-      </h1>
-      {missingTranslationWarning(draft.label, contentLocale, draft.baseLocale) && (
-        <p {...stylex.props(styles.warning)}>{missingTranslationWarning(draft.label, contentLocale, draft.baseLocale)}</p>
-      )}
-      {/* Read-only; the editable key control lives in the Settings tab's
-          Developer view. studio-canvas's header-bar requirement
-          names this display explicitly: "the process name and the key in
-          the mono face." */}
-      {draft.key && <span {...stylex.props(styles.headerBarKey)}>{draft.key}</span>}
-      <IssueList entityId="process" />
-      <span {...stylex.props(styles.headerBarBadge)}>
-        {t("headerBar.revision")} {revision}
-      </span>
-      <span {...stylex.props(isDirty ? styles.headerBarDirty : styles.headerBarSaved)}>
-        {isDirty ? t("headerBar.unsaved") : t("headerBar.saved")}
-      </span>
-      {!isDirty && lastSavedAt && (
-        <span {...stylex.props(styles.headerBarTimestamp)}>
-          {t("headerBar.lastSaved")} {lastSavedAt.toLocaleTimeString()}
-        </span>
-      )}
-      {publishResult && (
-        <span {...stylex.props(styles.headerBarPublished)}>
-          {t("headerBar.published")} v{publishResult.version} ({publishResult.definitionHash.slice(0, 12)})
-        </span>
-      )}
+        {isDirty && (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            aria-disabled={actions.saving ? true : undefined}
+            onClick={() => {
+              if (actions.saving) return;
+              savePressedRef.current = true;
+              actions.save();
+            }}
+          >
+            {actions.saving ? t("draftToolbar.saving") : t("draftToolbar.save")}
+          </button>
+        )}
+        {editingLanguage !== undefined && (
+          <button type="button" className="btn btn-ghost" onClick={onOpenSettings}>
+            {t("headerBar.editingNote").replace("{language}", () => editingLanguage)}
+          </button>
+        )}
+        {justPublished && (
+          <button type="button" className="btn btn-ghost" onClick={onVersions}>
+            {t("headerBar.versions")}
+          </button>
+        )}
+      </div>
 
-      <ContentLocaleBadge />
-
-      {/* Right-aligned, ahead of the `⋮` trigger (`studio-process-tabs`):
-          always visible, never inside the menu, on every tab and while the
-          JSON surface is active — this row renders unconditionally above the
-          tab row regardless of `jsonOpen`. Wrapped together with the `⋮`
-          menu below in one `trailingCluster` so a narrow viewport wraps them
-          as a unit instead of stranding the menu alone at the row's left
-          edge (design.md). */}
+      {/* Test and Publish, right-aligned ahead of the `⋮` trigger
+          (`studio-process-tabs`): always visible, never inside the menu, on
+          every tab and while the JSON surface is active — this row renders
+          unconditionally above the tab row regardless of `jsonOpen`. Wrapped
+          together with the `⋮` menu below in one `trailingCluster` so a narrow
+          viewport wraps them as a unit instead of stranding the menu alone at
+          the row's left edge. */}
       <div {...stylex.props(styles.trailingCluster)}>
         {/* The cluster's leading item, so the reason reads on the row's own
             baseline beside the state it explains, wraps with the controls it
@@ -797,11 +961,8 @@ export function ProcessHeaderBar({
         <PublishReasonLine canPublish={canPublish} blocked={blocked} noStepYet={validation.noStepYet} />
 
         <div {...stylex.props(styles.draftActions)}>
-          <button type="button" className="btn btn-secondary" disabled={actions.saving} onClick={actions.save}>
-            {actions.saving ? t("draftToolbar.saving") : t("draftToolbar.save")}
-          </button>
-          <button ref={discardTriggerRef} type="button" className="btn btn-ghost" onClick={actions.discard}>
-            {t("draftToolbar.discard")}
+          <button type="button" className="btn btn-secondary" onClick={onPlayer}>
+            {t("headerBar.test")}
           </button>
           <PublishNavControl
             canPublish={canPublish}
@@ -827,13 +988,13 @@ export function ProcessHeaderBar({
           </button>
           {menuOpen && (
             <div {...stylex.props(styles.headerBarMenuPanel)}>
-              {/* One group, Views: navigation to other views of this
-                  process, never a draft-body mutation, so it stays reachable
-                  whichever surface is active. Save, Discard draft and Publish
-                  stand in this row instead, and the process settings on the
-                  Settings tab (`studio-process-tabs`). The panel holds command
-                  buttons alone but implements no arrow-key navigation, so it
-                  carries no `role="menu"`/`menuitem` pair. */}
+              {/* Views: navigation to other views of this process, never a
+                  draft-body mutation, so it stays reachable whichever surface is
+                  active. Draft holds Discard draft. Save and Publish stand in
+                  this row instead, and the process settings on the Settings tab
+                  (`studio-process-tabs`). The panel holds command buttons alone
+                  but implements no arrow-key navigation, so it carries no
+                  `role="menu"`/`menuitem` pair. */}
               <div {...stylex.props(styles.headerBarMenuGroup)}>
                 <span {...stylex.props(styles.headerBarMenuLabel)}>{t("headerBar.menuGroupViews")}</span>
                 <button
@@ -862,6 +1023,18 @@ export function ProcessHeaderBar({
                 >
                   <Play size={18} strokeWidth={1.75} aria-hidden="true" />
                   {t("headerBar.player")}
+                </button>
+              </div>
+              <div {...stylex.props(styles.headerBarMenuGroup)}>
+                <span {...stylex.props(styles.headerBarMenuLabel)}>{t("headerBar.menuGroupDraft")}</span>
+                <button
+                  type="button"
+                  className={`btn btn-secondary btn-destructive ${headerBarMenuLinkProps.className}`}
+                  style={headerBarMenuLinkProps.style}
+                  onClick={() => runMenuAction(actions.discard)}
+                >
+                  <Trash2 size={18} strokeWidth={1.75} aria-hidden="true" />
+                  {t("draftToolbar.discard")}
                 </button>
               </div>
             </div>
@@ -894,7 +1067,7 @@ export function ProcessHeaderBar({
           processLabel={processLabel}
           revision={revision}
           lastSavedAt={lastSavedAt}
-          triggerRef={discardTriggerRef}
+          triggerRef={triggerRef}
           error={actions.error}
           busy={false}
           onCancel={() => actions.resolveDialog(false)}
@@ -902,8 +1075,15 @@ export function ProcessHeaderBar({
         />
       )}
 
+      </header>
+
+      {/* A block sibling, beside the failure banners: in the row it grew the
+          bar to three lines. It reports a gap, not a failure, so it stays
+          through an open dialog, which repeats nothing of it. */}
+      {nameWarning && <p {...stylex.props(styles.warning)}>{nameWarning}</p>}
+
       {publishResult && publishResult.findings.length > 0 && (
-        <ul className="issue-list">
+        <ul className={`issue-list ${stylex.props(styles.findings).className}`}>
           {publishResult.findings.map((f, i) => (
             <li key={i} className="issue issue-finding">
               {t("headerBar.findingPrefix")} {f.dataSourceId ?? f.loc}: {f.reference} (
@@ -915,14 +1095,13 @@ export function ProcessHeaderBar({
           ))}
         </ul>
       )}
-      </header>
 
       {/* Siblings of the header, not items inside it. The header is a wrapping
           flex row, so a bordered banner placed in it stays one more item on a
-          wrapped line, beside ten badges — the exact rendering that let a 403
-          reach the DOM and reach nobody. `.studio-edit-screen` is a flex
-          column, so a block sibling needs no rule of its own; the
-          `.draft-incomplete` paragraph is already one.
+          wrapped line — the exact rendering that let a 403 reach the DOM and
+          reach nobody. `.studio-edit-screen` is a flex column, so a block
+          sibling needs no rule of its own; the `.draft-incomplete` paragraph
+          is already one.
 
           Suppressed while a dialog is open: the dialog reports the same
           failure inside itself, and two alert regions for one failure announce

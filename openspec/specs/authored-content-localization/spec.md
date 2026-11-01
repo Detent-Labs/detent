@@ -55,10 +55,13 @@ reaches neither of them, and no type error marks its absence.
 
 The inline missing-translation warning does not read that walk.
 `missingTranslationWarning` takes one value. Each site declaring a
-`LocalizedTextInput` also calls it, directly beside that input. A new
+`LocalizedTextInput` also calls it, directly beside that input. The process label
+draws its result below the header bar. A new
 `LocalizedText` position therefore SHALL carry its own call, beside its own
 input.
 
+<!-- antislop: allow passive-voice -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 #### Scenario: A label missing the base-locale entry is rejected
 - **WHEN** a process declares `baseLocale: "en"` and a step's `label` is
   `{ de: "Prüfen" }` (no `en` entry)
@@ -70,6 +73,8 @@ input.
 - **THEN** the process body parses successfully (subject to every other
   invariant)
 
+<!-- antislop: allow long-words -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 #### Scenario: A label with the base locale plus additional locales is valid
 - **WHEN** a process declares `baseLocale: "en"` and a step's `label` is
   `{ en: "Review", de: "Prüfen" }`

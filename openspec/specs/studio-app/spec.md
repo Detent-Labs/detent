@@ -69,12 +69,17 @@ the role authoritatively.
 <!-- antislop: allow synonym-rotation -->
 <!-- A MODIFIED header cannot change, so the header keeps the base words. -->
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 ### Requirement: Leaving the edit screen with unsaved changes prompts first
 
+<!-- antislop: allow sentence-length -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 Every control that navigates away from an open draft SHALL check the dirty
 state before navigating. The requirement "A layout change counts as an unsaved
-change" defines that state. The check covers the edit screen's own "Back to
-processes", "Versions" and "Player" links and the `⋮` menu's groups link. It
+change" defines that state. The check covers the header bar's back control, Test and
+Versions offer, the `⋮` menu's Versions and Player entries, and the Access view's
+groups link. It
 also covers the "Processes", "Tools" and "Templates" tabs, and the account
 menu's area switch, profile entry and logout.
 
@@ -89,7 +94,7 @@ prompt with a `t()` string.
 
 <!-- antislop: allow synonym-rotation -->
 <!-- Discard names the toolbar control; remove names a field removal. -->
-The toolbar's Publish and Discard controls no longer share that pattern.
+The header bar's Publish and Discard draft controls no longer share that pattern.
 Each confirms in a dialog of the application's own instead. Each commits an
 act the developer cannot undo. See `studio-publish` for the publish dialog,
 and the requirement below for the other one. A navigation prompt guards no
@@ -115,7 +120,7 @@ A Back or Forward step between entries of this page is out of scope.
 #### Scenario: An unsaved change on the edit screen's own nav prompts first
 
 - **WHEN** the developer has an unsaved change on the open draft and
-  chooses "Back to processes", "Versions" or "Player"
+  chooses the back control, Test, Versions or Player
 - **THEN** the screen asks for confirmation before navigating
 
 #### Scenario: An unsaved change on the studio area's top-level nav prompts first
@@ -127,7 +132,7 @@ A Back or Forward step between entries of this page is out of scope.
 #### Scenario: The groups link prompts first
 
 - **WHEN** the developer has an unsaved change and chooses "Manage assignment
-  groups for this process" in the `⋮` menu
+  groups for this process" on the Access view
 - **THEN** the screen asks for confirmation before navigating to the admin
   area
 
@@ -314,13 +319,18 @@ save or publish runs.
 
 ### Requirement: Discarding a draft confirms in a modal dialog
 
-The edit screen's Discard control SHALL confirm in a modal dialog of the
-application's own, not in the browser's `confirm()` prompt. The dialog SHALL
+<!-- antislop: allow sentence-length trailing-negation -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
+The Discard draft entry in the header bar's `⋮` menu SHALL confirm in a modal
+dialog of the application's own, not in the browser's `confirm()` prompt. The dialog SHALL
 take the treatment `studio-publish` fixes for the publish dialog. That means
 the native `dialog` element opened with `showModal()`, an accessible name
 through `aria-labelledby`, and a platform cancel read as a decline. It also
-means the initial focus and the focus return that requirement fixes.
+means the initial focus that requirement fixes. Picking the entry closes the menu,
+so every close route SHALL return the focus to the `⋮` trigger.
 
+<!-- antislop: allow negation-habit -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 Here the confirming control destroys the draft, and the studio carries no undo.
 So the declining control SHALL hold the initial focus, and the destructive one
 SHALL NOT. Document order alone puts the destructive control first.
@@ -330,6 +340,8 @@ SHALL state that the published versions stay. It SHALL state that only the
 unpublished draft goes. That last sentence is the one fact a developer
 needs. The native prompt could not carry it beside the facts above.
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 Declining SHALL leave the draft untouched and SHALL send no request. A
 discard the engine refuses SHALL render its reason inside the open dialog.
 The publish dialog reports a refusal the same way.
@@ -367,6 +379,11 @@ The publish dialog reports a refusal the same way.
 - **THEN** the declining control holds the focus
 - **AND** the Discard draft control does not hold it
 
+#### Scenario: Closing the dialog returns focus to the menu trigger
+
+- **WHEN** the developer closes the discard dialog by any route that keeps the draft
+- **THEN** focus stands on the `⋮` trigger
+- **AND** focus does not drop to the document body
 <!-- antislop: allow sentence-length run-ons passive-voice -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
 
@@ -849,6 +866,8 @@ Live validation SHALL remain exactly what it is today. It runs the engine's own
 publish-time chain in the browser and reports issues in place. It SHALL NOT block
 saving, since a work-in-progress draft is normally invalid.
 
+<!-- antislop: allow trailing-negation -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 The step page's masthead SHALL carry one issue count for the open step as a
 whole. That count SHALL cover the step's own issues, and the issues of its paths,
 timers and actions. Here `resolveLoc` returns the deepest entity it finds. A
@@ -864,12 +883,15 @@ counts at the paths section, and a timer's at the time-limit section. An issue
 A tab SHALL carry one issue count for its own subject. Every count SHALL take the
 same visual tone. The rest of the studio area already takes that tone for issues.
 
-The studio's area nav SHALL offer a **Publish** action (see the `studio-publish`
+<!-- antislop: allow trailing-negation -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
+The header bar SHALL offer a **Publish** action (see the `studio-publish`
 capability). It calls `POST /drafts/:processId/publish` against the currently
 persisted draft, not the in-browser draft state. When local changes remain
-unsaved, the action SHALL prompt the author to save first. It must not publish
-stale or ahead-of-server content. On success, the studio SHALL confirm the new
-version number and `definitionHash`.
+unsaved, the dialog SHALL say that publishing saves them first. It must not
+publish stale or ahead-of-server content. On success, the header bar SHALL state
+the new version number. The Settings tab's Developer view SHALL hold its
+`definitionHash`.
 
 #### Scenario: A draft round-trips through the panels
 
@@ -885,9 +907,8 @@ version number and `definitionHash`.
 
 #### Scenario: An invalid draft is still saveable
 
-- **WHEN** live validation reports issues for the current draft
-- **THEN** the surface prints the issues, keeps the save action available,
-  and the save succeeds
+- **WHEN** live validation reports issues for a draft carrying unsaved work
+- **THEN** the surface prints the issues, offers Save, and the save succeeds
 
 #### Scenario: A Structure-surface link opens the panels screen
 
@@ -913,16 +934,16 @@ version number and `definitionHash`.
 
 #### Scenario: Publishing with unsaved changes prompts a save first
 
-- **WHEN** the author picks Publish in the area nav while local changes
+- **WHEN** the author picks Publish in the header bar while local changes
   remain unsaved
-- **THEN** the studio prompts the author to save before publishing, and does
+- **THEN** the dialog says publishing saves them first, and the studio does
   not call `POST /drafts/:processId/publish` until the save completes
 
 #### Scenario: The screen confirms a successful publish
 
 - **WHEN** `POST /drafts/:processId/publish` succeeds
-- **THEN** the studio prints the returned version number and `definitionHash`
-
+- **THEN** the header bar prints the returned version number
+- **AND** the Settings tab's Developer view prints the `definitionHash`
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 <!-- antislop: allow synonym-rotation -->
 
@@ -3110,6 +3131,77 @@ through the picker.
 - **WHEN** an actor holding only `system:developer` opens the templates screen
 - **THEN** the screen refuses and states which role the account lacks
 
+### Requirement: The content-locale switcher stands on the Settings tab
+
+The content-locale switcher SHALL stand on the Settings tab's Process view, under
+a visible label. It SHALL stay out of the header bar. Its options keep the
+per-locale gap counts.
+
+#### Scenario: A process in one language shows no locale in the bar
+
+- **WHEN** an author edits a draft in its base language
+- **THEN** the header bar names no locale
+
+### Requirement: The header bar says when an author edits another language
+
+The edited content locale can differ from a well-formed base language while the
+JSON surface is shut. The header bar SHALL then print one control. It SHALL name
+that language in words. It SHALL open the Settings tab's Process view and hand the
+focus to the Settings tab. It SHALL stay away while the two match.
+
+#### Scenario: Another language shows in the bar
+
+- **WHEN** an author picks `de` on the Process view of a draft whose base is `en`
+- **THEN** the header bar prints a control reading "Editing German"
+
+#### Scenario: A part-typed base language shows no note
+
+- **WHEN** an author on an `en` draft has typed `d` into the base language
+- **THEN** the header bar names no locale
+
+#### Scenario: That control leads back
+
+- **WHEN** an author presses that control on the Steps tab
+- **THEN** the Settings tab's Process view opens with the switcher in reach
+
+#### Scenario: That control leaves another Settings view
+
+- **WHEN** an author presses that control on the Settings tab's Access view
+- **THEN** the Process view opens and focus stands on the Settings tab
+
+#### Scenario: The form editor leaves for Settings
+
+- **WHEN** an author presses that control inside the form editor
+- **THEN** the form editor closes and the Settings tab's Process view opens
+
+### Requirement: The Process view's language controls use the author's words
+
+<!-- antislop: allow em-dash -->
+<!-- Why: the dash stands inside the catalog's own option text, quoted exactly. -->
+The content-locale switcher's options SHALL read the language's name and code, as
+"German (de)". A language with gaps SHALL read "German (de) — 20 missing". A code
+with no name SHALL print alone. The add-a-language control SHALL carry a visible
+label. A refused code SHALL read one sentence with an alert role, and the input
+SHALL point at it.
+
+#### Scenario: An option names its language
+
+- **WHEN** a draft holds `de` with three gaps
+<!-- antislop: allow em-dash -->
+<!-- Why: the dash stands inside the catalog's own option text, quoted exactly. -->
+- **THEN** the switcher offers "German (de) — 3 missing"
+
+#### Scenario: A code with no name prints alone
+
+- **WHEN** a draft holds a code the browser cannot name
+- **THEN** the switcher offers that code with no parenthesis
+
+#### Scenario: A refused code reads as a sentence
+
+- **WHEN** an author adds a value that is no language code
+- **THEN** a sentence with an alert role says so
+- **AND** the input carries `aria-invalid` and names that sentence
+
 ### Requirement: The content-locale switcher shows a per-locale translation-gap count
 
 For each locale `ContentLocaleSwitcher` offers, the studio SHALL count
@@ -3142,9 +3234,13 @@ value already flags that entry.
 
 ### Requirement: A LocalizedText entry missing the current locale draws an inline warning
 
+<!-- antislop: allow sentence-length -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 Take the studio's currently selected `contentLocale`. Take an entry that
 carries the draft's `baseLocale` value but lacks that locale's own value.
-That entry SHALL draw a warning next to its `LocalizedTextInput`. The
+That entry SHALL draw a warning next to its `LocalizedTextInput`. The process
+label is the one exception: its warning SHALL stand directly below the header bar,
+so the bar keeps one row. The
 warning SHALL NOT be an `EditorIssue`, and SHALL NOT block or delay
 publishing.
 
@@ -3193,6 +3289,8 @@ rule rejects a tree it exists to admit.
   warning
 - **THEN** the publish succeeds
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 #### Scenario: A new render site warns
 
 - **WHEN** the studio area gains a `LocalizedTextInput` site
@@ -3217,6 +3315,13 @@ rule rejects a tree it exists to admit.
   the base-locale value alone
 - **THEN** the note's strip shows the warning beside its text input
 
+#### Scenario: The process label's warning stands below the bar
+
+<!-- antislop: allow negation-habit -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
+- **WHEN** the edited language holds no process name
+- **THEN** the warning stands directly below the header bar
+- **AND** the bar keeps one row
 <!-- antislop: allow synonym-rotation -->
 
 ### Requirement: The panels screen and its process-wide views render from compiled styles
@@ -3296,14 +3401,12 @@ concern. Only the dialog itself is this requirement's scope.
 ### Requirement: The content-locale switcher renders from compiled styles
 
 `panels/shared/ContentLocaleSwitcher.tsx` SHALL render from compiled
-component styles. The rendered result SHALL match the previous
-stylesheet declaration for declaration.
+component styles. It SHALL read as a field under the area's field rule.
 
 #### Scenario: The content-locale switcher keeps its look
 
-- **WHEN** a browser renders the header bar's content-locale switcher
-- **THEN** its computed layout, spacing, color and border equal the
-  values the deleted stylesheet declared
+- **WHEN** a browser renders the Process view's content-locale switcher
+- **THEN** its layout, spacing, color and border come from compiled styles
 
 ### Requirement: Both process-wide field views take the area's field rule
 
@@ -3558,13 +3661,15 @@ of its children. Inside the halves, only the group's preview draws them.
 Translation status SHALL show as a badge beside the label input. The
 badge SHALL name the current locale's missing count. The field SHALL
 have no separate translation-status list. Adding a language SHALL stay
-draft-scoped in the content-locale switcher.
+draft-scoped in the Process view's add-a-language control.
 
 "How it will look" SHALL sit in the definition half, inside a collapsed
 `<details>` disclosure. It SHALL start closed. The developer view SHALL
 keep its own existing, separate `<details>` disclosure, untouched by
 this change.
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 Remove field SHALL sit below a rule at the definition half's end. It
 SHALL read as the half's least frequent action.
 
@@ -3582,7 +3687,7 @@ multi-value equivalent when the field's type is `list`.
 For a `string` field declaring a `format` it SHALL be that format's own
 native input.
 
-<!-- antislop: allow sentence-length -->
+<!-- antislop: allow negation-habit sentence-length -->
 <!-- Why: copied byte for byte from the live requirement. -->
 Either control SHALL offer no option when the field is
 `dataSource`-bound, since the draft carries no resolved rows for one.
@@ -3637,7 +3742,7 @@ grouping the shared form component itself applies. The synthesis
 SHALL also carry the sample values in the shape that component reads
 them, keyed by field id.
 
-<!-- antislop: allow sentence-length -->
+<!-- antislop: allow paragraph-length sentence-length -->
 <!-- Why: copied byte for byte from the live requirement. -->
 A dataSource-backed field SHALL preview with no option list. The
 draft has no resolved rows for one. The row stating so SHALL name
@@ -3680,7 +3785,7 @@ reads a non-array value as an empty selection.
   the active content locale
 - **AND** no separate translation-status list renders
 - **AND** the badge names no locale of its own. The content-locale
-  switcher already names `de` once, in the toolbar
+  switcher already names `de` once, on the Settings tab
 
 #### Scenario: A disclosure survives a selection that returns
 

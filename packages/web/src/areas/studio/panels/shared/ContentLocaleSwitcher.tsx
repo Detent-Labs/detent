@@ -1,42 +1,57 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, space } from "form-ui/tokens.stylex";
 import { useDraft } from "../../draft/store";
 import { t } from "../../catalog.js";
 import { localeGapCount, resolveAddLocaleAttempt } from "../../draft/localized-text";
+import type { Draft } from "../../draft/types";
+import { languageName } from "../../screens/draftToolbarState.js";
+import { StudioSelect } from "./StudioSelect";
 
-/** `.studio-header-bar-locale-badge` and `.studio-header-bar-menu-
- * add-locale` from `app.css`. */
 const styles = stylex.create({
-  localeBadge: {
-    fontFamily: fonts.mono,
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    color: colors.text,
-    paddingBlock: space.s1,
-    paddingInline: space.s2,
+  // The design language's field: label above control, 4px apart.
+  field: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    fontSize: "0.9rem",
+  },
+  fieldText: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
   },
   addLocale: {
     display: "flex",
     alignItems: "center",
     gap: space.s2,
   },
+  addLocaleError: {
+    margin: 0,
+    color: colors.refusal,
+  },
 });
 
+/** One locale's option text: the language's name and code, "German (de)", or
+ * the code alone when no name exists. A locale with gaps adds its count of
+ * missing entries. A native `<option>` renders no markup, so the count rides in
+ * the text. Omitted at zero. The Publish dialog's Languages fact reads the same
+ * wording. */
+export function localeOptionLabel(draft: Draft, code: string): string {
+  const name = languageName(code);
+  const language = name === code ? code : `${name} (${code})`;
+  const gaps = localeGapCount(draft, code);
+  return gaps > 0 ? t("contentLocale.optionGap").replace("{locale}", () => language).replace("{count}", () => String(gaps)) : language;
+}
+
 /**
- * The switch alone: a compact control for the header row (studio-canvas: "A
- * process-identity header bar shows draft and publish status" — the
- * content-locale badge). Its option set is derived per-Draft (every locale
- * already used, plus whichever one is currently selected), not a fixed
- * platform list. Split out of the combined fieldset below so the header row
- * can show only the switch, never the add-locale control beside it
- * (design.md: "ContentLocaleSwitcher's add-locale control moves into
- * [the `⋮` menu's 'Process, saved with the draft'] group, not just its
- * dropdown").
+ * The language the studio edits in, as a labelled field for the Settings
+ * tab's Process view. Its option set is derived per draft: every locale
+ * already used, plus whichever one is currently selected. It writes no draft
+ * body.
  */
-export function ContentLocaleBadge() {
+export function ContentLocaleSelect() {
   const { draft, contentLocale, setContentLocale, usedLocales } = useDraft();
 
   // The currently selected locale must always be a valid <option>, even
@@ -45,32 +60,70 @@ export function ContentLocaleBadge() {
   const options = Array.from(new Set([...usedLocales, contentLocale])).sort();
 
   return (
-    <select
-      aria-label={t("contentLocale.legend")}
-      {...stylex.props(styles.localeBadge)}
-      value={contentLocale}
-      onChange={(e) => setContentLocale(e.target.value)}
-    >
-      {/* The gap count rides in the option's own text: a native <select>
-          renders no markup inside an <option>, so there is no badge to
-          place. Omitted at zero, so a fully-translated locale reads
-          exactly as it did before. */}
-      {options.map((code) => {
-        const gaps = localeGapCount(draft, code);
-        return (
+    <label {...stylex.props(styles.field)}>
+      <span {...stylex.props(styles.fieldText)}>{t("settings.contentLocale")}</span>
+      <StudioSelect value={contentLocale} onChange={(e) => setContentLocale(e.target.value)}>
+        {options.map((code) => (
           <option key={code} value={code}>
-            {gaps > 0 ? t("contentLocale.optionGap").replace("{locale}", () => code).replace("{count}", () => String(gaps)) : code}
+            {localeOptionLabel(draft, code)}
           </option>
-        );
-      })}
-    </select>
+        ))}
+      </StudioSelect>
+    </label>
   );
 }
 
 /**
- * The add-locale input and button alone, for the Settings tab's Process view.
- * Declaring a new content locale is a draft-scoped concern, the same as the
- * base locale it sits beside.
+ * The add-locale field with its state lifted out: a visible label above the
+ * input and the button, then the refusal while one stands. The refusal is an
+ * alert, and the input points at it with `aria-describedby`.
+ */
+export function AddLocaleField({
+  value,
+  error,
+  onChange,
+  onAdd,
+}: {
+  value: string;
+  error: string | undefined;
+  onChange: (next: string) => void;
+  onAdd: () => void;
+}) {
+  const inputId = useId();
+  const errorId = useId();
+
+  return (
+    <div {...stylex.props(styles.field)}>
+      <label htmlFor={inputId} {...stylex.props(styles.fieldText)}>
+        {t("contentLocale.addLabel")}
+      </label>
+      <div {...stylex.props(styles.addLocale)}>
+        <input
+          id={inputId}
+          type="text"
+          placeholder={t("contentLocale.addPlaceholder")}
+          value={value}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <button type="button" className="btn btn-secondary" onClick={onAdd}>
+          {t("contentLocale.add")}
+        </button>
+      </div>
+      {error && (
+        <p id={errorId} role="alert" {...stylex.props(styles.addLocaleError)}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The add-locale field for the Settings tab's Process view. Declaring a new
+ * content locale is a draft-scoped concern, the same as the base locale it
+ * sits beside.
  */
 export function AddLocaleControl() {
   const { setContentLocale } = useDraft();
@@ -88,18 +141,5 @@ export function AddLocaleControl() {
     setError(undefined);
   };
 
-  return (
-    <div {...stylex.props(styles.addLocale)}>
-      <input
-        type="text"
-        placeholder={t("contentLocale.addPlaceholder")}
-        value={newLocale}
-        onChange={(e) => setNewLocale(e.target.value)}
-      />
-      <button type="button" className="btn btn-secondary" onClick={addLocale}>
-        {t("contentLocale.add")}
-      </button>
-      {error && <span className="content-locale-error">{error}</span>}
-    </div>
-  );
+  return <AddLocaleField value={newLocale} error={error} onChange={setNewLocale} onAdd={addLocale} />;
 }

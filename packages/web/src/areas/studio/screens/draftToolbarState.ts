@@ -1,4 +1,5 @@
 import { canonicalize } from "workflow-engine/schema/canonical-json";
+import { resolveAddLocaleAttempt } from "../draft/localized-text.js";
 
 /**
  * Whether the currently-open draft differs from the last body successfully
@@ -94,9 +95,103 @@ export function publishAvailability(
  *
  * The prediction can be wrong: another environment can promote a version
  * between the load and the publish. That is why the dialog labels the row
- * "Next version" rather than "Version", and why the header's published stamp
- * stays the report of the number the engine actually assigned.
+ * "Next version" rather than "Version", and why the header bar's state stays
+ * the report of the number the engine actually assigned.
  */
 export function nextVersionLabel(baseVersion: number | null | undefined): string {
   return `v${typeof baseVersion === "number" ? baseVersion + 1 : 1}`;
+}
+
+/** What the header bar's state line prints, as parts the caller turns into
+ * catalog sentences. `unsaved` carries no time. `savedAt` carries the formatted
+ * clock time of a save in this session. `saved` is a clean draft with no save
+ * yet. `version` is present where a published version exists. */
+export interface HeaderStateLine {
+  state: "unsaved" | "savedAt" | "saved";
+  time?: string;
+  version?: string;
+}
+
+/**
+ * The state line's parts (studio-canvas spec: "The header bar's state says
+ * what holds for the draft"). A dirty draft is `unsaved`, whatever happened
+ * before. A clean one is `savedAt` once `savedTime` exists, else `saved`.
+ * `baseVersion` is the version the draft stands on; null, undefined, 0 or a
+ * non-integer means nobody has published it, so the line carries no version.
+ */
+export function headerStateLine(
+  dirty: boolean,
+  savedTime: string | undefined,
+  baseVersion: number | null | undefined,
+): HeaderStateLine {
+  const published = typeof baseVersion === "number" && Number.isInteger(baseVersion) && baseVersion > 0;
+  const version = published ? { version: `v${baseVersion}` } : {};
+  if (dirty) return { state: "unsaved", ...version };
+  if (savedTime !== undefined) return { state: "savedAt", time: savedTime, ...version };
+  return { state: "saved", ...version };
+}
+
+/**
+ * The just-published flag after a render (studio-publish spec: "After a publish
+ * the header bar states the version and offers Versions"). A successful publish
+ * raises it directly. A dirty draft lowers it, and nothing here raises it again,
+ * so a later save leaves it down.
+ */
+export function justPublishedAfter(current: boolean, dirty: boolean): boolean {
+  return current && !dirty;
+}
+
+/**
+ * Where the focus goes once a save has answered (studio-process-tabs spec: "A
+ * keyboard save keeps its place"). `"stateLine"` only when Save's own press
+ * started that save, the answer left the draft clean, so the button is gone, and
+ * the focus fell to the body. `undefined` leaves the focus where it stands: a
+ * refused save keeps the button, and focus the author moved stays put.
+ */
+export function saveFocusTarget(answer: {
+  pressed: boolean;
+  clean: boolean;
+  focusOnBody: boolean;
+}): "stateLine" | undefined {
+  return answer.pressed && answer.clean && answer.focusOnBody ? "stateLine" : undefined;
+}
+
+/** The clock time of a save, hour and minute, in the browser's locale. */
+export function formatSavedTime(at: Date): string {
+  return at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/**
+ * The English name of a language code, or the code itself when no name
+ * exists. `Intl.DisplayNames#of` throws on a malformed tag and echoes a
+ * well-formed code it cannot name, so a throw prints the code too.
+ */
+export function languageName(code: string): string {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/**
+ * The language name for the header bar's "Editing" note, or `undefined` when
+ * the bar prints none (studio-app spec: "The header bar says when an author
+ * edits another language"). The note stands only while the content locale
+ * differs from a well-formed base language and the JSON surface is shut. The
+ * JSON surface prints every language and reads no content locale.
+ *
+ * An absent base reads as "en", the fallback every other locale reader
+ * applies. A malformed base, such as a half-typed `d`, yields no note.
+ */
+export function editingLocaleNote(
+  contentLocale: string,
+  baseLocale: string | undefined,
+  jsonOpen: boolean,
+): string | undefined {
+  if (jsonOpen) return undefined;
+  const base = baseLocale ?? "en";
+  if (!resolveAddLocaleAttempt(base).ok) return undefined;
+  if (contentLocale === base) return undefined;
+  return languageName(contentLocale);
 }

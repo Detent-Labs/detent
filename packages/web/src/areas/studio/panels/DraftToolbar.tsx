@@ -30,9 +30,11 @@ export interface DraftToolbarProps {
   /** Fired only from `doSave()`'s success branch — never from `reload()`'s
    * conflict-recovery branch, which calls `onSavedBodyChange` and
    * `onSavedLayoutChange` alone. A mere reload is not a save, and must not
-   * advance `EditorArea`'s `lastSavedAt`. */
+   * advance the `lastSavedAt` the header bar's state line prints. */
   onSaved?: () => void;
   publishResult: PublishResult | null;
+  /** A successful publish's answer. The caller raises the header bar's
+   * just-published line and Versions offer from it. */
   onPublishResult: (result: PublishResult | null) => void;
   onDiscarded: () => void;
   onUnauthorized: () => void;
@@ -60,7 +62,7 @@ export interface DraftToolbarActions {
   saving: boolean;
   publishing: boolean;
   error: string | null;
-  /** Set by `publish()` or `discard()`, cleared when the developer resolves
+  /** Set by `publish()` or the menu's `discard()`, cleared when the developer resolves
    * the dialog or the act succeeds. A refused request leaves it set, so the
    * reason renders inside the open dialog rather than behind it. */
   pendingDialog: PendingDialog;
@@ -81,8 +83,8 @@ export interface DraftToolbarActions {
  * The save/discard/publish logic `DraftToolbar` has always owned — pending
  * flags, the network calls, the 401 and conflict handling — lives in this one
  * hook. `EditScreen.tsx` calls it once and threads the result down as props,
- * so whichever component renders the buttons (`ProcessHeaderBar` today) never
- * reimplements the logic itself.
+ * so whichever component renders the controls (`ProcessHeaderBar` and its `⋮`
+ * menu today) never reimplements the logic itself.
  *
  * It raises no native browser prompt. Publish and discard each open the
  * application's own modal dialog instead: `publish()` and `discard()` only set
@@ -197,7 +199,7 @@ export function useDraftToolbarActions({
       // local edits, so a draft byte-identical to the server's reads as dirty
       // for the rest of the session and Publish always prompts to save first.
       // No onSaved() call here (design.md): a reload is not a save, and must
-      // not advance EditorArea's lastSavedAt.
+      // not advance the lastSavedAt the header bar's state line prints.
       onSavedBodyChange(body);
       // An administrator can grant or withdraw the publish permission while the
       // edit screen sits open. Reload is the one control the conflict banner

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/store.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
+import type { PublishResult } from "../src/areas/studio/api/types.js";
 import type { DraftToolbarActions } from "../src/areas/studio/panels/DraftToolbar.js";
 import { ProcessHeaderBar, PublishNavControl, PublishReasonLine } from "../src/areas/studio/panels/ProcessHeaderBar.js";
 
@@ -13,11 +14,11 @@ import { ProcessHeaderBar, PublishNavControl, PublishReasonLine } from "../src/a
  * bare colored paragraph, as one more inline item in a wrapping row of ten
  * badges, with no alert role on it — it reached the DOM and reached nobody.
  *
- * `studio-draft-actions-to-header-bar` moved Save, Discard draft and Publish
- * (and their two confirmation dialogs, and the Publish permission gate) back
- * into this header bar, right-aligned ahead of the `⋮` menu trigger — this
- * file covers all of it now. `studio-draftNavControls.test.tsx` keeps only
- * the Checks control, which stays in the studio's area nav.
+ * The header bar holds the back control, the name, the state, Save beside the
+ * state while the draft is dirty, Test, Publish and the `⋮` menu, with the two
+ * confirmation dialogs and the Publish permission gate. This file covers all of
+ * it. `studio-draftNavControls.test.tsx` keeps only the Checks control, which
+ * stays in the studio's area nav.
  *
  * Renders `<DraftContext.Provider>` with a hand-built value, the idiom
  * `studio-processHeaderBar-findingFallback.test.tsx` established for this same
@@ -42,7 +43,7 @@ const validation: ValidationResult = {
 };
 
 const contextValue: DraftContextValue = {
-  draft: { label: { en: "Expense approval" }, baseLocale: "en" },
+  draft: { label: { en: "Expense approval" }, baseLocale: "en", key: "expense_approval_key" },
   mutate: () => {},
   replace: () => {},
   validation,
@@ -106,23 +107,32 @@ function renderHeader(over: {
   isDirty?: boolean;
   canPublish?: boolean;
   baseVersion?: number | null;
+  lastSavedAt?: Date;
+  publishResult?: PublishResult;
+  justPublished?: boolean;
+  structureActive?: boolean;
+  contentLocale?: string;
+  draft?: DraftContextValue["draft"];
 }): string {
   return renderToStaticMarkup(
-    <DraftContext.Provider value={contextValue}>
+    <DraftContext.Provider value={{ ...contextValue, draft: over.draft ?? contextValue.draft, contentLocale: over.contentLocale ?? "en" }}>
       <ProcessHeaderBar
         revision={7}
         isDirty={over.isDirty ?? false}
-        lastSavedAt={undefined}
-        publishResult={null}
+        lastSavedAt={over.lastSavedAt}
+        publishResult={over.publishResult ?? null}
         conflict={over.conflict ?? false}
         actions={{ ...noActions, ...over.actions }}
         canPublish={over.canPublish ?? true}
         baseVersion={over.baseVersion === undefined ? 3 : over.baseVersion}
         validation={validationOf(over.issues ?? [], over.zodValid ?? true)}
         processLabel="Expense approval"
-        structureActive={true}
+        structureActive={over.structureActive ?? true}
         processId="proc_a"
         token="token"
+        justPublished={over.justPublished ?? false}
+        onBack={() => {}}
+        onOpenSettings={() => {}}
         onToggleJson={() => {}}
         onVersions={() => {}}
         onPlayer={() => {}}
@@ -179,13 +189,8 @@ describe("ProcessHeaderBar's failure region", () => {
 });
 
 /**
- * Task 2.9 and task 2.15 of `studio-guided-surface`. The header bar stands no
- * Structure/JSON pair, and its `⋮` menu carries none of the area nav's one
- * control (Checks) or of Save, Discard draft and Publish, which stand in this
- * row instead (`studio-draft-actions-to-header-bar`). `studio-header-menu-merge`
- * later gave the JSON toggle a home in this same `⋮` menu's own "Views"
- * group, so this still holds: it names the area nav's one control and the
- * three header-row actions, not the JSON toggle itself.
+ * The header bar stands no Structure/JSON pair. The JSON entry stands in the
+ * `⋮` menu's "Views" group, out of this closed-menu render.
  */
 describe("What the header bar no longer carries", () => {
   it("stands no Structure control and no JSON control", () => {
@@ -203,15 +208,80 @@ describe("What the header bar no longer carries", () => {
   });
 });
 
+/** The publish dialog's Developer view `<details>`, and the dialog without it. */
+function splitDialogDeveloperView(html: string): { inside: string; outside: string } {
+  const summary = html.indexOf(">Developer view</summary>");
+  expect(summary).toBeGreaterThan(-1);
+  const start = html.lastIndexOf("<details", summary);
+  const end = html.indexOf("</details>", summary) + "</details>".length;
+  return { inside: html.slice(start, end), outside: html.slice(0, start) + html.slice(end) };
+}
+
 describe("The publish dialog", () => {
-  it("names the process, the revision and the version the publish mints", () => {
+  it("names the process and the version the publish mints", () => {
     const html = renderHeader({ actions: { pendingDialog: "publish" } });
 
     expect(html).toContain("Publish this draft");
     expect(html).toContain("Expense approval");
-    expect(html).toContain(">7<");
     expect(html).toContain(">v4<");
     expect(html).toContain("A published version can never change");
+  });
+
+  it("holds the key, the process id and the revision in a closed Developer view", () => {
+    const { inside, outside } = splitDialogDeveloperView(renderHeader({ actions: { pendingDialog: "publish" } }));
+
+    expect(inside.match(/^<details[^>]*>/)![0]).not.toContain("open");
+    expect(inside).toContain(">Key</dt>");
+    expect(inside).toContain(">expense_approval_key</dd>");
+    expect(inside).toContain(">Process id</dt>");
+    expect(inside).toContain(">proc_a</dd>");
+    expect(inside).toContain(">Revision</dt>");
+    expect(inside).toContain(">7</dd>");
+    for (const value of ["expense_approval_key", "proc_a", ">Revision<", ">Process id<", ">Key<"]) {
+      expect(outside).not.toContain(value);
+    }
+  });
+
+  it("omits the key row when the draft has no key", () => {
+    const html = renderHeader({ actions: { pendingDialog: "publish" }, draft: { label: { en: "Expense approval" }, baseLocale: "en" } });
+    const { inside } = splitDialogDeveloperView(html);
+
+    expect(inside).not.toContain(">Key</dt>");
+    expect(inside).toContain(">Process id</dt>");
+  });
+
+  it("names no language for a draft in one language", () => {
+    const html = renderHeader({ actions: { pendingDialog: "publish" } });
+
+    expect(html).not.toContain(">Languages</dt>");
+  });
+
+  it("names each language with its gap count for a draft in two", () => {
+    const draft = { label: { en: "Expense approval", de: "Spesen" }, description: { en: "a" }, baseLocale: "en", key: "expense_approval_key" };
+    const html = renderHeader({ actions: { pendingDialog: "publish" }, draft });
+    const facts = html.slice(html.indexOf(">Languages</dt>"));
+    const list = facts.slice(0, facts.indexOf("</ul>"));
+
+    expect(html).toContain(">Languages</dt>");
+    expect(list).toContain("<li>German (de) \u2014 1 missing</li>");
+    expect(list).toContain("<li>English (en)</li>");
+  });
+
+  // Mono marks a value the engine matches exactly. "de \u2014 1 missing" is
+  // prose around a code, so the list takes the body face. Compiled classes are
+  // atomic, so the class the machine-value rows add over a plain row is the
+  // mono face (plus nothing else), and the list must not carry it.
+  it("prints the Languages fact in the body face, not mono", () => {
+    const draft = { label: { en: "Expense approval", de: "Spesen" }, description: { en: "a" }, baseLocale: "en", key: "expense_approval_key" };
+    const html = renderHeader({ actions: { pendingDialog: "publish" }, draft });
+    const classesOf = (tag: string) => new Set(/class="([^"]*)"/.exec(tag)?.[1]?.split(" ") ?? []);
+    const monoRow = classesOf(html.slice(html.indexOf("</dt>", html.indexOf(">Process id</dt>")) + 5));
+    const plainRow = classesOf(html.slice(html.indexOf("</dt>", html.indexOf(">Open issues</dt>")) + 5));
+    const monoOnly = [...monoRow].filter((c) => !plainRow.has(c));
+    const list = classesOf(html.slice(html.indexOf("<ul", html.indexOf(">Languages</dt>"))));
+
+    expect(monoOnly.length).toBeGreaterThan(0);
+    for (const c of monoOnly) expect(list.has(c)).toBe(false);
   });
 
   it("names no open issue and no refusal on a clean draft", () => {
@@ -243,16 +313,16 @@ describe("The publish dialog", () => {
   });
 
   // A static render fires no effect, so the base body's read never starts and
-  // the row stands in its reading state.
+  // the row stands in its reading state. The one `<details>` is the Developer view.
   it("carries the Changes row: reading the base version, or a first version", () => {
     const reading = renderHeader({ actions: { pendingDialog: "publish" } });
     expect(reading).toContain(">Changes<");
     expect(reading).toContain("Reading version 3…");
-    expect(reading).not.toContain("<details");
+    expect(reading.match(/<details/g)).toHaveLength(1);
 
     const first = renderHeader({ baseVersion: null, actions: { pendingDialog: "publish" } });
     expect(first).toContain("This publish mints the first version.");
-    expect(first).not.toContain("<details");
+    expect(first.match(/<details/g)).toHaveLength(1);
   });
 
   it("renders a refusal inside the open dialog, never behind it", () => {
@@ -367,27 +437,27 @@ describe("The Publish control's permission gate", () => {
   // strands at the row's leading edge wherever the row wraps.
   //
   // What a static render sees is the nesting depth between the reason and
-  // Save. One `<div>` opens between them, the `draftActions` wrapper that
-  // holds the three buttons. A reason placed ahead of the cluster would put
+  // Test. One `<div>` opens between them, the `draftActions` wrapper that
+  // holds Test and Publish. A reason placed ahead of the cluster would put
   // the cluster's own wrapper there too, and the count would read two.
-  it("renders the reason as the action cluster's leading item, ahead of Save", () => {
+  it("renders the reason as the action cluster's leading item, ahead of Test", () => {
     const html = renderHeader({ canPublish: false });
     const reasonAt = html.indexOf('id="studio-publish-reason"');
-    const saveAt = html.indexOf(">Save<");
+    const testAt = html.indexOf(">Test<");
 
     expect(reasonAt).toBeGreaterThan(-1);
-    expect(saveAt).toBeGreaterThan(reasonAt);
-    expect(html.slice(reasonAt, saveAt).match(/<div/g) ?? []).toHaveLength(1);
+    expect(testAt).toBeGreaterThan(reasonAt);
+    expect(html.slice(reasonAt, testAt).match(/<div/g) ?? []).toHaveLength(1);
   });
 
   it("keeps the blocked reason in that same place", () => {
     const html = renderHeader({ issues: [issue("cel")] });
     const reasonAt = html.indexOf('id="studio-publish-reason"');
-    const saveAt = html.indexOf(">Save<");
+    const testAt = html.indexOf(">Test<");
 
     expect(html).toContain("Blocked by an open issue");
-    expect(saveAt).toBeGreaterThan(reasonAt);
-    expect(html.slice(reasonAt, saveAt).match(/<div/g) ?? []).toHaveLength(1);
+    expect(testAt).toBeGreaterThan(reasonAt);
+    expect(html.slice(reasonAt, testAt).match(/<div/g) ?? []).toHaveLength(1);
   });
 
   // A blocking issue names itself before the click, rather than only inside
@@ -490,10 +560,8 @@ describe("The Publish control on a draft with no step yet", () => {
 });
 
 /**
- * `studio-header-menu-merge`: the `⋮` menu now carries what the tab row's
- * own overflow menu used to (JSON surface, Versions, Player), so this
- * trigger's closed-state markup gets the same coverage that menu's trigger
- * had before it was deleted.
+ * The `⋮` menu carries the JSON surface, Versions, Player and Discard draft.
+ * `studio-processSurface.test.ts` reads its open contents at the source.
  */
 describe("The header bar's ⋮ menu", () => {
   it("stays closed until something opens it", () => {
@@ -502,5 +570,246 @@ describe("The header bar's ⋮ menu", () => {
     expect(html).toContain('aria-haspopup="true"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).not.toContain('role="menu"');
+  });
+});
+
+/** The `<header>` element's own markup, without the dialogs or the banners. */
+function barOf(html: string): string {
+  return html.slice(html.indexOf("<header"), html.indexOf("</header>"));
+}
+
+/** The state line's own markup. Its span closes where the open tags balance. */
+function stateLineOf(html: string): string {
+  const start = html.indexOf('role="status"');
+  let depth = 0;
+  for (const tag of html.slice(start - "<span ".length).matchAll(/<span\b|<\/span>/g)) {
+    depth += tag[0] === "</span>" ? -1 : 1;
+    if (depth === 0) return html.slice(start, start - "<span ".length + tag.index + tag[0].length);
+  }
+  throw new Error("the state line never closes");
+}
+
+const buttonLabels = (html: string) => [...html.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => m[1]);
+
+const PUBLISHED: PublishResult = {
+  processId: "proc_a",
+  version: 2,
+  definitionHash: "abcdef0123456789abcdef",
+  status: "published",
+  findings: [],
+};
+
+describe("A clean header bar", () => {
+  it("holds the back control, the name, the state, Test, Publish and the menu, in that order", () => {
+    const bar = barOf(renderHeader({}));
+    const order = ["Back to processes", "<h1", 'role="status"', ">Test<", ">Publish<", "More actions"].map((part) => bar.indexOf(part));
+
+    expect(order.every((at) => at > -1)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(bar.match(/<button/g)).toHaveLength(4);
+  });
+
+  it("prints no key, revision, hash or locale select", () => {
+    const bar = barOf(renderHeader({ publishResult: PUBLISHED, justPublished: true, baseVersion: 2 }));
+
+    expect(bar).not.toContain("expense_approval_key");
+    expect(bar).not.toContain("proc_a");
+    expect(bar).not.toContain("rev.");
+    expect(bar).not.toContain("abcdef");
+    expect(bar).not.toContain("<select");
+    expect(bar).not.toContain(">en<");
+  });
+
+  it("offers no Save and no Discard draft, and Test stands ahead of Publish", () => {
+    const labels = buttonLabels(barOf(renderHeader({})));
+
+    expect(labels).not.toContain("Save");
+    expect(labels).not.toContain("Discard draft");
+    expect(labels.indexOf("Test")).toBeLessThan(labels.indexOf("Publish"));
+    expect(labels.indexOf("Test")).toBeGreaterThan(-1);
+  });
+
+  it("names the back control in words that hold the visible word", () => {
+    const back = buttonTags(barOf(renderHeader({})))[0]!;
+
+    expect(back).toContain('aria-label="Back to processes"');
+    expect(buttonLabels(barOf(renderHeader({})))[0]).toBe("← Processes");
+  });
+});
+
+describe("Save beside the state", () => {
+  it("stands after the state while the draft is dirty, outside the state's span", () => {
+    const html = renderHeader({ isDirty: true });
+    const line = stateLineOf(html);
+
+    expect(line).toContain("Unsaved changes");
+    expect(line).not.toContain("<button");
+    expect(html.indexOf(">Save<")).toBeGreaterThan(html.indexOf(line) + line.length - 1);
+    expect(html.indexOf(">Save<")).toBeLessThan(html.indexOf(">Test<"));
+  });
+
+  it("carries aria-disabled and no native disabled while saving, and reads Saving…", () => {
+    const html = renderHeader({ isDirty: true, actions: { saving: true } });
+    const save = /<button[^>]*>Saving…/.exec(html)?.[0];
+
+    expect(save).toBeDefined();
+    expect(save).toContain('aria-disabled="true"');
+    expect(save).not.toContain("disabled=\"\"");
+    expect(html).not.toContain(">Save<");
+  });
+
+  it("carries no aria-disabled while idle", () => {
+    expect(/<button[^>]*>Save</.exec(renderHeader({ isDirty: true }))?.[0]).not.toContain("aria-disabled");
+  });
+
+  it("stays while a refused save leaves the draft dirty", () => {
+    const html = renderHeader({ isDirty: true, actions: { error: "refused" } });
+
+    expect(html).toContain(">Save<");
+    expect(stateLineOf(html)).toContain("Unsaved changes");
+  });
+});
+
+describe("The state line", () => {
+  it("is one status span the focus can land on and Tab skips", () => {
+    const html = renderHeader({});
+
+    expect(html.match(/role="status"/g)).toHaveLength(1);
+    expect(/<span[^>]*role="status"[^>]*>/.exec(html)?.[0]).toContain('tabindex="-1"');
+  });
+
+  it("reads Saved and the version on a clean published draft", () => {
+    const line = stateLineOf(renderHeader({ baseVersion: 1 }));
+
+    expect(line).toContain(">Saved<");
+    expect(line).toMatch(/translate="no"[^>]*>v1<\/span> published/);
+  });
+
+  it("reads the save's time after a save in this session", () => {
+    const line = stateLineOf(renderHeader({ lastSavedAt: new Date(2026, 0, 2, 10, 32) }));
+
+    expect(line).toContain("Saved at ");
+    expect(line).toContain("32");
+    expect(line).not.toContain("{time}");
+  });
+
+  it("prints no version on a draft nobody published", () => {
+    const line = stateLineOf(renderHeader({ baseVersion: null }));
+
+    expect(line).not.toContain("published");
+    expect(line).not.toContain("·");
+  });
+
+  it("parts the dirty words from the clean ones by class", () => {
+    const words = (html: string) => /role="status"[^>]*><span([^>]*)>/.exec(html)?.[1];
+
+    expect(words(renderHeader({ isDirty: true }))).not.toBe(words(renderHeader({})));
+  });
+});
+
+describe("After a publish", () => {
+  const justPublished = () => renderHeader({ baseVersion: 2, publishResult: PUBLISHED, justPublished: true });
+
+  it("reads the version sentence in one span, with the version in mono", () => {
+    expect(stateLineOf(justPublished())).toMatch(/translate="no"[^>]*>v2<\/span> published/);
+  });
+
+  it("offers Versions after the state, and prints no hash", () => {
+    const html = justPublished();
+    const line = stateLineOf(html);
+
+    expect(line).not.toContain("<button");
+    expect(buttonLabels(barOf(html))).toContain("Versions");
+    expect(html.indexOf(">Versions<")).toBeGreaterThan(html.indexOf(line));
+    expect(html.indexOf(">Versions<")).toBeLessThan(html.indexOf(">Test<"));
+    expect(barOf(html)).not.toContain(PUBLISHED.definitionHash.slice(0, 6));
+  });
+
+  it("takes the version out of the ink tone and drops the offer once it no longer stands", () => {
+    const later = renderHeader({ baseVersion: 2, publishResult: PUBLISHED, justPublished: false });
+    const tone = (html: string) => /· <span([^>]*)>/.exec(stateLineOf(html))?.[1];
+
+    expect(buttonLabels(barOf(later))).not.toContain("Versions");
+    expect(stateLineOf(later)).toMatch(/>v2<\/span> published/);
+    expect(tone(later)).not.toBe(tone(justPublished()));
+  });
+});
+
+describe("The Editing note", () => {
+  it("names the language in words while the content locale differs from the base", () => {
+    const html = renderHeader({ contentLocale: "de" });
+
+    expect(buttonLabels(barOf(html))).toContain("Editing German");
+    expect(stateLineOf(html)).not.toContain("Editing");
+  });
+
+  it("stays away on the base language", () => {
+    expect(renderHeader({ contentLocale: "en" })).not.toContain("Editing");
+  });
+
+  it("stays away over the JSON surface", () => {
+    expect(renderHeader({ contentLocale: "de", structureActive: false })).not.toContain("Editing");
+  });
+});
+
+describe("The commands over the JSON surface", () => {
+  it("keeps Test, Publish, the menu and a dirty draft's Save", () => {
+    const html = renderHeader({ structureActive: false, isDirty: true });
+
+    expect(html).toContain(">Test<");
+    expect(html).toContain(">Publish<");
+    expect(html).toContain("More actions");
+    expect(html).toContain(">Save<");
+  });
+});
+
+/**
+ * The name's accessible name, its placeholder and its missing translation
+ * warning (`studio-canvas`: "The header bar holds back, name, state, Test,
+ * Publish and the menu").
+ */
+describe("The process name", () => {
+  const translating = {
+    label: { en: "Expense approval" },
+    baseLocale: "en",
+    key: "expense_approval_key",
+  };
+
+  it("carries the accessible name Process name, inside the h1", () => {
+    const html = renderHeader({});
+    const h1 = html.slice(html.indexOf("<h1"), html.indexOf("</h1>"));
+
+    expect(h1).toMatch(/<input[^>]*aria-label="Process name"/);
+  });
+
+  it("stands the missing translation warning after the header, not inside it", () => {
+    const html = renderHeader({ draft: translating, contentLocale: "de" });
+    const warning = html.indexOf("No de translation yet");
+
+    expect(warning).toBeGreaterThan(html.indexOf("</header>"));
+    expect(html.slice(html.indexOf("</header>"))).toMatch(/^<\/header><p[^>]*>No de translation yet/);
+  });
+
+  it("stands the warning through an open dialog, which repeats nothing of it", () => {
+    const html = renderHeader({ draft: translating, contentLocale: "de", actions: { pendingDialog: "publish" } });
+
+    expect(html.indexOf("No de translation yet")).toBeGreaterThan(html.indexOf("</header>"));
+  });
+
+  it("renders no warning in the base language", () => {
+    expect(renderHeader({ draft: translating })).not.toContain("translation yet");
+  });
+
+  it("reads the base-language name as the placeholder while the edited language has none", () => {
+    const html = renderHeader({ draft: translating, contentLocale: "de" });
+
+    expect(html).toContain('placeholder="Expense approval"');
+    expect(html).not.toContain("(untitled process)");
+  });
+
+  it("reads the untitled words with no base-language name", () => {
+    const html = renderHeader({ draft: { baseLocale: "en", key: "k" }, contentLocale: "de" });
+
+    expect(html).toContain('placeholder="(untitled process)"');
   });
 });

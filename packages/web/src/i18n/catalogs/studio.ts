@@ -17,8 +17,7 @@
  */
 export const en = {
   "app.title": "Process Studio",
-  "app.draftIncomplete":
-    "Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below).",
+  "app.draftIncomplete": "Open Checks and fix this draft's structure, so every check can run.",
   "app.leaveDraftConfirm": "Leave this draft? Unsaved edits will be lost.",
   "app.screenLoading": "Loading the screen…",
   "app.processLegend": "Process",
@@ -40,6 +39,9 @@ export const en = {
   "draftToolbar.dialogProcess": "Process",
   "draftToolbar.dialogProcessId": "Process id",
   "draftToolbar.dialogRevision": "Revision",
+  "draftToolbar.dialogKey": "Key",
+  "draftToolbar.dialogDeveloperView": "Developer view",
+  "draftToolbar.dialogLanguages": "Languages",
   "draftToolbar.publishDialogHeading": "Publish this draft",
   "draftToolbar.publishDialogNextVersion": "Next version",
   "draftToolbar.publishDialogUnsaved": "This draft has unsaved changes. Publishing saves them first.",
@@ -369,7 +371,7 @@ export const en = {
   "formEditor.noteKind": "Note",
   "formEditor.stepNotFound": "This step no longer exists in the draft.",
   "formEditor.loadFailed": "The form editor could not load. Your draft is unchanged: go back, save it, then reload the page.",
-  "formEditor.navigateAwayKeepsChanges": "Every change is already in the draft. Save, Discard and Publish stay on the header bar.",
+  "formEditor.navigateAwayKeepsChanges": "Every change is already in the draft. The header bar saves and publishes it, and its ⋮ menu discards it.",
   "formEditor.paletteLabel": "Catalog fields not on this form",
   "formEditor.paletteHeading": "Available fields",
   "formEditor.paletteEmpty": "Every catalog field is on this form.",
@@ -548,12 +550,12 @@ export const en = {
   "subprocess.childInputsNone": "The called process declares no input fields.",
   "subprocess.noteAllMapped": "Every input field of the called process is mapped.",
 
-  "contentLocale.legend": "Content locale",
   // A locale option that has gaps. `{locale}` is the code, `{count}` the number of missing entries.
   "contentLocale.optionGap": "{locale} — {count} missing",
-  "contentLocale.invalid": "invalid locale code",
-  "contentLocale.addPlaceholder": "add locale (e.g. de)",
-  "contentLocale.add": "+ add locale",
+  "contentLocale.addLabel": "Add another language",
+  "contentLocale.invalid": "That is not a language code. Try one such as de or fr-CH.",
+  "contentLocale.addPlaceholder": "Language code, such as de",
+  "contentLocale.add": "Add",
 
   "tabs.rowLabel": "Process surface",
   "tabs.map": "Map",
@@ -584,6 +586,7 @@ export const en = {
   "settings.contract": "What it takes in and gives back",
   "settings.access": "Access",
   "settings.baseLocale": "Base language",
+  "settings.contentLocale": "Language you are editing",
   "settings.cancellable": "A case can be cancelled while it runs",
   "settings.collaborationLegend": "Collaboration",
   "settings.comments": "Participants can comment on a case",
@@ -591,6 +594,9 @@ export const en = {
   "settings.developerView": "Developer view",
   "settings.key": "Key",
   "settings.processId": "Process id",
+  "settings.revision": "Revision",
+  "settings.publishedVersion": "Published version",
+  "settings.definitionHash": "Definition hash",
   "settings.manageGroups": "Manage assignment groups for this process",
 
   // The Forms tab: one plate per step that declares a view
@@ -878,11 +884,9 @@ export const en = {
   "assignment.none": "Nobody in particular",
 
   "headerBar.unnamedProcess": "(untitled process)",
-  "headerBar.revision": "rev.",
+  "headerBar.nameLabel": "Process name",
   "headerBar.unsaved": "Unsaved changes",
   "headerBar.saved": "Saved",
-  "headerBar.lastSaved": "Last saved",
-  "headerBar.published": "Published",
   "headerBar.findingPrefix": "Stale reference in",
   "headerBar.findingCarriedBy": "carried by",
   "headerBar.findingLiveElsewhere": "live instance(s) elsewhere",
@@ -893,6 +897,18 @@ export const en = {
   "headerBar.jsonLeave": "Leave the JSON surface",
   "headerBar.versions": "Versions",
   "headerBar.player": "Player",
+  // The back control and its accessible name, which holds the visible word.
+  "headerBar.back": "← Processes",
+  "headerBar.backLabel": "Back to processes",
+  // The state line's parts (`studio-canvas`). `{time}` is the save's clock
+  // time. `{version}` is the mono version label, such as `v2`.
+  "headerBar.savedAt": "Saved at {time}",
+  "headerBar.versionPublished": "{version} published",
+  "headerBar.test": "Test",
+  "headerBar.menuGroupDraft": "Draft",
+  // Beside the state while the content locale differs from the base language
+  // (`studio-app`). `{language}` is the language's English name.
+  "headerBar.editingNote": "Editing {language}",
 
   // The Player screen. Its own strings are still mostly inline English; this
   // one is a catalog key because it is an accessible name.

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DraftProvider } from "../src/areas/studio/draft/store.js";
 import { ProcessSettingsPanel } from "../src/areas/studio/panels/ProcessSettingsPanel.js";
+import { AddLocaleField } from "../src/areas/studio/panels/shared/ContentLocaleSwitcher.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 import { t } from "../src/areas/studio/catalog.js";
 
@@ -14,10 +15,12 @@ import { t } from "../src/areas/studio/catalog.js";
 const KEY = "settings_fixture_key";
 const PROCESS_ID = "proc_settings_fixture";
 
-function render(draft: Draft): string {
+const HASH = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+function render(draft: Draft, lastPublish?: { version: number; definitionHash: string }): string {
   return renderToStaticMarkup(
     <DraftProvider initial={draft} token="t">
-      <ProcessSettingsPanel processId={PROCESS_ID} />
+      <ProcessSettingsPanel processId={PROCESS_ID} revision={7} lastPublish={lastPublish} />
     </DraftProvider>,
   );
 }
@@ -45,10 +48,29 @@ describe("ProcessSettingsPanel", () => {
     expect(html).toMatch(/<span[^>]*>Base language<\/span><input type="text" value="de"\/>/);
   });
 
-  it("renders the add-a-language control", () => {
+  it("renders the add-a-language control under a visible label", () => {
     const html = render({ key: KEY });
 
-    expect(html).toContain(`>${t("contentLocale.add")}</button>`);
+    expect(html).toMatch(/<label for="([^"]+)"[^>]*>Add another language<\/label>/);
+    const id = /<label for="([^"]+)"[^>]*>Add another language/.exec(html)![1];
+    expect(html).toContain(`<input id="${id}" type="text" placeholder="Language code, such as de"`);
+    expect(html).toContain(">Add</button>");
+  });
+
+  it("renders no refusal before one stands", () => {
+    const html = render({ key: KEY });
+
+    expect(html).not.toContain('role="alert"');
+    expect(html).not.toContain("aria-invalid");
+  });
+
+  it("renders the refusal as an alert the input points at", () => {
+    const html = renderToStaticMarkup(<AddLocaleField value="xx!" error={t("contentLocale.invalid")} onChange={() => {}} onAdd={() => {}} />);
+    const describedBy = /aria-describedby="([^"]+)"/.exec(html)![1];
+
+    expect(html).toContain('aria-invalid="true"');
+    expect(html).toContain(`<p id="${describedBy}" role="alert"`);
+    expect(html).toContain("That is not a language code. Try one such as de or fr-CH.");
   });
 
   it("checks the cancellable setting when the draft carries no cancellable key", () => {
@@ -94,5 +116,55 @@ describe("ProcessSettingsPanel", () => {
 
     expect(outside).not.toContain(KEY);
     expect(outside).not.toContain(PROCESS_ID);
+  });
+
+  it("stands the content-locale select between the base language and the add control", () => {
+    const html = render({ key: KEY, baseLocale: "en", label: { en: "Expense", de: "Spesen" }, description: { en: "Claims" } });
+    const label = html.indexOf(`>${t("settings.contentLocale")}</span>`);
+
+    expect(label).toBeGreaterThan(html.indexOf(`>${t("settings.baseLocale")}</span>`));
+    expect(label).toBeLessThan(html.indexOf(t("contentLocale.addPlaceholder")));
+    expect(html).toContain("Language you are editing");
+    expect(html).not.toContain("Content locale");
+  });
+
+  it("lists each used language as an option, with the gap count of a part-translated one", () => {
+    const html = render({ key: KEY, baseLocale: "en", label: { en: "Expense", de: "Spesen" }, description: { en: "Claims" } });
+    const select = html.slice(html.indexOf("<select"), html.indexOf("</select>"));
+
+    expect(select).toContain('<option value="en" selected="">English (en)</option>');
+    expect(select).toContain('<option value="de">German (de) \u2014 1 missing</option>');
+  });
+
+  it("prints a language it cannot name as its code alone, with no parenthesis", () => {
+    const html = render({ key: KEY, baseLocale: "en", label: { en: "Expense", zz: "x" } });
+    const select = html.slice(html.indexOf("<select"), html.indexOf("</select>"));
+
+    expect(select).toContain('<option value="zz">zz</option>');
+  });
+
+  it("prints the revision inside the Developer view only", () => {
+    const { inside, outside } = splitDetails(render({ key: KEY }));
+
+    expect(inside).toContain(`${t("settings.revision")} <code`);
+    expect(inside).toContain(">7</code>");
+    expect(outside).not.toContain(t("settings.revision"));
+  });
+
+  it("prints no version and no hash before a publish", () => {
+    const html = render({ key: KEY });
+
+    expect(html).not.toContain(t("settings.publishedVersion"));
+    expect(html).not.toContain(t("settings.definitionHash"));
+  });
+
+  it("prints the published version and the whole hash inside the Developer view after a publish", () => {
+    const { inside, outside } = splitDetails(render({ key: KEY }, { version: 2, definitionHash: HASH }));
+
+    expect(inside).toContain(`${t("settings.publishedVersion")} <code`);
+    expect(inside).toContain(">v2</code>");
+    expect(inside).toContain(`>${HASH}</code>`);
+    expect(outside).not.toContain(HASH);
+    expect(outside).not.toContain(t("settings.publishedVersion"));
   });
 });

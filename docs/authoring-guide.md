@@ -961,7 +961,7 @@ The example declares no `collaboration` anywhere. Every one of its steps
 keeps both comments and attachments enabled, exactly as before this key
 existed.
 
-In Studio, the process default is two checkboxes on the process header bar.
+In Studio, the process default is two checkboxes on the Settings tab's Process view.
 A step's own override is a three-way choice per key. Each key picks
 Default, On or Off. Picking Default shows the currently resolved value
 below the control.
@@ -1061,8 +1061,9 @@ Your installation may list no template. Somebody holding `system:templates`
 creates them on Studio's **Templates** screen, from a published version of a
 process.
 
-Studio's own header bar carries **Save**, **Discard draft** and **Publish**.
-Those three stand there whatever you have open.
+Studio's own header bar carries **Test**, **Publish** and a **⋮** menu. They
+stand there whatever you have open. **Save** appears beside the draft's state
+while you hold unsaved changes. The menu holds **Discard draft**.
 
 A draft opens on one screen. A tab row over the body holds six tabs: Map,
 Steps, Fields, Forms, Checks and Settings. Map draws the process on a canvas.
@@ -1080,10 +1081,9 @@ Checks reads as a plain count, like any other tab, until something blocks a
 publish. Then the count itself turns red. Open the tab to see what Studio
 found.
 
-The header bar's `⋮` menu holds three more entries, under Views. The
-**JSON** entry prints the same draft as raw text. That helps when you want to
-read the whole body at once. The **Versions** and **Player** entries open
-their own screens.
+The `⋮` menu holds three entries under Views. The **JSON** entry prints the
+same draft as raw text. That helps when you want to read the whole body at
+once. The **Versions** and **Player** entries open their own screens.
 
 ### 2. Define the field catalog
 
@@ -1186,8 +1186,8 @@ own column count, and it answers no click. Under the fields it draws one
 control per manual path, so you read the buttons a participant will press.
 
 The editor writes into the draft as you work. It has no Save button of its
-own: the header bar's Save, Discard draft and Publish still govern what
-persists.
+own: the header bar's Save and Publish still govern what persists. Discard
+draft, in the `⋮` menu, drops the whole draft.
 
 An end step usually shows a readonly summary. A step early in the process
 usually demands the fields it collects.
@@ -1321,7 +1321,7 @@ Skip this step when nothing calls your process.
 
 ### 9. Run it in the Player
 
-The Player runs your draft. Open it from the header bar's `⋮` menu. Fill in
+The Player runs your draft. Open it with **Test** in the header bar. Fill in
 the forms as a participant would, and walk the process to an end step. Walk it
 again down a different path.
 

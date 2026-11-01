@@ -76,6 +76,9 @@ function renderHeader(findings: PublishFinding[]): string {
         structureActive={true}
         processId="proc_a"
         token="token"
+        justPublished={true}
+        onBack={() => {}}
+        onOpenSettings={() => {}}
         onToggleJson={() => {}}
         onVersions={() => {}}
         onPlayer={() => {}}
@@ -85,6 +88,21 @@ function renderHeader(findings: PublishFinding[]): string {
 }
 
 describe("ProcessHeaderBar's publish findings", () => {
+  it("stands the finding after the header row, and raises no alert", () => {
+    const html = renderHeader([
+      {
+        loc: "workflow.steps[0].onEntry[0]",
+        referenceKind: "path",
+        reference: "path_issue",
+        carriedByVersions: [],
+        liveInstanceCountOutsideCarryingVersions: 0,
+      },
+    ]);
+
+    expect(html.indexOf("Stale reference in")).toBeGreaterThan(html.indexOf("</header>"));
+    expect(html).not.toContain('role="alert"');
+  });
+
   it("names the loc for an action finding, which carries no data source id", () => {
     const html = renderHeader([
       {

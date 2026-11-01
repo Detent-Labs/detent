@@ -59,6 +59,10 @@ interface Props {
    * gating. */
   roles: readonly string[];
   processId: string;
+  /** The draft's current revision, for the Process view's Developer view. */
+  revision: number;
+  /** The last publish of this session, or absent before one. */
+  lastPublish?: { version: number; definitionHash: string };
   /** Cross-area navigation, for the assignment-groups link. */
   go: (href: string, opts?: NavigateOptions) => void;
   /** True while the Settings tab stands open and the JSON surface does not. */
@@ -73,7 +77,7 @@ interface Props {
  * mounted, and `hidden` reveals one, so the contract editor keeps a
  * half-typed outcome name across a switch.
  */
-export function SettingsTab({ view, onOpenView, token, roles, processId, go, visible, onUnauthorized }: Props) {
+export function SettingsTab({ view, onOpenView, token, roles, processId, revision, lastPublish, go, visible, onUnauthorized }: Props) {
   const groupsLinkProps = stylex.props(styles.groupsLink);
   const body = (id: SettingsView) => {
     const hide = view !== id;
@@ -100,7 +104,7 @@ export function SettingsTab({ view, onOpenView, token, roles, processId, go, vis
         label={t("settings.rowLabel")}
       />
       <div {...body("process")}>
-        <ProcessSettingsPanel processId={processId} />
+        <ProcessSettingsPanel processId={processId} revision={revision} lastPublish={lastPublish} />
       </div>
       <div {...body("sources")}>
         <DataSourcesTab token={token} visible={visible && view === "sources"} />

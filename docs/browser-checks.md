@@ -197,7 +197,7 @@ added:
   register's first step (`studio-step-bench`).
 - **A way out's sentence on the Map**: a readable condition, and a
   hand-written rule that reads "a hand-written rule holds".
-- **Process-identity header bar**: clean, dirty, and just-published states.
+- **Process-identity header bar**: clean, dirty, saving, just-published and other-language states.
 - **Routed form editor**: the palette, the canvas, and the selected-field
   strip.
 - **"Add a field" palette section**: default and drag-hover states.
@@ -1456,7 +1456,8 @@ cell, and the grid is again the page's one tab stop.
 Activate a cell, then click elsewhere on the page. Pass: the cell
 deactivates without focus jumping back to the grid.
 
-Switch the studio's content locale to German. Pass: no column clips or
+Switch the studio's content locale to German, on the Settings tab's Process
+view. Pass: no column clips or
 overflows at 1280px. No column width visibly derives from the English
 step label; a German label wraps inside its column instead.
 
@@ -1826,8 +1827,10 @@ Pass: tab 1's save answers 409. The header shows "Unsaved changes" before
 that save and after the 409 too. A conflict banner appears with a Reload
 action.
 
-Click Reload. Pass: the header reads "Saved". The revision number advances
-to match tab 2's. Edit the label once more. Pass: the header reads
+Click Reload. Pass: the header reads "Saved". Open the Settings tab's Process
+view and its Developer view. Pass: the revision matches tab 2's.
+
+Edit the label once more. Pass: the header reads
 "Unsaved changes" again. The reload does not turn the dirty gate off for
 good.
 
@@ -1866,7 +1869,7 @@ process".
 Pass: the browser's native prompt `Leave this draft? Unsaved edits will be lost.`
 appears. Cancel keeps the screen and the new label.
 
-Press Save. Pass: the header bar reads "Saved". Choose the same link again.
+Press Save. Pass: the header bar reads "Saved at" and the time. Choose the same link again.
 Pass: the browser navigates to `/admin/groups?processId=<id>` with no prompt.
 
 Open the draft again and change the label once more. Choose the link a third
@@ -1893,9 +1896,9 @@ Pass: the browser returns to `/login` with no prompt.
 Map tab. Drag one step to a new position and change nothing else. Pass: the
 header bar reads "Unsaved changes".
 
-Choose "Back to processes". Pass: the native prompt appears. Cancel it.
+Choose "← Processes". Pass: the native prompt appears. Cancel it.
 
-Press Save. Pass: the header bar reads "Saved". Choose "Back to processes"
+Press Save. Pass: the header bar reads "Saved at" and the time. Choose "← Processes"
 again. Pass: the browser navigates to the process list at `/studio` with no
 prompt.
 
@@ -1916,7 +1919,7 @@ playwright route. The route fulfills only the PUT, with status 409 and the body
 `{"error":{"type":"draft-conflict","message":"Conflict."}}`. Press Save. Pass:
 the conflict banner appears with a "Reload" button.
 
-Press Reload. Pass: the header bar reads "Saved". Choose "Publish". Pass: the
+Press Reload. Pass: the header bar reads "Saved" or "Saved at". Choose "Publish". Pass: the
 dialog opens without the save-first note. Cancel the dialog and unroute the
 answer.
 
@@ -1965,21 +1968,21 @@ accept. Pass: the label from the 401 session returns, and the notice is gone.
 The restored draft reads "Unsaved changes". Make the save answer 401 and press
 Save. At the login screen, leave the first context alone. In the second
 context, open the draft, change a label and press Save. Pass: the header bar
-reads "Saved".
+reads "Saved at" and the time.
 
 Back in the first context, unroute the answer and log in as
 `demo-superuser@example.test`. Open the draft, choose "Restore unsaved changes"
 and press Save. Pass: the conflict banner appears, because the restore kept the
 stored revision. Press Reload. Pass: the
-header bar reads "Saved", and the draft holds the label from the second
+header bar reads "Saved" or "Saved at", and the draft holds the label from the second
 context.
 
 Change a label, make the save answer 401 and press Save. Unroute the answer,
 log in as `demo-superuser@example.test` and open the draft. Change another
 label. Delay the answer of `PUT /drafts/:id` by a few seconds and press Save.
 While the save runs, inspect the notice. Pass: both buttons carry the
-`disabled` attribute. After the answer arrives, the header bar reads "Saved",
-and the notice is gone.
+`disabled` attribute. After the answer arrives, the header bar reads "Saved at"
+and the time, and the notice is gone.
 
 Change the label again, make the save answer 401 and press Save. At the login
 screen, log in as `demo-developer@example.test` on the same tab. Open the same
@@ -1990,13 +1993,13 @@ draft. Only then read the notice. Pass: no notice appears, because the stored
 copy belongs to the first actor. A refusal screen instead of the header bar
 proves nothing, so repeat the Access view step.
 
-**7. Discard draft after a drag.** Drag a step on the Map tab. Choose
-"Discard draft" in the header bar. The application's own dialog,
+**7. Discard draft after a drag.** Drag a step on the Map tab. Open the header
+bar's `⋮` menu and choose "Discard draft" under Draft. The application's own dialog,
 "Discard this draft", opens. Confirm it. Pass: no native browser prompt
 appears, and the screen returns to the process list.
 
-**8. A 401 on a clean draft.** Open the draft and change nothing. The Save
-button stays disabled, so force the 401 on another request. Open Settings,
+**8. A 401 on a clean draft.** Open the draft and change nothing. The header
+bar shows no Save button, so force the 401 on another request. Open Settings,
 then Access. Make `PUT /processes/:id/access` answer 401 with a playwright route.
 
 Type any text into the Developer list's add box and press Add. Pass: the login
@@ -2537,9 +2540,11 @@ process-scoped `read` grant on the target; a developer with neither sees a
 real, correctly-mapped 403.
 
 Pass: the publish succeeds even though `labelFieldId` names a process with
-no live instance. Right below the "Published vN (hash)" line, the header bar
-lists one line per unresolved reference. Each reads "Stale reference in
-<data source id>: <field id> (not carried by any live version)". Change the
+no live instance. The state line reads "Saved at" and the time, then "vN
+published". Right below
+the header bar, a list shows one line per unresolved reference. Each reads
+"Stale reference in <data source id>: <field id> (not carried by any live
+version)". Change the
 config back to a resolvable reference and publish again. Pass: no finding
 line renders.
 
@@ -2741,8 +2746,8 @@ Save the draft. Publish it as an actor who holds `read` and `migrate` on the
 target process. Pass: the publish succeeds.
 
 Now change `pathId` to an id no live version of the target carries. Publish
-again. Pass: the header bar lists one finding line below the published-version
-line. That line names the action's location in the body, since an action
+again. Pass: one finding line shows below the header bar, under the state line's
+new version. That line names the action's location in the body, since an action
 carries no data source id to name instead.
 
 Last, unbind the field, save the draft, and publish again. Pass: the publish
@@ -2927,15 +2932,15 @@ rest: the gate's own markup, and the banner's alert role.
 
 Sign in as `demo-developer@example.test`. That account holds
 `system:developer` and not `system:publish`, so it is the actor the gate
-catches. Open a draft. Then open the header bar's `⋮` menu.
+catches. Open a draft.
 
-Pass: Publish still renders, dimmed. One line of label text beneath it reads
-"Needs the publish permission for this process". Click it. Pass: nothing
-happens, and the network tab shows no request.
+Pass: Publish still renders in the header bar, dimmed. One line of label text
+leads it on the same row, reading "Needs the publish permission for this
+process". Click it. Pass: nothing happens, and the network tab shows no
+request.
 
-Tab to the Publish item. Pass: it takes focus, unlike the natively disabled
-Save item beside it while a save runs. A screen reader reads the reason with
-the control, through `aria-describedby`.
+Tab to Publish. Pass: it takes focus, unlike a natively disabled button. A
+screen reader reads the reason with the control, through `aria-describedby`.
 
 Now sign in as an account holding `system:publish` and open the same draft.
 Choose Publish. Pass: the dialog names the process, the process id, the
@@ -2953,8 +2958,8 @@ Edit the label and choose Publish again. Pass: the dialog says that publishing
 saves the unsaved changes first. Confirm. Pass: one `PUT` then one `POST`, and
 no second prompt between them.
 
-Choose Discard. Pass: a dialog opens naming the process and the revision, and
-stating that the published versions stay. Cancel. Pass: the draft is still
+Open the `⋮` menu and choose Discard draft. Pass: a dialog opens naming the
+process and the revision, and stating that the published versions stay. Cancel. Pass: the draft is still
 open and unchanged.
 
 To see a refusal render, sign back in as `demo-developer` and open the draft.
@@ -2962,6 +2967,108 @@ Publish through the browser console rather than through the gated control.
 Pass: the failure renders as a bordered banner with a FAILED stamp. It sits as
 its own block below the header bar. A screen reader announces it, with no move
 of the focus.
+
+### The header bar's two rows (`studio-header-two-rows`)
+
+Source: `studio-header-two-rows` task 4.3.
+
+Two rows stand over the tab row. The shared header comes first, then the
+header bar. The file `packages/web/test/studio-draftToolbarState.test.ts`
+reads the state logic as pure functions. It sees no focus, no layout and no
+wrapping. Every case below needs a real browser.
+
+Use the production build served from `WEB_ROOT`. The dev server crashes on
+the first validation. Sign in as `demo-superuser@example.test` unless a step
+names another account.
+
+1. **A clean, published draft.** Open the draft of a process with a published
+   version. Pass: the bar reads the back control "← Processes", the name and
+   the state line "Saved · v1 published". Test, Publish and the `⋮` trigger
+   follow, right-aligned. Pass: no key, id, revision, hash or locale code shows. Pass:
+   Publish is the only filled control.
+2. **A draft never published.** Create a new process and open its draft.
+   Pass: the state line reads "Saved" alone, with no "published" part.
+3. **A dirty draft.** Change a field's label. Pass: the state line reads
+   "Unsaved changes · v1 published" in the refusal color, and Save stands
+   beside it. Pass: Test, Publish and the `⋮` trigger have not moved.
+4. **Saving.** Delay the answer of `PUT /drafts/:id` by a few seconds. Tab
+   to Save and press Enter. Pass: Save reads "Saving…" and keeps its focus ring. Press Enter on it
+   again. Pass: no second `PUT` goes out. After the answer, the state line reads
+   "Saved at" and the time, and Save is gone.
+5. **Save's focus rule.** Change a label, Tab to Save and press Enter, with
+   the same delay. Pass: when Save vanishes, the focus ring stands on the state
+   line. The page top holds none. Change a label and press Save again. Before the
+   answer, click the name input. Pass: the focus stays in the name input.
+6. **Just published.** Choose Publish and confirm. Pass: the focus returns to
+   Publish. Pass: the state line reads "Saved at" and the time, then "v2
+   published", in plain ink. Pass: no stamp and no toast show. Pass: a ghost
+   "Versions" button follows the line.
+7. **The Versions offer.** Press "Versions". Pass: the Versions screen opens.
+   Go back to the draft and publish again.
+8. **The offer ends.** Change a label. Pass: the "Versions" button is gone.
+   Press Save. Pass: it does not return. Reload the page. Pass: the line reads
+   "Saved · v2 published" and the offer stays away.
+9. **A blocked draft.** Add a step no path reaches. Pass: "Blocked by an open
+   issue" leads Publish on the bar's row. Choose Publish. Pass: the dialog opens
+   and states the refusal. Sign in as `demo-developer@example.test`. Pass:
+   Publish reads dimmed and its reason reads "Needs the publish permission for
+   this process".
+10. **A conflict.** Change a label. Make `PUT /drafts/:id` answer 409 with a
+    playwright route, then press Save. Pass: the conflict banner shows below the
+    bar, and the state line still reads "Unsaved changes".
+11. **The Editing note on Steps.** On the Settings tab's Process view, add
+    `de` and pick "German (de)" under "Language you are editing". Open the Steps tab.
+    Pass: a ghost button "Editing German" stands beside the state line. Press
+    it. Pass: the Process view opens with the language select in reach.
+12. **The Editing note on the Access view.** Open Settings, then Access.
+    Press "Editing German". Pass: the Process view opens, and the focus stands
+    on the Settings tab.
+13. **The Editing note in the form editor.** Open a step's form editor. Press
+    "Editing German". Pass: the form editor closes and the Process view opens.
+14. **The Editing note over the JSON surface.** Open the `⋮` menu and choose
+    "Open the JSON surface". Pass: the note is gone, the name input is dimmed
+    and cannot take focus, and Test and Publish stay. Leave the JSON surface.
+    Pass: the note returns. Pick English again. Pass: the note goes.
+15. **A part-typed base language.** On an English draft, type `d` into Base
+    language. Pass: the bar names no locale. Complete it to `de`. Pass: the
+    content locale moves, and the note stays away while the two match.
+16. **A name missing its translation.** In German, type a German name, then
+    clear it. Pass: its missing-translation warning stands under the bar, and
+    Test, Publish and the `⋮` trigger stay on the bar's row at 1280px.
+17. **A long name.** Type a name of 80 characters. Pass: the input stops near
+    40 characters wide. Pass: the commands stay on the first row at 1280px.
+    Narrow the window to 800px. Pass: the left group wraps inside itself, and
+    the trailing group stays on the row. Narrow it to 560px. Pass: the trailing
+    group wraps under the left group, and Test, Publish and the `⋮` trigger
+    move as one.
+18. **The discard dialog's focus return.** Open the `⋮` menu. Pass: it holds
+    two groups, Views and Draft, and Draft holds "Discard draft" in an accent
+    outline. Choose it. Pass: the focus ring sits on Cancel. Cancel. Pass: the
+    focus ring stands on the `⋮` trigger. Repeat with Escape and get the same
+    result.
+19. **The menu over the field matrix.** Open the Fields tab, Where fields
+    appear, at 1280px. Scroll the grid so its sticky headers sit under the
+    menu panel, then open the menu. Pass: a press on "Discard draft" reaches
+    that entry, and the dialog opens. Repeat on the Map tab at 400px wide.
+20. **Test and Back.** Change a label, then press Test. Pass: the native leave
+    prompt appears, and Cancel keeps the draft. Repeat with the back control.
+    Save the draft, then press Test. Pass: the Player opens without a prompt.
+21. **The warning below the bar, with the placeholder.** In German, clear the
+    name. Pass: the warning stands as a block under the bar, left of the
+    advisory rule, and the bar keeps one row. Pass: the name input reads the
+    English name as its placeholder, in place of "(untitled process)". Pass: a
+    screen reader names the input "Process name". Clear the English name too
+    on a draft with no German name. Pass: the placeholder reads "(untitled
+    process)".
+22. **The Process view's language words.** Open Settings, Process, with `de`
+    added. Pass: the select reads "English (en)" and "German (de)", and a
+    German entry with gaps reads "German (de) — 2 missing". Pass: "Add another
+    language" labels the input above it, whose placeholder reads "Language
+    code, such as de", beside a button reading "Add". Type `xx!` and press Add.
+    Pass: "That is not a language code. Try one such as de or fr-CH." stands under
+    the field, a screen reader announces it, and the input is marked invalid.
+    Open the Publish dialog. Pass: its Languages fact reads the same
+    "English (en)" and "German (de)" words.
 
 ### Where a confirmation dialog leaves the focus (`studio-publish-gate-and-report`)
 
@@ -2974,13 +3081,15 @@ A rendered string carries no active element. So the file
 control the markup primes, and nothing beyond that. Where the focus sits, and
 where it goes on close, needs a browser.
 
-Open a draft as an account holding `system:publish`. Save, Discard draft and
-Publish stand as their own controls on the header bar, each ahead of the `⋮`
-menu trigger. Choose Publish. Pass: the focus ring sits on Cancel, not on
-Publish. Press Enter without moving. Pass: the dialog closes and no `POST`
+Open a draft as an account holding `system:publish`. Test and Publish stand as
+their own controls on the header bar, ahead of the `⋮` menu trigger. Discard
+draft sits in that menu, under Draft.
+
+Choose Publish. Pass: the focus ring sits on Cancel, not on Publish. Press
+Enter without moving. Pass: the dialog closes and no `POST`
 goes out.
 
-Choose Discard draft, its own control on the header bar. Pass: the focus ring
+Open the `⋮` menu and choose Discard draft. Pass: the focus ring
 sits on Cancel, never on Discard draft. This one matters most: the studio
 carries no undo, and Discard draft is the first focusable control in DOM
 order.
@@ -2988,9 +3097,11 @@ order.
 Now close each dialog by each of its routes, and watch where the focus lands
 every time. Cancel it. Press Escape. Confirm a publish and let it finish.
 
-Pass: each dialog opens from its own control on the header bar. Every route
-returns the focus ring to that same control, Publish or Discard draft in
-turn. It never lands on the top of the page, and never on nothing at all.
+Pass: the publish dialog opens from Publish, and the discard dialog from the
+`⋮` menu. Every route returns the focus ring to the control that started it:
+Publish, or the `⋮` trigger for Discard draft. The menu closes when the author
+picks the entry, so the trigger takes the focus. It never lands on the top of the
+page, and never on nothing at all.
 
 Press Tab straight after each close. Pass: the next stop sits right after
 whichever control opened it, not the first control on the screen.
@@ -3077,7 +3188,7 @@ Keep NVDA running and press each arrow inside the canvas. Pass: focus moves.
 Browse mode taking the key for itself is what `role="application"` exists to
 stop.
 
-Change the header's content locale and watch the nodes. Pass: every label
+Change the content locale on the Settings tab's Process view and watch the nodes. Pass: every label
 repaints in the locale you chose. A label with no entry there falls back to the
 draft's base locale.
 
@@ -3233,8 +3344,8 @@ each view keeps its own edit state across the switch.
 Open the Versions screen, then the publish dialog's Changes row, in turn.
 Pass: each renders with no console error.
 
-Open each of the four dialogs in turn. Two open from the header
-bar's `⋮` menu, publish-confirm and discard-confirm. Two open from
+Open each of the four dialogs in turn. Publish-confirm opens from the
+header bar's Publish control, and discard-confirm from its `⋮` menu. Two open from
 the Processes screen, promotion-preview and start-picker. Pass: each
 opens as a native `<dialog>`, with a visible `::backdrop` behind it.
 
@@ -3821,8 +3932,8 @@ reads well there, in both color schemes, is a visual judgment no `bun:test`
 assertion can make. `development-toolchain`'s split rule keeps it here,
 since no defect record exists for it yet.
 
-Open a draft with no open issue. Pass: the header bar carries Save, Discard
-draft and Publish, and the area nav stands empty. The tab row's Checks count
+Open a draft with no open issue. Pass: the header bar carries Test, Publish
+and the `⋮` trigger, and the area nav stands empty. The tab row's Checks count
 reads in the tab row's ordinary color, the same as every other tab's count.
 
 Introduce a blocking issue (an unreachable step works) without leaving the
@@ -3893,8 +4004,8 @@ Whether the row still reads as one line with a ninth item on it is a visual
 judgment.
 
 Open a draft holding a blocker, as an actor with the publish permission.
-Pass: the reason reads on the row itself, in the refusal color, on Save's own
-baseline. Nothing renders beneath the buttons. The bar's bottom border runs
+Pass: the reason reads on the row itself, in the refusal color, on the state
+line's baseline. Nothing renders beneath the buttons. The bar's bottom border runs
 unbroken. The Checks tab's count reads in the refusal color,
 bold. Publish stays enabled, and a click still opens the confirmation dialog.
 
@@ -4229,9 +4340,9 @@ the pointer.
 **Processes list.** Create a draft of any process. Its row shows Discard
 draft.
 
-**Draft confirmation dialog.** Open that draft and read Save in the header bar.
-Save is the plain control here, read before the dialog opens. Then choose
-Discard draft in the header bar. The dialog shows its own Discard draft beside
+**Draft confirmation dialog.** Open that draft, change a label and read Save in
+the header bar. Save is the plain control here, read before the dialog opens.
+Then open the `⋮` menu and choose Discard draft. The dialog shows its own Discard draft beside
 Cancel. Cancel is a ghost control, and its text reads in the accent too.
 
 Pass: the dialog's Discard draft reads a transparent background. The browser's
@@ -4323,9 +4434,7 @@ capped at 20rem tall, and scrolls inside that cap. Every row still shows
 its number, label and grip, and none show a summary line.
 
 Go back to the process list and choose "Discard draft" on the "IT Offboarding"
-row. Accept the browser's confirm. That leaves no draft behind. The header bar's own
-"Discard draft" does not work, so do not use it here. See the
-`docs/decisions.md` entry DRAFT-1.
+row. Accept the browser's confirm. That leaves no draft behind.
 
 ### Steps rail rows in the draft's own order (`steps-rail-follows-author-order`)
 
@@ -4344,9 +4453,7 @@ each on its own fresh draft.
    and three traded places.
 3. Go back to the process list and choose "Discard draft" on the
    "IT Offboarding" row, then accept the browser's confirm. Pass: that row
-   reads "No draft" under Draft, with "Create draft" as its one button. The header bar's
-   own "Discard draft" does not work, so do not use it here. See the
-   `docs/decisions.md` entry DRAFT-1.
+   reads "No draft" under Draft, with "Create draft" as its one button.
 
 ### The Forms tab card miniature (`forms-tab-form-strip`)
 
@@ -4588,11 +4695,9 @@ alpha 0.14, in `color(srgb …)` notation:
 }
 ```
 
-Choose "← Back to processes" to return to the process list. Steps 6 and 10
+Choose "← Processes" to return to the process list. Steps 6 and 10
 left the draft dirty, so accept its leave-draft confirm. Then choose
-"Discard draft" on the "IT Offboarding" row, and accept the browser's confirm. The
-header bar's own "Discard draft" does not work, so do not use it here. See the
-`docs/decisions.md` entry DRAFT-1.
+"Discard draft" on the "IT Offboarding" row, and accept the browser's confirm.
 
 ### The advisory role and the change list's command (`authoring-command-ink-advisory-role`)
 
@@ -4604,9 +4709,9 @@ database, then sign in as `demo-superuser@example.test`, password
 `seed-demo-password`. In the Processes list, find "IT Offboarding" and choose
 "Create draft". Under `playwright-cli`, pass `-s=advisory-role` on every call.
 
-1. Open the Settings tab's Process view. Type `de` into its add-locale
-   control, the input reading "add locale (e.g. de)". Then choose
-   "+ add locale". Pass: the warning callout beside the process name draws its
+1. Open the Settings tab's Process view. Type `de` into the input under
+   "Add another language", the one reading "Language code, such as de". Then
+   choose "Add". Pass: the warning callout under the header bar draws its
    3px rule in `rgb(226, 90, 64)` light and `rgb(255, 151, 131)` dark.
 2. Open the Steps tab and choose "Submit the Exit Notification" in the steps
    rail. In that step page's "Ways out" section, choose "Happens by itself"
@@ -4622,11 +4727,11 @@ database, then sign in as `demo-superuser@example.test`, password
    release.
 
 Step 1 reads the callout through this `run-code` function. The callout is the
-paragraph right after the header bar's `h1`:
+paragraph right after the header bar's `header`:
 
 ```js
 async (page) => {
-  const callout = page.getByRole("heading", { level: 1 }).locator("xpath=following-sibling::p[1]");
+  const callout = page.getByRole("heading", { level: 1 }).locator("xpath=ancestor::header[1]/following-sibling::p[1]");
   const result = { text: await callout.innerText() };
   for (const scheme of ["light", "dark"]) {
     await page.emulateMedia({ colorScheme: scheme });
@@ -4737,11 +4842,9 @@ A passing run returns these values:
 }
 ```
 
-Choose "← Back to processes" to return to the process list. Step 2 left the
+Choose "← Processes" to return to the process list. Step 2 left the
 draft dirty, so accept its leave-draft confirm. Then choose "Discard draft" on the
-"IT Offboarding" row, and accept the browser's confirm. The header bar's own
-"Discard draft" does not work, so do not use it here. See the
-`docs/decisions.md` entry DRAFT-1.
+"IT Offboarding" row, and accept the browser's confirm.
 
 ### The field matrix's height (`field-matrix-fill-height`)
 
@@ -4776,9 +4879,7 @@ appear.
    the tab body back up from here. Use the tab body's own scrollbar or the
    keyboard instead.
 5. Go back to the process list and choose "Discard draft" on the
-   "IT Offboarding" row, then accept the browser's confirm. The header bar's
-   own "Discard draft" does not work, so do not use it here. See the
-   `docs/decisions.md` entry DRAFT-1.
+   "IT Offboarding" row, then accept the browser's confirm.
 6. Find the row "Access Request" and choose "Create draft". Open its Where
    fields appear view at 1440x1200. First confirm the grid's own height sits between
    384px and the height under the toolbar. Pass: the grid's own frame ends
@@ -4956,10 +5057,10 @@ async (page) => {
    screen opens is the editor's own base read, `draft/publishedFields.tsx`.
 4. Take the delay off. Under `playwright-cli`, a `run-code` call to
    `page.unroute("**/drafts/*")` does that. Edit the process label. Press
-   Save. Pass: the header bar reads "Saved". No conflict banner shows.
+   Save. Pass: the header bar reads "Saved at" and the time. No conflict
+   banner shows.
 5. Go back to the process list. Choose "Discard draft" on the
-   "IT Offboarding" row. Accept the browser's confirm. The header bar's own "Discard draft" does
-   nothing, per DRAFT-1 in `docs/decisions.md`.
+   "IT Offboarding" row. Accept the browser's confirm.
 6. Install the 500 route. Press that row's "Create draft". Pass: the error
    banner shows its "Failed" stamp. The row still reads "No draft" under
    Draft. Its button reports no `disabled`.
@@ -5209,10 +5310,9 @@ The card prints no key.
    `labelLines` reads 1.
 3. Read the result for 1100px. Pass: the three pass lines of step 2 hold
    here too. The label holds one line at this width as well.
-4. Choose the breadcrumb's first crumb, Forms, then "← Back to processes". Choose
+4. Choose the breadcrumb's first crumb, Forms, then "← Processes". Choose
    "Discard draft" on the "IT Offboarding" row and accept the browser's confirm.
-   Under `playwright-cli`, `dialog-accept` answers it. The header bar's own
-   "Discard draft" does not work, per DRAFT-1 in `docs/decisions.md`.
+   Under `playwright-cli`, `dialog-accept` answers it.
 
 ```js
 async (page) => {
@@ -5349,8 +5449,7 @@ returns an object, so an empty printout means it threw.
       where it stands.
 14. Go back to the process list and choose "Discard draft" on the
     "IT Offboarding" row. Accept the browser's confirm, with `dialog-accept` under
-    `playwright-cli`. The header bar's own "Discard draft" does not work, per
-    DRAFT-1 in `docs/decisions.md`.
+    `playwright-cli`.
 
 The setup function:
 
@@ -6631,8 +6730,7 @@ draft's change list stands under the table with no press, and it names the
 renamed field.
 
 Go back to the process list and choose "Discard draft" on the "IT
-Offboarding" row. Accept the browser's confirm. The header bar's own "Discard
-draft" does not work, per DRAFT-1 in `docs/decisions.md`.
+Offboarding" row. Accept the browser's confirm.
 
 ### The form editor names fields on its cards (`studio-form-editor-names-fields`)
 
@@ -6731,8 +6829,8 @@ first section lists "Spare".
 reads "Bank account" on one line. Pass: no word breaks mid-word.
 
 **10. A kept name.** Press "Date", then press Enter at once. Pass: the card
-reads "Date", with DATE beneath. Pass: no banner reads "Draft is not yet
-structurally valid".
+reads "Date", with DATE beneath. Pass: no banner reads "Open Checks and fix
+this draft's structure, so every check can run.".
 
 **11. A new card's input on a two-column form.** At 1440px, set the Columns
 control to Two. Press "Text". Read the new card's input width in devtools
@@ -6749,8 +6847,7 @@ Pass: the palette's box overlaps neither the canvas nor the preview.
 
 Discard the draft from the process list, on the "IT Offboarding" row, and
 accept the browser's confirm. Under `playwright-cli`, `dialog-accept` answers
-it. The header bar's own "Discard draft" does not work, per DRAFT-1 in
-`docs/decisions.md`.
+it.
 
 ### Studio: selects list labels (`studio-selects-show-labels`)
 

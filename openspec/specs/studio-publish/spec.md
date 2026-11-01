@@ -327,7 +327,7 @@ reaches this requirement's condition.
 
 ### Requirement: Publishing confirms in a modal dialog that names the version and its immutability
 
-<!-- antislop: allow synonym-rotation -->
+<!-- antislop: allow synonym-rotation trailing-negation -->
 <!-- Why: a platform cancel is the dialog decline, and a tab stop is a focus position, two unrelated concepts. -->
 The studio SHALL confirm a publish in a modal dialog of its own, not in the
 browser's `confirm()` prompt. The dialog SHALL use the native `dialog`
@@ -339,11 +339,15 @@ decline.
 The dialog SHALL state, before the developer confirms:
 
 - the process it will publish;
-- the draft revision it will publish;
 - the version the publish will mint;
 - the number of open issues the draft carries;
 - that a published version can never change, and that a correction needs a
   new version.
+
+A closed Developer view in the dialog SHALL hold the process key, the process id
+and the draft revision. None of the three SHALL print until it opens. Where the
+draft holds more than one language, the dialog SHALL name each language with its
+translation gap count.
 
 <!-- "issue" names a validation entry; "error" elsewhere names the engine's authorization error. -->
 <!-- antislop: allow synonym-rotation -->
@@ -366,6 +370,8 @@ A publish that the engine refuses SHALL render its reason inside the open
 dialog, and SHALL leave the dialog open. A modal dialog puts everything
 behind it out of reach, so the developer cannot read a message back there.
 
+<!-- antislop: allow negation-habit -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 The dialog SHALL NOT open with its confirming control focused. The declining
 control SHALL hold the initial focus instead. The studio carries no undo, and
 this dialog guards an act the developer cannot reverse. A reflexive Enter on an
@@ -376,7 +382,7 @@ first focusable descendant when nothing claims the focus. So the studio SHALL
 place that focus itself rather than rely on document order.
 
 When the dialog closes, focus SHALL return to the control that opened it. The
-studio's area nav now carries that control. This binds every close route. Those
+header bar carries that control. This binds every close route. Those
 are the declining control, the Escape key, a backdrop dismissal, and a request
 that finished. Focus otherwise drops to the document body, and the developer
 restarts their traversal from the top of the screen.
@@ -384,7 +390,7 @@ restarts their traversal from the top of the screen.
 #### Scenario: Publishing a clean draft confirms first
 
 - **WHEN** the developer chooses Publish on a draft with no unsaved work
-- **THEN** a modal dialog opens naming the process and the revision
+- **THEN** a modal dialog opens naming the process
 - **AND** it names the expected version, the open issue count and the
   immutability rule
 <!-- antislop: allow passive-voice -->
@@ -425,7 +431,7 @@ restarts their traversal from the top of the screen.
 #### Scenario: Closing the dialog returns focus to the control that opened it
 
 - **WHEN** the developer closes that dialog by any route
-- **THEN** focus returns to the area nav's Publish control
+- **THEN** focus returns to the header bar's Publish control
 - **AND** focus does not drop to the document body
 
 #### Scenario: A blocking issue warns inside the dialog
@@ -434,6 +440,59 @@ restarts their traversal from the top of the screen.
 - **THEN** the dialog reads one open issue
 - **AND** the dialog says the engine refuses the publish until somebody fixes
   it
+
+#### Scenario: Machine values wait behind the Developer view
+
+- **WHEN** the publish dialog opens
+- **THEN** no key, process id or revision shows until its Developer view opens
+- **AND** the open Developer view holds all three
+
+#### Scenario: A draft in two languages names both
+
+- **WHEN** the publish dialog opens on a draft holding `en` and `de`, with three
+  `de` gaps
+- **THEN** the dialog names `en` and `de`, with `de`'s three missing entries
+
+#### Scenario: A draft in one language names none
+
+- **WHEN** the publish dialog opens on a draft holding one language
+- **THEN** the dialog prints no language fact
+
+### Requirement: After a publish the header bar states the version and offers Versions
+
+After a publish, the header bar's state SHALL print the engine's version and the
+word "published", in the ink tone. A control reading
+"Versions" SHALL follow it and SHALL open the Versions screen. The hash SHALL
+stay out of the bar.
+
+That offer SHALL stand until the draft next changes. The version then prints in
+the state's ordinary tone with no control. A later save SHALL NOT bring the offer
+back. Versions stays in the `⋮` menu throughout.
+
+#### Scenario: A publish states its version
+
+- **WHEN** a publish succeeds and the engine assigns version 2
+- **THEN** the bar reads "v2 published" and offers Versions
+- **AND** no hash prints in the bar
+
+#### Scenario: The offer leads to Versions
+
+- **WHEN** an author presses that control
+- **THEN** the Versions screen opens on this process
+
+#### Scenario: The next edit retires the offer
+
+- **WHEN** an author alters the draft after that publish, then saves
+- **THEN** the bar reads "v2 published" with no Versions control
+
+### Requirement: A publish's findings stand below the header bar
+
+A publish's findings SHALL render as a list below the bar, outside its row.
+
+#### Scenario: Findings stand below the bar
+
+- **WHEN** a publish returns a finding
+- **THEN** its line stands below the bar and outside the bar's row
 
 ### Requirement: The publish dialog states the changes since the base version
 

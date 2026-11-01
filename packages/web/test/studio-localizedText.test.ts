@@ -4,6 +4,7 @@ import {
   fieldLocaleGaps,
   localeGapCount,
   missingTranslationWarning,
+  nameInputPlaceholder,
   resolveAddLocaleAttempt,
 } from "../src/areas/studio/draft/localized-text.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
@@ -248,5 +249,22 @@ describe("missingTranslationWarning", () => {
       "No de translation yet. Publishing still works; a reader of de sees the en text.",
     );
     expect(missingTranslationWarning({ en: "Amount" }, "en", undefined)).toBeUndefined();
+  });
+});
+
+describe("nameInputPlaceholder", () => {
+  it("reads the base-language name while the edited language has none", () => {
+    expect(nameInputPlaceholder({ en: "Expense approval" }, "en", "(untitled)")).toBe("Expense approval");
+    expect(nameInputPlaceholder({ de: "Spesen", en: "Expenses" }, "de", "(untitled)")).toBe("Spesen");
+  });
+
+  it("reads an absent base as en", () => {
+    expect(nameInputPlaceholder({ en: "Expense approval" }, undefined, "(untitled)")).toBe("Expense approval");
+  });
+
+  it("reads the unnamed words with no base-language name", () => {
+    expect(nameInputPlaceholder(undefined, "en", "(untitled)")).toBe("(untitled)");
+    expect(nameInputPlaceholder({ de: "Spesen" }, "en", "(untitled)")).toBe("(untitled)");
+    expect(nameInputPlaceholder({ en: "" }, "en", "(untitled)")).toBe("(untitled)");
   });
 });

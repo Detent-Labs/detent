@@ -19,8 +19,8 @@ interface Props {
    * can focus a new field's label after an add. Every other caller omits it. */
   id?: string;
   /** The input's accessible name, for a site with no visible `<label>`
-   * around it: the form editor's card name input. Every other caller omits
-   * it. */
+   * around it: the form editor's card name input and the header bar's name
+   * input. Every other caller omits it. */
   ariaLabel?: string;
   /** Passed through to the `<input>`. The form editor's card name input sets
    * "off", since a browser's saved entries name no field. Every other caller

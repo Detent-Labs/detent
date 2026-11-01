@@ -883,20 +883,6 @@ recorded rather than fixed. The RAIL tags are local to this section.
   the refusal ink and an advisory the muted ink, in `StepsRail.tsx`. The
   label behind the count omits the severity. Risk (Medium): colour is the
   only carrier, which WCAG 1.4.1 refuses.
-- **DRAFT-1 (behaviour bug, own OpenSpec change): the header bar's Discard
-  draft does nothing.** Choose it on a
-  draft's process surface, then choose the dialog's own Discard draft: the
-  dialog stays open, the draft survives, and the process list still lists it.
-  The console reports no error. Measured 2026-09-12 at 1440px and at 420px,
-  during a browser check for another change. The process list's own Discard
-  button does work, through a native browser confirm. Risk (High): the studio
-  has no undo, so an author who means to drop a draft keeps it, and the next
-  session reads that draft as current work.
-  Risk (Informational): a long label wraps on a wide screen and fits on a
-  narrow one.
-
-  A re-check on 2026-10-30 did not reproduce it. The entry stays open until a
-  second check or a found cause closes it.
 - **A canvas removal drops keyboard focus, and nothing announces it.**
   `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:678`)
   clears the selection. The pressed control unmounts with it, so focus lands on
@@ -944,7 +930,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   the tension sits in `DESIGN.md` itself.
 - **`.btn-ghost` text falls under 4.5:1 on its own washes.** The draft
   confirmation dialog's Cancel carries it
-  (`packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx:588`). Its accent
+  (`packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx:562`). Its accent
   text reads 3.90:1 hovered and 3.44:1 pressed in light, and 4.15:1 pressed in
   dark. `destructive-buttons-show-the-accent` cleared the same shortfall for
   `.btn-destructive` with `--color-accent-on-muted`, and this one wants the
@@ -1004,7 +990,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   them on 2026-09-14. The step page's `hint` sets written text at 0.8rem
   (`panels/StepPage.tsx:164`). A condition row's remove glyph sets 1.1rem
   (`panels/shared/ConditionBuilder.tsx:63`). The header bar's name sets 1rem,
-  where the Headline role asks 1.25rem (`panels/ProcessHeaderBar.tsx:39`).
+  where the Headline role asks 1.25rem (`panels/ProcessHeaderBar.tsx:60`).
   - Four more flags on the step page mark mono machine values at 0.8rem.
     The Hierarchy in `DESIGN.md` allows that size for them.
   - Risk (Low): type drifts outside the roles `DESIGN.md` names.
@@ -1058,7 +1044,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   user presses Tab up to 52 times to cross the rail.
 - **FIELDS-7: the Fields tab's headings and checks lack structure.** The
   outline jumps from the header bar's `h1` to the field's `h3`. They sit at
-  `panels/ProcessHeaderBar.tsx:793` and `panels/FieldCatalogPanel.tsx:1205`,
+  `panels/ProcessHeaderBar.tsx:895` and `panels/FieldCatalogPanel.tsx:1205`,
   with zone headings at `h4` (`:599`). A zone's check list (`:602`) sits above
   its controls, and neither `aria-invalid` nor `aria-describedby` ties a check
   to its control. The zone heading marks a check by colour alone (`:267`,
@@ -1075,7 +1061,8 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
   longer look up. Adding an empty field raises the banner at
   `screens/EditScreen.tsx:967` before the author types. The banner reads
-  `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`,
+  `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`
+  (the banner now reads "Open Checks and fix this draft's structure, so every check can run."),
   and it pushes the page down 35px at 1400px and 99px at 900px. The messages
   come from `src/schema/definition.ts:1014`, `src/schema/compile.ts:612` and
   `src/schema/definition.ts:1095`, and the "ZOD" label from
@@ -1351,17 +1338,6 @@ tags are local to this section; paths under `panels/` and `screens/` start at
   Processes screen, the Tools screen and the migration plan screen draw
   theirs the same way. Risk (Low): a screen reader hears nothing while a
   body loads (WCAG 4.1.3).
-- **CHANGES-5: the header bar's open `⋮` menu panel loses hit points to
-  tab-body content.** Its panel sets `zIndex: 1`
-  (`panels/ProcessHeaderBar.tsx:199`). The review measured this
-  2026-09-13, identical with and without `visually-hidden-text-page-bounds`:
-  at 1280x720 on the Field matrix tab, an `elementFromPoint` sweep lost 15
-  of 36 hit points to the grid's sticky headers, which set `zIndex: 2` and
-  `zIndex: 3` (`panels/FieldMatrixGrid.tsx:82`, `:97`). At 400x800 on the
-  Canvas tab, the same sweep lost 5 of 30 hit points to the canvas toolbar,
-  which sets `zIndex: 1` later in tree order (`canvas/CanvasView.tsx:84`).
-  Neither element stood confirmed as the cause. Risk (Medium): a click
-  meant for the open menu can land on tab-body content instead.
 - **CHANGES-6: the participant Task screen scrolls sideways at 400px.** The
   `visually-hidden-text-page-bounds` audit met it on the app area's Task
   screen. Its claim row sets `display: "flex"` with no `flexWrap`
@@ -1483,7 +1459,7 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
   draws `missingTranslationWarning` beside a 2px refusal rule, its `warning`
   block (`panels/StepPage.tsx:149`). Three other sites draw the same message
   beside the 3px advisory rule. Those are the header bar's `warning` block
-  (`panels/ProcessHeaderBar.tsx:63`) and the field catalog's `studioWarning`
+  (`panels/ProcessHeaderBar.tsx:88`) and the field catalog's `studioWarning`
   (`panels/FieldCatalogPanel.tsx:334`). The form editor's `studioWarning`
   (`screens/FormEditorScreen.tsx:122`) is the third.
   - Two more 3px rules mix refusal at 55%. The checks rail draws one in
@@ -1534,10 +1510,6 @@ Paths under `panels/` and `screens/` start at `packages/web/src/areas/studio/`.
   335.5. The row's padding box ran from 292 to 332. Both sides of the ring
   stay, 32px clear of the edge fade. This is CHANGES-2 on the tab row. Risk
   (Low): the ring still meets WCAG 2.4.7.
-- **BAR-1: the process name input takes its placeholder as its name.** The
-  input has no label (`panels/ProcessHeaderBar.tsx:794-796`). Its accessible name
-  read "(untitled process)" while it held IT Offboarding. Risk (Medium): a
-  screen reader announces an untitled process on every draft (WCAG 4.1.2).
 
 ## Open from test-instance-claim-bypass (needs its own OpenSpec change)
 
@@ -1798,12 +1770,6 @@ this section.
   access lists. The critique's sketch: one checkbox sentence "Another
   process can call this one", two fieldsets in the entity-rail row style,
   outcomes as ruled rows; a picker over users and groups by display name.
-- **The add-locale input has no label.** `panels/shared/ContentLocaleSwitcher.tsx`
-  gives it a placeholder alone, "add locale (e.g. de)". `studio-six-tabs`
-  moved it onto the Settings tab's Process view without changing it. The
-  `/impeccable audit` of 2026-10-31 rates it P2. The critique proposes one
-  "Languages" fieldset: "Written first in" as a select of language names,
-  the added languages as ruled rows, "Add a language" as a labelled select.
 - **Forced colors drop the open mark on every tab strip.** Under
   `forced-colors: active` the sub-row's inset `box-shadow` and the tab
   row's `::after` bar both vanish, and weight 800 stays the only cue. The
@@ -2162,6 +2128,74 @@ MAPLABELS tag is local to this section.
   units tall, six lines, whatever the sentence holds. A short sentence at the
   graph's edge then adds blank room to the frame. Risk (Low): the frame comes
   out a little loose.
+
+## Open from studio-header-two-rows (needs its own OpenSpec change)
+
+The change cut the header bar to back, name, state, Test, Publish and the `⋮`
+menu. It moved the content-locale switcher and the machine values to Settings
+and the Publish dialog. It left the seven points below to later changes. The
+HEADER tag is local to this section.
+
+- **HEADER-1: the publish findings list prints raw references.** Each line
+  reads "Stale reference in <id>: <field> (...)", with a data source id or a
+  location in the body. Design principle 2 keeps such a value behind a
+  Developer view. The change moved the list under the bar and left its words
+  alone. Risk (Medium): an author reads an id and a field key in plain view,
+  and the line names no step or field label.
+
+  Upgrade entry: print the data source's label and the field's label in the
+  sentence, and keep the raw reference in a Developer view. The strings are
+  `headerBar.findingPrefix` and its neighbours in `i18n/catalogs/studio.ts`.
+- **HEADER-2: a process key follows the name after a publish.** The name input
+  rewrites the key on every keystroke while the key still matches the
+  derivation from the name. A field's key stops following at its first
+  publish (`studio-field-key-follows-name`). Risk (Low): an author who
+  renames a published process changes a key that an outside caller may read.
+
+  Upgrade entry: add a published check to the `shouldAutoDeriveKey` call in
+  `panels/ProcessHeaderBar.tsx`, reading the base version it already holds.
+- **HEADER-4: Test lands on a Player whose two buttons differ, and a dirty
+  draft meets a native prompt first.** The Player's filled create button runs
+  the published version and its outlined one runs the draft. Nothing on the bar
+  says which Test will run. Risk (Low): an author expects Test to run the draft
+  and starts a case on the published version. Change 15 removes the prompt, and
+  the Player's two buttons stay open.
+
+  Upgrade entry: name the two runs on the Player's buttons, or let Test open
+  the draft run. The handler is `onPlayer` in `panels/ProcessHeaderBar.tsx`.
+- **HEADER-5: a publish with no changes promises the next version.** The dialog
+  names the next version, closes silently and mints nothing. The dialog's
+  Changes row already says so. Risk (Low): an author reads "Next version" as a
+  promise.
+
+  Upgrade entry: print the version only while the Changes row lists a change,
+  or turn the confirm into a notice. The dialog is `PublishConfirmDialog` in
+  `panels/ProcessHeaderBar.tsx`.
+- **HEADER-6: the `⋮` trigger announces a popup it does not behave as.** It
+  carries `aria-haspopup` with no menu role and no arrow keys. Risk (Low): a
+  screen reader promises a menu and the keyboard offers a plain disclosure.
+
+  Upgrade entry: drop `aria-haspopup`, or build the menu role with arrow-key
+  navigation. The trigger is in `panels/ProcessHeaderBar.tsx`.
+- **HEADER-7: the dialogs print engine words and raw messages.** The Publish
+  dialog's blocked sentence says "the engine" and "somebody". A refused publish
+  can print a raw message such as "label: missing baseLocale". Change 12 maps
+  engine messages. The discard dialog prints the revision, and change 13 owns
+  that dialog. Risk (Medium): an author reads an engine word and a field path.
+
+  Upgrade entry: change 12 maps the message, and change 13 drops the revision.
+  The strings are `draftToolbar.publishDialogBlocked` and its neighbours in
+  `i18n/catalogs/studio.ts`.
+- **HEADER-8: the Developer view's version and hash survive only while the
+  process surface stays mounted.** After a publish in this session, the Process
+  view's Developer view shows the published version and the definition hash.
+  Pressing Versions in the `⋮` menu unmounts the process surface, so returning
+  shows no hash. The Versions screen prints both values. Risk (Low): an author
+  who returns from Versions finds no hash in the Developer view.
+
+  Upgrade entry: hold the session's last publish above the process surface, so
+  a remount still reads it. The Developer view is in
+  `panels/ProcessSettingsPanel.tsx`.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

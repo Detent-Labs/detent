@@ -44,9 +44,8 @@ test("a publish adds a version", async ({ page }) => {
   await dialog.getByRole("button", { name: "Publish", exact: true }).click();
 
   await expect(dialog).toBeHidden();
-  await expect(page.getByText(/^Published v2 \(/)).toBeVisible();
+  await expect(page.getByText(/v2 published/)).toBeVisible();
 
-  await page.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("button", { name: "Versions", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Versions" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "v1", exact: true })).toBeVisible();

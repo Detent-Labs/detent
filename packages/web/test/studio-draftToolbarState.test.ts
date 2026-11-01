@@ -1,5 +1,17 @@
 import { describe, expect, it } from "bun:test";
-import { isDirty, isLayoutDirty, isDraftDirty, publishAvailability, nextVersionLabel } from "../src/areas/studio/screens/draftToolbarState.js";
+import {
+  isDirty,
+  isLayoutDirty,
+  isDraftDirty,
+  publishAvailability,
+  nextVersionLabel,
+  headerStateLine,
+  formatSavedTime,
+  editingLocaleNote,
+  languageName,
+  justPublishedAfter,
+  saveFocusTarget,
+} from "../src/areas/studio/screens/draftToolbarState.js";
 import { applyReload, applySaveResult, initialSaveState } from "../src/areas/studio/screens/draftSaveLogic.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
@@ -343,5 +355,139 @@ describe("nextVersionLabel (studio-publish: the dialog names a valid version lab
     for (const base of [null, undefined, 0, 1, 42]) {
       expect(nextVersionLabel(base)).toMatch(/^v[0-9]+$/);
     }
+  });
+});
+
+describe("headerStateLine", () => {
+  it("a dirty draft reads unsaved, with or without a version and a past save", () => {
+    expect(headerStateLine(true, undefined, null)).toEqual({ state: "unsaved" });
+    expect(headerStateLine(true, undefined, 1)).toEqual({ state: "unsaved", version: "v1" });
+    expect(headerStateLine(true, "10:32", 1)).toEqual({ state: "unsaved", version: "v1" });
+  });
+
+  it("a clean draft with no save in this session reads saved", () => {
+    expect(headerStateLine(false, undefined, null)).toEqual({ state: "saved" });
+    expect(headerStateLine(false, undefined, undefined)).toEqual({ state: "saved" });
+    expect(headerStateLine(false, undefined, 3)).toEqual({ state: "saved", version: "v3" });
+  });
+
+  it("NaN and 0 are no published version", () => {
+    expect(headerStateLine(false, undefined, Number.NaN)).toEqual({ state: "saved" });
+    expect(headerStateLine(false, undefined, 0)).toEqual({ state: "saved" });
+    expect(headerStateLine(true, undefined, 0)).toEqual({ state: "unsaved" });
+  });
+
+  it("a non-integer or negative base is no published version", () => {
+    expect(headerStateLine(false, undefined, 1.5)).toEqual({ state: "saved" });
+    expect(headerStateLine(false, undefined, -1)).toEqual({ state: "saved" });
+  });
+
+  it("a clean draft after a save reads saved at its time", () => {
+    expect(headerStateLine(false, "10:32", null)).toEqual({ state: "savedAt", time: "10:32" });
+    expect(headerStateLine(false, "10:32", 2)).toEqual({ state: "savedAt", time: "10:32", version: "v2" });
+  });
+});
+
+describe("formatSavedTime", () => {
+  it("prints hour and minute without seconds", () => {
+    const out = formatSavedTime(new Date(2026, 0, 5, 9, 7, 42));
+    expect(out).toMatch(/9.07/);
+    expect(out).not.toMatch(/42/);
+  });
+});
+
+describe("editingLocaleNote", () => {
+  it("names nothing in the base language", () => {
+    expect(editingLocaleNote("en", "en", false)).toBeUndefined();
+    expect(editingLocaleNote("de", "de", false)).toBeUndefined();
+  });
+
+  it("names the language of another content locale", () => {
+    expect(editingLocaleNote("de", "en", false)).toBe("German");
+    expect(editingLocaleNote("en", "de", false)).toBe("English");
+    expect(editingLocaleNote("pt-BR", "en", false)).toBe("Brazilian Portuguese");
+  });
+
+  it("reads an absent base as en", () => {
+    expect(editingLocaleNote("de", undefined, false)).toBe("German");
+    expect(editingLocaleNote("en", undefined, false)).toBeUndefined();
+  });
+
+  it("names nothing while the base language is part-typed or empty", () => {
+    expect(editingLocaleNote("de", "d", false)).toBeUndefined();
+    expect(editingLocaleNote("de", "", false)).toBeUndefined();
+    expect(editingLocaleNote("de", "EN", false)).toBeUndefined();
+  });
+
+  it("prints a code it cannot name as itself and never throws", () => {
+    expect(editingLocaleNote("zz", "en", false)).toBe("zz");
+    expect(editingLocaleNote("not a tag", "en", false)).toBe("not a tag");
+  });
+
+  it("names nothing while the JSON surface is open", () => {
+    expect(editingLocaleNote("de", "en", true)).toBeUndefined();
+  });
+});
+
+describe("justPublishedAfter", () => {
+  /** The flag across a run of renders, each named by whether the draft is dirty. */
+  const across = (start: boolean, renders: boolean[]) => renders.reduce(justPublishedAfter, start);
+
+  it("stands through clean renders after a publish", () => {
+    expect(across(true, [false, false, false])).toBe(true);
+  });
+
+  it("falls on the first dirty render", () => {
+    expect(across(true, [false, true])).toBe(false);
+  });
+
+  it("stays down after a publish, an edit and a save", () => {
+    expect(across(true, [true, false])).toBe(false);
+  });
+
+  it("stays down when the author undoes the edit by hand", () => {
+    expect(across(true, [true, true, false, false])).toBe(false);
+  });
+
+  it("never rises on its own, on a draft nobody published in this session", () => {
+    expect(justPublishedAfter(false, false)).toBe(false);
+    expect(justPublishedAfter(false, true)).toBe(false);
+  });
+});
+
+describe("saveFocusTarget", () => {
+  const answered = { pressed: true, clean: true, focusOnBody: true };
+
+  it("moves the focus to the state line when a pressed Save vanished from the focus", () => {
+    expect(saveFocusTarget(answered)).toBe("stateLine");
+  });
+
+  it("moves nothing on a refused save, which leaves the draft dirty", () => {
+    expect(saveFocusTarget({ ...answered, clean: false })).toBeUndefined();
+  });
+
+  it("moves nothing on a successful save with a draft edited meanwhile", () => {
+    expect(saveFocusTarget({ ...answered, clean: false, focusOnBody: false })).toBeUndefined();
+  });
+
+  it("moves nothing when the author moved the focus elsewhere", () => {
+    expect(saveFocusTarget({ ...answered, focusOnBody: false })).toBeUndefined();
+  });
+
+  it("moves nothing on a save Save's own press did not start, such as the publish dialog's", () => {
+    expect(saveFocusTarget({ ...answered, pressed: false })).toBeUndefined();
+  });
+});
+
+describe("languageName", () => {
+  it("names a language by its English name", () => {
+    expect(languageName("de")).toBe("German");
+    expect(languageName("pt-BR")).toBe("Brazilian Portuguese");
+  });
+
+  it("prints a code it cannot name as itself and never throws", () => {
+    expect(languageName("zz")).toBe("zz");
+    expect(languageName("not a tag")).toBe("not a tag");
+    expect(languageName("")).toBe("");
   });
 });
