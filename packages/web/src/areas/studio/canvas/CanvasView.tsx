@@ -32,9 +32,10 @@ import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups"
 import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER, type Fit } from "./fit";
 import { resolveDropGesture } from "./dropGesture";
 import { inlineRenamePatch } from "./inlineRename";
-import { pathName } from "./pathName";
+import { nodeName, pathName, stampWords, wayOutSentence } from "./mapWords";
 import { nextFocus, entryFocus, type ArrowKey, type Focus } from "./traversal";
 import { nextStepKey } from "../panels/stepsPanelLogic.js";
+import { stepTextMap } from "../panels/shared/optionText";
 import { buildOperands, edgeGuardLabel } from "../panels/shared/conditionLogic";
 
 const HANDLE_RADIUS = 7;
@@ -1107,30 +1108,10 @@ export function CanvasView({
   const stepLabel = (s: (typeof steps)[number] | undefined) =>
     resolveDraftLocalizedText(s?.label, contentLocale, baseLocale) || s?.key || t("steps.unnamedStep");
 
-  /** The stamp's own three words, so the node's accessible name and the role
-   * stamp beside it cannot name one step's kind differently
-   * (`studio-guided-vocabulary`). `end` is a `terminal` flag on an ordinary
-   * task step, never a `type` of its own. */
-  const stepKind = (s: (typeof steps)[number]) =>
-    s.type === "subprocess" ? t("stepRole.subprocess") : s.terminal === true ? t("stepRole.end") : t("stepRole.task");
-
-  /** A step's accessible name. The base template carries the segments every
-   * step has; a stamp appends only where it applies, because an unfilled slot
-   * would print a bare comma. `outgoing` counts the paths the traversal
-   * reaches, which is the set the edge pass below drew, and it picks the
-   * template: one fixed plural announces "1 outgoing paths". */
-  const nodeName = (s: (typeof steps)[number], outgoing: number) => {
-    const parts = [
-      t(outgoing === 1 ? "canvas.nodeLabelOnePath" : "canvas.nodeLabel")
-        .replace("{label}", stepLabel(s))
-        .replace("{key}", s.key ?? "")
-        .replace("{kind}", stepKind(s))
-        .replace("{paths}", String(outgoing)),
-    ];
-    if (s.terminal === true && s.outcome) parts.push(t("canvas.nodeLabelOutcome").replace("{outcome}", s.outcome));
-    if (s.id !== undefined && s.id === initialStepId) parts.push(t("canvas.nodeLabelInitial"));
-    return parts.join(", ");
-  };
+  /** The step text both accessible names read: the step page's selects' own
+   * text, which never falls back to a key and numbers repeats. */
+  const stepTexts = useMemo(() => stepTextMap(steps, contentLocale, baseLocale), [steps, contentLocale, baseLocale]);
+  const nameText = (id: string | undefined) => (id !== undefined ? stepTexts.get(id) : undefined) ?? t("steps.unnamedStep");
 
   /**
    * The canvas's own keyboard. It binds on the `<svg>` rather than on
@@ -1234,7 +1215,13 @@ export function CanvasView({
         // field inside a `role="button"`, and the field is that node's own.
         role={isRenaming ? undefined : "button"}
         tabIndex={isRenaming ? undefined : focus.kind === "step" && focus.stepId === step.id ? 0 : -1}
-        aria-label={isRenaming ? undefined : nodeName(step, outgoingCount.get(step.id) ?? 0)}
+        // `outgoing` counts the paths the traversal reaches, the set the edge
+        // pass drew.
+        aria-label={
+          isRenaming
+            ? undefined
+            : nodeName(step, nameText(step.id), outgoingCount.get(step.id) ?? 0, stampWords(step, initialStepId))
+        }
         onPointerDown={(e) => onNodePointerDown(e, step.id as string)}
         onPointerUp={(e) => onNodePointerUp(e, step.id as string)}
         onDoubleClick={(e) => {
@@ -1533,7 +1520,7 @@ export function CanvasView({
                 data-step-id={path.id !== undefined ? step.id : undefined}
                 role="button"
                 tabIndex={focus.kind === "path" && focus.pathId === path.id ? 0 : -1}
-                aria-label={pathName(path, stepLabel(step), stepLabel(steps.find((s) => s.id === path.to)), guardText)}
+                aria-label={pathName(path, nameText(step.id), nameText(path.to), wayOutSentence(path, step, operands))}
                 // The press takes the roving stop, entered through the source,
                 // which is the end Up and Down walk from. A path with no id
                 // takes none: nothing can name it.

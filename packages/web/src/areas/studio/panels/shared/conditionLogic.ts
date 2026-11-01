@@ -523,9 +523,9 @@ function summarizeRow(row: Row, byPath: Map<string, Operand>, raw: RawRowReading
  * builder's sentence and the canvas edge label share. Walks the same
  * `Condition`/`Row` model `ConditionBuilder` holds, never the CEL text.
  *
- * `raw` picks what a raw row reads as. The canvas edge and the form preview's
- * path note keep the fragment's CEL text; the builder's sentence reads the
- * catalog's phrase.
+ * `raw` picks what a raw row reads as. `guardEdgeLabel` keeps the fragment's
+ * CEL text; the builder's sentence and `guardPhrase` read the catalog's
+ * phrase.
  *
  * Returns `""` for a condition with no complete row (an empty guard, or one
  * still mid-edit); the caller decides what an empty summary means for its
@@ -575,6 +575,24 @@ export function readerSentence(src: string, operands: Operand[]): string {
   const clauses = condition ? summarizeCondition(condition, operands, "phrase") : "";
   if (!clauses) return t("condition.readerRaw");
   return capitalize(fill(t("condition.sentence"), { condition: clauses }));
+}
+
+/**
+ * A guard's condition as a phrase, the words the canvas way out's sentence and
+ * the form preview's note read. The complete rows' clauses read as the
+ * builder's sentence does, with no capital added: a field label keeps the
+ * author's case, a context operand reads lowercase. A raw row beside a
+ * readable row reads as the catalog's phrase. Source that does not parse, or
+ * holds no complete comparison row, reads as a hand-written rule holding.
+ * No CEL source prints, whatever the guard holds.
+ */
+export function guardPhrase(src: string, operands: Operand[]): string {
+  const condition = fromCel(src, operands);
+  if (!condition) return t("condition.handWrittenHolds");
+  const byPath = new Map(operands.map((o) => [o.path, o]));
+  // A raw row counts as complete, so the test reads the row kind.
+  if (!condition.rows.some((r) => r.kind === "cmp" && isComplete(r, byPath))) return t("condition.handWrittenHolds");
+  return summarizeCondition(condition, operands, "phrase");
 }
 
 /**

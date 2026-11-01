@@ -170,7 +170,7 @@ describe("The preview's line for a guarded manual path", () => {
     expect(html).not.toContain("<code");
   });
 
-  it("prints a guard the builder cannot read as CEL in a code element, inside the one sentence", () => {
+  it("prints a guard the builder cannot read as a hand-written rule, with no CEL and no code element", () => {
     const html = render(
       step({
         paths: [
@@ -179,7 +179,9 @@ describe("The preview's line for a guarded manual path", () => {
       }),
     );
 
-    expect(html).toMatch(/<li[^>]*>Approve: shown only when <code[^>]*>size\(data\.amount\) &gt; 3<\/code><\/li>/);
+    expect(html).toMatch(/<li[^>]*>Approve: shown only when a hand-written rule holds<\/li>/);
+    expect(html).not.toContain("<code");
+    expect(html).not.toContain("size(data.amount)");
   });
 
   it("prints no line for an unguarded manual path", () => {
