@@ -224,7 +224,7 @@ miniature draws that mark:
 - an outline, named field
 - a solid fill, named required
 - a dashed outline, named required if a condition holds
-- a group break, named section
+- a group break, named group
 - three outlines of rising height, named taller asks for more
 
 The samples SHALL stay out of the accessibility tree. The legend's words SHALL
@@ -239,7 +239,7 @@ tab with no card SHALL have no legend.
 
 - **WHEN** an author opens the Forms tab of a draft holding one form
 - **THEN** one legend stands above the first card
-- **AND** it names field, required, required if a condition holds, section,
+- **AND** it names field, required, required if a condition holds, group,
   and taller asks for more
 
 #### Scenario: A screen reader reads the legend's words alone
@@ -263,6 +263,12 @@ tab with no card SHALL have no legend.
 - **WHEN** no step in a draft declares a view
 - **THEN** the Forms tab says so in words
 - **AND** it has no legend
+
+#### Scenario: The group mark reads Group
+
+- **WHEN** an author reads the legend
+- **THEN** the group break's name reads "Group"
+- **AND** no legend word reads "Section"
 
 ### Requirement: A card opens the form editor for its step
 
