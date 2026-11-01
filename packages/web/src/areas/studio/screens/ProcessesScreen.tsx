@@ -761,6 +761,7 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
       {pendingDiscard !== undefined && (
         <DiscardDraftDialog
           processLabel={pendingDiscard.name || t("processList.untitled")}
+          lastSavedAt={pendingDiscard.saved ? new Date(pendingDiscard.saved.at) : undefined}
           refusal={discardError === undefined ? null : { message: discardError, detail: null }}
           busy={discarding}
           triggerRef={discardTrigger}

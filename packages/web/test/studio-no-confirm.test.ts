@@ -24,7 +24,7 @@ const ROOT = new URL("../src/areas/studio/", import.meta.url).pathname;
 /** The one file that writes `<dialog` and calls `showModal(`. */
 const DIALOG_FRAME = "panels/shared/StudioDialog.tsx";
 
-/** Below the 200-odd files the area holds today, and far above an emptied walk. */
+/** Below the 174 files the area holds today, and far above an emptied walk. */
 const FILE_FLOOR = 150;
 
 /** Block comments first, then line comments — the order matters for a `//`

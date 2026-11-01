@@ -62,12 +62,12 @@ describe("the process list's discard", () => {
     expect(screen).toContain("const failDiscard = useFail(onUnauthorized, (err) => setDiscardError(describeCaughtError(err)));");
   });
 
-  it("passes the state to the dialog: busy, a refusal with no detail, and the row's control", () => {
+  it("passes the state to the dialog: busy, a refusal with no detail, the row's control and its last save", () => {
     const dialog = between(screen, "<DiscardDraftDialog", "/>");
     expect(dialog).toContain("busy={discarding}");
     expect(dialog).toContain("detail: null");
     expect(dialog).toContain("triggerRef={discardTrigger}");
-    expect(dialog).not.toContain("lastSavedAt");
+    expect(dialog).toContain("lastSavedAt={pendingDiscard.saved ? new Date(pendingDiscard.saved.at) : undefined}");
   });
 
   it("lands on the row's name link, else on Import, from an effect", () => {
