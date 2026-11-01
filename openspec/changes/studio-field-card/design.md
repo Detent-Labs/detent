@@ -356,10 +356,12 @@ uses, in catalog order. "this answer" stays first and takes no count.
   else "(unnamed field)") and the kind word, mono only when `unmatched`.
 - The column header prints the step's label alone; the key span goes.
 - `FLAG_LETTER` goes. A badge prints `t(FLAG_LABEL_KEY[key])`: Asked,
-  Required, Read-only. The badge grid's columns read `repeat(3, 1fr)`. In a
-  shrink-to-fit header, three `1fr` tracks each take the widest track's
-  max-content. That is the shared width the spec asks for. The badge's
-  width drops to `100%`.
+  Required, Read-only. The badge grid's columns read `repeat(3, max-content)`.
+  The badge sets no width. Each badge takes its word's width on one line.
+- Measured in the browser at 1440px on a column header, the badges read 41,
+  57 and 61px. Chrome sizes the `repeat(3, 1fr)` tracks of a shrink-to-fit
+  grid in a table cell to each track's own max-content. One shared width
+  never appears. Read-only, the widest word, stands widest.
 - The cells' checkbox grid keeps `repeat(3, 1.75rem)`. A badge keeps its
   slot order over the checkboxes and no longer its pixel column. The
   bulk-toggle requirement drops that pixel claim.
@@ -467,14 +469,15 @@ Removed: `fieldCatalog.whatAsksHeading`, `fieldCatalog.whatKindHeading`,
 `overflow: "visible"` and rows `"auto auto"`; `editor` reads `overflowY:
 "visible"` there and keeps its padding. The rail keeps its 20rem cap.
 
-The `layout` also reads `flex: "0 0 auto"` under `NARROW`, as the Steps
-tab's grid does. A zero flex basis would hold the grid at the view's height.
 `FieldsTabViews.tsx`'s `view` style gains `overflowY: "auto"`,
 `overscrollBehavior: "contain"`, `padding: focus.reach` and `scrollPadding:
 focus.reach`, the four keys `SettingsTab.tsx`'s `view` carries, which
 `studio-scrollBoxRingRoom.test.ts` demands of every studio scroll box. The
 view body then scrolls as the step page's tab body does. At 1024px the card
 scrolls with the view. The label and Read by stand in one scroll.
+
+The `layout` also reads `flex: "0 0 auto"` under `NARROW`, as the Steps
+tab's grid does. A zero flex basis would hold the grid at the view's height.
 
 ### D14. Tests
 
@@ -558,9 +561,8 @@ scrolls with the view. The label and Read by stand in one scroll.
 - [Moving the data sources breaks a bookmarked `settings/sources` address]
   → It falls to the Settings tab's Process view, the unknown-view rule. No
   deployment runs this studio.
-- [The matrix badges grow to a word's width] → One shared width keeps the
-  three aligned. The grid's column
-  widens. The horizontal scroll already absorbs that.
+- [The matrix badges grow to a word's width] → Each badge takes its word's
+  width. The grid's column widens. The horizontal scroll already absorbs that.
 - [A form-flag "Open" stops one press short of the flag] → The author
   opens the field's Developer view in the strip. Recorded as an open point.
 - [The card grows past the two halves' height] → More folds seven controls.

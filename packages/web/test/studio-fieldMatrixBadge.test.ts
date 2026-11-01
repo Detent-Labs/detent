@@ -170,13 +170,15 @@ describe("the bulk badge grid", () => {
     return grid.slice(start, grid.indexOf("\n  },", start));
   };
 
-  it("shares the widest word's width across the three badges of one header", () => {
-    // Three `1fr` tracks of a shrink-to-fit header each take the widest
-    // track's max-content, so Asked, Required and Read-only line up.
+  it("sizes each badge to its own word, so Read-only stands widest", () => {
+    // Chrome sizes `1fr` tracks of a shrink-to-fit grid in a table cell to
+    // each track's own max-content, so no shared width materialises. The
+    // tracks read `max-content` and the badge sets no width of its own.
     const flags = block("matrixFlags");
-    expect(flags).toContain('gridTemplateColumns: "repeat(3, 1fr)"');
+    expect(flags).toContain('gridTemplateColumns: "repeat(3, max-content)"');
+    expect(flags).not.toContain("1fr");
     expect(flags).not.toContain("1.75rem");
-    expect(block("matrixFlagBadge")).toContain('width: "100%"');
+    expect(block("matrixFlagBadge")).not.toMatch(/\bwidth:/);
   });
 
   it("keeps the cells' checkbox grid at three fixed 1.75rem tracks", () => {
@@ -184,8 +186,8 @@ describe("the bulk badge grid", () => {
   });
 
   it("keeps each word on one line, and never clips it", () => {
-    // "Read-only" wrapped onto two lines at 1440. The `1fr` tracks widen to
-    // the widest word instead.
+    // "Read-only" wrapped onto two lines at 1440. `nowrap` keeps each word
+    // whole.
     expect(block("matrixFlagBadge")).toContain('whiteSpace: "nowrap"');
     expect(block("matrixFlagBadge")).not.toContain("overflow");
   });

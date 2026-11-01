@@ -1179,3 +1179,11 @@ system that resulted; this file explains why it took that shape.
   the canvas" entry stays open. Change 11 owns the matrix's words.
 
   Resolved by `studio-field-card` on 2026-11-01: the matrix's row header prints the field's label and a kind word, and its column header prints the step's label.
+- **FIELDS-25: the effect half prints one step list twice.** "Only ask this
+  when" and "Ask for this" each open with "Writes to:" and the full step list
+  (`panels/FieldCatalogPanel.tsx:1023`, `:1061`). Measured 2026-09-24 at
+  1300x900 on the group "Personal details": each list names all 12 steps and
+  wraps to five lines. Risk (Low): each zone's own control sits below five
+  lines of the same names.
+
+  Resolved by `studio-field-card` on 2026-11-01: both scope notes went; the Asked on rows name the steps.

@@ -256,18 +256,17 @@ const styles = stylex.create({
   },
   matrixFlags: {
     display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
+    gridTemplateColumns: "repeat(3, max-content)",
     columnGap: 0,
     justifyItems: "stretch",
     marginTop: space.s2,
   },
-  // One line per word: the `1fr` tracks widen to the widest flag word
-  // rather than wrap it.
+  // One line per word: each badge takes its word's width, so Read-only
+  // stands widest and no word wraps.
   matrixFlagBadge: {
     fontSize: "11px",
     lineHeight: 1.6,
     whiteSpace: "nowrap",
-    width: "100%",
     textAlign: "center",
     color: colors.textMuted,
     backgroundColor: "transparent",

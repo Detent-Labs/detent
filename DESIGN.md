@@ -695,7 +695,7 @@ own.
 - A grid in a 1px hairline box, with sticky column and row headers on paper.
 - A column header takes the Legend style over the step's label.
 - The bulk badges print the words Asked, Required and Read-only in the body
-  face. All three take one shared width, set by the widest. A conditional flag
+  face. Each badge takes its word's width on one line. A conditional flag
   prints the stamp "Condition".
 - A 2px divider sits under the column headers and beside the row headers.
 - A cell takes a 1px hairline on its bottom and right edges, and 4px by 8px

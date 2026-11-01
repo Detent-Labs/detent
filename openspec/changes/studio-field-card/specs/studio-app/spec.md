@@ -371,8 +371,7 @@ process". A type the table does not name SHALL print its registry type.
 ### Requirement: The matrix badges print each mark's word
 
 Each bulk badge SHALL print the flag's one name: Asked, Required or
-Read-only. No badge SHALL print a letter code. The three badges in one
-header SHALL share one width, the widest word's.
+Read-only. No badge SHALL print a letter code.
 
 #### Scenario: A badge reads its word
 
@@ -1007,17 +1006,16 @@ row header SHALL print the field's `key` or its base `type`.
 
 ### Requirement: The three bulk flag badges render at one shared width
 
-Each bulk flag badge the field matrix draws SHALL render at one shared
-width. The width SHALL be the same for `visible`, `required` and
-`readonly` alike. It SHALL fit the widest word, Read-only. The badges then
-read as members of one group. This holds on the column and row headers
-wherever they carry a bulk badge.
+Each bulk flag badge the field matrix draws SHALL take its own word's
+width, on one line. The widest word, Read-only, then stands widest, and no
+word wraps. This holds on the column and row headers wherever they carry a
+bulk badge.
 
 #### Scenario: The readonly badge is no narrower than its neighbors
 
 - **WHEN** the field matrix draws a column or row header whose eligible
   set holds more than one flag
-- **THEN** each badge renders at the same width as its neighbors
+- **THEN** the `readonly` badge is as wide as its word
 - **AND** the `readonly` badge is no narrower than the `visible` or
   `required` badge
 
@@ -1581,8 +1579,8 @@ The row's operand picker SHALL withhold `child.*`. No `visible` override
 admits `child`: the runtime resolves the flag with no child in scope.
 
 Updating the condition SHALL write the same override to every
-referencing view. The Asked on rows above it name every step the write
-reaches before it happens. Where a referencing view holds a literal, the
+referencing view. The Asked on rows above it SHALL name every step the write
+reaches, before it happens. Where a referencing view holds a literal, the
 notice SHALL name that step.
 
 An unfinished row SHALL write nothing. Each referencing view's `visible`

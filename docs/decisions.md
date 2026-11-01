@@ -1270,12 +1270,6 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 
   Name the fix: separate the two commands, with spacing and a rule between
   them, or move Remove field into the field's own heading row.
-- **FIELDS-25: the effect half prints one step list twice.** "Only ask this
-  when" and "Ask for this" each open with "Writes to:" and the full step list
-  (`panels/FieldCatalogPanel.tsx:1023`, `:1061`). Measured 2026-09-24 at
-  1300x900 on the group "Personal details": each list names all 12 steps and
-  wraps to five lines. Risk (Low): each zone's own control sits below five
-  lines of the same names.
 - **FIELDS-26: a changed option value leaves CEL comparisons on the old
   string.** A change or deletion of an option `value` on a field leaves every
   CEL comparison such as `data.priority == "high"` on the old string. The
@@ -2214,7 +2208,7 @@ come from those two reports.
 
   Upgrade entry: mark a hand-set value apart from an empty one.
 - **FIELDCARD-11: the badge grid no longer shares a pixel edge with the
-  checkbox columns.** The word badges are wider. Only the slot order aligns.
+  checkbox columns.** The word badges are wider and size to their words. Only the slot order aligns.
   Risk (Low): a badge stands off the checkbox column it toggles.
 
   Upgrade entry: size the matrix columns to the widest badge.
