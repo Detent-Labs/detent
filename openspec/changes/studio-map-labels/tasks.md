@@ -3,7 +3,6 @@
 ## 1. The words: one module, no CEL fallback
 
 - [ ] 1.1 In `panels/shared/conditionLogic.ts`, add `guardPhrase` per design D2. Keep `edgeGuardLabel` for now.
-- [ ] 1.2 Drop the `RawRowReading` parameter and type, so `summarizeCondition` always reads the phrase, per D2.
 - [ ] 1.3 Add `condition.handWrittenHolds`, "a hand-written rule holds", to `i18n/catalogs/studio.ts`.
 - [ ] 1.4 Make `draft/guarded-path-notes.ts` read `guardPhrase` and drop `raw`. Drop `FormPreview.tsx`'s `<code>` branch, per D2.
 - [ ] 1.5 Add `canvas/mapWords.ts` per design D1, D3, D9 and D11, with `stampLines` per D4.
@@ -25,6 +24,7 @@
 - [ ] 2.2 Add `NodeStamp` and draw both stamps per D4. Delete `stampCircle`, `stampText` and `canvas.initialStamp`.
 - [ ] 2.3 Add `EdgeLabel` and draw `wayOutSentence` per D5, with `aria-hidden` on its text block.
 - [ ] 2.4 Delete `edgeBadge`, both badge texts, `canvas.elseMarker`, `guardEdgeLabel` and `edgeGuardLabel`.
+- [ ] 2.4a Drop the `RawRowReading` parameter and type per D2. Fix the tests in `studio-conditionLogic.test.ts` that read them.
 - [ ] 2.5 Add the connect handle's hit circle with its `<title>`, per D6.
 - [ ] 2.6 Make the node body read `stepTextMap`, never `step.key`, per D11.
 - [ ] 2.7 Delete the inline rename per D8, with `inlineRename.ts`, its test and `stepSections.renameLabel`.

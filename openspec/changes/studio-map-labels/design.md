@@ -125,8 +125,8 @@ argument and the type go. `summarizeCondition` then always reads the phrase.
 
 A path counts as guarded where `guard.src` holds text after trimming. Two
 callers read `guardPhrase` only then: `wayOutSentence` and
-`guardedManualPathNotes`. That way
-so an empty source reads as no guard, as it does today.
+`guardedManualPathNotes`. An empty source then reads as no guard, as it
+does today.
 
 `wayOutSentence` picks one form per path:
 
