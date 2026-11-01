@@ -422,10 +422,10 @@ function BulkBadges({
 }) {
   // A key whose eligible target set is empty (e.g. required/readonly on a
   // technical field's row) gets no badge at all — a button that answers no
-  // click reads as broken, per studio-app's bulk-toggle requirement. Its
-  // grid slot stays, as an empty placeholder, so the remaining badges never
-  // shift out of alignment with the checkbox columns below them
-  // (studio-app's bulk-toggle column-alignment requirement).
+  // click reads as broken, per studio-app's bulk-toggle requirement. Its grid
+  // slot stays, as an empty placeholder, so the remaining badges keep their
+  // slot order: Asked, Required, Read-only. The word badges are wider than
+  // the checkbox columns below them, so only that order lines up.
   const eligible = FLAG_KEYS.filter(
     (key) => eligibleTargetEntries(allSteps, targets, key, written, technicalFieldIds).length > 0,
   );
