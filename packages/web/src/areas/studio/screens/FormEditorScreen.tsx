@@ -57,6 +57,7 @@ import { flattenRailFields } from "../draft/panel-rail";
 import { fieldKindIcon, fieldKindLabel, fieldKindWord, isUnmatchedKind } from "../draft/field-type-labels";
 import { FormPreview } from "../panels/FormPreview";
 import { FormTabStrip, formTabDomId, formTabPanelDomId } from "../panels/FormTabStrip";
+import { btn, ghost } from "../panels/shared/btn.js";
 import { scrollKeyboardFocusIntoView } from "../focusScroll.js";
 import type { ProcessTab } from "../routing.js";
 
@@ -474,8 +475,8 @@ const styles = stylex.create({
   // both consumers, and the field card's own plain Remove, use this block;
   // the group's own `Remove ({count})` keeps its `.btn-secondary
   // btn-destructive` classes unchanged. Like both cited precedents, this
-  // pairs with the shared `.btn.btn-ghost` reset (via the `ghost()` helper
-  // below) rather than standing alone: `.btn` supplies `font-weight: 800`
+  // pairs with the shared `.btn.btn-ghost` reset (via `shared/btn.ts`'s `ghost()`)
+  // rather than standing alone: `.btn` supplies `font-weight: 800`
   // (not covered anywhere else, and font-weight inherits, so a bare button
   // would render at the page's normal weight) and `.btn-ghost` supplies the
   // 4px `paddingInline` this block leaves unset on purpose, so there is one
@@ -727,20 +728,6 @@ function CardNameInput({
       <CardKindLine field={field} />
     </div>
   );
-}
-
-/** Literal `.btn` classes plus compiled styles, as one set of props, since
- * spreading `stylex.props(...)` beside a `className` attribute drops
- * whichever of the two the JSX writes first. */
-function btn(classes: string, ...style: stylex.StyleXStyles[]) {
-  const compiled = stylex.props(...style);
-  return { ...compiled, className: `${classes} ${compiled.className ?? ""}`.trim() };
-}
-
-/** `btn btn-ghost` plus compiled styles — the same join `FormTabStrip.tsx`'s
- * `ghost()` makes. */
-function ghost(...style: stylex.StyleXStyles[]) {
-  return btn("btn btn-ghost", ...style);
 }
 
 /** One override field: a plain checkbox, always reachable, and a

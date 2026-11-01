@@ -4,9 +4,9 @@
 
 ## 1. The frame (spa-accessibility, studio-app)
 
-- [ ] 1.1 Add `panels/shared/btn.ts` with `btn` and `ghost` per design D10. Move `ChangeList.tsx`, `FormTabStrip.tsx`, `FormEditorScreen.tsx` and `EditScreen.tsx` onto it. Check with the typecheck.
-- [ ] 1.2 Give `ToolsScreen.tsx`, `PlayerScreen.tsx`, `VersionsScreen.tsx` and `MigrationPlanScreen.tsx` the helper on their back controls, per D10.
-- [ ] 1.2a A source test pins that no studio file writes a literal `.btn` beside `stylex.props`, across line breaks too.
+- [x] 1.1 Add `panels/shared/btn.ts` with `btn` and `ghost` per design D10. Move `ChangeList.tsx`, `FormTabStrip.tsx`, `FormEditorScreen.tsx` and `EditScreen.tsx` onto it. Check with the typecheck.
+- [x] 1.2 Give `ToolsScreen.tsx`, `PlayerScreen.tsx`, `VersionsScreen.tsx` and `MigrationPlanScreen.tsx` the helper on their back controls, per D10.
+- [x] 1.2a A source test pins that no studio file writes a literal `.btn` beside `stylex.props`, across line breaks too.
 - [ ] 1.3 Add `panels/shared/dialogFocus.ts` with `wrapTarget`, `dialogFocusables` and `activeControl` per D3 and D4.
 - [ ] 1.3a Add `packages/web/test/studio-dialogFocus.test.ts` for `wrapTarget` at both ends, from outside the list, and with an empty list.
 - [ ] 1.4 Add `panels/shared/StudioDialog.tsx` with the parts of D1, the layout of D2, and the hook of D3 and D4. Its scroll padding satisfies `studio-scrollBoxRingRoom.test.ts`.

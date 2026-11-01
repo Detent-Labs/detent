@@ -56,6 +56,7 @@ import { useFail } from "../../../shell/useFail.js";
 import { focusAtTop, scrollKeyboardFocusIntoView } from "../focusScroll.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
 import type { SectionRequest } from "../panels/stepSummaries.js";
+import { ghost } from "../panels/shared/btn.js";
 import type { NavigateOptions } from "../../../shell/routing.js";
 
 /** The width below which the Steps tab stands one column. `EntityTabs`
@@ -339,14 +340,6 @@ interface ProcessSurfaceProps {
   actorId: string;
   onUnauthorized: () => void;
   onDirtyChange?: (dirty: boolean) => void;
-}
-
-/** `btn btn-ghost` plus compiled styles, as one set of props: spreading
- * `stylex.props(...)` beside a `className` attribute drops whichever of the
- * two the JSX writes first. */
-function ghostBack(...style: stylex.StyleXStyles[]) {
-  const compiled = stylex.props(...style);
-  return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
 }
 
 /**
@@ -1346,7 +1339,7 @@ export function EditScreen({ processId, formStepId, tab, view, stepId, token, ro
   if (state.kind === "error") {
     return (
       <main {...stylex.props(styles.studioScreen)}>
-        <button type="button" {...ghostBack(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
+        <button type="button" {...ghost(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
           ← Back to processes
         </button>
         <div {...stylex.props(styles.errorBanner)} role="alert">
@@ -1362,7 +1355,7 @@ export function EditScreen({ processId, formStepId, tab, view, stepId, token, ro
   if (state.kind === "not-found") {
     return (
       <main {...stylex.props(styles.studioScreen)}>
-        <button type="button" {...ghostBack(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
+        <button type="button" {...ghost(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
           ← Back to processes
         </button>
         <div {...stylex.props(styles.errorBanner)} role="alert">

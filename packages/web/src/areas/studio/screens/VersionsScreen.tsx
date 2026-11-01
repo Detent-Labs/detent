@@ -13,6 +13,7 @@ import { useFail } from "../../../shell/useFail.js";
 import { t } from "../catalog.js";
 import { describeChanges, type ChangeRow } from "../draft/changeSet.js";
 import { ChangeList } from "../panels/ChangeList.js";
+import { ghost } from "../panels/shared/btn.js";
 
 const styles = stylex.create({
   studioScreen: {
@@ -283,7 +284,7 @@ export function VersionsScreen({ processId, token, navigate, onUnauthorized }: V
 
   return (
     <main {...stylex.props(styles.studioScreen)}>
-      <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={() => navigate({ name: "edit", processId })}>
+      <button type="button" {...ghost(styles.studioBack)} onClick={() => navigate({ name: "edit", processId })}>
         ← Back to process
       </button>
       <h1>Versions</h1>

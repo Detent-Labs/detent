@@ -25,6 +25,7 @@ import { describeError, describeCaughtError } from "../errors.js";
 import { t } from "../catalog.js";
 import { is401, useFail } from "../../../shell/useFail.js";
 import { createLatestGate } from "../../../shell/latestGate.js";
+import { ghost } from "../panels/shared/btn.js";
 
 interface PlayerScreenProps {
   processId: string;
@@ -346,7 +347,7 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
 
   return (
     <main {...stylex.props(styles.studioScreen, styles.studioPlayerScreen)}>
-      <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={() => navigate({ name: "edit", processId })}>
+      <button type="button" {...ghost(styles.studioBack)} onClick={() => navigate({ name: "edit", processId })}>
         ← Back to process
       </button>
       <h1>Player</h1>
