@@ -120,7 +120,7 @@ export const en = {
     "This field's people list comes from the groups this process allows. It resolves when a participant reaches this step, not here.",
   "fieldCatalog.usedInHeading": "Used in",
   "fieldCatalog.usedInEmpty": "No step asks for this field yet.",
-  "fieldCatalog.showOnCanvas": "Show on the canvas",
+  "fieldCatalog.showOnCanvas": "Show on the map",
   "fieldCatalog.readByHeading": "Read by",
   "fieldCatalog.readByEmpty": "No condition reads this field.",
   "fieldCatalog.onlyAskWhenHeading": "Only ask this when",

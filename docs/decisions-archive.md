@@ -1000,3 +1000,35 @@ system that resulted; this file explains why it took that shape.
   Resolved by `studio-step-accordion`, except the Checks label: the walk's
   Previous and Next read `stepText`. The Checks narrowing label stays open as
   ACCORDION-4 in `docs/decisions.md`.
+- **"Show on the canvas" names the Map tab's surface.** The field catalog's
+  "Used in" rows read "Show on the canvas" (`fieldCatalog.showOnCanvas`),
+  and the spec names the control by that string. The tab reads Map since
+  `studio-six-tabs`. Change 5 (`studio-map-labels`) owns the Map's words
+  and takes the rename, with the spec sentence in `studio-app`. The matrix
+  row headers still print keys alone beside the Catalog's labels; change 11
+  owns the matrix's words.
+
+  Resolved by `studio-map-labels`, except the matrix: the control reads "Show
+  on the map", and the key keeps its name. The matrix row headers stay open as
+  MAPLABELS-10 in `docs/decisions.md`.
+- **SENTENCE-3: the canvas edge label keeps a raw fragment's CEL text.** The
+  form preview's path note does the same. Both read the shared clause keys
+  for every other row. Change 5 owns the canvas and decides their wording.
+
+  Resolved by `studio-map-labels`: both read `guardPhrase`, which never falls
+  back to CEL. A raw row reads "a hand-written rule", and source that does not
+  parse reads "a hand-written rule holds".
+- **SELECTS-4: the canvas node's accessible name carries the step key.** A
+  screen reader hears the key and not the label. Change 5 owns the canvas
+  words.
+
+  Resolved by `studio-map-labels`: the name reads the text the node prints,
+  the kind phrase, the count of ways out and the stamp words. It has no step
+  key.
+- **ACCORDION-1: choosing the selected way out again on the canvas leaves
+  Ways out closed.** The effect keys on `selectedPathId`, which does not move. Risk
+  (Low): an author who closed Ways out must open it by hand.
+
+  Resolved by `studio-map-labels`: a double-click on a way out bumps
+  `waysOutRequest`, and the step page's effect keys on it too. Ways out then
+  reopens for the way out already selected.

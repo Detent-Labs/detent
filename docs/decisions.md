@@ -537,8 +537,8 @@ word. `ROADMAP.md` carries stage-by-stage status.
   value directly. The per-request tenant resolve runs inside the dispatch
   path, at `:859-862`. The rewrite needs an OpenSpec change of its own; this
   entry records the finding and leaves its shape open.
-- **Three lines in `studio-canvas` still say "palette".** Lines 679,
-  1827 and 1836, in "The canvas is keyboard-operable, and traversal follows
+- **Three lines in `studio-canvas` still say "palette".** Lines 698,
+  1868 and 1877, in "The canvas is keyboard-operable, and traversal follows
   the paths" and "The masthead's step key auto-derives from the step label".
   The `studio-canvas-bar` change of 2026-09-10 deleted
   that control and its component. Its delta declares "edit rail" the older
@@ -548,6 +548,11 @@ word. `ROADMAP.md` carries stage-by-stage status.
   rewording untouched prose would exceed the delta and put new text under the
   prose ratchet. A sweep of the stale word wants its own change, together
   with the six requirements that still say "edit rail".
+
+  The `studio-map-labels` delta takes all three lines once it syncs. It
+  rewrites the keyboard requirement without the word. It replaces the
+  masthead requirement with "A step's key auto-derives from its label on the
+  step page", which says "canvas bar". The "edit rail" sweep stays open.
 - **Retired UI words still sit in live specs.**
   `openspec/specs/studio-app/spec.md:841` and
   `openspec/specs/studio-canvas/spec.md:1113`, `:3005` and `:3053` still
@@ -582,6 +587,10 @@ word. `ROADMAP.md` carries stage-by-stage status.
   the terminal/initial stamp circle and its text with `colors.neutral900`,
   also a primitive. Neither site moved in a design change yet. Each is
   separate from the `#726e6e` entry above.
+
+  Resolved for the canvas by `studio-map-labels`: the canvas stamp reads
+  `colors.text` on `colors.surface`, and no `neutral900` read remains in
+  `CanvasView.tsx`. The form-ui site stays open.
 - **Ten sites set an off-spec weight on the written face.**
   `.claude/rules/design-language.md` allows only 800 and 400 there. Three
   sites set 500:
@@ -1080,7 +1089,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   (`panels/FieldCatalogPanel.tsx:882`). It also shows a disabled "Default
   value" (`:933`), "Validation" (`:937`) and a disabled Technical checkbox
   (`:863`). Its effect half shows "A participant must fill this in" (`:1076`)
-  and up to 12 "Show on the canvas" buttons. Each button's accessible name
+  and up to 12 "Show on the map" buttons. Each button's accessible name
   omits its step (`:1008`). The group's one action, the zone "Fields inside
   this group" (`:948`), comes after "Validation". Measured 2026-09-13 at
   1400x900, its heading sits at y=1078, 200px below the pane's bottom.
@@ -1800,13 +1809,6 @@ this section.
   row's `::after` bar both vanish, and weight 800 stays the only cue. The
   audit of 2026-10-31 counts eight sites with the same technique. A fix
   draws the mark with a border or an outline, which forced colors keep.
-- **"Show on the canvas" names the Map tab's surface.** The field catalog's
-  "Used in" rows read "Show on the canvas" (`fieldCatalog.showOnCanvas`),
-  and the spec names the control by that string. The tab reads Map since
-  `studio-six-tabs`. Change 5 (`studio-map-labels`) owns the Map's words
-  and takes the rename, with the spec sentence in `studio-app`. The matrix
-  row headers still print keys alone beside the Catalog's labels; change 11
-  owns the matrix's words.
 
 ## Open from studio-condition-sentence (needs its own OpenSpec change)
 
@@ -1821,9 +1823,6 @@ last six. The SENTENCE tag is local to this section.
 - **SENTENCE-2: a list clause is not good grammar.** It reads "The person's
   roles contains “manager”". The clause cannot know whether a label is
   plural. Change 16 revisits the phrasing of list clauses.
-- **SENTENCE-3: the canvas edge label keeps a raw fragment's CEL text.** The
-  form preview's path note does the same. Both read the shared clause keys
-  for every other row. Change 5 owns the canvas and decides their wording.
 - **SENTENCE-4: the rule builder's other-field picker shows labels alone.**
   The shared `fieldOperand` drops the key, and it adds none of the condition
   picker's duplicate numbering. Two fields with one label then read the same
@@ -1895,9 +1894,6 @@ local to this section.
 - **SELECTS-3: the Fields tab's data source select prints `ds.key ?? ds.id`.**
   The select shows a key where the step selects show a label. Change 11 owns
   the Sources view and can settle the wording.
-- **SELECTS-4: the canvas node's accessible name carries the step key.** A
-  screen reader hears the key and not the label. Change 5 owns the canvas
-  words.
 - **SELECTS-5: the migration plan form keeps its key and label choices.** No
   change is planned. A migration maps instance data by key, so its spec asks
   for both.
@@ -2012,7 +2008,7 @@ raised the last four.
   Upgrade entry: name up to three places in the line, and tint the rewritten
   rows in `panels/FieldCatalogPanel.tsx` with the usage tint.
 - **KEYFOLLOW-9: a "Read by" row offers no way to its condition.** The "Used
-  in" rows carry "Show on the canvas", and a "Read by" row has no control.
+  in" rows carry "Show on the map", and a "Read by" row has no control.
   Risk (Low): an author opens the Steps tab and finds the way out by hand.
 
   Upgrade entry: change 11 (`studio-field-card`) gives each row a control that
@@ -2044,9 +2040,6 @@ reviews, its browser check, its design critique and its technical audit left
 the points below. Each one falls outside the change's scope. The ACCORDION
 tag is local to this section.
 
-- **ACCORDION-1: choosing the selected way out again on the canvas leaves
-  Ways out closed.** The effect keys on `selectedPathId`, which does not move. Risk
-  (Low): an author who closed Ways out must open it by hand.
 - **ACCORDION-2: the check badge names itself on a span with no role.** Its
   `aria-label` sits on a generic element in `StepsRail.tsx` and `StepPage.tsx`
   alike. Risk (Medium): ARIA 1.2 prohibits that name, and a screen reader may
@@ -2110,6 +2103,60 @@ tag is local to this section.
   values share no baseline. The two dialogs it copies share all three. Change
   13 owns the one dialog. Risk (Low): the dialog reads unlike the register it
   confirms.
+
+## Open from studio-map-labels (needs its own OpenSpec change)
+
+The change made every mark on the Map read as a word or a sentence. Its
+design's Non-Goals and its task reviews left the points below. The removal
+focus drop, the caret menu's arrow keys and the Delete key stayed out of
+scope too. Their entries stand under the 2026-09-11 design audits. The
+MAPLABELS tag is local to this section.
+
+- **MAPLABELS-1: the canvas bar's words still read like machine output.** The
+  reachability report prints "unconnected" (`canvas.unconnected`), and the
+  step-kind menu keeps its own words. Risk (Low): the bar reads in a different
+  voice from the canvas under it.
+- **MAPLABELS-2: a group box prints its step count in mono.** The count reads
+  a number and "steps" (`canvas.groupStepCount`). A count is not a value the
+  engine matches. Risk (Low): the mono face marks something it does not mean.
+- **MAPLABELS-3: a way out's default label reads "Source → Target".** The
+  canvas names a new way out after its two steps. A shorter default would
+  need its own wording rule. Risk (Low): a long step name makes a long label.
+- **MAPLABELS-4: a condition that mixes a readable row with a raw one reads
+  awkwardly.** It reads "Only if Amount is greater than 1,000 and a
+  hand-written rule", the builder's own phrase. Risk (Low): the sentence is
+  exact and stiff.
+- **MAPLABELS-5: the step page's guard heading reads "Only when".** The canvas
+  reads "Only if", and so does the vocabulary table's row for a guard. The
+  heading is `condition.onlyWhenHeading`. Risk (Low): one rule reads two ways
+  on two tabs.
+- **MAPLABELS-6: a double-click on the connect handle opens the step.** The
+  hit circle sits inside the node's group, so its double-click bubbles to the
+  node's handler. Each press on the handle also runs a connect gesture first.
+  Risk (Low): an author who presses the handle twice lands on the Steps tab.
+
+  Upgrade entry: stop the double-click's propagation on the hit circle in
+  `canvas/CanvasView.tsx`, if the browser check shows the step page opening.
+- **MAPLABELS-7: a press on a way out's sentence leaves the roving stop
+  behind.** A press on the line moves it, and a press on the sentence only
+  selects. Enter after a sentence press then acts on the older stop. Risk
+  (Low): the keyboard and the pointer disagree on the current way out.
+
+  Upgrade entry: give the sentence's text block an `onPointerDown` that moves
+  the stop to that path, as the line's handler does.
+- **MAPLABELS-8: the stamp's compiled style repeats four sizes as literals.**
+  StyleX cannot read a constant imported from `canvas/mapWords.ts` at build
+  time. The `stamp` style in `CanvasView.tsx` writes the rule, both paddings
+  and the line height by hand. A test reads the style from source
+  and pins each literal to its constant. Risk (Low): a new size needs two
+  edits, and the test catches a missed one.
+- **MAPLABELS-9: a node with both stamps and a long outcome draws a tall
+  stamp.** Each stamp takes half the width. "End: escalated_to_management"
+  then wraps over four lines and stands 58 units tall. Risk (Low): the
+  stamp can cover a step drawn close above.
+- **MAPLABELS-10: the field matrix's row headers print keys alone.** The
+  Catalog view prints labels beside them. This half of the archived "Show on
+  the canvas" entry stays open. Change 11 owns the matrix's words.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

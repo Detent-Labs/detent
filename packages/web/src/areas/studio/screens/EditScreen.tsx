@@ -608,7 +608,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     setSelectedPathId(pathId);
   };
 
-  // The route's one-shot step target ("Show on the canvas"). Keyed on `stepId`
+  // The route's one-shot step target ("Show on the map"). Keyed on `stepId`
   // alone, not on mount: the surface stays mounted across a tab switch, so a
   // mount-only read would never fire on this navigation. An unknown id selects
   // nothing, the same rule an unknown tab name already follows. The effect then
