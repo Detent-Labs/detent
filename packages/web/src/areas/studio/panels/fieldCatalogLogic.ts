@@ -19,6 +19,10 @@ import type { Draft } from "../draft/types.js";
  * `taken` is the caller's own `draftFields(draft)`-derived set (design.md:
  * "do not hand-roll a second flatten"), excluding the field being edited.
  *
+ * The prior derivation is deduped against `taken` too, so a key that took a
+ * `_2` suffix beside another field's key still reads as derived and keeps
+ * following the label.
+ *
  * `locked` is the caller's verdict that a CEL expression reads the key or a
  * published version holds the field (`isFieldKeyLocked`). It stops auto-fill
  * for a non-empty key, even while the key equals the prior derivation. An
@@ -36,7 +40,7 @@ export function nextFieldKey(
   locked = false,
 ): string | undefined {
   if (locked && currentKey !== "") return undefined;
-  const priorDerived = deriveKey(resolveDraftLocalizedText(priorLabel, baseLocale, baseLocale) ?? "");
+  const priorDerived = dedupeKey(deriveKey(resolveDraftLocalizedText(priorLabel, baseLocale, baseLocale) ?? ""), taken);
   if (!shouldAutoDeriveKey(currentKey, priorDerived)) return undefined;
 
   const newDerived = deriveKey(resolveDraftLocalizedText(newLabel, baseLocale, baseLocale) ?? "");
@@ -61,8 +65,9 @@ export function isFieldKeyLocked(draft: Draft, field: DraftField, published: Rea
  * The patch a label change writes to a field that is not a `group`: the new
  * label, plus the key `nextFieldKey` derives while the lock leaves
  * auto-fill live. `taken` leaves out the empty key a minted field carries, so
- * a label beside any key-less field does not derive `_2`. A group's label goes through `view-group-sync.ts::
- * writeGroupLabel` instead, which rewrites the view entries naming its key.
+ * a label beside any key-less field does not derive `_2`. A group's label
+ * goes through `view-group-sync.ts::writeGroupLabel` instead, which rewrites
+ * the view entries naming its key.
  */
 export function labelChangePatch(
   draft: Draft,

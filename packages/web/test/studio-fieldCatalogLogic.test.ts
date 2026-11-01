@@ -627,3 +627,56 @@ describe("labelChangePatch beside a key-less field", () => {
     expect(patch).toEqual({ label: { en: "Amount" }, key: "amount" });
   });
 });
+
+describe("a key that took a suffix keeps following the label", () => {
+  /** Types `text` into `fieldId`'s label one character at a time, each
+   * keystroke through `write`, the way the card input writes. */
+  const typeLabel = (draft: Draft, fieldId: string, text: string, write: (d: Draft, label: { en: string }) => void) => {
+    for (let n = 1; n <= text.length; n++) write(draft, { en: text.slice(0, n) });
+    return draftFields(draft).find((f) => f.id === fieldId)!;
+  };
+
+  it("ends a field typed beside an existing amount with the key amount_due", () => {
+    const draft = {
+      baseLocale: "en",
+      fields: [
+        { id: "field_amount", key: "amount", type: "number", label: { en: "Amount" } },
+        mintCatalogField("text", { en: "" }, "en"),
+      ],
+    } as unknown as Draft;
+    const fieldId = draft.fields![1]!.id!;
+    const seen: string[] = [];
+
+    const typed = typeLabel(draft, fieldId, "Amount due", (d, label) => {
+      const field = draftFields(d).find((f) => f.id === fieldId)!;
+      Object.assign(field, labelChangePatch(d, field, label, "en", new Set()));
+      seen.push(field.key ?? "");
+    });
+
+    expect(seen[5]).toBe("amount_2");
+    expect(typed.key).toBe("amount_due");
+  });
+
+  it("ends a group typed beside an existing amount with the key amount_due", () => {
+    const draft = {
+      baseLocale: "en",
+      fields: [
+        { id: "field_amount", key: "amount", type: "number", label: { en: "Amount" } },
+        mintCatalogField("group", { en: "" }, "en"),
+      ],
+    } as unknown as Draft;
+    const groupId = draft.fields![1]!.id!;
+
+    const typed = typeLabel(draft, groupId, "Amount due", (d, label) => writeGroupLabel(d, groupId, label, "en"));
+
+    expect(typed.key).toBe("amount_due");
+  });
+
+  it("follows on from a deduped key, and leaves a hand-typed key alone", () => {
+    const priorLabel = { en: "Amount" };
+    const taken = new Set(["amount"]);
+
+    expect(nextFieldKey("amount_2", priorLabel, { en: "Amount " }, "en", taken)).toBe("amount_2");
+    expect(nextFieldKey("amt", priorLabel, { en: "Amount " }, "en", taken)).toBeUndefined();
+  });
+});

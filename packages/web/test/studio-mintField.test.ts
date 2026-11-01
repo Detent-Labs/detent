@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { FIELD_KINDS } from "workflow-engine/schema";
 import { baseTypeForPaletteKind, mintCatalogField, PALETTE_FIELD_KINDS } from "../src/areas/studio/draft/mintField.js";
+import { fieldKindLabel } from "../src/areas/studio/draft/field-type-labels.js";
 import { insertViewField, isDraftViewField } from "../src/areas/studio/draft/view-layout.js";
 
 describe("baseTypeForPaletteKind", () => {
@@ -39,6 +40,18 @@ describe("mintCatalogField", () => {
     expect(field.key).toBe("");
     expect(field.type).toBe("string");
     expect(field.format).toBe("date");
+  });
+
+  it("seeds the base-locale label with the kind's name, for every kind", () => {
+    for (const kind of PALETTE_FIELD_KINDS) {
+      expect(mintCatalogField(kind, { en: "" }, "en").label?.en).toBe(fieldKindLabel(kind).name);
+    }
+    expect(mintCatalogField("date", { en: "" }, "en").label).toEqual({ en: "Date" });
+  });
+
+  it("keeps the content-locale seed beside the base-locale kind name", () => {
+    expect(mintCatalogField("number", { de: "" }, "en").label).toEqual({ de: "", en: "Number" });
+    expect(mintCatalogField("number", undefined, "en").label).toEqual({ en: "Number" });
   });
 
   it("mints a Number as a number field with no format or control", () => {

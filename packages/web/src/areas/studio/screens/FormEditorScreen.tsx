@@ -102,7 +102,11 @@ const styles = stylex.create({
     paddingBlock: space.s1,
     paddingInline: space.s2,
   },
+  // 24px tall, the WCAG 2.5.8 target floor. `list-item` keeps the
+  // disclosure marker a `min-height` would otherwise not need to touch.
   studioDevviewSummary: {
+    display: "list-item",
+    minHeight: 24,
     cursor: "pointer",
     color: colors.textMuted,
     fontFamily: fonts.mono,
@@ -260,8 +264,9 @@ const styles = stylex.create({
       backgroundColor: colors.surfaceMuted,
     },
   },
+  // The row's own bottom hairline, dashed; the other three sides stay bare.
   formPaletteFieldMint: {
-    borderStyle: "dashed",
+    borderBottomStyle: "dashed",
   },
   formPaletteKindIcon: {
     flex: "none",
@@ -400,12 +405,6 @@ const styles = stylex.create({
     minWidth: 0,
     overflowWrap: "anywhere",
   },
-  formCardMarks: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "baseline",
-    gap: space.s1,
-  },
   // The Label role (`DESIGN.md`'s Hierarchy section): the kind line and the
   // "Required" and "Read-only" marks.
   formCardLabelRole: {
@@ -419,7 +418,15 @@ const styles = stylex.create({
     display: "inline-flex",
     alignItems: "center",
     gap: space.s1,
-    flex: "auto",
+    minWidth: 0,
+  },
+  // The card's second line: the kind, then the marks after it.
+  formCardKindRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: space.s2,
+    flexBasis: "100%",
     minWidth: 0,
   },
   // The raw `{type, format, control}` triple no curated kind names: a machine
@@ -604,6 +611,10 @@ const styles = stylex.create({
  * change to make. */
 type Dragging = { kind: "palette"; ref: FieldId } | { kind: "card"; index: number } | { kind: "mint"; fieldKind: FieldKindName };
 
+/** The element id of the editor's `h2`, which takes the focus when the editor
+ * opens. */
+export const FORM_EDITOR_HEADING_ID = "form-editor-heading";
+
 /** The element id of a card's name input, which takes the focus when a
  * minted card opens for naming. */
 export const formCardNameInputId = (fieldId: string) => `form-card-name-${fieldId}`;
@@ -624,6 +635,12 @@ function hasLabelText(label: DraftLocalizedText, contentLocale: string, baseLoca
  * the base locale. */
 function displayLabel(label: DraftLocalizedText, contentLocale: string, baseLocale: string): string | undefined {
   return label?.[contentLocale] || label?.[baseLocale] || undefined;
+}
+
+/** A card control's accessible name: `key`'s sentence with `{field}` filled
+ * by a replacer function, so a label holding `$&` reads as typed. */
+function named(key: "formEditor.moveUpNamed" | "formEditor.moveDownNamed" | "formEditor.removeNamed", field: string): string {
+  return t(key).replace("{field}", () => field);
 }
 
 /** A card's kind line: the kind's icon and its name, the words the Fields
@@ -651,16 +668,18 @@ function CardNameInput({
   fieldId,
   onChange,
   onKeyDown,
+  onFocus,
   onBlur,
 }: {
   field: DraftField;
   fieldId: string;
   onChange: (label: DraftLocalizedText) => void;
   onKeyDown: (e: KeyboardEvent) => void;
+  onFocus: (e: FocusEvent) => void;
   onBlur: (e: FocusEvent) => void;
 }) {
   return (
-    <div {...stylex.props(styles.formCardNameBox)} onKeyDown={onKeyDown} onBlur={onBlur}>
+    <div {...stylex.props(styles.formCardNameBox)} onKeyDown={onKeyDown} onFocus={onFocus} onBlur={onBlur}>
       {/* translation-warning-exempt: this input shows only while the card is
           naming, or while neither the content locale nor the base locale
           holds a label. The strip's Name control carries the warning. */}
@@ -678,13 +697,18 @@ function CardNameInput({
   );
 }
 
-/** `btn btn-ghost` plus compiled styles, as one set of props — the same join
- * `FormTabStrip.tsx`'s `ghost()` makes, since spreading `stylex.props(...)`
- * beside a `className` attribute drops whichever of the two the JSX writes
- * first. */
-function ghost(...style: stylex.StyleXStyles[]) {
+/** Literal `.btn` classes plus compiled styles, as one set of props, since
+ * spreading `stylex.props(...)` beside a `className` attribute drops
+ * whichever of the two the JSX writes first. */
+function btn(classes: string, ...style: stylex.StyleXStyles[]) {
   const compiled = stylex.props(...style);
-  return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
+  return { ...compiled, className: `${classes} ${compiled.className ?? ""}`.trim() };
+}
+
+/** `btn btn-ghost` plus compiled styles — the same join `FormTabStrip.tsx`'s
+ * `ghost()` makes. */
+function ghost(...style: stylex.StyleXStyles[]) {
+  return btn("btn btn-ghost", ...style);
 }
 
 /** One override field: a plain checkbox, always reachable, and a
@@ -1026,16 +1050,24 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
 
   // The selection belongs to the step this page was opened for, and so does
   // the open tab: another step's tab keys name nothing here.
+  // The heading takes the focus on every open, whatever route opened the
+  // editor: the control that opened it sits in a body the editor hides.
   useEffect(() => {
     setSelected(undefined);
     setActiveTab(undefined);
     setNaming(undefined);
+    document.getElementById(FORM_EDITOR_HEADING_ID)?.focus();
   }, [step.id]);
 
-  // A minted card's input takes the focus at once, so the first keystroke
-  // writes the label.
+  // A minted card's input takes the focus at once, its seeded kind name
+  // selected, so the first keystroke replaces the name. An input that already
+  // holds the focus set `naming` itself and keeps its caret.
   useEffect(() => {
-    if (naming !== undefined) document.getElementById(formCardNameInputId(naming))?.focus();
+    if (naming === undefined) return;
+    const input = document.getElementById(formCardNameInputId(naming));
+    if (!(input instanceof HTMLInputElement) || document.activeElement === input) return;
+    input.focus();
+    input.select();
   }, [naming]);
 
   const rows: DraftViewEntry[] = step.view?.fields ?? [];
@@ -1147,6 +1179,11 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
     setNaming(undefined);
     requestAnimationFrame(() => document.getElementById(formCardBodyId(fieldId))?.focus());
   };
+  /** Focus on a card's name input starts the naming, so a card whose label is
+   * empty keeps its input while the author types into it on a second visit.
+   * Without it the first keystroke gives the label text, the card draws its
+   * body, and the input unmounts under the focus. */
+  const nameFocus = (fieldId: FieldId) => () => setNaming(fieldId);
   const nameBlur = () => setNaming(undefined);
 
   /** Places a note at the end of the view, seeded with a non-empty entry for
@@ -1353,6 +1390,7 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
       // defined here.
       const groupKey = field?.key;
       const groupNaming = showsNameInput(field);
+      const groupName = labelFor(fieldRef);
       const memberScope: DragScope = { group: groupKey ?? "" };
       const memberCount = members.length;
       // A drop on the group's own box and a drop on its tail row both name
@@ -1384,6 +1422,7 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
                   fieldId={field.id}
                   onChange={(label) => writeLabel(field.id as FieldId, label)}
                   onKeyDown={nameKeyDown(field.id as FieldId)}
+                  onFocus={nameFocus(field.id as FieldId)}
                   onBlur={nameBlur}
                 />
               ) : (
@@ -1405,6 +1444,7 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
                   type="button"
                   {...ghost(styles.authoringCommand, isFirst && styles.authoringCommandDisabled)}
                   disabled={isFirst}
+                  aria-label={named("formEditor.moveUpNamed", groupName)}
                   onClick={() => move(rowIndex, -1)}
                 >
                   {t("formEditor.moveUp")}
@@ -1413,11 +1453,17 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
                   type="button"
                   {...ghost(styles.authoringCommand, isLast && styles.authoringCommandDisabled)}
                   disabled={isLast}
+                  aria-label={named("formEditor.moveDownNamed", groupName)}
                   onClick={() => move(rowIndex, 1)}
                 >
                   {t("formEditor.moveDown")}
                 </button>
-                <button type="button" className="btn btn-secondary btn-destructive" onClick={() => removeRow(rowIndex)}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-destructive"
+                  aria-label={named("formEditor.removeNamed", groupName)}
+                  onClick={() => removeRow(rowIndex)}
+                >
                   {t("formEditor.removeGroup").replace("{count}", String(removalCount))}
                 </button>
               </span>
@@ -1472,6 +1518,7 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
             fieldId={field.id!}
             onChange={(label) => writeLabel(field.id as FieldId, label)}
             onKeyDown={nameKeyDown(field.id as FieldId)}
+            onFocus={nameFocus(field.id as FieldId)}
             onBlur={nameBlur}
           />
         ) : (
@@ -1490,18 +1537,17 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
                 ? labelFor(row.ref)
                 : resolveDraftLocalizedText(row.text, contentLocale, baseLocale) || t("formEditor.emptyNote")}
             </span>
-            {isField ? (
-              field && <CardKindLine field={field} />
-            ) : (
-              <span {...stylex.props(styles.formCardLabelRole, styles.formCardKind)}>{t("formEditor.noteKind")}</span>
-            )}
-            {isField && (row.required === true || row.readonly === true || conditionMarked) && (
-              <span {...stylex.props(styles.formCardMarks)}>
-                {row.required === true && <span {...stylex.props(styles.formCardLabelRole)}>{t("formEditor.markRequired")}</span>}
-                {row.readonly === true && <span {...stylex.props(styles.formCardLabelRole)}>{t("formEditor.markReadonly")}</span>}
-                {conditionMarked && <span {...stylex.props(styles.formCondition)}>{t("formEditor.markCondition")}</span>}
-              </span>
-            )}
+            {/* The second line: the kind, then the marks after it. */}
+            <span {...stylex.props(styles.formCardKindRow)}>
+              {isField ? (
+                field && <CardKindLine field={field} />
+              ) : (
+                <span {...stylex.props(styles.formCardLabelRole, styles.formCardKind)}>{t("formEditor.noteKind")}</span>
+              )}
+              {isField && row.required === true && <span {...stylex.props(styles.formCardLabelRole)}>{t("formEditor.markRequired")}</span>}
+              {isField && row.readonly === true && <span {...stylex.props(styles.formCardLabelRole)}>{t("formEditor.markReadonly")}</span>}
+              {conditionMarked && <span {...stylex.props(styles.formCondition)}>{t("formEditor.markCondition")}</span>}
+            </span>
           </button>
         )}
         {/* The keyboard route to the same array change a drag makes. A drag
@@ -1511,6 +1557,7 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
             type="button"
             {...ghost(styles.authoringCommand, isFirst && styles.authoringCommandDisabled)}
             disabled={isFirst}
+            aria-label={isField ? named("formEditor.moveUpNamed", labelFor(row.ref)) : t("formEditor.moveNoteUp")}
             onClick={() => move(rowIndex, -1)}
           >
             {t("formEditor.moveUp")}
@@ -1519,11 +1566,17 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
             type="button"
             {...ghost(styles.authoringCommand, isLast && styles.authoringCommandDisabled)}
             disabled={isLast}
+            aria-label={isField ? named("formEditor.moveDownNamed", labelFor(row.ref)) : t("formEditor.moveNoteDown")}
             onClick={() => move(rowIndex, 1)}
           >
             {t("formEditor.moveDown")}
           </button>
-          <button type="button" {...ghost(styles.authoringCommand)} onClick={() => removeRow(rowIndex)}>
+          <button
+            type="button"
+            {...ghost(styles.authoringCommand)}
+            aria-label={isField ? named("formEditor.removeNamed", labelFor(row.ref)) : t("formEditor.removeNote")}
+            onClick={() => removeRow(rowIndex)}
+          >
             {t("formEditor.remove")}
           </button>
         </span>
@@ -1572,7 +1625,7 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
             </li>
           </ol>
         </nav>
-        <h2 id="form-editor-heading" {...stylex.props(styles.formEditorHeading)}>
+        <h2 id={FORM_EDITOR_HEADING_ID} tabIndex={-1} {...stylex.props(styles.formEditorHeading)}>
           {t("formEditor.heading").replace("{step}", () => stepLabel)}
         </h2>
       </header>
@@ -1644,7 +1697,7 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
               rather than inside it (studio-form-editor: "An author places a
               note on the form canvas"). */}
           <h3 {...stylex.props(styles.formPaletteHeading, styles.formPaletteHeadingBordered)}>{t("formEditor.noteSectionHeading")}</h3>
-          <button type="button" className="btn btn-secondary" {...stylex.props(styles.formAddNote)} onClick={insertNote}>
+          <button type="button" {...btn("btn btn-secondary", styles.formAddNote)} onClick={insertNote}>
             {t("formEditor.addNote")}
           </button>
         </nav>
@@ -1660,8 +1713,7 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
               <button
                 key={n}
                 type="button"
-                className="btn btn-secondary"
-                {...stylex.props(columns === n && styles.formColumnsOptionPressed)}
+                {...btn("btn btn-secondary", columns === n && styles.formColumnsOptionPressed)}
                 aria-pressed={columns === n}
                 onClick={() => setColumns(n)}
               >

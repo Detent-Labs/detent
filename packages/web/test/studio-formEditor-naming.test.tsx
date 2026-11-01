@@ -310,3 +310,106 @@ describe("The palette offers every curated kind", () => {
     expect(section).toContain(">Number<");
   });
 });
+
+describe("A card reads its label, then its kind and marks on one line", () => {
+  const draft = draftWith(
+    [{ id: FULL_NAME, key: "full_name", type: "string", label: { en: "First and last name" } }],
+    [{ ref: FULL_NAME, required: true, readonly: true }],
+  );
+
+  it("puts Required and Read-only after the kind word, in the kind line's own row", () => {
+    const card = cardBlock(canvasHtml(render(draft)), "First and last name");
+    const start = card.indexOf('class="formCardKindRow"');
+    expect(start, "expected the card's kind row").toBeGreaterThan(-1);
+    const row = card.slice(start);
+
+    expect(row.indexOf(">Text<")).toBeGreaterThan(-1);
+    expect(row.indexOf(">Text<")).toBeLessThan(row.indexOf(">Required<"));
+    expect(row.indexOf(">Required<")).toBeLessThan(row.indexOf(">Read-only<"));
+    expect(card.indexOf(">First and last name<")).toBeLessThan(start);
+  });
+});
+
+describe("A card's controls name the entry they act on", () => {
+  const GROUP = "field_00000000-0000-4000-8000-0000000000e7";
+  const draft = draftWith(
+    [
+      { id: AMOUNT, key: "amount", type: "number", label: { en: "Cost $&" } },
+      { id: GROUP, key: "applicant", type: "group", label: { en: "Applicant" }, fields: [] },
+    ],
+    [{ ref: AMOUNT }, { kind: "note", text: { en: "Read this first" } }, { ref: GROUP }],
+  );
+  const canvas = canvasHtml(render(draft));
+
+  it("names the field in each leaf control and keeps the short visible text", () => {
+    const card = cardBlock(canvas, formCardBodyId(AMOUNT));
+
+    expect(card).toContain('aria-label="Move Cost $&amp; up"');
+    expect(card).toContain('aria-label="Move Cost $&amp; down"');
+    expect(card).toContain('aria-label="Remove Cost $&amp;"');
+    expect(card).toContain(">Move up<");
+    expect(card).toContain(">Remove<");
+  });
+
+  it("names a note as the note", () => {
+    const card = cardBlock(canvas, "Read this first");
+
+    expect(card).toContain('aria-label="Move the note up"');
+    expect(card).toContain('aria-label="Move the note down"');
+    expect(card).toContain('aria-label="Remove the note"');
+  });
+
+  it("names the group in a group card's controls", () => {
+    const legendStart = canvas.lastIndexOf("<legend", canvas.indexOf(formCardBodyId(GROUP)));
+    const legend = canvas.slice(legendStart, canvas.indexOf("</legend>", legendStart));
+
+    expect(legend).toContain('aria-label="Move Applicant up"');
+    expect(legend).toContain('aria-label="Move Applicant down"');
+    expect(legend).toContain('aria-label="Remove Applicant"');
+    expect(legend).toContain(">Remove (0)<");
+  });
+});
+
+describe("The editor's controls keep their shared button classes", () => {
+  const html = render(draftWith([], []));
+
+  it("joins .btn with the compiled style on the Columns options and Add a note", () => {
+    expect(html).toMatch(/<button type="button" class="btn btn-secondary formColumnsOptionPressed" aria-pressed="true">One<\/button>/);
+    expect(html).toMatch(/<button type="button" class="btn btn-secondary" aria-pressed="false">Two<\/button>/);
+    expect(html).toMatch(/<button type="button" class="btn btn-secondary formAddNote">Add a note<\/button>/);
+  });
+
+  it("lets the heading take the focus the editor hands it on open", () => {
+    expect(headerHtml(html)).toMatch(/<h2 id="form-editor-heading" tabindex="-1"/);
+  });
+});
+
+/** The source pins a server render cannot observe: a focus handler, and the
+ * declarations of three compiled styles the stub renders as bare keys. */
+describe("What a server render cannot show", () => {
+  const source = readFileSync(new URL("../src/areas/studio/screens/FormEditorScreen.tsx", import.meta.url), "utf-8");
+  const rule = (name: string) => {
+    const start = source.indexOf(`  ${name}: {`);
+    expect(start, `expected the style ${name}`).toBeGreaterThan(-1);
+    return source.slice(start, source.indexOf("\n  },", start));
+  };
+
+  // A focus event needs a DOM, and this suite has none: the pin holds the
+  // wrapper's handler, which sets `naming` so a revisited empty input stays.
+  it("starts the naming when the name input takes the focus", () => {
+    expect(source).toMatch(/<div \{\.\.\.stylex\.props\(styles\.formCardNameBox\)\} onKeyDown=\{onKeyDown\} onFocus=\{onFocus\} onBlur=\{onBlur\}>/);
+    expect(source).toContain("const nameFocus = (fieldId: FieldId) => () => setNaming(fieldId);");
+    expect((source.match(/onFocus=\{nameFocus\(field\.id as FieldId\)\}/g) ?? []).length).toBe(2);
+  });
+
+  it("dashes only the mint row's bottom hairline", () => {
+    const mint = rule("formPaletteFieldMint");
+
+    expect(mint).toContain('borderBottomStyle: "dashed"');
+    expect(mint).not.toMatch(/\bborderStyle:/);
+  });
+
+  it("gives the Developer view's summary a 24px target", () => {
+    expect(rule("studioDevviewSummary")).toContain("minHeight: 24");
+  });
+});

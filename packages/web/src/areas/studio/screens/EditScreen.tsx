@@ -345,6 +345,14 @@ interface ProcessSurfaceProps {
   onDirtyChange?: (dirty: boolean) => void;
 }
 
+/** `btn btn-ghost` plus compiled styles, as one set of props: spreading
+ * `stylex.props(...)` beside a `className` attribute drops whichever of the
+ * two the JSX writes first. */
+function ghostBack(...style: stylex.StyleXStyles[]) {
+  const compiled = stylex.props(...style);
+  return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
+}
+
 /**
  * Focuses a tab's own button without a scroll, then hands the scroll to
  * `scrollTabIntoRow`, the one function that scrolls the tab row. At a narrow
@@ -956,12 +964,22 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     onSelectStep(target);
     navigate({ name: "edit", processId, formStepId: target });
   };
+  /** Leaves the form editor for `target` and hands the focus to that tab's
+   * button, since the control that left unmounts with the editor. A target
+   * already open takes the focus at once: the pending-focus effect fires
+   * only on an `openTab` change, and leaving for the origin tab changes
+   * nothing there. */
+  const leaveFormEditorFor = (target: ProcessTab) => {
+    goToTab(target);
+    if (target === openTab) focusTabButton(target);
+    else setPendingTabFocus(target);
+  };
   /** Leaves the form editor for the tab it stands in. */
-  const leaveFormEditor = () => goToTab(formEditorReturnTab(formOrigin));
+  const leaveFormEditor = () => leaveFormEditorFor(formEditorReturnTab(formOrigin));
   /** The breadcrumb's step crumb: the step's own page on the Steps tab. */
   const openFormStep = () => {
     if (formStepId !== undefined) onSelectStep(formStepId);
-    goToTab("steps");
+    leaveFormEditorFor("steps");
   };
   const processLabel =
     resolveDraftLocalizedText(draft.label, contentLocale, baseLocale) ?? t("headerBar.unnamedProcess");
@@ -1035,7 +1053,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     <PublishedFieldIdsProvider processId={processId} token={token} baseVersion={changesBaseVersion}>
       <main {...stylex.props(styles.studioScreen, styles.studioEditScreen)}>
         <nav {...stylex.props(styles.studioHeaderNav)}>
-          <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBackInNav)} onClick={() => navigate({ name: "processes" })}>
+          <button type="button" {...ghostBack(styles.studioBackInNav)} onClick={() => navigate({ name: "processes" })}>
             &larr; Back to processes
           </button>
         </nav>
@@ -1074,7 +1092,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
             open={openTab}
             counts={counts}
             checksBlocked={checksBlocked}
-            onOpen={goToTab}
+            onOpen={(target) => (formStepId === undefined ? goToTab(target) : leaveFormEditorFor(target))}
             jsonOpen={jsonOpen}
           />
           {/* The JSON surface stands in place of every tab body, never beside
@@ -1253,7 +1271,7 @@ export function EditScreen({ processId, formStepId, tab, view, stepId, token, ro
   if (state.kind === "error") {
     return (
       <main {...stylex.props(styles.studioScreen)}>
-        <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
+        <button type="button" {...ghostBack(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
           ← Back to processes
         </button>
         <div {...stylex.props(styles.errorBanner)} role="alert">
@@ -1269,7 +1287,7 @@ export function EditScreen({ processId, formStepId, tab, view, stepId, token, ro
   if (state.kind === "not-found") {
     return (
       <main {...stylex.props(styles.studioScreen)}>
-        <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
+        <button type="button" {...ghostBack(styles.studioBack)} onClick={() => navigate({ name: "processes" })}>
           ← Back to processes
         </button>
         <div {...stylex.props(styles.errorBanner)} role="alert">

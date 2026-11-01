@@ -374,6 +374,14 @@ export const en = {
   "formEditor.moveDown": "Move down",
   "formEditor.remove": "Remove",
   "formEditor.removeGroup": "Remove ({count})",
+  // A card control's accessible name, naming the entry it acts on. The
+  // visible text stays the short form above.
+  "formEditor.moveUpNamed": "Move {field} up",
+  "formEditor.moveDownNamed": "Move {field} down",
+  "formEditor.removeNamed": "Remove {field}",
+  "formEditor.moveNoteUp": "Move the note up",
+  "formEditor.moveNoteDown": "Move the note down",
+  "formEditor.removeNote": "Remove the note",
   "formEditor.markRequired": "Required",
   "formEditor.markReadonly": "Read-only",
   "formEditor.markCel": "CEL",

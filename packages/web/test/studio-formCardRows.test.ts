@@ -442,9 +442,17 @@ describe("A form's size text", () => {
   });
 
   it("matches the card's own foot text for every card", () => {
-    const [first] = formCardRows(DRAFT, [], "en");
+    const rows = formCardRows(DRAFT, [], "en");
+    const expected: Record<string, string | undefined> = { step_a: "4 fields, 1 required", step_b: undefined };
 
-    expect(formSizeText(first!.fieldCount, first!.requiredCount)).toBe("4 fields, 1 required");
+    expect(rows.map((row) => row.stepId)).toEqual(Object.keys(expected));
+    for (const row of rows) {
+      const step = DRAFT.workflow!.steps!.find((s) => s.id === row.stepId)!;
+      const { fieldCount, requiredCount } = formCounts(step, DRAFT.fields);
+
+      expect(formSizeText(row.fieldCount, row.requiredCount)).toBe(expected[row.stepId]);
+      expect(formSizeText(row.fieldCount, row.requiredCount)).toBe(formSizeText(fieldCount, requiredCount));
+    }
   });
 });
 
