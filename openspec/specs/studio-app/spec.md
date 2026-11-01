@@ -1594,8 +1594,10 @@ and to a field nested inside a `group` field alike.
 
 Derivation SHALL read only the base-locale entry of the field's label. A write
 to any other locale's translation SHALL NOT trigger key derivation.
-Derivation SHALL lower-case the label. It SHALL collapse every run of
-characters outside `[a-z0-9]` to a single `_`. It SHALL trim a leading or
+
+Derivation SHALL lower-case the label. It SHALL transliterate it by the
+rule the header bar's process key states (`studio-canvas`). "Prüfung" then
+reads "pruefung". It SHALL collapse every run of characters outside `[a-z0-9]` to a single `_`. It SHALL trim a leading or
 trailing `_`. A result starting with a digit SHALL gain a leading `_`.
 
 The result then takes the shape the definition contract's identifier grammar
@@ -1731,6 +1733,12 @@ input throughout.
 - **AND** the other field's key has since changed
 - **AND** the developer changes the first field's label to "Due date"
 - **THEN** the field's key reads `due_date`
+
+#### Scenario: A field label with an umlaut derives a readable key
+
+- **WHEN** the developer types "Größe" into a new field's label, never
+  touching its key field
+- **THEN** the field's key reads `groesse`
 
 ### Requirement: A field's key input commits on blur
 
