@@ -883,20 +883,6 @@ recorded rather than fixed. The RAIL tags are local to this section.
   the refusal ink and an advisory the muted ink, in `StepsRail.tsx`. The
   label behind the count omits the severity. Risk (Medium): colour is the
   only carrier, which WCAG 1.4.1 refuses.
-- **DRAFT-1 (behaviour bug, own OpenSpec change): the header bar's Discard
-  draft does nothing.** Choose it on a
-  draft's process surface, then choose the dialog's own Discard draft: the
-  dialog stays open, the draft survives, and the process list still lists it.
-  The console reports no error. Measured 2026-09-12 at 1440px and at 420px,
-  during a browser check for another change. The process list's own Discard
-  button does work, through a native browser confirm. Risk (High): the studio
-  has no undo, so an author who means to drop a draft keeps it, and the next
-  session reads that draft as current work.
-  Risk (Informational): a long label wraps on a wide screen and fits on a
-  narrow one.
-
-  A re-check on 2026-10-30 did not reproduce it. The entry stays open until a
-  second check or a found cause closes it.
 - **A canvas removal drops keyboard focus, and nothing announces it.**
   `deleteSelection` (`packages/web/src/areas/studio/screens/EditScreen.tsx:678`)
   clears the selection. The pressed control unmounts with it, so focus lands on
@@ -1352,17 +1338,6 @@ tags are local to this section; paths under `panels/` and `screens/` start at
   Processes screen, the Tools screen and the migration plan screen draw
   theirs the same way. Risk (Low): a screen reader hears nothing while a
   body loads (WCAG 4.1.3).
-- **CHANGES-5: the header bar's open `⋮` menu panel loses hit points to
-  tab-body content.** Its panel sets `zIndex: 1`
-  (`panels/ProcessHeaderBar.tsx:199`). The review measured this
-  2026-09-13, identical with and without `visually-hidden-text-page-bounds`:
-  at 1280x720 on the Field matrix tab, an `elementFromPoint` sweep lost 15
-  of 36 hit points to the grid's sticky headers, which set `zIndex: 2` and
-  `zIndex: 3` (`panels/FieldMatrixGrid.tsx:82`, `:97`). At 400x800 on the
-  Canvas tab, the same sweep lost 5 of 30 hit points to the canvas toolbar,
-  which sets `zIndex: 1` later in tree order (`canvas/CanvasView.tsx:84`).
-  Neither element stood confirmed as the cause. Risk (Medium): a click
-  meant for the open menu can land on tab-body content instead.
 - **CHANGES-6: the participant Task screen scrolls sideways at 400px.** The
   `visually-hidden-text-page-bounds` audit met it on the app area's Task
   screen. Its claim row sets `display: "flex"` with no `flexWrap`
