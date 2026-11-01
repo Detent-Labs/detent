@@ -455,9 +455,9 @@ One shape breaks the rectangle. The register tab cuts its trailing edge with
 `clip-path: polygon(0 0, 100% 0, calc(100% - 0.4rem) 100%, 0 100%)`. It reads
 as a divider tab slotted into a ledger, never as a pill.
 
-The canvas draws SVG geometry, and three of its shapes curve. A circle of
-radius 16 marks the initial and the terminal step. A circle of radius 7 marks
-a connect handle. A path turns each corner on an 8px arc.
+The canvas draws SVG geometry, and two of its shapes curve. A circle of
+radius 7 marks a connect handle. A path turns each corner on an 8px arc. The
+canvas stamp stays a straight rectangle, as every other stamp does.
 
 ### Named Rules
 
@@ -698,8 +698,11 @@ own.
   path draws dashed. A selected path turns accent.
 - **Group:** a 1px hairline stroke with no fill. A collapsed group fills with
   paper at 1.5px.
-- **Canvas stamp:** a circle of radius 16 around a mono label at 9px. It marks
-  the initial step and the terminal step. The terminal one tilts 8 degrees.
+- **Canvas stamp:** a straight rectangle across the step's top edge, with no
+  tilt. Its text is uppercase mono at 11px, weight 600, in the text role. A
+  2px rule in the text role frames it on the surface. It marks the initial
+  step at the top-left corner and an end at the top-right. A long stamp
+  wraps onto more lines and grows upward. It never clips.
 - **Focus:** a 2px dashed accent ring around the step.
 - **Marquee:** a 1px dashed accent box over the accent at 8%.
 

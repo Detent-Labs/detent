@@ -113,16 +113,144 @@ describe("what the surface no longer carries", () => {
 describe("the canvas opens the Steps tab, and keeps its own selection behavior", () => {
   const CANVAS = "src/areas/studio/canvas/CanvasView.tsx";
 
-  it("opens the Steps tab from the Enter binding alone", () => {
+  /** The `onDoubleClick` handler's body after `anchor`, up to its closing `}}`. */
+  const doubleClickAfter = (code: string, anchor: string): string => {
+    const from = code.indexOf(anchor);
+    expect(from).toBeGreaterThan(-1);
+    const at = code.indexOf("onDoubleClick={(e) => {", from);
+    expect(at).toBeGreaterThan(-1);
+    return code.slice(at, code.indexOf("}}", at));
+  };
+
+  it("opens the Steps tab from Enter, and Enter on a path passes its id", () => {
     const code = stripComments(read(CANVAS));
     const enterAt = code.indexOf('if (e.key === "Enter")');
     const binding = code.slice(enterAt, code.indexOf("const arrow", enterAt));
 
     expect(enterAt).toBeGreaterThan(-1);
-    expect(binding).toContain("onOpenStepPage");
-    // Exactly the two calls that binding makes: a step focus and a path
-    // focus. A third would mean a pointer handler reached it too.
-    expect(code.match(/onOpenStepPage\?\.\(/g)).toHaveLength(2);
+    expect(binding).toContain("onOpenStepPage?.(focus.stepId)");
+    expect(binding).toContain("onOpenStepPage?.(owner.id, focus.pathId)");
+    // Two from Enter, and one from each of the five double-click routes: the
+    // node, its connect handle, the edge group, the sentence and the midpoint
+    // handle. An eighth would mean a single press reached it too.
+    expect(code.match(/onOpenStepPage\?\.\(/g)).toHaveLength(7);
+  });
+
+  it("opens the step from a double-click on its node", () => {
+    const handler = doubleClickAfter(stripComments(read(CANVAS)), "const renderNode");
+
+    expect(handler).toContain("onSelectStep(step.id as string)");
+    expect(handler).toContain("onOpenStepPage?.(step.id as string)");
+  });
+
+  it("opens the source step's Ways out from a double-click on the edge group", () => {
+    const handler = doubleClickAfter(stripComments(read(CANVAS)), 'tabIndex={focus.kind === "path"');
+
+    expect(handler).toContain("onSelectStep(step.id, path.id)");
+    expect(handler).toContain("onOpenStepPage?.(step.id as string, path.id)");
+  });
+
+  it("opens the source step's Ways out from a double-click on the sentence", () => {
+    const code = stripComments(read(CANVAS));
+    const handler = doubleClickAfter(code, "function EdgeLabel");
+    const at = code.indexOf("<EdgeLabel");
+    const opener = code.slice(code.indexOf("onOpen={", at), code.indexOf("/>", at));
+
+    expect(handler).toContain("onOpen()");
+    expect(opener).toContain("onSelectStep(label.stepId, label.pathId)");
+    expect(opener).toContain("onOpenStepPage?.(label.stepId, label.pathId)");
+  });
+
+  it("opens the way out from a double-click on its midpoint handle, and adds no waypoint", () => {
+    const code = stripComments(read(CANVAS));
+    const at = code.indexOf("const onMidpointDoubleClick");
+    const handler = code.slice(at, code.indexOf("};", at));
+    const handles = code.slice(code.indexOf("{waypointHandles.map("));
+    const wiring = handles.slice(handles.indexOf("onDoubleClick="), handles.indexOf("/>"));
+
+    expect(at).toBeGreaterThan(-1);
+    expect(handler).toContain("e.stopPropagation()");
+    expect(handler).toContain("onSelectStep(stepId, pathId)");
+    expect(handler).toContain("onOpenStepPage?.(stepId, pathId)");
+    expect(handler).not.toContain("onWaypointsChange");
+    // The midpoint handle opens; an existing waypoint's handle still deletes.
+    expect(wiring).toContain("h.index === undefined ? onMidpointDoubleClick(e, h.stepId, h.pathId)");
+    expect(wiring).toContain("onWaypointDoubleClick(e, h.pathId, h.index)");
+  });
+
+  it("moves the roving stop from a press on the sentence, as from a press on the line", () => {
+    const code = stripComments(read(CANVAS));
+    const label = code.slice(code.indexOf("function EdgeLabel"), code.indexOf("export function CanvasView"));
+    const at = code.indexOf("<EdgeLabel");
+    const press = code.slice(code.indexOf("onPress={", at), code.indexOf("onSelect=", at));
+
+    expect(label).toContain("onPointerDown={onPress}");
+    // The mouse press's default would move focus to the canvas svg after it.
+    expect(label).toContain("onMouseDown={(e) => e.preventDefault()}");
+    expect(press).toContain('if (label.pathId !== undefined) moveFocus({ kind: "path", pathId: label.pathId, from: "source" })');
+  });
+
+  it("opens the step from a double-click on its connect handle, which draws outside the node", () => {
+    const code = stripComments(read(CANVAS));
+    const handles = code.slice(code.indexOf("{connectHandles.map("));
+    const handler = handles.slice(handles.indexOf("onDoubleClick={(e) => {"), handles.indexOf("}}"));
+
+    expect(handler).toContain("onSelectStep(h.stepId)");
+    expect(handler).toContain("onOpenStepPage?.(h.stepId)");
+    // A handle blocks no sentence, since it draws above them all; only the
+    // placement's fallback weighs it (`studio-sentencePlacement.test.ts`).
+    expect(code).toContain("handleObstacle(at)");
+    expect(code.indexOf("{connectHandles.map(")).toBeGreaterThan(code.indexOf("{edgeLabels.map("));
+    expect(code.indexOf("{connectHandles.map(")).toBeGreaterThan(code.indexOf("{waypointHandles.map("));
+    expect(code.indexOf("{disclosures.map(")).toBeGreaterThan(code.indexOf("{connectHandles.map("));
+  });
+
+  it("keeps focus on the node from a press on its connect handle, and moves the roving stop there", () => {
+    const code = stripComments(read(CANVAS));
+    const down = code.slice(code.indexOf("const onHandlePointerDown"), code.indexOf("const onHandlePointerMove"));
+    const handles = code.slice(code.indexOf("{connectHandles.map("), code.indexOf("{disclosures.map("));
+
+    expect(down).toContain('moveFocus({ kind: "step", stepId })');
+    // Pointer capture and the drag stay as they were.
+    expect(down).toContain("capturePointer(e)");
+    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, start: p, current: p })");
+    // Without this the press's default focused the canvas svg, which drew
+    // its outline around the whole graph.
+    expect(handles).toContain("onMouseDown={(e) => e.preventDefault()}");
+  });
+
+  it("writes nothing from a click on the connect handle, only from a drag past the threshold", () => {
+    const code = stripComments(read(CANVAS));
+    const down = code.slice(code.indexOf("const onHandlePointerDown"), code.indexOf("const onHandlePointerMove"));
+    const up = code.slice(code.indexOf("const onHandlePointerUp"), code.indexOf("setConnectDrag(null);\n  };"));
+    const guard = "if (!exceedsClickThreshold(dragDelta(connectDrag.start, point))) {";
+
+    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, start: p, current: p })");
+    expect(up).toContain(guard);
+    // The guard returns before any write: a way out, a new step or a toast.
+    const afterGuard = up.indexOf("return;", up.indexOf(guard));
+    for (const write of ["resolveDropGesture(", "updateInDraftArray(", "mutate(", "showRejection("]) {
+      expect(up.indexOf(write)).toBeGreaterThan(afterGuard);
+    }
+  });
+
+  it("hands the canvas memoized waypoints and groups, so a selection click places nothing again", () => {
+    const code = stripComments(read(SURFACE));
+
+    expect(code).toMatch(/const waypoints = useMemo\(\(\) => \{[\s\S]*?\}, \[storedWaypoints\]\);/);
+    expect(code).toMatch(/const groups = useMemo\(\(\) => \{[\s\S]*?\}, \[storedGroups, steps\]\);/);
+    expect(code).toContain("waypoints={waypoints}");
+    expect(code).toContain("groups={groups}");
+  });
+
+  it("places no sentence while the Map tab is hidden, and places them when it shows", () => {
+    const code = stripComments(read(CANVAS));
+    const at = code.indexOf("const sentenceBoxes = useMemo(");
+    const memo = code.slice(at, code.indexOf("const [nodeDrag", at));
+
+    expect(at).toBeGreaterThan(-1);
+    expect(memo).toContain("if (!visible) return new Map<string, SentenceBox>();");
+    expect(memo).toMatch(/\}, \[visible, /);
   });
 
   it("leaves a pointer press on the canvas, so a set can still be built", () => {
@@ -134,17 +262,22 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     expect(handler).not.toContain("onOpenStepPage");
   });
 
-  it("keeps the inline rename on a node's double-click", () => {
+  it("has no inline rename left on a node's double-click", () => {
     const code = stripComments(read(CANVAS));
-    const at = code.indexOf("onDoubleClick={(e) => {");
-    const handler = code.slice(at, code.indexOf("}}", at));
 
-    expect(handler).toContain("startRename(");
-    expect(handler).not.toContain("onOpenStepPage");
+    expect(doubleClickAfter(code, "const renderNode")).not.toContain("startRename");
+    expect(code).not.toContain("renaming");
+    expect(code).not.toContain("inlineRename");
   });
 
-  it("wires the surface's own opener to the Steps tab", () => {
-    expect(stripComments(read(SURFACE))).toContain('onOpenStepPage={() => goToTab("steps")}');
+  it("wires the surface's own opener to the Steps tab, bumping waysOutRequest for a way out", () => {
+    const code = stripComments(read(SURFACE));
+    const at = code.indexOf("onOpenStepPage={");
+    const opener = code.slice(at, code.indexOf("}}", at));
+
+    expect(opener).toContain("setWaysOutRequest(");
+    expect(opener).toContain('goToTab("steps")');
+    expect(code).toContain("waysOutRequest={waysOutRequest}");
   });
 });
 

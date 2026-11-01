@@ -1071,6 +1071,11 @@ holds four: **Process**, **Where values come from**, **What it takes in and
 gives back** and **Access**. The Access view manages who holds standing on
 the process, a `process-access-roles` concern outside what this guide teaches.
 
+On the Map, double-click a step to open it on the Steps tab. Double-click a
+way out to open its step with **Ways out** unfolded. To add a way out, drag
+from the dot on a step's right edge to another step. Drop it on empty space
+and Studio adds a new step there.
+
 Checks reads as a plain count, like any other tab, until something blocks a
 publish. Then the count itself turns red. Open the tab to see what Studio
 found.

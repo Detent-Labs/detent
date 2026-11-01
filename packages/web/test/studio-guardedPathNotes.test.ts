@@ -7,8 +7,8 @@ import { buildOperands } from "../src/areas/studio/panels/shared/conditionLogic.
 
 /**
  * `studio-form-editor`: the preview prints one line per guarded manual path,
- * naming the path and its condition in the canvas edge's words. These are the
- * lines it prints.
+ * naming the path and its condition in the words a canvas way out reads.
+ * These are the lines it prints, with no CEL source in any of them.
  */
 
 type DraftStep = DraftOf<Step>;
@@ -33,7 +33,7 @@ describe("guardedManualPathNotes", () => {
     );
 
     expect(notes).toEqual([
-      { pathId: "path_1", label: "Approve", condition: "Amount is greater than 1,000", raw: false },
+      { pathId: "path_1", label: "Approve", condition: "Amount is greater than 1,000" },
     ]);
   });
 
@@ -55,7 +55,18 @@ describe("guardedManualPathNotes", () => {
     expect(notes).toEqual([]);
   });
 
-  it("prints the CEL text of a guard the builder cannot read", () => {
+  it("gives a manual path whose guard source is blank no note", () => {
+    const notes = guardedManualPathNotes(
+      step([
+        { id: "path_1", key: "approve", label: "Approve", to: "step_b", trigger: "manual", guard: { lang: "cel", src: "  " } },
+      ]),
+      operands,
+    );
+
+    expect(notes).toEqual([]);
+  });
+
+  it("reads source that does not parse as a hand-written rule holding", () => {
     const notes = guardedManualPathNotes(
       step([
         { id: "path_1", key: "approve", label: "Approve", to: "step_b", trigger: "manual", guard: { lang: "cel", src: "data.amount >" } },
@@ -63,17 +74,17 @@ describe("guardedManualPathNotes", () => {
       operands,
     );
 
-    expect(notes).toEqual([{ pathId: "path_1", label: "Approve", condition: "data.amount >", raw: true }]);
+    expect(notes).toEqual([{ pathId: "path_1", label: "Approve", condition: "a hand-written rule holds" }]);
   });
 
-  it("marks a guard that parses but reads as no row as CEL text", () => {
+  it("reads a guard that parses into no readable row as a hand-written rule holding", () => {
     const src = "size(data.amount) > 3";
     const notes = guardedManualPathNotes(
       step([{ id: "path_1", key: "approve", label: "Approve", to: "step_b", trigger: "manual", guard: { lang: "cel", src } }]),
       operands,
     );
 
-    expect(notes).toEqual([{ pathId: "path_1", label: "Approve", condition: src, raw: true }]);
+    expect(notes).toEqual([{ pathId: "path_1", label: "Approve", condition: "a hand-written rule holds" }]);
   });
 
   it("keeps the step's own path order", () => {

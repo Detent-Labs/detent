@@ -928,6 +928,8 @@ version number and `definitionHash`.
 
 ### Requirement: The panels screen is a routed sub-state of the edit screen
 
+<!-- antislop: allow trailing-negation synonym-rotation -->
+<!-- Why: the paragraph repeats the live spec's wording verbatim; this change edits one sentence of the block. -->
 The six tabs SHALL sit on a routed surface, not behind a dialog. The path
 SHALL read `/processes/:id/edit/:tab`. Here `:tab` is one of `map`, `steps`,
 `fields`, `forms`, `checks` or `settings`. A view of the Fields or Settings
@@ -941,11 +943,15 @@ An unrecognized `:tab` SHALL fall back to the Map tab. The routing table
 already answers an unrecognized path with the process list, and this is that rule
 one level down.
 
+<!-- antislop: allow trailing-negation -->
+<!-- Why: the paragraph repeats the live spec's wording verbatim; this change edits one sentence of the block. -->
 The surface SHALL stand the tab row above one body. The body SHALL hold the open
 tab alone. No rail of tab names SHALL stand beside it. The rail's one-line
 summary SHALL stand in the studio's area nav, not at the surface's bottom edge.
 See the `studio-checks-rail` capability for what the rail carries there.
 
+<!-- antislop: allow negation-habit -->
+<!-- Why: the paragraph repeats the live spec's wording verbatim; this change edits one sentence of the block. -->
 A tab SHALL fill the body. The tab row above it SHALL keep every other tab one
 click away. The surface therefore needs no control back to the canvas.
 
@@ -953,11 +959,9 @@ A step target SHALL ride on the `edit` route at its own path segment,
 `/processes/:id/edit/step/:stepId`, ranked after the `tab` and `formStepId`
 matches.
 
-<!-- "Show on the canvas" repeats the control's own name, so the word stays. -->
-<!-- antislop: allow synonym-rotation -->
-Choosing a "Show on the canvas" control SHALL open the Map tab with that step
-preselected. The Map tab SHALL read the target whenever it changes, not only
-once on mount. Reaching it from another tab therefore still selects the step.
+Choosing a "Show on the map" control SHALL open the Map tab with that step
+preselected. The Map tab SHALL read the target on every change of it, and on
+mount. Reaching it from another tab therefore still selects the step.
 
 Once read, the surface SHALL replace that history entry with the plain `edit`
 route. It SHALL NOT leave the step target addressable. The browser's Back control
@@ -1011,9 +1015,10 @@ body, and no empty band sits below it.
   the browser's Back control
 - **THEN** the Map tab returns, and the draft keeps every change
 
+<!-- The scenario name repeats the live spec's; a MODIFIED block cannot rename a scenario. -->
 #### Scenario: Show on the canvas preselects a step
 
-- **WHEN** the author picks "Show on the canvas" on a used-in row of the
+- **WHEN** the author picks "Show on the map" on a used-in row of the
   Fields tab
 - **THEN** the Map tab opens and selects the step that row named
 
@@ -3813,8 +3818,8 @@ because a column mapping writes into other fields. That is effect, not
 definition.
 
 "Used in" SHALL list every step whose view references the field, with
-the modes those references set. A "Show on the canvas" control on a row
-SHALL return to the canvas with that step preselected.
+the modes those references set. A "Show on the map" control on a row
+SHALL open the Map tab with that step preselected.
 
 "Only ask this when" is a third condition-builder site, alongside the
 path guard and the view-override sites `studio-condition-builder`

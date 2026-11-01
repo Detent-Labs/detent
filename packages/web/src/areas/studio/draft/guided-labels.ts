@@ -82,8 +82,9 @@ export function assignmentWord(strategy: { type?: unknown } | undefined): {
  * `performedBy.ts`'s own three values, so the performed-by control and the
  * palette cannot offer different words for one kind.
  *
- * A stamp naming an existing step's kind reads `stepRole.*` instead: a stamp
- * takes a word, not a phrase.
+ * A form card's kicker and the step page's initial mark read the short
+ * `stepRole.*` word instead: a phrase does not fit there. The canvas stamps
+ * read `canvas.startStamp` and `canvas.endStamp*`.
  */
 export function stepKindPhrase(kind: PerformedBy): string {
   return t(`stepKind.${kind}`);

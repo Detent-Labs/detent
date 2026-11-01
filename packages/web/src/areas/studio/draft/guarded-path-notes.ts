@@ -1,15 +1,12 @@
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "./types";
-import { edgeGuardLabel, type Operand } from "../panels/shared/conditionLogic";
+import { guardPhrase, type Operand } from "../panels/shared/conditionLogic";
 
 export interface GuardedPathNote {
   pathId: string | undefined;
   label: string;
-  /** The guard in the canvas edge's words, or its CEL text where the builder
-   * cannot read it. */
+  /** The guard in the words a canvas way out's sentence reads. */
   condition: string;
-  /** `condition` is the guard's CEL text, which prints in the mono face. */
-  raw: boolean;
 }
 
 /**
@@ -17,14 +14,13 @@ export interface GuardedPathNote {
  * order (`studio-form-editor`). The runtime offers such a path's control only
  * while its guard holds; the form preview has no instance data to test it, so
  * it draws the control and prints these notes under the controls. An
- * unguarded manual path and every automatic path get none.
+ * unguarded manual path, one whose guard source is blank, and every automatic
+ * path get none.
  */
 export function guardedManualPathNotes(step: DraftOf<Step>, operands: Operand[]): GuardedPathNote[] {
   return (step.paths ?? []).flatMap((path) => {
-    if (path.trigger !== "manual") return [];
-    const condition = edgeGuardLabel(path, operands);
-    if (condition === undefined) return [];
-    // `guardEdgeLabel` hands back the source itself when no row reads.
-    return [{ pathId: path.id, label: path.label ?? "", condition, raw: condition === path.guard?.src }];
+    const src = path.guard?.src;
+    if (path.trigger !== "manual" || !src?.trim()) return [];
+    return [{ pathId: path.id, label: path.label ?? "", condition: guardPhrase(src, operands) }];
   });
 }

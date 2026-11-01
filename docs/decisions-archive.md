@@ -1000,3 +1000,61 @@ system that resulted; this file explains why it took that shape.
   Resolved by `studio-step-accordion`, except the Checks label: the walk's
   Previous and Next read `stepText`. The Checks narrowing label stays open as
   ACCORDION-4 in `docs/decisions.md`.
+- **"Show on the canvas" names the Map tab's surface.** The field catalog's
+  "Used in" rows read "Show on the canvas" (`fieldCatalog.showOnCanvas`),
+  and the spec names the control by that string. The tab reads Map since
+  `studio-six-tabs`. Change 5 (`studio-map-labels`) owns the Map's words
+  and takes the rename, with the spec sentence in `studio-app`. The matrix
+  row headers still print keys alone beside the Catalog's labels; change 11
+  owns the matrix's words.
+
+  Resolved by `studio-map-labels`, except the matrix: the control reads "Show
+  on the map", and the key keeps its name. The matrix row headers stay open as
+  MAPLABELS-10 in `docs/decisions.md`.
+- **SENTENCE-3: the canvas edge label keeps a raw fragment's CEL text.** The
+  form preview's path note does the same. Both read the shared clause keys
+  for every other row. Change 5 owns the canvas and decides their wording.
+
+  Resolved by `studio-map-labels`: both read `guardPhrase`, which never falls
+  back to CEL. A raw row reads "a hand-written rule", and source that does not
+  parse reads "a hand-written rule holds".
+- **SELECTS-4: the canvas node's accessible name carries the step key.** A
+  screen reader hears the key and not the label. Change 5 owns the canvas
+  words.
+
+  Resolved by `studio-map-labels`: the name reads the text the node prints,
+  the kind phrase, the count of ways out and the stamp words. It has no step
+  key.
+- **ACCORDION-1: choosing the selected way out again on the canvas leaves
+  Ways out closed.** The effect keys on `selectedPathId`, which does not move. Risk
+  (Low): an author who closed Ways out must open it by hand.
+
+  Resolved by `studio-map-labels`: a double-click on a way out bumps
+  `waysOutRequest`, and the step page's effect keys on it too. Ways out then
+  reopens for the way out already selected.
+- **MAPLABELS-6: a double-click on the connect handle opens the step.** The
+  hit circle sits inside the node's group, so its double-click bubbles to the
+  node's handler. Each press on the handle also runs a connect gesture first.
+  Risk (Low): an author who presses the handle twice lands on the Steps tab.
+
+  Upgrade entry: stop the double-click's propagation on the hit circle in
+  `canvas/CanvasView.tsx`, if the browser check shows the step page opening.
+
+  Ruled by `studio-map-labels`: the handle belongs to the node. Its
+  double-click opens the step, as the node's own does.
+
+  Correction: the entry missed a write. Each press ran a full connect
+  gesture, so a plain click wrote a way out to the step itself or added a
+  new step. A double-click wrote two before the Steps tab opened. The risk
+  was higher than Low. Fixed by `studio-map-labels`: a release under the
+  click threshold writes nothing, the rule the waypoint handle follows.
+- **MAPLABELS-7: a press on a way out's sentence leaves the roving stop
+  behind.** A press on the line moves it, and a press on the sentence only
+  selects. Enter after a sentence press then acts on the older stop. Risk
+  (Low): the keyboard and the pointer disagree on the current way out.
+
+  Upgrade entry: give the sentence's text block an `onPointerDown` that moves
+  the stop to that path, as the line's handler does.
+
+  Resolved by `studio-map-labels`: the text block's `onPointerDown` moves the
+  stop to its way out, as the line's handler does.

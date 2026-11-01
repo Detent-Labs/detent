@@ -1015,8 +1015,9 @@ It SHALL still draw the control. It SHALL print a line under the controls that
 names the path and its condition.
 
 The line reads the path's label, then the condition in the words the canvas
-edge uses. A guard the builder cannot read prints its CEL
-text instead. A manual path with no guard SHALL get no line.
+way out's sentence uses. A guard the builder cannot read reads "a hand-written rule holds",
+and the line SHALL NOT print CEL source. A manual path with no guard SHALL get
+no line.
 
 The preview SHALL take no keyboard focus and no pointer interaction. It carries
 the `inert` attribute, so a screen reader passes over it. Every change in the
@@ -1059,6 +1060,14 @@ form canvas SHALL reach the preview at once, without a reload.
 
 - **WHEN** a view entry declares `required: true`
 - **THEN** the preview marks that entry's label as required
+
+#### Scenario: An unreadable guard prints no CEL in the preview
+
+- **WHEN** the step declares a manual path labelled "Approve" whose guard the
+  builder cannot read
+- **THEN** the line under the controls reads "Approve: shown only when a
+  hand-written rule holds"
+- **AND** the guard's source text appears nowhere in the preview
 
 ### Requirement: The preview yields its column at 80rem and below
 

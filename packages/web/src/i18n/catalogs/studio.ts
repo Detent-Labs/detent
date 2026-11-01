@@ -120,7 +120,7 @@ export const en = {
     "This field's people list comes from the groups this process allows. It resolves when a participant reaches this step, not here.",
   "fieldCatalog.usedInHeading": "Used in",
   "fieldCatalog.usedInEmpty": "No step asks for this field yet.",
-  "fieldCatalog.showOnCanvas": "Show on the canvas",
+  "fieldCatalog.showOnCanvas": "Show on the map",
   "fieldCatalog.readByHeading": "Read by",
   "fieldCatalog.readByEmpty": "No condition reads this field.",
   "fieldCatalog.onlyAskWhenHeading": "Only ask this when",
@@ -476,6 +476,9 @@ export const en = {
   "condition.sentence.divergent": "The steps hold different conditions. Build one here to set it on every step.",
   "condition.rawRowSentence": "A hand-written rule. The Developer view holds its text.",
   "condition.readerRaw": "A hand-written rule.",
+  // The condition a way out's sentence and the form preview's note read for a
+  // guard with no readable row, or source that does not parse.
+  "condition.handWrittenHolds": "a hand-written rule holds",
   "readBy.wayOut": "On {step}: way out {wayOut}",
   "readBy.asked": "When {step} asks for {field}",
   "readBy.required": "When {step} requires {field}",
@@ -727,7 +730,6 @@ export const en = {
   "stepSections.outcomePlaceholder": "choose how it ended…",
   "stepSections.isInitialStep": "This is the process's first step.",
   "stepSections.noSelection": "Select a step or a way out to edit it.",
-  "stepSections.renameLabel": "Step name",
   "stepSections.keyField": "Key",
   "stepSections.labelField": "Name",
   "stepSections.idField": "Id",
@@ -816,8 +818,10 @@ export const en = {
   "stepPage.developerViewNote":
     "The JSON is read-only here. The JSON surface stays the one place for hand-authoring a definition.",
 
-  // The role a step's stamp reads, in the steps register and in the
-  // configuration pane's masthead. `draft/roleStamp.ts` picks which one.
+  // The role word a form card's kicker reads, picked by `draft/roleStamp.ts`,
+  // and the step page's mark on the initial step. The canvas stamps read
+  // `canvas.startStamp` and `canvas.endStamp*` instead: "End: {outcome}" has
+  // no `stepRole` peer.
   "stepRole.initial": "Initial",
   "stepRole.task": "Task",
   "stepRole.subprocess": "Subprocess",
@@ -826,8 +830,10 @@ export const en = {
   // The phrase a control choosing a step's kind prints
   // (`studio-guided-vocabulary`). Keyed by `draft/performedBy.ts`'s own three
   // values, so the closed key union stays exhaustive against the model the
-  // sections read. A stamp naming an existing step's kind keeps the short
-  // `stepRole.*` word instead: a phrase does not fit a stamp.
+  // sections read. A canvas node's accessible name reads the same phrase. A
+  // form card's kicker and the step page's initial mark keep the short
+  // `stepRole.*` word instead: a phrase does not fit there. The canvas stamps
+  // read `canvas.startStamp` and `canvas.endStamp*`.
   "stepKind.legend": "What this step is",
   "stepKind.participant": "A step someone works",
   "stepKind.subprocess": "A call to another process",
@@ -927,8 +933,6 @@ export const en = {
   "canvas.arrange": "Arrange",
   "canvas.arrangeConfirm":
     "Arrange every step from the workflow graph? This overwrites every saved position and clears any waypoint a path carries.",
-  "canvas.elseMarker": "else",
-  "canvas.initialStamp": "start",
   "canvas.edgeStyleToggle": "Rounded corners",
   "canvas.selectionHeading": "Steps selected",
   "canvas.selectionRemoveOne": "Remove step",
@@ -948,26 +952,43 @@ export const en = {
   "canvas.addStepMore": "More step kinds",
   "canvas.unconnected": "unconnected",
 
+  // The marks the canvas draws, filled by `canvas/mapWords.ts`. A stamp
+  // names the start or an end, with the outcome's whole name. A way out's
+  // sentence takes one whole key per form, so a translator sees each
+  // sentence: a guarded path reads "Only if", led by its place among the
+  // step's automatic ways out, and the guardless default reads "Otherwise".
+  // The connect handle's tooltip says what a drag from it does.
+  "canvas.startStamp": "Start",
+  "canvas.endStamp": "End",
+  "canvas.endStampOutcome": "End: {outcome}",
+  "canvas.onlyIf": "Only if {phrase}",
+  "canvas.onlyIf.first": "First, only if {phrase}",
+  "canvas.onlyIf.second": "Second, only if {phrase}",
+  "canvas.onlyIf.third": "Third, only if {phrase}",
+  "canvas.onlyIf.fourth": "Fourth, only if {phrase}",
+  "canvas.onlyIf.fifth": "Fifth, only if {phrase}",
+  "canvas.onlyIf.nth": "Number {n}, only if {phrase}",
+  "canvas.otherwise": "Otherwise",
+  "canvas.connectHandle": "Drag to a step to add a way out, or to empty space to add a new step.",
+  "canvas.connectHandleEnd": "An end has no way out.",
+
   // The accessible names the canvas composes for its nodes, its paths and
-  // its `<svg>` root. Each `{slot}` is filled with `.replace()`. The two
-  // base templates carry only the segments every element has; a segment that
-  // is sometimes absent takes a key of its own, because filling an unused
-  // slot with an empty string prints "Capture, capture, Step, , 2 outgoing
-  // paths". The kind word comes from `stepRole.task`, `stepRole.subprocess` or
-  // `stepRole.end`, the same three the stamp reads, and the guard slot takes
-  // the readable guard the edge label draws or, for a guardless path,
-  // `canvas.pathLabelNoGuard`.
+  // its `<svg>` root, filled by `canvas/mapWords.ts`. A node's name reads the
+  // step's text, the step page's kind phrase (`stepKind.*`) and its count of
+  // ways out; each stamp's word follows after a comma, start before end. A
+  // path's name reads its label, both steps, how it is taken and the
+  // sentence its line draws, or `canvas.pathNoCondition` where the line draws
+  // none. No name carries a key, an enum value, a priority or CEL.
   //
-  // The fan count picks between two node templates, because a fixed plural
-  // announces "1 outgoing paths" on every single-path step.
-  "canvas.nodeLabel": "{label}, {key}, {kind}, {paths} outgoing paths",
-  "canvas.nodeLabelOnePath": "{label}, {key}, {kind}, {paths} outgoing path",
-  "canvas.nodeLabelOutcome": "outcome {outcome}",
-  "canvas.nodeLabelInitial": "entry point",
-  "canvas.pathLabel": "{label}, from {source} to {target}, {trigger}, {guard}",
-  "canvas.pathLabelPriority": "priority {priority}",
-  "canvas.pathLabelNoGuard": "no guard",
-  "canvas.pathLabelNoTrigger": "trigger not set",
+  // The count picks between two node templates, because a fixed plural
+  // announces "1 ways out" on every single-path step.
+  "canvas.nodeLabel": "{label}, {kind}, {count} ways out",
+  "canvas.nodeLabelOneWayOut": "{label}, {kind}, 1 way out",
+  "canvas.pathLabel": "{label}, from {source} to {target}, {taken}, {sentence}",
+  "canvas.pathTakenManual": "a person chooses",
+  "canvas.pathTakenAutomatic": "happens by itself",
+  "canvas.pathTakenUnset": "not set yet",
+  "canvas.pathNoCondition": "no condition",
   "canvas.groupDisclosure": "Steps in {group}",
   "canvas.svgLabel": "Process graph",
 

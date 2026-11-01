@@ -4,10 +4,8 @@ import { resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/loc
 
 /**
  * A step's label edit's whole key decision (design.md: "Extract the step-key
- * decision"), shared by the identity zone's own label input and the canvas
- * node's inline rename, so the two routes to `step.label` cannot drift on
- * this behavior either — `inlineRename.ts`'s own "cannot drift" contract,
- * extended to the derived key.
+ * decision"), read by the step page's name line, the one route that writes a
+ * step's label.
  *
  * Derivation reads only the base-locale entry of both the prior and the new
  * label (design.md Decisions: "Derivation reads only the base-locale

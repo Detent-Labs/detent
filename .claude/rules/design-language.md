@@ -89,8 +89,8 @@ unresolved migration mapping, or a conditionally visible form card.
 A participant reads, so the reading column stays narrow. An operator scans,
 so the operator's screens go wide. `--layout-cap-narrow` (61rem) and
 `--layout-cap-wide` (80rem) hold those two widths. Radius is 0 on every
-box. The canvas's SVG geometry is the one exception: its stamps, handles
-and path corners curve.
+box. The canvas's SVG geometry is the one exception: its handles and path
+corners curve. Its stamps stay straight rectangles, as every stamp does.
 
 ## Icons
 

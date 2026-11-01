@@ -130,9 +130,8 @@ describe("the canvas node's label", () => {
   });
 
   // The key is a slug that references nothing, so the canvas does not spend a
-  // second element on it. It stays in the node's accessible name and in the
-  // inspector. A step whose label resolves empty is the one case where the
-  // key reaches the body, through the fallback the last case here pins.
+  // second element on it. It stays in the step page's Developer view, and no
+  // fallback reaches the body either: the last case here pins that.
   it("draws one label element per node, and no key beside it", () => {
     for (const node of [...ENGLISH, ...GERMAN]) {
       expect(node.labelCount).toBe(1);
@@ -142,7 +141,7 @@ describe("the canvas node's label", () => {
 
   // The label was an SVG `<text>` at a fixed baseline, which neither wraps nor
   // truncates. It is HTML now, so the node body draws no `<text>` at all. The
-  // three fixture steps carry no stamp, which is the only `<text>` left.
+  // three fixture steps carry no stamp, and a stamp is HTML too.
   it("draws no `<text>` in the node body", () => {
     for (const node of [...ENGLISH, ...GERMAN]) {
       expect(node.texts).toEqual([]);
@@ -157,11 +156,12 @@ describe("the canvas node's label", () => {
     expect(GERMAN[0].label).not.toBe("Capture the request");
   });
 
-  // The fallback chain the key line's removal left untouched: a step whose
-  // label resolves to nothing still reads as its key.
-  it("prints the key when the label resolves empty", () => {
+  // The defect: a step whose label resolved to nothing printed its key. The
+  // body reads `stepTextMap`, the step page's selects' own text (design D11).
+  it("prints the unnamed-step text, never the key, when the label resolves empty", () => {
     expect(ENGLISH[1].stepId).toBe("step_archive");
-    expect(ENGLISH[1].label).toBe("archive");
+    expect(ENGLISH[1].label).toBe("(unnamed step)");
+    expect(ENGLISH[1].label).not.toContain("archive");
   });
 });
 

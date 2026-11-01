@@ -5,7 +5,7 @@ import {
   celLiteral,
   conditionSentence,
   fromCel,
-  guardEdgeLabel,
+  guardPhrase,
   operandSignature,
   readerSentence,
   operatorsFor,
@@ -555,14 +555,13 @@ describe("summarizeCondition", () => {
     expect(summarizeCondition(condition, operands)).toBe("amount is greater than 1,000 or flagged is yes");
   });
 
-  it("prints a raw row's own CEL text by default, or the catalog's phrase on request", () => {
+  it("reads a raw row as the catalog's phrase, never its CEL text", () => {
     const operands = catalog([field("amount", "number")]);
     const src = "data.amount * 2.0 > 1000.0";
     const condition = fromCel(src, operands)!;
     expect(condition.rows[0].kind).toBe("raw");
-    expect(summarizeCondition(condition, operands)).toBe(src);
-    expect(summarizeCondition(condition, operands, "source")).toBe(src);
-    expect(summarizeCondition(condition, operands, "phrase")).toBe("a hand-written rule");
+    expect(summarizeCondition(condition, operands)).toBe("a hand-written rule");
+    expect(summarizeCondition(condition, operands)).not.toContain("data.amount");
   });
 
   it("fills a value holding a placeholder or a $ pattern as written", () => {
@@ -576,28 +575,28 @@ describe("summarizeCondition", () => {
   });
 });
 
-describe("guardEdgeLabel", () => {
-  it("prefers the clause words when the guard parses", () => {
+describe("guardPhrase", () => {
+  it("reads the clause words when the guard parses, with no capital added", () => {
     const operands = catalog([field("amount", "number")]);
-    expect(guardEdgeLabel("data.amount > 1000.0", operands)).toBe("Amount is greater than 1,000");
+    expect(guardPhrase("data.amount > 1000.0", operands)).toBe("amount is greater than 1,000");
   });
 
-  it("keeps a raw row's CEL text beside a readable row", () => {
+  it("reads a raw row beside a readable row as the builder's phrase, not its CEL text", () => {
     const operands = catalog([field("tags", "list"), field("amount", "number")]);
     const src = 'data.tags.exists(t, t == "vip") && data.amount > 1000.0';
-    expect(guardEdgeLabel(src, operands)).toBe('data.tags.exists(t, t == "vip") and amount is greater than 1,000');
+    expect(guardPhrase(src, operands)).toBe("a hand-written rule and amount is greater than 1,000");
   });
 
-  it("falls back to raw CEL for a fragment the builder cannot represent at all", () => {
+  it("reads a fragment the builder cannot represent at all as a hand-written rule holding", () => {
     const operands = catalog([field("amount", "number")]);
     const src = "!(data.amount > 1000.0)";
     const condition = fromCel(src, operands)!;
     expect(condition.rows).toEqual([{ kind: "raw", src }]);
-    expect(guardEdgeLabel(src, operands)).toBe(src);
+    expect(guardPhrase(src, operands)).toBe(t("condition.handWrittenHolds"));
   });
 
-  it("returns the source itself when the guard does not parse", () => {
-    expect(guardEdgeLabel("data.amount >", catalog([field("amount", "number")]))).toBe("data.amount >");
+  it("reads source that does not parse as a hand-written rule holding", () => {
+    expect(guardPhrase("data.amount >", catalog([field("amount", "number")]))).toBe(t("condition.handWrittenHolds"));
   });
 });
 

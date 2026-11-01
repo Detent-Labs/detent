@@ -504,13 +504,11 @@ function summarizeValue(row: Extract<Row, { kind: "cmp" }>, operand: Operand | u
   return `“${String(row.value ?? "")}”`;
 }
 
-/** What a raw row reads as: its own CEL text, or the catalog's phrase. */
-export type RawRowReading = "source" | "phrase";
-
 /** One row's clause. A boolean row takes the `eq` or `ne` clause with the
- * value "yes" or "no". */
-function summarizeRow(row: Row, byPath: Map<string, Operand>, raw: RawRowReading): string {
-  if (row.kind === "raw") return raw === "source" ? row.src : t("condition.clause.raw");
+ * value "yes" or "no". A raw row reads as the catalog's phrase, never its CEL
+ * text. */
+function summarizeRow(row: Row, byPath: Map<string, Operand>): string {
+  if (row.kind === "raw") return t("condition.clause.raw");
   const operand = byPath.get(row.operand);
   return fill(t(`condition.clause.${OP_NAMES[row.op]}`), {
     field: operand?.clauseLabel ?? operand?.label ?? row.operand,
@@ -520,20 +518,16 @@ function summarizeRow(row: Row, byPath: Map<string, Operand>, raw: RawRowReading
 
 /**
  * The complete rows' clauses, joined by the condition's joiner: the words the
- * builder's sentence and the canvas edge label share. Walks the same
- * `Condition`/`Row` model `ConditionBuilder` holds, never the CEL text.
- *
- * `raw` picks what a raw row reads as. The canvas edge and the form preview's
- * path note keep the fragment's CEL text; the builder's sentence reads the
- * catalog's phrase.
+ * builder's sentence and `guardPhrase` share. Walks the same `Condition`/`Row`
+ * model `ConditionBuilder` holds, never the CEL text.
  *
  * Returns `""` for a condition with no complete row (an empty guard, or one
  * still mid-edit); the caller decides what an empty summary means for its
  * placement.
  */
-export function summarizeCondition(condition: Condition, operands: Operand[], raw: RawRowReading = "source"): string {
+export function summarizeCondition(condition: Condition, operands: Operand[]): string {
   const byPath = new Map(operands.map((o) => [o.path, o]));
-  const clauses = condition.rows.filter((r) => isComplete(r, byPath)).map((r) => summarizeRow(r, byPath, raw));
+  const clauses = condition.rows.filter((r) => isComplete(r, byPath)).map((r) => summarizeRow(r, byPath));
   if (!clauses.length) return "";
   const join = t(condition.joiner === "&&" ? "condition.join.and" : "condition.join.or");
   return clauses.reduce((left, right) => fill(join, { left, right }));
@@ -554,12 +548,12 @@ const capitalize = (s: string): string => s.charAt(0).toLocaleUpperCase("en") + 
  *   read): the author finishes a row first.
  */
 export function conditionSentence(condition: Condition, operands: Operand[], stored: string | undefined): string {
-  const clauses = summarizeCondition(condition, operands, "phrase");
+  const clauses = summarizeCondition(condition, operands);
   if (clauses) return capitalize(fill(t("condition.sentence"), { condition: clauses }));
   const hasStored = Boolean(stored?.trim());
   if (!condition.rows.length && !hasStored) return t("condition.empty");
   const held = hasStored ? fromCel(stored, operands) : null;
-  const heldClauses = held ? summarizeCondition(held, operands, "phrase") : "";
+  const heldClauses = held ? summarizeCondition(held, operands) : "";
   if (heldClauses) return capitalize(fill(t("condition.sentence.held"), { condition: heldClauses }));
   return t("condition.sentence.none");
 }
@@ -572,35 +566,25 @@ export function conditionSentence(condition: Condition, operands: Operand[], sto
  */
 export function readerSentence(src: string, operands: Operand[]): string {
   const condition = fromCel(src, operands);
-  const clauses = condition ? summarizeCondition(condition, operands, "phrase") : "";
+  const clauses = condition ? summarizeCondition(condition, operands) : "";
   if (!clauses) return t("condition.readerRaw");
   return capitalize(fill(t("condition.sentence"), { condition: clauses }));
 }
 
 /**
- * The readable form of a guard's CEL text: a plain-English summary when the
- * guard parses into rows, the raw CEL text otherwise (a fragment the builder
- * cannot represent at all — see "A fragment the builder cannot represent
- * survives as a raw row").
+ * A guard's condition as a phrase, the words the canvas way out's sentence and
+ * the form preview's note read. The complete rows' clauses read as the
+ * builder's sentence does, with no capital added: a field label keeps the
+ * author's case, a context operand reads lowercase. A raw row beside a
+ * readable row reads as the catalog's phrase. Source that does not parse, or
+ * holds no complete comparison row, reads as a hand-written rule holding.
+ * No CEL source prints, whatever the guard holds.
  */
-export function guardEdgeLabel(src: string, operands: Operand[]): string {
+export function guardPhrase(src: string, operands: Operand[]): string {
   const condition = fromCel(src, operands);
-  if (!condition) return src;
-  const summary = summarizeCondition(condition, operands, "source");
-  if (!summary) return src;
-  // The label reads as the head of a sentence, as the builder's does. A raw
-  // row at the head prints its CEL text, which stays as written.
+  if (!condition) return t("condition.handWrittenHolds");
   const byPath = new Map(operands.map((o) => [o.path, o]));
-  const head = condition.rows.find((r) => isComplete(r, byPath));
-  return head?.kind === "cmp" ? capitalize(summary) : summary;
-}
-
-/**
- * The canvas edge label for a path, whatever its trigger: the guard's readable
- * form, or `undefined` for a path with no guard. A manual path's guard decides
- * whether the participant gets the button, so its edge names it too.
- */
-export function edgeGuardLabel(path: { guard?: { src?: string } }, operands: Operand[]): string | undefined {
-  const src = path.guard?.src;
-  return src ? guardEdgeLabel(src, operands) : undefined;
+  // A raw row counts as complete, so the test reads the row kind.
+  if (!condition.rows.some((r) => r.kind === "cmp" && isComplete(r, byPath))) return t("condition.handWrittenHolds");
+  return summarizeCondition(condition, operands);
 }

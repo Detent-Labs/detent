@@ -195,8 +195,8 @@ added:
   That path-guard toggle is a distinct, out-of-scope control from the
   step's "View raw JSON" toggle. With nothing selected the pane shows the
   register's first step (`studio-step-bench`).
-- **Canvas-edge guard label**: a plain-English summary and a raw-CEL
-  fallback.
+- **A way out's sentence on the Map**: a readable condition, and a
+  hand-written rule that reads "a hand-written rule holds".
 - **Process-identity header bar**: clean, dirty, and just-published states.
 - **Routed form editor**: the palette, the canvas, and the selected-field
   strip.
@@ -1111,9 +1111,10 @@ filled shape there means the hit area lost its `fill: none`.
 Save the draft and open it again. Pass: the style you chose is the style you
 get, and every step kept its position.
 
-A guard label on a routed path sits at the middle of the route. On a route that
-turns, that puts it on a vertical run. Pass: it is legible and clear of every
-step. It is not expected to sit between the two steps.
+A way out's sentence on a routed path stands on the route, as near its middle
+as the room allows. On a route that turns, that can put it on a vertical run.
+Pass: it is legible and clear of every step. It is not expected to sit between
+the two steps.
 
 An edge crosses a step that lies in its path. Pass: it does. Nothing routes
 around an obstacle, by decision, and stage 33's control points are the answer.
@@ -1126,7 +1127,7 @@ this repository reads a rendered node.
 
 Read the two nodes. Pass: the subprocess step carries a second rule inside its
 rectangle, and the task step carries one rule alone. Watch for the defect: a
-filled rectangle over the label and the key. That means the rule lost its
+filled rectangle over the label. That means the rule lost its
 `fill: none`.
 
 Select the task step and switch its "performed by" control to subprocess. Pass:
@@ -1136,8 +1137,8 @@ it back. Pass: the rule leaves.
 Select the subprocess step. Pass: the outer rule turns to the accent, and the
 inner rule stays the border colour.
 
-Double-click the subprocess node's label. Pass: the rename field opens over the
-node, and the inner rule stays clear of it on both sides.
+Read the subprocess node's label. Pass: the inner rule stays clear of it on
+both sides.
 
 Point at the subprocess node's connect handle. Pass: the handle draws whole. It
 overlaps the inner rule's right edge by 3px and covers it there.
@@ -1177,9 +1178,8 @@ takes five segments and comes in from outside the target's right edge.
 Read the arrowhead in each of the four cases. Pass: it points into the side
 the route enters, and it is never sideways to that edge.
 
-Find a guarded automatic path whose route runs vertically. Pass: its guard
-label and its priority badge sit on the route and stay legible. They do not
-overlap a node.
+Find a guarded automatic path whose route runs vertically. Pass: its sentence
+sits on the route and stays legible. It does not overlap a node.
 
 Click a vertical route away from its ends. Pass: that path selects.
 
@@ -1220,8 +1220,8 @@ waypoints, and every step kept its position.
 Double-click a filled square. Pass: that waypoint goes. Delete the last one.
 Pass: the path draws the straight route it drew at the start.
 
-Find a guarded automatic path and select it. Pass: the midpoint square sits
-over its guard label and stays grabbable. Deselect. Pass: the label reads
+Find a guarded automatic path and select it. Pass: the midpoint square stays
+grabbable, over its sentence or beside it. Deselect. Pass: the sentence reads
 whole again.
 
 ### Canvas step groups (`canvas-step-groups`)
@@ -2016,8 +2016,8 @@ Only a keyboard pass shows the second.
 
 Source: `redesign-step-inspector`, `studio-step-bench`.
 
-On the canvas, select a step. Then click one of its outgoing path edges. A
-guard label works as a click target.
+On the canvas, select a step. Then click one of its outgoing path edges. The
+way out's sentence works as a click target.
 
 Pass: the step page switches to the path's source step. The Ways out section
 stands open with its body. The selected path's own row shows a highlight
@@ -3041,8 +3041,8 @@ Press Tab. Pass: the stop leaves the canvas and reaches the control after it,
 rather than another node.
 
 From the canvas press Escape, then Tab, then Shift+Tab, then Right. Pass: the
-Shift+Tab lands on the `<svg>` root, and Right moves from there to the entry
-point. It does not return to the node you left.
+Shift+Tab lands on the `<svg>` root, and Right moves from there to the step
+stamped Start. It does not return to the node you left.
 
 Focus a node and count the rings on it. Pass: exactly one draws, an accent
 rectangle held off the node's edge. No second bounding box sits beside it. Do
@@ -3064,9 +3064,10 @@ Set the browser zoom to 200 percent and focus a node. Pass: the ring is still
 there, and it still measures 2px. A ring that thickens with the zoom means a
 missing `vector-effect`.
 
-Start a screen reader and focus a step. Pass: it reads the label, the key, the
-kind word and the outgoing count. A terminal step adds its outcome, and the
-initial step says that it is the entry point.
+Start a screen reader and focus a step. Pass: it reads the text the node
+prints, the kind phrase and the count of ways out: "2 ways out", say. A step
+carrying a stamp adds the stamp's words, "Start" or "End: rejected". It reads
+no step key.
 
 Focus a group's disclosure button with that reader running. Pass: it names the
 group the button opens, and reports that group's open or collapsed state.
@@ -3088,8 +3089,9 @@ Route a path across the box's bottom-right corner, then press the button. Pass:
 the button takes the press, and no path becomes selected. The 12-wide hit area
 under the route is what would otherwise take it.
 
-Drag a guard label or a waypoint handle over that same corner, then press the
-button again. Pass: the button still takes it. Both of those draw before the
+Move a step until a way out's sentence lies over that same corner, or drag a
+waypoint handle there. Then press the button again. Pass: the button still
+takes it. Both of those draw before the
 disclosure pass does.
 
 Move focus to the button and look at the box corner. Pass: the outline is
@@ -3111,19 +3113,11 @@ Click a group's disclosure with the pointer, then press Enter. Pass: the group
 toggles and nothing else happens. A stop left on a step would let that one
 Enter toggle the group and open the step.
 
-These two stay manual for the same reason as the check below. A pointer press
-and a focus move are both invisible to `renderToStaticMarkup`, and the web
-package carries no DOM harness.
+These two stay manual. A pointer press and a focus move are both invisible to
+`renderToStaticMarkup`, and the web package carries no DOM harness.
 
-Double-click a node's label to open the inline rename, then read that node's
-`<g>` in the configuration pane. Pass: it carries no `role`, no `aria-label` and no
-`tabindex` while the field is open. ARIA forbids a focusable input inside a
-button, and the node is a button everywhere else.
-
-This one stays manual for a mechanical reason. Only a double click sets the
-internal `renaming` state. A static render draws the initial state alone, and
-the web package carries no DOM harness. So the rename branch never renders in
-a test.
+Double-click a node. Pass: the Steps tab opens on that step, and no text field
+opens on the canvas. The entry for `studio-map-labels` walks each double-click.
 
 ### The StyleX pilot: computed styles, not source (`stylex-phase-0-tooling`)
 
@@ -3294,8 +3288,8 @@ out `stylex-phase-3-studio`'s deferral.
 
 **Drag probe: Panzoom exclusion.** Start a pointer drag on a step node.
 Pass: the node moves; the canvas does not pan. Start a drag on an edge's
-route, a waypoint handle, and the inline rename field (double-click a
-node first). Pass: none of the three pans the canvas either.
+route, a waypoint handle, and a way out's sentence. Pass: none of the three
+pans the canvas either.
 
 Start a drag on empty canvas space. Pass: the canvas pans. This confirms
 the exclusion covers exactly the elements that need it, not the whole
@@ -3774,8 +3768,7 @@ around the canvas itself. Pass: the viewport draws a 1px frame and the muted
 fill under its dot grid.
 
 Drag on empty canvas to pull a selection marquee. Pass: the marquee draws a
-dashed accent frame over an 8% accent tint. Double-click a node to rename it.
-Pass: the input draws an accent frame on the surface fill.
+dashed accent frame over an 8% accent tint.
 
 Open the JSON view from the header bar's `⋮` menu. Pass: the text area draws a
 1px frame, and it sits on the surface fill rather than the page ground.
@@ -3990,8 +3983,8 @@ the connect handle, and the handle draws whole. Drag from the handle. Pass:
 the connect gesture still starts.
 
 Drag the node by its label. Pass: the node moves and the canvas does not pan.
-Double-click the label. Pass: the rename field opens over the node. Click the
-label once. Pass: the node selects.
+Double-click the label. Pass: the Steps tab opens on that step. Back on Map,
+click the label once. Pass: the node selects, and the tab stays Map.
 
 Switch the content locale to German on a draft carrying translations. Pass:
 each node prints its German label under the same clamp. German runs up to 40%
@@ -5944,8 +5937,8 @@ Pass: the "Only when" heading and the row stay on screen.
 
 Pass: no `priority` input shows.
 
-Pass: the Map tab draws the path's edge with a label for the row and no
-priority badge.
+Pass: the Map tab draws the sentence "Only if Quantity is greater than 5" on
+the path's edge. No rank word shows.
 
 Pass: the preview in that step's form editor, from the Forms tab, names the
 path and its condition in words. The line sits under the controls.
@@ -6915,11 +6908,122 @@ step and clear its name line. Choose "Manager Approval" again. Pass: its Next
 control reads "Next: (unnamed step)", and no key shows.
 
 **9. A way out picked on the Map.** Choose "Manager Approval". Close Ways out
-where it stands open. Open the Map tab. Press one of that step's paths on the
-canvas.
+where it stands open. Open the Map tab. Double-click one of that step's paths
+on the canvas.
 
 Pass: the Steps tab opens, and Ways out stands open. Pass: that path's row
 carries the current mark.
 
 Discard the draft from the process list and accept the browser's confirm.
+Under `playwright-cli`, `dialog-accept` answers it.
+
+### The Map's words and double-click (`studio-map-labels`)
+
+Source: `studio-map-labels` tasks 4.4 to 4.7. The bun tests pin every word
+the Map prints and every accessible name. A wrapped stamp, a sentence's place
+on its route, a tooltip, a cursor and a double-click need a real browser.
+
+<!-- antislop: allow long-words -->
+<!-- Why: "Purchase Requisition" is the seeded process's name, quoted as the list prints it. -->
+See this file's "Before you start" section. Use the production build on this
+checkout's own engine port. Seed the database and sign in as
+`demo-superuser@example.test`, password `seed-demo-password`. Create a draft
+of "Purchase Requisition" and one of "Expense Approval". Under
+`playwright-cli`, pass `-s=studio-map-labels` on every call. Every step below
+runs at 1440x900 unless it names another width.
+
+**1. The two stamps.** Open the requisition draft's Map tab. Pass: "Draft
+Requisition" carries a straight stamp reading "Start" at its top-left
+corner. "Closed" carries one reading "End: closed" at its top-right corner.
+
+Pass: each stamp prints mono uppercase text inside a 2px rule in ink, on the
+surface fill. No stamp tilts. No circle, no four-letter cut and no "•" appears
+on the canvas. Switch to the dark scheme. Pass: both stamps stay legible.
+
+**2. A long outcome.** Open the Settings tab's What it takes in and gives back
+view. Add the outcome `escalated_to_management`. On the Steps tab, choose
+"Rejected" and pick that outcome under How it ended. Open Map.
+
+Pass: the stamp reads "End: escalated_to_management" over two or more lines.
+Its foot keeps its place at the node's top edge, and the extra lines grow
+upward. The stamp clips no letter.
+
+**3. Both stamps on one node.** Choose "Rejected" on the Steps tab and press
+"Set as the process's first step". Open Map. Pass: "Start" stands at the
+node's left corner, and the long end stamp at its right. Neither overlaps the
+other. The end stamp wraps inside its half of the width, and "Start" stays one
+line.
+
+**4. Fit to view frames a stamp.** Drag "Rejected" above every other step, to
+the top edge of the graph. Press Fit to view. Pass: the whole stamp stands
+inside the canvas, its top rule included. A stamp cut at the canvas's top
+edge is the defect.
+
+**5. The sentences on two maps.** On the requisition draft, read the two ways
+out of "Route by Amount". Pass: "Needs finance approval" reads "First,
+only if a hand-written rule holds". "Under threshold" reads "Otherwise".
+
+Read the ways out of "Check the Receipt". Pass: the first reads "First, only
+if" and then its condition in words, and the second reads "Otherwise". A
+manual way out draws no sentence. Open the Expense Approval draft. Read the
+ways out of "Book". Pass: they read "First, only if" and "Second, only if",
+each with its condition in words.
+
+Pass, on both maps: no CEL, no bare number and no "else" shows on the canvas.
+Each sentence stands on its route, as near its middle as the room allows. It
+wraps over six lines at most. It stays clear of every node label, every stamp
+and every other sentence. A sentence the clamp cut ends in an ellipsis, and
+pointing at it shows the whole sentence.
+
+**6. The sentences at 1024.** Resize the window to 1024x800. Press Fit to view
+on each draft. Read every sentence again. Pass: the five checks of the
+paragraph above hold at this width too.
+
+**7. The connect handle.** Point at the dot on the right edge of "Manager
+Approval". Pass: a tooltip appears. It reads "Drag to a step to add a way
+out, or to empty space to add a new step." The cursor reads crosshair.
+
+Point at the handle of "Closed". Pass: the tooltip reads "An end has no way
+out.", and the cursor reads not-allowed.
+
+Zoom in until a node draws at least 180px wide. Press 10px right of the centre of
+the handle on "Manager Approval". Drag to "Finance Review". Pass: the connect
+gesture starts, and a new way out appears on release.
+
+**8. Each double-click.** Double-click "Finance Review". Pass: the Steps tab
+opens on "Finance Review", and no text field opens on the canvas. Back on
+Map, click a node once. Pass: it selects, and the tab stays Map.
+
+Double-click the line of "Needs finance approval". Pass: the Steps tab opens on
+"Route by Amount". Ways out stands open, and that way out's row carries the
+current mark. Back on Map, double-click the same way out's sentence. Pass: the
+same happens.
+
+Select "Needs finance approval", then double-click its midpoint square. Pass:
+the Steps tab opens on "Route by Amount", with Ways out open. Back on Map, the
+way out has no new waypoint.
+
+Select a way out and drag its midpoint square aside to add a waypoint.
+Double-click the filled square. Pass: the waypoint goes, and the tab stays
+Map. The Steps tab opening here is the defect.
+
+**9. A folded Ways out reopens.** Double-click "Under threshold" on Map. On the
+Steps tab, close Ways out. Open Map again, where that way out stays selected.
+Double-click it again. Pass: Ways out opens, and the row carries the current
+mark.
+
+**10. Two gestures the reviews named.** Double-click the connect handle of
+"Manager Approval". Pass: the Steps tab opens on "Manager Approval". The
+handle belongs to the node, so its double-click opens the step.
+
+Back on Map, count the steps and the ways out of "Manager Approval". Click its
+connect handle once without moving, then double-click it. Return to Map.
+Pass: the counts stay the same. A click and a double-click on the handle add
+no way out and no step.
+
+Press the sentence of "Under threshold", then press Enter. Pass: the Steps tab
+opens on "Route by Amount". The press moved the keyboard's stop to that way
+out, as a press on its line does.
+
+Discard both drafts from the process list and accept the browser's confirm.
 Under `playwright-cli`, `dialog-accept` answers it.

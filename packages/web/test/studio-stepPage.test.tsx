@@ -294,6 +294,17 @@ describe("The step page opens on the section that needs the author", () => {
     expect(openNames(render({ selectedPathId: "path_1" }))).toEqual(["Ways out"]);
   });
 
+  // The defect (ACCORDION-1): an effect keyed on the selected way out alone
+  // never ran again for the same way out, so a folded Ways out stayed shut
+  // when the Map tab opened that way out a second time.
+  it("keys the Ways out effect on each open request, so a repeated one reopens it", () => {
+    const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
+    const effect = /if \(selectedPathId !== undefined && holdsPaths\) setOpenSection\("paths"\);\s*\}, \[([^\]]*)\]\);/.exec(source);
+
+    expect(effect).not.toBeNull();
+    expect(effect![1].split(",").map((dep) => dep.trim())).toEqual(["selectedPathId", "holdsPaths", "waysOutRequest"]);
+  });
+
   it("opens an unassigned step whose ways out all happen by themselves on Who acts only as the first section", () => {
     const automatic = {
       ...TASK_STEP,
