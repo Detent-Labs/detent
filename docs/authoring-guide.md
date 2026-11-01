@@ -1225,8 +1225,8 @@ never arrives waits forever.
 
 ### 7. Set assignment
 
-For every step a person must act on, open its **Assignment** section and pick
-who acts. A step nobody acts on needs no assignment, and the section says so.
+For every step a person must act on, open its **Who acts** section and pick
+a strategy. A step nobody acts on needs no assignment, and the section says so.
 
 The strategy is a plugin, like an action or a data source. It carries a `type`
 and a `config`. The picker lists the strategies your deployment registers,

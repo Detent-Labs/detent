@@ -5896,7 +5896,7 @@ below 40rem. Three boxes,
 `ChecksRail`, `FormsTab` and `FormEditorScreen`, already pad past the
 ring's reach on their own. The step page's own `page` box sets no block
 padding. Its first and last controls still clear the ring, through the
-masthead's own padding and the developer section's own padding.
+masthead's own padding and the walk's own padding.
 
 Scroll the Checks tab's rail or the Forms tab's grid partway. Stop so
 one control sits half hidden at the scroll box's near edge. Tab onto
@@ -6321,7 +6321,8 @@ Pass: the rail row of the next data source holds the focus. The Checks tab
 reports no unresolved `dataSource`. On the JSON surface none of the three
 fields holds `dataSource` and the one `columnMapping` is gone.
 
-On the Steps tab, press "Remove this step" on step 2.
+On the Steps tab, press "Remove this step" on step 2. In the dialog, press
+"Remove the step".
 
 Pass: the focus lands on the current row of the steps rail.
 
@@ -6460,14 +6461,14 @@ automatic way out and a form.
 
 **1. The captions are words.** On the Steps tab, open the task step. Pass:
 every caption on the step page is a word or a sentence. No `<code>` element
-stands beside a caption. The sections read Ways out, Who acts, When entered,
-When left and Form.
+stands beside a caption. The section headers read Who acts, Form, Ways out,
+Time limit, When entered or left and More, in that order.
 
 **2. The masthead has no key.** Read the masthead. Pass: it shows Name and
 Description and no key input.
 
-**3. The step's Developer view holds the key.** Open the Developer view at the
-foot of the page. Pass: it shows Key, then the id, then the JSON. Type a new
+**3. The step's Developer view holds the key.** Open More, then the Developer
+view at its foot. Pass: it shows Key, then the id, then the JSON. Type a new
 key. Pass: the JSON shows the new key at once.
 
 <!-- antislop: allow passive-voice -->
@@ -6821,6 +6822,92 @@ The slate chevron sits at the select's own trailing edge, inside its border.
 **10. A default way-out label names its target once.** Draw a way out on the
 canvas from "Antrag" to "Abschluss". Open "Antrag" on the Steps tab. Pass: the
 row heading reads "Antrag → Abschluss", with no second "→ Abschluss".
+
+Discard the draft from the process list and accept the browser's confirm.
+Under `playwright-cli`, `dialog-accept` answers it.
+
+### The step page's accordion (`studio-step-accordion`)
+
+Source: `studio-step-accordion` tasks 4.7 to 4.10. The bun tests pin the
+section order, the summaries, the opening section and the dialog's facts. A
+tab order, a focus move, a computed style and a wrapped row need a real
+browser.
+
+<!-- antislop: allow long-words -->
+<!-- Why: "Purchase Requisition" is the seeded process's name, quoted as the list prints it. -->
+See this file's "Before you start" section for the build and the address.
+Seed the database and sign in as `demo-superuser@example.test`, password
+`seed-demo-password`. In the Processes list, find the row "Purchase
+Requisition" and choose "Create draft". Under `playwright-cli`, pass
+`-s=studio-step-accordion` on every call. Every step below runs at 1440x900
+unless it names another width.
+
+**1. Six headers on a task step.** Open the Steps tab and choose "Manager
+Approval". Pass: one column of section headers stands under the masthead. They
+read Who acts, Form, Ways out, Time limit, When entered or left and More, in
+that order.
+
+Pass: each header is a button with `aria-expanded`, and exactly one stands
+open. Pass: each header carries a one-line summary beside its name.
+
+**2. One section open at a time.** Press a closed header. Pass: it opens, and
+the section open before it closes. Press the same header again. Pass: no
+section stands open.
+
+Open Form again. Focus the name input in the masthead and press Tab until the
+walk takes the focus. Pass: the focus runs through the masthead, then the
+headers in order. The open section's controls follow its own header. The walk's
+Previous and Next controls come last.
+
+**3. More, on each kind.** Open More on "Manager Approval". Pass: it holds the
+cancelling control, then Comment and Attachments, then the Developer view last.
+Pass: the Developer view stands closed, and no key prints until you open it.
+
+Choose "Closed", an end step. Pass: its headers read Who acts, Form, How the
+case ends, When entered and More. Pass: its More holds Comment and
+Attachments, then the Developer view, and no cancelling control.
+
+Press "Add a call to another process" at the foot of the steps rail. Pass: the
+new step's headers read Which process it calls, Ways out, Time limit, When
+entered or left and More. Pass: its More holds the cancelling control and the
+Developer view, and no Comment or Attachments control.
+
+**4. A fresh task step.** Press "Add a step" at the foot of the steps rail.
+Pass: Who acts stands open. Its summary reads "Nobody in particular" in slate,
+and its header shows no Done mark. Pass: the Ways out header reads "No way out
+yet", with a check badge reading 1.
+
+Pick a strategy under Who acts. Pass: the header shows the Done mark, a check
+icon named "Done". Pass: the summary reads the strategy's name in ink.
+
+**5. The removal dialog.** Choose "Finance Review", a step two ways out lead
+to. Press "Remove this step". Pass: the control draws outlined in the accent. A
+dialog opens with the heading "Remove “Finance Review”?".
+
+Pass: its facts name the step and read 2 under "Ways out leading here". They
+also count the fields on its form. Pass: the note "The studio has no undo."
+stands under the facts. Pass: "Cancel" holds the focus, and the confirm control
+draws outlined in the accent.
+
+Press Escape. Pass: the dialog closes, the draft keeps the step, and "Remove
+this step" holds the focus. Press it again.
+
+Press "Remove the step". Pass: the steps rail no longer lists "Finance
+Review". Pass: the focus lands on the current row of the steps rail.
+
+**6. The page at 420px.** Resize the window to 420x900. Pass: the steps rail
+stands above the step page, no taller than 20rem. Pass: the page has no scroll
+box of its own. Read `getComputedStyle` on the step page's own box. Pass: it
+reads `overflow-y: visible`.
+
+Scroll the tab body. Pass: the page moves with it, so the steps rail and the
+tab body are the two scroll boxes. Under `playwright-cli`, read the style with
+`run-code` and `page.evaluate`, since a worktree refuses `eval`.
+
+**7. The condition row at 1024px.** Resize the window to 1024x800. Choose
+"Route by Amount" and open Ways out. Read the condition of "Needs finance
+approval". Pass: the condition builder's row wraps inside the page column.
+Pass: no control clips, and none runs under the steps rail.
 
 Discard the draft from the process list and accept the browser's confirm.
 Under `playwright-cli`, `dialog-accept` answers it.

@@ -90,8 +90,9 @@ Every other term below belongs to one tab.
 | grip | the steps rail's own drag control, trailing each row | `panels/StepsRail.tsx` (`GripVertical`) |
 | step page | the Steps tab's wide right column, open on the one selected step | `panels/StepPage.tsx` |
 | masthead | the step page's top zone. It holds the step number, the kind phrase, the name, the description, and the issues no section claims | `panels/StepPage.tsx` |
-| section | one subject group on the step page, standing open in one of two columns | `panels/sectionsFor.ts` |
-| Developer view | a disclosure over raw JSON, CEL or machine values. The step page's holds the step's key and JSON, and each way-out row's holds that way out's key. The change-list row, each process list row, the form editor and a condition or rule input hold one. A field's own editor keeps its key there, under "What this field asks". The Settings tab's Process view holds one, with the key and the process id. Every Developer view stands closed on open, bar a condition input's, which opens by itself over unparseable source. | `panels/StepPage.tsx`, `panels/PathsPanel.tsx`, `panels/ChangeList.tsx`, `panels/ProcessSettingsPanel.tsx`, `screens/ProcessesScreen.tsx`, `panels/FieldCatalogPanel.tsx`, `screens/FormEditorScreen.tsx`, `panels/shared/ConditionInput.tsx`, `panels/shared/RuleInput.tsx` |
+| section | one subject group on the step page, one of six, open one at a time | `panels/sectionsFor.ts` |
+| section header | the button that opens and closes one section. It carries the section's name, a one-line summary and a mark | `panels/StepPage.tsx` |
+| Developer view | a disclosure over raw JSON, CEL or machine values. The step page's, in More, holds the step's key and JSON, and each way-out row's holds that way out's key. The change-list row, each process list row, the form editor and a condition or rule input hold one. A field's own editor keeps its key there, under "What this field asks". The Settings tab's Process view holds one, with the key and the process id. Every Developer view stands closed on open, bar a condition input's, which opens by itself over unparseable source. | `panels/StepPage.tsx`, `panels/PathsPanel.tsx`, `panels/ChangeList.tsx`, `panels/ProcessSettingsPanel.tsx`, `screens/ProcessesScreen.tsx`, `panels/FieldCatalogPanel.tsx`, `screens/FormEditorScreen.tsx`, `panels/shared/ConditionInput.tsx`, `panels/shared/RuleInput.tsx` |
 | sentence | the line that reads a condition in words. It stands under a condition input's rows and under a Read by row's place | `panels/shared/ConditionInput.tsx`, `panels/shared/conditionLogic.ts::readerSentence` |
 | Read by zone | the field editor's effect-half zone under "Used in". It lists each expression that reads the field, by place and sentence | `panels/FieldCatalogPanel.tsx`, rows from `panels/readByRows.ts` |
 | rewrite line | the line under a field's label that says how many conditions a key change updated | `panels/FieldCatalogPanel.tsx` |
@@ -157,8 +158,8 @@ same `view.tabs`, and it takes the same name. A code identifier stays out of
 scope for this glossary's rules. In `packages/form-ui/src/FieldForm.tsx:399`,
 `styles.tabRow` names a compiled style, code the rule above never reaches.
 
-The step page has no tab row of its own. Its two columns of open sections
-take the place of one.
+The step page has no tab row of its own. Its accordion of sections takes the
+place of one.
 
 **inert** carries two readings here, both HTML terms used for their literal
 meaning rather than a rotated synonym for either. The field matrix stamps a step
