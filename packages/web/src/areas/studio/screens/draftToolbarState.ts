@@ -95,8 +95,8 @@ export function publishAvailability(
  *
  * The prediction can be wrong: another environment can promote a version
  * between the load and the publish. That is why the dialog labels the row
- * "Next version" rather than "Version", and why the header's published stamp
- * stays the report of the number the engine actually assigned.
+ * "Next version" rather than "Version", and why the header bar's state stays
+ * the report of the number the engine actually assigned.
  */
 export function nextVersionLabel(baseVersion: number | null | undefined): string {
   return `v${typeof baseVersion === "number" ? baseVersion + 1 : 1}`;

@@ -884,11 +884,8 @@ export const en = {
   "assignment.none": "Nobody in particular",
 
   "headerBar.unnamedProcess": "(untitled process)",
-  "headerBar.revision": "rev.",
   "headerBar.unsaved": "Unsaved changes",
   "headerBar.saved": "Saved",
-  "headerBar.lastSaved": "Last saved",
-  "headerBar.published": "Published",
   "headerBar.findingPrefix": "Stale reference in",
   "headerBar.findingCarriedBy": "carried by",
   "headerBar.findingLiveElsewhere": "live instance(s) elsewhere",

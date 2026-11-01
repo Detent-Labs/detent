@@ -1053,8 +1053,8 @@ interface Props {
  * and a strip editing the selected field's name and overrides.
  *
  * No Save. Every change writes straight into the in-browser draft through
- * `mutate()`. The header bar's Save, Discard and Publish stay the only
- * controls that persist.
+ * `mutate()`. The header bar's Save and Publish and its menu's Discard draft
+ * stay the only controls that persist.
  */
 export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpenStep }: Props) {
   const { draft, mutate, contentLocale } = useDraft();

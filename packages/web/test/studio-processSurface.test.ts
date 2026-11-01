@@ -79,11 +79,10 @@ describe("what the surface no longer carries", () => {
     expect(code).not.toContain('role="tablist"');
   });
 
-  it("keeps the header bar menu to the Views group, clear of Save, Discard draft and Publish", () => {
+  it("gives the header bar menu the Views and Draft groups, with Discard draft and no Save or Publish", () => {
     const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
-    // The three stand in the header row itself now, ahead of the menu
-    // trigger — scope the "clear of" assertion to the menu's own slice, or a
-    // whole-file search would find them there and fail.
+    // Save and Publish stand in the header row itself, so the "clear of"
+    // assertion reads the menu's own slice. A whole-file search would find them.
     // The slice ends where the confirmation dialogs begin, not at </header>:
     // PublishConfirmDialog's own `busy={actions.saving || actions.publishing}`
     // prop sits between the menu and </header>, and "actions.publishing"
@@ -95,18 +94,85 @@ describe("what the surface no longer carries", () => {
     expect(menuAt).toBeGreaterThan(-1);
     expect(dialogsAt).toBeGreaterThan(-1);
     expect(menu).not.toContain("actions.save");
-    expect(menu).not.toContain("actions.discard");
     expect(menu).not.toContain("actions.publish");
-    // The menu keeps one group, Views. The process settings and the admin
-    // groups link stand on the Settings tab.
+    expect(menu).toContain("runMenuAction(actions.discard)");
+    expect(menu).toContain("btn btn-secondary btn-destructive");
+    // The process settings and the admin groups link stand on the Settings tab.
     expect(menu).toContain("headerBar.menuGroupViews");
-    expect(menu).not.toContain("headerBar.menuGroupDraft");
+    expect(menu).toContain("headerBar.menuGroupDraft");
+    expect(menu).toContain("headerBar.versions");
     expect(menu).not.toContain("AddLocaleControl");
     expect(menu).not.toContain("headerBar.manageGroups");
-    // They render somewhere in the file — the header row's own top-level code.
+    // They render in the header row's own top-level code.
     expect(code).toContain("actions.save");
-    expect(code).toContain("actions.discard");
     expect(code).toContain("actions.publish");
+  });
+
+  it("stands the open menu above the field matrix's sticky headers", () => {
+    const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
+    const panel = code.slice(code.indexOf("headerBarMenuPanel: {"), code.indexOf("headerBarMenuGroup: {"));
+
+    expect(panel).toContain("zIndex: 4");
+  });
+
+  it("returns the discard dialog's focus to the menu trigger", () => {
+    const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
+    const dialog = code.slice(code.indexOf("<DiscardConfirmDialog"));
+
+    expect(dialog).toContain("triggerRef={triggerRef}");
+  });
+
+  it("moves the focus to the state line only when a pressed Save vanished from the focus", () => {
+    const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
+
+    expect(code).toContain("savePressedRef.current = true");
+    expect(code).toContain("if (actions.saving) return;");
+    expect(code).toContain("if (!isDirty && document.activeElement === document.body) stateLineRef.current?.focus();");
+  });
+
+  it("sizes the process name to its text, up to the cap", () => {
+    const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
+    const input = code.slice(code.indexOf("headerBarNameInput: {"), code.indexOf("warning: {"));
+
+    expect(input).toContain('fieldSizing: "content"');
+    expect(input).toContain('maxWidth: "min(40ch, 100%)"');
+  });
+});
+
+describe("the process surface's frame around the header bar", () => {
+  it("keeps no screen nav above the bar", () => {
+    const code = stripComments(read(SURFACE));
+
+    expect(code).not.toContain("<nav");
+    expect(code).not.toContain("studioHeaderNav");
+    expect(code).not.toContain("studioBackInNav");
+    expect(code).toContain('onBack={() => navigate({ name: "processes" })}');
+  });
+
+  it("renders the structural banner after the bar", () => {
+    const code = stripComments(read(SURFACE));
+    const barAt = code.indexOf("<ProcessHeaderBar");
+    const bannerAt = code.indexOf("showsStructuralBanner(validation) &&");
+
+    expect(barAt).toBeGreaterThan(-1);
+    expect(bannerAt).toBeGreaterThan(code.indexOf("/>", barAt));
+  });
+
+  it("raises the just-published flag from a publish and clears it during render on a dirty draft", () => {
+    const code = stripComments(read(SURFACE));
+
+    expect(code).toContain("setJustPublished(result !== null)");
+    expect(code).toContain("if (justPublished && dirtyNow) setJustPublished(false);");
+  });
+
+  it("opens Settings on its Process view, leaving the form editor where one stands", () => {
+    const code = stripComments(read(SURFACE));
+    const opener = code.slice(code.indexOf("const openSettings = "), code.indexOf("const leaveFormEditor = "));
+
+    expect(opener).toContain('leaveFormEditorFor("settings")');
+    expect(opener).toContain('goToTab("settings", "process")');
+    expect(opener).toContain('focusTabButton("settings")');
+    expect(opener).toContain('setPendingTabFocus("settings")');
   });
 });
 

@@ -136,22 +136,10 @@ const styles = stylex.create({
     minHeight: 0,
     flexDirection: "column",
   },
-  studioHeaderNav: {
-    display: "flex",
-    gap: space.s3,
-    marginBottom: space.s2,
-    marginTop: 0,
-  },
   studioBack: {
     display: "block",
     paddingLeft: 0,
     marginBottom: space.s3,
-  },
-  // `.studio-header-nav .studio-back`.
-  studioBackInNav: {
-    display: "block",
-    paddingLeft: 0,
-    marginBottom: 0,
   },
   // `.draft-incomplete` already zeroes its own top margin, so it needs no
   // extra help from `.studio-edit-screen > *` (below).
@@ -448,6 +436,9 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // `applySaveResult`'s identity check both rely on.
   const [savedLayout, setSavedLayout] = useState(initialLayout);
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
+  // Whether the draft still stands as the last publish left it. The header bar
+  // holds the Versions offer and the ink version line on it (`studio-publish`).
+  const [justPublished, setJustPublished] = useState(false);
   // `loadedBaseVersion` cannot move: `EditScreen.load` depends on
   // processId/token/onUnauthorized alone, and neither the publish path nor
   // the conflict reload re-runs it. A publish DOES move the stored base
@@ -469,6 +460,9 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // cleanup fires on unmount AND on every dependency change, so a route
   // change away from `edit` can never leave a stale `true` behind.
   const dirtyNow = isDraftDirty(draft, savedBody, saveState.layout, savedLayout);
+  // The first dirty render retires the offer, during render, the way React
+  // adjusts state from state. A later save leaves it retired.
+  if (justPublished && dirtyNow) setJustPublished(false);
   useEffect(() => {
     onDirtyChange?.(dirtyNow);
     return () => onDirtyChange?.(false);
@@ -903,7 +897,10 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
       dropStash();
     },
     publishResult,
-    onPublishResult: setPublishResult,
+    onPublishResult: (result: PublishResult | null) => {
+      setPublishResult(result);
+      setJustPublished(result !== null);
+    },
     onDiscarded: () => {
       dropStash();
       onDirtyChange?.(false);
@@ -992,6 +989,18 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     if (target === openTab) focusTabButton(target);
     else setPendingTabFocus(target);
   };
+  /** The header bar's "Editing" note: the Settings tab's Process view, with the
+   * focus on the Settings tab. `openTabFromRow` keeps the open view, and an
+   * author on the Access view has to land on Process. */
+  const openSettings = () => {
+    if (formStepId !== undefined) {
+      leaveFormEditorFor("settings");
+      return;
+    }
+    goToTab("settings", "process");
+    if (openTab === "settings") focusTabButton("settings");
+    else setPendingTabFocus("settings");
+  };
   /** Leaves the form editor for the tab it stands in. */
   const leaveFormEditor = () => leaveFormEditorFor(formEditorReturnTab(formOrigin));
   /** The breadcrumb's step crumb: the step's own page on the Steps tab. */
@@ -1070,20 +1079,9 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   return (
     <PublishedFieldIdsProvider processId={processId} token={token} baseVersion={changesBaseVersion}>
       <main {...stylex.props(styles.studioScreen, styles.studioEditScreen)}>
-        <nav {...stylex.props(styles.studioHeaderNav)}>
-          <button type="button" {...ghostBack(styles.studioBackInNav)} onClick={() => navigate({ name: "processes" })}>
-            &larr; Back to processes
-          </button>
-        </nav>
-        {showsStructuralBanner(validation) && <p {...stylex.props(styles.draftIncomplete)}>{t("app.draftIncomplete")}</p>}
-        {/* Renders on both surfaces (studio-json-view: the content-locale
-            switcher "SHALL remain visible and usable regardless of which
-            surface is active") — only its process label input is
-            surface-gated, via `structureActive`, since it mutates the draft
-            body. Save, Discard draft and Publish
-            render here too now (`studio-process-tabs`) and share that same
-            unconditional visibility — nothing about their presence depends on
-            `structureActive`. */}
+        {/* Renders on both surfaces. Only its process label input and its
+            "Editing" note read `structureActive`. Test, Publish, Save and the
+            menu stand whichever surface is open (`studio-process-tabs`). */}
         <ProcessHeaderBar
           revision={saveState.revision}
           isDirty={dirtyNow}
@@ -1098,10 +1096,14 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
           structureActive={!jsonOpen}
           processId={processId}
           token={token}
+          justPublished={justPublished}
+          onBack={() => navigate({ name: "processes" })}
+          onOpenSettings={openSettings}
           onToggleJson={() => setJsonOpen((open) => !open)}
           onVersions={() => navigate({ name: "versions", processId })}
           onPlayer={() => navigate({ name: "play", processId })}
         />
+        {showsStructuralBanner(validation) && <p {...stylex.props(styles.draftIncomplete)}>{t("app.draftIncomplete")}</p>}
         {/* Either button moves focus to the open tab, which the tab row holds
             over the form editor too. */}
         {stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} disabled={requestRunning} />}

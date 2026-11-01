@@ -83,7 +83,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
   // read only inside event handlers.
   const dirtyRef = useRef(false);
   // The studio's area nav reserves no element for a draft control any more.
-  // Save, Discard draft and Publish render directly in the header bar, inside
+  // Save, Test and Publish render directly in the header bar, inside
   // `EditScreen`'s own tree, and the Checks tab's own count reports the state
   // the old area-nav Checks control used to carry (`studio-process-tabs`).
   useEffect(() => {
