@@ -7,7 +7,7 @@ import type { DraftField } from "../draft/fields";
 import { newPath, pathWithTrigger, triggerForNewPath } from "../draft/createPath";
 import { removeAt, replaceAt, updateAt } from "../draft/list-ops";
 import { t } from "../catalog.js";
-import { stepTextMap, wayOutHeading } from "./shared/optionText";
+import { plainStepTextMap, stepTextMap, wayOutHeading } from "./shared/optionText";
 import { StudioSelect } from "./shared/StudioSelect";
 import { ConditionInput } from "./shared/ConditionInput";
 import { IssueList } from "./shared/IssueList";
@@ -231,6 +231,7 @@ export function PathsPanel({
   // One text per step: the step selects and every row heading read the same
   // map, so "Review (step 6)" names one step everywhere.
   const stepTexts = stepTextMap(steps, contentLocale, baseLocale);
+  const plainTexts = plainStepTextMap(steps, contentLocale, baseLocale);
   const stepOptions = steps.map((s) => (
     <option key={s.id} value={s.id}>
       {s.id !== undefined ? stepTexts.get(s.id) : undefined}
@@ -259,7 +260,7 @@ export function PathsPanel({
           key={path.id ?? index}
         >
           {/* An h4: the step page's section heading above is an h3. */}
-          <h4 {...stylex.props(styles.rowHeading)}>{wayOutHeading(path, stepTexts)}</h4>
+          <h4 {...stylex.props(styles.rowHeading)}>{wayOutHeading(path, stepTexts, plainTexts)}</h4>
           <label {...stylex.props(styles.fieldLabel, styles.nameLabel)}>
             <span {...stylex.props(styles.fieldLabelText)}>
               {t("paths.labelCaption")}

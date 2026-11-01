@@ -198,8 +198,9 @@ them.
 A path the canvas creates carries the default label "Source → Target". The
 heading template "{path} → {step}" then repeats the target. The result
 reads "Prüfung → Capture → Capture".
-`wayOutHeading` prints the label alone when it already ends with " → "
-plus the target's text. The default label stays as `studio-canvas` states
+The function `wayOutHeading` prints the label alone when it ends with an
+arrow and the target's text, plain or numbered. The plain text is what `createPath.ts` puts
+in the default label. The default label stays as `studio-canvas` states
 it, since a participant's button reads it.
 
 ### D9. The time-limit select takes the studio select

@@ -37,6 +37,18 @@ export function numberRepeats<T>(items: readonly T[], textOf: (item: T) => strin
   });
 }
 
+/** Step id to the step's plain text (`stepText`), the text a default
+ * "Source → Target" way-out label carries. A step with no id takes no entry. */
+export function plainStepTextMap(
+  steps: readonly DraftStep[],
+  contentLocale: string,
+  baseLocale: string,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const s of steps) if (s.id !== undefined) map.set(s.id, stepText(s, contentLocale, baseLocale));
+  return map;
+}
+
 /**
  * Step id to text, the one map every step select and way-out heading reads.
  * A label one step alone carries reads plain. Steps sharing a label each add
@@ -73,12 +85,21 @@ function heading(pathLabel: string, stepLabel: string): string {
 
 /**
  * A way out's heading: its label, then the target's text from `stepTexts`
- * (step id to text). A label that already ends with the arrow and that text,
- * as a default "Source → Target" label does, prints alone.
+ * (step id to text). A label that already ends with the arrow and the
+ * target's text, numbered from `stepTexts` or plain from `plainTexts` (as a
+ * default "Source → Target" label carries it), prints alone.
  */
-export function wayOutHeading(path: DraftPath, stepTexts: ReadonlyMap<string, string>): string {
+export function wayOutHeading(
+  path: DraftPath,
+  stepTexts: ReadonlyMap<string, string>,
+  plainTexts: ReadonlyMap<string, string> = stepTexts,
+): string {
   const target = path.to ? stepTexts.get(path.to) : undefined;
+  const plain = path.to ? plainTexts.get(path.to) : undefined;
   const named = path.label?.trim() ? path.label : undefined;
-  if (named !== undefined && target !== undefined && named.trim().endsWith(heading("", target))) return named;
+  if (named !== undefined && target !== undefined) {
+    const label = named.trim();
+    if (label.endsWith(heading("", target)) || (plain !== undefined && label.endsWith(heading("", plain)))) return named;
+  }
   return heading(named ?? t("paths.unnamedPath"), target ?? t("paths.noTargetYet"));
 }

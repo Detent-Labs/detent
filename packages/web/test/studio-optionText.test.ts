@@ -141,10 +141,17 @@ describe("wayOutHeading", () => {
     expect(wayOutHeading(way("Prüfung → Done ", "step_b"), texts)).toBe("Prüfung → Done ");
   });
 
-  it("compares against the target's text from the map", () => {
+  it("prints a label ending with the target's numbered text alone", () => {
     const numbered = new Map([["step_6", "Review (step 6)"]]);
-    expect(wayOutHeading(way("A → Review (step 6)", "step_6"), numbered)).toBe("A → Review (step 6)");
-    expect(wayOutHeading(way("A → Review", "step_6"), numbered)).toBe("A → Review → Review (step 6)");
+    const plain = new Map([["step_6", "Review"]]);
+    expect(wayOutHeading(way("A → Review (step 6)", "step_6"), numbered, plain)).toBe("A → Review (step 6)");
+  });
+
+  it("prints a label ending with the target's plain text alone", () => {
+    const numbered = new Map([["step_6", "Review (step 6)"]]);
+    const plain = new Map([["step_6", "Review"]]);
+    expect(wayOutHeading(way("A → Review", "step_6"), numbered, plain)).toBe("A → Review");
+    expect(wayOutHeading(way("A → Check", "step_6"), numbered, plain)).toBe("A → Check → Review (step 6)");
   });
 
   it("still names the target when the label ends with another step or no arrow", () => {

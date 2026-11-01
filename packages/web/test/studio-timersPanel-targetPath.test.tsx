@@ -125,6 +125,23 @@ describe("the time limit's way-out select", () => {
     expect(wayOutOptions(html)[1]).toEqual(["path_1", "Weiter → Prüfung (step 2)"]);
   });
 
+  it("offers a default label naming a repeated target plainly as written", () => {
+    const html = renderToStaticMarkup(
+      <DraftContext.Provider value={context}>
+        <TimersPanel
+          timers={[TIMER]}
+          paths={[{ id: "path_1", key: "a", label: "Start → Prüfung", to: "step_2" }] as unknown as DraftPath[]}
+          steps={[STEPS[0]!, { ...STEPS[0]!, id: "step_2" } as DraftStep]}
+          fields={[]}
+          onChange={() => {}}
+          contentLocale="en"
+          baseLocale="en"
+        />
+      </DraftContext.Provider>,
+    );
+    expect(wayOutOptions(html)[1]).toEqual(["path_1", "Start → Prüfung"]);
+  });
+
   it("takes the studio select, its chevron trailing the select", () => {
     const html = render([{ id: "path_1", key: "a", label: "Freigeben", to: "step_2" }]);
     const at = html.indexOf(studioCatalog.en["timers.targetPathCaption"].replace(/'/g, "&#x27;"));

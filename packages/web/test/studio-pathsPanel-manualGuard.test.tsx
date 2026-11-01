@@ -297,6 +297,13 @@ describe("two steps sharing a label", () => {
   it("name the second by its rail number in a way out's heading", () => {
     expect(rowHeading(html)).toBe("Again → Review (step 6)");
   });
+
+  it("let a default label that names the target plainly head its row alone", () => {
+    const plain = renderSteps(steps, [{ id: "path_1", key: "p", label: "Antrag → Review", to: "step_6" }]);
+    expect(rowHeading(plain)).toBe("Antrag → Review");
+    const numbered = renderSteps(steps, [{ id: "path_1", key: "p", label: "Antrag → Review (step 6)", to: "step_6" }]);
+    expect(rowHeading(numbered)).toBe("Antrag → Review (step 6)");
+  });
 });
 
 describe("two unnamed steps", () => {

@@ -10,7 +10,7 @@ import { deadlinePatch } from "../draft/timer-deadline.js";
 import { maxTimeLimitCount, timeLimitDuration, timeLimitInRange, timeLimitParts, type TimeLimitUnit } from "../draft/time-limit.js";
 import { t, type CatalogKey } from "../catalog.js";
 import { ExpressionInput } from "./shared/ExpressionInput";
-import { numberRepeats, stepTextMap, wayOutHeading } from "./shared/optionText";
+import { numberRepeats, plainStepTextMap, stepTextMap, wayOutHeading } from "./shared/optionText";
 import { StudioSelect } from "./shared/StudioSelect";
 import { IssueList } from "./shared/IssueList";
 import { ActionListEditor } from "./ActionListEditor";
@@ -176,7 +176,8 @@ export function TimersPanel({
   // two headings match. The heading reads the step texts the Ways out section
   // reads, so it names its target exactly as "Leads to" does.
   const stepTexts = stepTextMap(steps, contentLocale, baseLocale);
-  const pathTexts = numberRepeats(paths, (p) => wayOutHeading(p, stepTexts));
+  const plainTexts = plainStepTextMap(steps, contentLocale, baseLocale);
+  const pathTexts = numberRepeats(paths, (p) => wayOutHeading(p, stepTexts, plainTexts));
 
   const addTimer = () => {
     const next: DraftTimer = { id: mintId("timer"), duration: "PT1H", onFire: {} };
