@@ -550,7 +550,6 @@ export const en = {
   "subprocess.childInputsNone": "The called process declares no input fields.",
   "subprocess.noteAllMapped": "Every input field of the called process is mapped.",
 
-  "contentLocale.legend": "Content locale",
   // A locale option that has gaps. `{locale}` is the code, `{count}` the number of missing entries.
   "contentLocale.optionGap": "{locale} — {count} missing",
   "contentLocale.invalid": "invalid locale code",

@@ -3,7 +3,7 @@ import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import { resolveBaseLocaleChange } from "../screens/processHeaderLogic.js";
-import { AddLocaleControl } from "./shared/ContentLocaleSwitcher.js";
+import { AddLocaleControl, ContentLocaleSelect } from "./shared/ContentLocaleSwitcher.js";
 
 const styles = stylex.create({
   // One column of labelled controls, capped at a reading width.
@@ -85,6 +85,10 @@ const styles = stylex.create({
     fontFamily: fonts.mono,
     fontSize: "0.8rem",
   },
+  // A hash is long and has no break point, so it wraps anywhere.
+  hash: {
+    overflowWrap: "anywhere",
+  },
 });
 
 /**
@@ -94,10 +98,23 @@ const styles = stylex.create({
  * `disabled`: the Settings tab body hides while the JSON surface is open, so
  * none is reachable then.
  *
- * The key and the process id stand in a closed Developer view, so the view
- * prints no machine value until an author opens it.
+ * The content-locale select stands between the base language and the
+ * add-a-language control. The key, the process id, the draft's revision and,
+ * after a publish in this session, the published version and its definition
+ * hash stand in a closed Developer view, so the view prints no machine value
+ * until an author opens it.
  */
-export function ProcessSettingsPanel({ processId }: { processId: string }) {
+export function ProcessSettingsPanel({
+  processId,
+  revision,
+  lastPublish,
+}: {
+  processId: string;
+  /** The draft's current revision. */
+  revision: number;
+  /** The last publish of this session, or absent before one. */
+  lastPublish?: { version: number; definitionHash: string };
+}) {
   const { draft, mutate, contentLocale, setContentLocale } = useDraft();
 
   /** The typed value writes through unvalidated, and a well-formed one also
@@ -116,6 +133,7 @@ export function ProcessSettingsPanel({ processId }: { processId: string }) {
         <span {...stylex.props(styles.fieldLabelText)}>{t("settings.baseLocale")}</span>
         <input type="text" value={draft.baseLocale ?? ""} onChange={(e) => changeBaseLocale(e.target.value)} />
       </label>
+      <ContentLocaleSelect />
       <AddLocaleControl />
       {/* Checked when the draft carries no key: the engine reads an absent
           `cancellable` as true. */}
@@ -181,6 +199,19 @@ export function ProcessSettingsPanel({ processId }: { processId: string }) {
         <p {...stylex.props(styles.developerId)}>
           {t("settings.processId")} <code {...stylex.props(styles.mono)}>{processId}</code>
         </p>
+        <p {...stylex.props(styles.developerId)}>
+          {t("settings.revision")} <code {...stylex.props(styles.mono)}>{revision}</code>
+        </p>
+        {lastPublish && (
+          <>
+            <p {...stylex.props(styles.developerId)}>
+              {t("settings.publishedVersion")} <code {...stylex.props(styles.mono)}>{`v${lastPublish.version}`}</code>
+            </p>
+            <p {...stylex.props(styles.developerId)}>
+              {t("settings.definitionHash")} <code {...stylex.props(styles.mono, styles.hash)}>{lastPublish.definitionHash}</code>
+            </p>
+          </>
+        )}
       </details>
     </div>
   );

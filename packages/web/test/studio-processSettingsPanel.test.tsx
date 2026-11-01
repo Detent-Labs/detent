@@ -14,10 +14,12 @@ import { t } from "../src/areas/studio/catalog.js";
 const KEY = "settings_fixture_key";
 const PROCESS_ID = "proc_settings_fixture";
 
-function render(draft: Draft): string {
+const HASH = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+function render(draft: Draft, lastPublish?: { version: number; definitionHash: string }): string {
   return renderToStaticMarkup(
     <DraftProvider initial={draft} token="t">
-      <ProcessSettingsPanel processId={PROCESS_ID} />
+      <ProcessSettingsPanel processId={PROCESS_ID} revision={7} lastPublish={lastPublish} />
     </DraftProvider>,
   );
 }
@@ -94,5 +96,48 @@ describe("ProcessSettingsPanel", () => {
 
     expect(outside).not.toContain(KEY);
     expect(outside).not.toContain(PROCESS_ID);
+  });
+
+  it("stands the content-locale select between the base language and the add control", () => {
+    const html = render({ key: KEY, baseLocale: "en", label: { en: "Expense", de: "Spesen" }, description: { en: "Claims" } });
+    const label = html.indexOf(`>${t("settings.contentLocale")}</span>`);
+
+    expect(label).toBeGreaterThan(html.indexOf(`>${t("settings.baseLocale")}</span>`));
+    expect(label).toBeLessThan(html.indexOf(t("contentLocale.addPlaceholder")));
+    expect(html).toContain("Language you are editing");
+    expect(html).not.toContain("Content locale");
+  });
+
+  it("lists each used language as an option, with the gap count of a part-translated one", () => {
+    const html = render({ key: KEY, baseLocale: "en", label: { en: "Expense", de: "Spesen" }, description: { en: "Claims" } });
+    const select = html.slice(html.indexOf("<select"), html.indexOf("</select>"));
+
+    expect(select).toContain('<option value="en" selected="">en</option>');
+    expect(select).toContain('<option value="de">de \u2014 1 missing</option>');
+  });
+
+  it("prints the revision inside the Developer view only", () => {
+    const { inside, outside } = splitDetails(render({ key: KEY }));
+
+    expect(inside).toContain(`${t("settings.revision")} <code`);
+    expect(inside).toContain(">7</code>");
+    expect(outside).not.toContain(t("settings.revision"));
+  });
+
+  it("prints no version and no hash before a publish", () => {
+    const html = render({ key: KEY });
+
+    expect(html).not.toContain(t("settings.publishedVersion"));
+    expect(html).not.toContain(t("settings.definitionHash"));
+  });
+
+  it("prints the published version and the whole hash inside the Developer view after a publish", () => {
+    const { inside, outside } = splitDetails(render({ key: KEY }, { version: 2, definitionHash: HASH }));
+
+    expect(inside).toContain(`${t("settings.publishedVersion")} <code`);
+    expect(inside).toContain(">v2</code>");
+    expect(inside).toContain(`>${HASH}</code>`);
+    expect(outside).not.toContain(HASH);
+    expect(outside).not.toContain(t("settings.publishedVersion"));
   });
 });

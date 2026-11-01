@@ -112,9 +112,10 @@ function renderHeader(over: {
   justPublished?: boolean;
   structureActive?: boolean;
   contentLocale?: string;
+  draft?: DraftContextValue["draft"];
 }): string {
   return renderToStaticMarkup(
-    <DraftContext.Provider value={{ ...contextValue, contentLocale: over.contentLocale ?? "en" }}>
+    <DraftContext.Provider value={{ ...contextValue, draft: over.draft ?? contextValue.draft, contentLocale: over.contentLocale ?? "en" }}>
       <ProcessHeaderBar
         revision={7}
         isDirty={over.isDirty ?? false}
@@ -207,15 +208,63 @@ describe("What the header bar no longer carries", () => {
   });
 });
 
+/** The publish dialog's Developer view `<details>`, and the dialog without it. */
+function splitDialogDeveloperView(html: string): { inside: string; outside: string } {
+  const summary = html.indexOf(">Developer view</summary>");
+  expect(summary).toBeGreaterThan(-1);
+  const start = html.lastIndexOf("<details", summary);
+  const end = html.indexOf("</details>", summary) + "</details>".length;
+  return { inside: html.slice(start, end), outside: html.slice(0, start) + html.slice(end) };
+}
+
 describe("The publish dialog", () => {
-  it("names the process, the revision and the version the publish mints", () => {
+  it("names the process and the version the publish mints", () => {
     const html = renderHeader({ actions: { pendingDialog: "publish" } });
 
     expect(html).toContain("Publish this draft");
     expect(html).toContain("Expense approval");
-    expect(html).toContain(">7<");
     expect(html).toContain(">v4<");
     expect(html).toContain("A published version can never change");
+  });
+
+  it("holds the key, the process id and the revision in a closed Developer view", () => {
+    const { inside, outside } = splitDialogDeveloperView(renderHeader({ actions: { pendingDialog: "publish" } }));
+
+    expect(inside.match(/^<details[^>]*>/)![0]).not.toContain("open");
+    expect(inside).toContain(">Key</dt>");
+    expect(inside).toContain(">expense_approval_key</dd>");
+    expect(inside).toContain(">Process id</dt>");
+    expect(inside).toContain(">proc_a</dd>");
+    expect(inside).toContain(">Revision</dt>");
+    expect(inside).toContain(">7</dd>");
+    for (const value of ["expense_approval_key", "proc_a", ">Revision<", ">Process id<", ">Key<"]) {
+      expect(outside).not.toContain(value);
+    }
+  });
+
+  it("omits the key row when the draft has no key", () => {
+    const html = renderHeader({ actions: { pendingDialog: "publish" }, draft: { label: { en: "Expense approval" }, baseLocale: "en" } });
+    const { inside } = splitDialogDeveloperView(html);
+
+    expect(inside).not.toContain(">Key</dt>");
+    expect(inside).toContain(">Process id</dt>");
+  });
+
+  it("names no language for a draft in one language", () => {
+    const html = renderHeader({ actions: { pendingDialog: "publish" } });
+
+    expect(html).not.toContain(">Languages</dt>");
+  });
+
+  it("names each language with its gap count for a draft in two", () => {
+    const draft = { label: { en: "Expense approval", de: "Spesen" }, description: { en: "a" }, baseLocale: "en", key: "expense_approval_key" };
+    const html = renderHeader({ actions: { pendingDialog: "publish" }, draft });
+    const facts = html.slice(html.indexOf(">Languages</dt>"));
+    const list = facts.slice(0, facts.indexOf("</ul>"));
+
+    expect(html).toContain(">Languages</dt>");
+    expect(list).toContain("<li>de \u2014 1 missing</li>");
+    expect(list).toContain("<li>en</li>");
   });
 
   it("names no open issue and no refusal on a clean draft", () => {
@@ -247,16 +296,16 @@ describe("The publish dialog", () => {
   });
 
   // A static render fires no effect, so the base body's read never starts and
-  // the row stands in its reading state.
+  // the row stands in its reading state. The one `<details>` is the Developer view.
   it("carries the Changes row: reading the base version, or a first version", () => {
     const reading = renderHeader({ actions: { pendingDialog: "publish" } });
     expect(reading).toContain(">Changes<");
     expect(reading).toContain("Reading version 3…");
-    expect(reading).not.toContain("<details");
+    expect(reading.match(/<details/g)).toHaveLength(1);
 
     const first = renderHeader({ baseVersion: null, actions: { pendingDialog: "publish" } });
     expect(first).toContain("This publish mints the first version.");
-    expect(first).not.toContain("<details");
+    expect(first.match(/<details/g)).toHaveLength(1);
   });
 
   it("renders a refusal inside the open dialog, never behind it", () => {

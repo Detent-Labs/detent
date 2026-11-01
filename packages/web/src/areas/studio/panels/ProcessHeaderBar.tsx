@@ -4,11 +4,12 @@ import { FileJson, History, MoreVertical, Play, Trash2 } from "lucide-react";
 import { colors, focus, fonts, space, shadow } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
-import { missingTranslationWarning, resolveDraftLocalizedText } from "../draft/localized-text";
+import { collectUsedLocales, missingTranslationWarning, resolveDraftLocalizedText } from "../draft/localized-text";
 import { deriveKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput.js";
 import { IssueList } from "./shared/IssueList.js";
 import { useConfirmDialog } from "./shared/confirmDialog.js";
+import { localeOptionLabel } from "./shared/ContentLocaleSwitcher.js";
 import { PublishChanges } from "./PublishChanges.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { editingLocaleNote, formatSavedTime, headerStateLine, nextVersionLabel, publishAvailability, saveFocusTarget } from "../screens/draftToolbarState.js";
@@ -187,6 +188,28 @@ const styles = stylex.create({
     margin: 0,
     minWidth: 0,
     overflowWrap: "anywhere",
+  },
+  dialogLanguages: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    fontFamily: fonts.mono,
+  },
+  // The machine values stand in a closed disclosure under the facts, in the
+  // shape the Settings tab's Developer view takes.
+  dialogDeveloper: {
+    marginBlock: space.s3,
+  },
+  dialogDeveloperSummary: {
+    cursor: "pointer",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
+  },
+  dialogMono: {
+    fontFamily: fonts.mono,
+    fontSize: "0.8rem",
   },
   dialogNote: {
     color: colors.textMuted,
@@ -458,6 +481,7 @@ function PublishConfirmDialog({
 }) {
   const { ref, declineRef } = useConfirmDialog(triggerRef);
   const dialogProps = stylex.props(styles.dialog);
+  const languages = collectUsedLocales(draft);
 
   return (
     <dialog
@@ -471,12 +495,6 @@ function PublishConfirmDialog({
       <dl {...stylex.props(styles.dialogFacts)}>
         <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogProcess")}</dt>
         <dd {...stylex.props(styles.dialogFactsDd)}>{processLabel}</dd>
-        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogProcessId")}</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>
-          <code>{processId}</code>
-        </dd>
-        <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogRevision")}</dt>
-        <dd {...stylex.props(styles.dialogFactsDd)}>{revision}</dd>
         {/* "Next version", not "Version": the engine assigns the number, and
             another environment can promote one between this load and this
             publish. The header bar's state reports what the engine actually
@@ -489,8 +507,37 @@ function PublishConfirmDialog({
             so the dialog and the control can never disagree. */}
         <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.publishDialogOpenIssues")}</dt>
         <dd {...stylex.props(styles.dialogFactsDd)}>{openIssues}</dd>
+        {/* A draft in one language has no language to name. Each language
+            reads as the content-locale select's option does. */}
+        {languages.length > 1 && (
+          <>
+            <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogLanguages")}</dt>
+            <dd {...stylex.props(styles.dialogFactsDd)}>
+              <ul {...stylex.props(styles.dialogLanguages)}>
+                {languages.map((code) => (
+                  <li key={code}>{localeOptionLabel(draft, code)}</li>
+                ))}
+              </ul>
+            </dd>
+          </>
+        )}
         <PublishChanges processId={processId} token={token} baseVersion={baseVersion} draft={draft} contentLocale={contentLocale} />
       </dl>
+      <details {...stylex.props(styles.dialogDeveloper)}>
+        <summary {...stylex.props(styles.dialogDeveloperSummary)}>{t("draftToolbar.dialogDeveloperView")}</summary>
+        <dl {...stylex.props(styles.dialogFacts)}>
+          {draft.key && (
+            <>
+              <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogKey")}</dt>
+              <dd {...stylex.props(styles.dialogFactsDd, styles.dialogMono)}>{draft.key}</dd>
+            </>
+          )}
+          <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogProcessId")}</dt>
+          <dd {...stylex.props(styles.dialogFactsDd, styles.dialogMono)}>{processId}</dd>
+          <dt {...stylex.props(styles.dialogFactsDt)}>{t("draftToolbar.dialogRevision")}</dt>
+          <dd {...stylex.props(styles.dialogFactsDd, styles.dialogMono)}>{revision}</dd>
+        </dl>
+      </details>
       {blocked && <p {...stylex.props(styles.dialogBlocked)}>{t("draftToolbar.publishDialogBlocked")}</p>}
       {dirty && <p {...stylex.props(styles.dialogNote)}>{t("draftToolbar.publishDialogUnsaved")}</p>}
       <p {...stylex.props(styles.dialogNote)}>{t("draftToolbar.publishDialogImmutable")}</p>

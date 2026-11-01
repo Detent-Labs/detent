@@ -1245,6 +1245,8 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
               token={token}
               roles={roles}
               processId={processId}
+              revision={saveState.revision}
+              lastPublish={publishResult ? { version: publishResult.version, definitionHash: publishResult.definitionHash } : undefined}
               go={go}
               visible={!jsonOpen && openTab === "settings"}
               onUnauthorized={stashOnUnauthorized}
