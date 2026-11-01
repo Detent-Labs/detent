@@ -37,7 +37,14 @@ The facts that shape the approach:
   focuses the rail's current row on the next frame.
 - The detector baseline on `StepPage.tsx` is five advisory
   `design-system-font-size` findings, all `0.8rem`.
-- The pass floor is 5199. `studio-sectionsFor.test.ts` holds twelve tests.
+- The pass floor is 5199. `studio-sectionsFor.test.ts` holds eleven tests.
+- `studio-vocabulary.test.ts` asserts the `stepSections.entry` and
+  `stepSections.exit` rows as typed catalog keys.
+- Two places still print a step's key for an unnamed step: the walk in
+  `EditScreen.tsx` and the row label in `StepsRail.tsx`. The helper
+  `stepText` in `shared/optionText.ts` prints the placeholder instead, with
+  no key between. The file `docs/decisions.md` records the two fallbacks as
+  SELECTS-1 and SELECTS-2 and hands both to this change.
 
 ## Shape brief
 
@@ -186,6 +193,8 @@ A new pure module, `panels/stepSummaries.ts`, exports:
   the content locale and the base locale.
 - `defaultOpenSection(sections, counts, states, selectedPathId)`. It returns
   a `SectionName` or `undefined`.
+- `nextOpenSection(open, pressed)`. It returns `undefined` when `pressed`
+  equals `open`, else `pressed`.
 
 The summary and the state per section:
 
@@ -227,8 +236,8 @@ does.
 `StepPage` holds `openSection: SectionName | undefined` in state. Its initial
 value is `defaultOpenSection(...)`. The page remounts per step through its
 `key`, so a new step recomputes it. An effect watches `selectedPathId`: when
-it takes a value, the state moves to `paths`. A header press sets its own
-section, or `undefined` when it was open.
+it takes a value, the state moves to `paths`. A header press sets the state
+to `nextOpenSection(openSection, section)`.
 
 Every body renders. The closed ones carry `hidden` with a compiled
 `display: none` style, the tab body's own mechanism. A body therefore keeps
@@ -253,9 +262,10 @@ and its select, where the kind carries `cancellable` (task and subprocess).
 Then the two `CollaborationControl`s, where the kind carries them (task and
 end). Then the Developer view `<details>` as today.
 
-The `lifecycle` body holds the `onEntry` editor. On a task or subprocess step the `onExit` and
-`onCancel` editors follow. The other bodies are today's section bodies,
-unchanged.
+The `lifecycle` body holds the `onEntry` editor. On a task or subprocess step
+the `onExit` and `onCancel` editors follow. The `form` body keeps the open
+control alone, since the header already states the size. The other bodies
+are today's section bodies, unchanged.
 
 The terminal note `stepSections.terminalNoPathsOrTimers` stays under the
 sections, and the walk follows it. The Developer view loses its own 2px top
@@ -269,7 +279,11 @@ it now.
 `scrollPaddingBlock` stays. A new `column` wrapper caps at `52rem` and sits
 flush left. It holds the masthead, the sections and the walk. The Ways out
 row holds the widest control, the condition builder's three-control row.
-52rem leaves it one line at the body size.
+That row wraps inside the column where it must, and nothing clips.
+
+The `page` style's comment credits the Developer view's padding with
+clearing the ring at the foot. The Developer view moves into More, so the
+comment names the walk's padding instead.
 
 `EditScreen.tsx`'s `stepsTab` grid reads `"22rem minmax(0, 1fr)"`. Under
 `NARROW` the rows read `"auto auto"`. The page then takes its content's
@@ -311,8 +325,9 @@ The masthead's Remove this step button takes `btn btn-secondary
 btn-destructive`. It stores itself in a `removeTriggerRef` and sets a
 `removing` flag that mounts the dialog. Confirm calls `onRemoveStep(step.id)`
 and clears the flag. `onRemoveStep` keeps its focus hand-off to the rail's
-current row. That hand-off lands after the dialog's own cleanup returns
-focus to the unmounted trigger.
+current row. The hand-off lands for two reasons. The trigger is a detached
+node by then, so the dialog cleanup's `focus()` on it is a no-op. And
+`pageStepId` falls back to the first step, so the rail has a current row.
 
 The dialog opens on every press, reach or none. The studio has no undo, and
 the owner's D7 asks one dialog form for every destructive action.
@@ -365,8 +380,15 @@ numerals, so "2 when entered, 0 when left" is a full sentence from one key.
   `sectionColumns` block goes.
 - `studio-sectionIssues.test.ts`: an `onEntry`, `onExit` and `onCancel`
   action land at `lifecycle`; a `cancellable` loc lands at `more`.
+- `studio-vocabulary.test.ts`: the `stepSections.entry` and
+  `stepSections.exit` rows give way to `["stepSections.lifecycle", "When
+  entered or left"]`, `["stepSections.lifecycleEntryOnly", "When entered"]`
+  and `["stepSections.more", "More"]`.
+- `studio-stepsRail.test.tsx`: a step with an empty label and the key
+  `review` renders a row reading "(unnamed step)" and not `review`.
 - New `studio-stepSummaries.test.ts`: every row of D3's table, the mono
-  flag, the three states, and `defaultOpenSection`'s four answers.
+  flag, the three states, `defaultOpenSection`'s four answers and
+  `nextOpenSection`'s two.
 - New `studio-stepRemoval.test.ts`: `stepRemovalReach` counts two incoming
   paths from two steps and ignores the step's own paths. It counts form
   fields as `formCounts` does, and reads `isInitial`.
@@ -398,14 +420,41 @@ read, and section 7 says "Who acts" for "Assignment".
 
 `docs/browser-checks.md`: a new entry walks the accordion, the default open
 section, the badge, the dialog and the 420px layout. The steps rail entry's
-420px line stays true.
+420px line stays true. Four passages go stale and get rewritten:
 
-`docs/decisions.md`: RAIL-6 and RAIL-7 move to `docs/decisions-archive.md`
-word for word. Each gains a resolution line naming this change. The entry
-"Remove step and the field catalog's Remove field trigger have no destructive
-treatment" gains a line too. It says the Remove step half resolved here and
-the field catalog half stays. A new section "Open from studio-step-accordion"
-takes what the browser check finds. `ROADMAP.md` marks change 10 shipped.
+- Lines 6461 to 6464 name the old section set. They take the six headers in
+  D1's order.
+- Lines 6469 to 6470 open the Developer view at the page foot. They open
+  More instead.
+- Lines 6324 to 6326 press Remove this step and read the focus. A confirm
+  press in the dialog comes between.
+- Lines 5896 to 5898 credit the developer section's padding with clearing
+  the ring at the page's bottom edge. The walk's padding does that now.
+
+`docs/decisions.md`: RAIL-6, RAIL-7, SENTENCE-7, SELECTS-1 and SELECTS-2
+move to `docs/decisions-archive.md` word for word. Each gains a resolution
+line naming this change. The entry "Remove step and the field catalog's
+Remove field trigger have no destructive treatment" gains a line too. It
+says the Remove step half resolved here and the field catalog half stays.
+
+KEYFOLLOW-11 gains a line saying the Steps tab half resolved here and the
+Fields tab half stays with change 11. SELECTS-9 and SELECTS-10 re-point to
+change 11, since this change leaves the section bodies as they are. A new
+section "Open from studio-step-accordion" takes what the browser check
+finds. `ROADMAP.md` marks change 10 shipped.
+
+### D11. An unnamed step reads "(unnamed step)" in the rail and the walk
+
+`EditScreen.tsx`'s `walkNeighbour` and `StepsRail.tsx`'s row label read
+`stepText(step, contentLocale, baseLocale)` from `shared/optionText.ts` in
+place of the label-else-key chain. An unnamed step then reads
+`steps.unnamedStep` in the rail, in Previous and in Next. Every step select
+already reads it that way. No key stands outside a Developer view on the Steps
+tab. This resolves SELECTS-1 and SELECTS-2.
+
+Alternative considered: leaving both fallbacks for a later change. Rejected:
+`docs/decisions.md` hands both to this change by name, and the fix is two
+call sites.
 
 ## Risks / Trade-offs
 
@@ -416,9 +465,10 @@ takes what the browser check finds. `ROADMAP.md` marks change 10 shipped.
   a check. Mitigation: the header counts every issue of the section, and the
   Checks tab lists them all.
 - Risk: the dialog's cleanup focuses the unmounted trigger before the rail
-  row takes focus. Mitigation: `onRemoveStep`'s `requestAnimationFrame` runs
-  after the cleanup, the order `KindSwitchDialog` already relies on. The
-  browser check reads `document.activeElement` after a confirm.
+  row takes focus. Mitigation: the page has unmounted the trigger by then,
+  so that `focus()` is a no-op. `onRemoveStep`'s `requestAnimationFrame`
+  lands on the rail's current row. The browser check reads `document.activeElement`
+  after a confirm.
 - Risk: four retired `stepSections.*` keys still have a reader. Mitigation:
   `bun run typecheck` fails on a missing `CatalogKey`.
 - Risk: the rail at 22rem narrows the page at 64rem to about 40rem.
@@ -440,3 +490,8 @@ stay as they are.
 - Whether a header later takes arrow-key navigation between sections. The
   sub-row and the form tab strip stay plain buttons too, so a later change
   decides all three at once. Nothing here depends on the answer.
+- How change 12 opens a named section from a Checks row. `openSection` lives
+  in `StepPage` state, and `selectedPathId` is its one outside input. Change
+  12 adds a `focusSection?: SectionName` prop beside it, or lifts the state
+  into `EditScreen`. Until then `defaultOpenSection` opens the first section
+  with a check, which is where a Checks row's step lands today.

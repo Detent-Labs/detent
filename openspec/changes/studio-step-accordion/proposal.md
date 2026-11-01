@@ -41,8 +41,11 @@ change 10 of stage 64. It builds on change 9, which shipped on 2026-10-31.
 - The steps rail widens to 22rem beside the page (RAIL-6). Below 64rem the
   step page gives up its own scroll box (RAIL-7). The tab body then scrolls
   the rail and the page as one.
-- Every string comes from the studio catalog. No key, id or CEL appears
-  outside a Developer view.
+- Every string comes from the studio catalog. No key or CEL appears outside
+  a Developer view. A process id prints in mono only while the process list
+  does not hold it.
+- The steps rail's row and the walk's two controls read "(unnamed step)" for
+  a step with no label. Today they read its key.
 - `src/schema/definition.ts` stays as it is. No API changes.
 
 ## Capabilities
@@ -61,6 +64,8 @@ None.
   counts them and the body prints them. The Checks tab keeps the sum.
 - `spa-accessibility`: the step page's section headers are disclosures the
   studio builds itself, so they carry `aria-expanded` and `aria-controls`.
+- `studio-guided-vocabulary`: the step page's section headings read the six
+  names of design D1.
 
 ## Impact
 
@@ -76,11 +81,14 @@ None.
   `packages/web/src/areas/studio/draft/stepRemoval.ts`: the dialog and the
   reach it counts.
 - `packages/web/src/areas/studio/screens/EditScreen.tsx`: the Steps tab's
-  grid, the rail width and the stacked rows.
+  grid, the rail width, the stacked rows and the walk's unnamed-step text.
+- `packages/web/src/areas/studio/panels/StepsRail.tsx`: the row's
+  unnamed-step text.
 - `packages/web/src/i18n/catalogs/studio.ts`: section, summary, state and
   dialog strings. Four section-heading keys go.
 - Tests under `packages/web/test/`: `studio-stepPage.test.tsx`,
-  `studio-sectionsFor.test.ts`, `studio-sectionIssues.test.ts` and
+  `studio-sectionsFor.test.ts`, `studio-sectionIssues.test.ts`,
+  `studio-vocabulary.test.ts`, `studio-stepsRail.test.tsx` and
   `studio-guidedSurfaceStyle.test.ts` change. New tests cover the summaries,
   the default-open rule and the removal reach.
 - `.claude/rules/ui-glossary.md`, `docs/authoring-guide.md`,
