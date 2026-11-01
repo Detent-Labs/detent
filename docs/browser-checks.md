@@ -7211,17 +7211,20 @@ of any seeded process. Under `playwright-cli`, pass
 **1. Break the draft.** Type `cancel_sink` as one step's key in its Developer
 view. Clear another step's name. Remove the step a way out leads to, so its row
 reads "(step removed)". On the Fields tab, clear a field's name, and add a data
-source with no name. On the JSON surface, delete the process's `key` line, and
-give a time limit the length `P1X`. Press Apply, then press the Checks tab.
+source with no name.
+
+On the JSON surface, delete the process's `key` line, and give a time limit the
+length `P1X`. Press Apply, then press the Checks tab.
 
 Pass: the tab press leaves the JSON surface and opens Checks.
 
 **2. Three subjects.** Pass: the rail draws no box and no "Checks" heading.
 Pass: it prints Steps, Fields and Before publishing, each as a heading over a
-hairline. Pass: the first two list rows, and the third holds the line. Pass: a subject with no row prints no heading.
-Before publishing is the one exception, since it holds the line. Pass: the
-steps follow the draft's own order. Pass: the structural banner stands on every
-tab but Checks.
+hairline. Pass: the first two list rows, and the third holds the line.
+
+Pass: a subject with no row prints no heading. Before publishing is the one
+exception, since it holds the line. Pass: the steps follow the draft's own order.
+Pass: the structural banner stands on every tab but Checks.
 
 **3. The words.** Pass: each row opens with the word Must fix in the refusal
 color. Add a view flag finding through the JSON surface, for example a field
@@ -7234,8 +7237,8 @@ or field and the place to go. Pass: no row prints a path such as `steps[1]`, a
 validator's name or "Invalid input". An unnamed step reads its number, as in
 "Step 2", and no sentence reads "key". Pass: a long name wraps inside the column.
 
-Pass: Fix stands beside the sentence's first line as an outlined button, with
-the word above that row and the Developer view under it.
+Pass: Fix stands beside the sentence's first line as an outlined button. The
+word stands above that row, and the Developer view under it.
 
 **5. Fix lands, one row at a time.** Press Fix on each row below and read the
 focus ring. Return to Checks between rows.
@@ -7258,8 +7261,8 @@ focus ring. Return to Checks between rows.
 - The process name, once cleared: the tab stays. Focus stands on the name
   input in the header bar.
 - A sentence naming the JSON surface, for example a duplicate id: the surface
-  opens with the sentence above the input as a warning callout. Focus stands in
-  the input. Press any tab. Pass: that tab opens. Open the surface from the `⋮`
+  opens. The sentence stands above the input as a warning callout. Focus stands
+  in the input. Press any tab. Pass: that tab opens. Open the surface from the `⋮`
   menu. Pass: no sentence stands above the input.
 
 Pass: each ring is the 2px accent ring, whole on every side. Pass: the ring on
@@ -7288,7 +7291,7 @@ starts "More checks run once you fix". Open the line's Developer view. Pass: it
 lists the held-back sources in mono, then the two held-back notes.
 
 Pass: a source that printed a row of its own stands in no list. Fix every row.
-Pass: the line drops its first sentence, and keeps the one that says publishing
+Pass: the line drops its first sentence. It keeps the one that says publishing
 checks a few things this list cannot.
 
 **9. The all clear.** With no row open, a 2px ink box reads "No open issues."
