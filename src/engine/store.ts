@@ -450,6 +450,20 @@ export async function initSchema(db: SQL = sql): Promise<void> {
     updated_by   text NOT NULL,
     updated_at   timestamptz NOT NULL DEFAULT now()
   )`;
+  // Named copies of a draft's persisted body and layout, kept beside the draft
+  // and outside its body so no hash reads them. No foreign key: tests truncate
+  // `drafts` with no CASCADE, and `deleteDraft` removes the rows itself.
+  await db`CREATE TABLE IF NOT EXISTS draft_save_points (
+    save_point_id text PRIMARY KEY,
+    process_id    text NOT NULL,
+    name          text NOT NULL,
+    body          jsonb NOT NULL,
+    layout        jsonb NOT NULL,
+    revision      integer NOT NULL,
+    created_by    text NOT NULL,
+    created_at    timestamptz NOT NULL DEFAULT now()
+  )`;
+  await db`CREATE INDEX IF NOT EXISTS draft_save_points_process_idx ON draft_save_points (process_id, created_at DESC)`;
   // A participant's unfinished form input on a running instance, kept apart
   // from `instances.body.data` so a save can never leak into guards, data
   // sources, the admin record, or reporting before submit validates it. One

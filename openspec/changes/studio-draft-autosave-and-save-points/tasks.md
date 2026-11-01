@@ -5,10 +5,10 @@
 
 ## 1. Save points on the engine
 
-- [ ] 1.1 Add `draft_save_points` and its index to `src/engine/store.ts` per design D8. Pass: `test/schema-bootstrap.test.ts` lists the table in its drop list and passes.
-- [ ] 1.2 Add `lockDraft` and `writeRestoredDraft` to `src/engine/drafts.ts`, then add `src/engine/draft-save-points.ts` per D8. Run each SQL statement in a test. Pass: `test/draft-save-points.test.ts` covers every scenario of the three engine requirements, the publish hash through `publishBody` included.
-- [ ] 1.3 Make `deleteDraft` remove the points in one transaction with the draft. Pass: a test removes a draft holding two points, and another process's point stays.
-- [ ] 1.4 Add a test that two concurrent creates at 49 points leave at most 50. Pass: the test fails on a copy of the function with no row lock.
+- [x] 1.1 Add `draft_save_points` and its index to `src/engine/store.ts` per design D8. Pass: `test/schema-bootstrap.test.ts` lists the table in its drop list and passes.
+- [x] 1.2 Add `lockDraft` and `writeRestoredDraft` to `src/engine/drafts.ts`, then add `src/engine/draft-save-points.ts` per D8. Run each SQL statement in a test. Pass: `test/draft-save-points.test.ts` covers every scenario of the three engine requirements, the publish hash through `publishBody` included.
+- [x] 1.3 Make `deleteDraft` remove the points in one transaction with the draft. Pass: a test removes a draft holding two points, and another process's point stays.
+- [x] 1.4 Add a test that two concurrent creates at 49 points leave at most 50. Pass: the test fails on a copy of the function with no row lock.
 
 ## 2. Save point routes and client
 

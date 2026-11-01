@@ -271,10 +271,52 @@ export async function listDrafts(db: SQL = sql): Promise<DraftSummary[]> {
   return rows.map(toDraftSummary);
 }
 
-/** Removes the row and touches no `definitions` row. Reports whether a draft existed to remove. */
+/**
+ * Reads a draft `FOR UPDATE`, so the rest of the transaction holds the row.
+ * Save points create and restore under this lock; their module reads the
+ * draft only through here.
+ */
+export async function lockDraft(processId: ProcessId, tx: SQL): Promise<Draft | undefined> {
+  const rows = (await tx`
+    SELECT process_id, body, layout, revision, base_version, updated_by, updated_at
+    FROM drafts WHERE process_id = ${processId} FOR UPDATE
+  ` as unknown) as DraftRow[];
+  return rows[0] ? toDraft(rows[0]) : undefined;
+}
+
+/**
+ * The write half of a save point restore: the restored body and layout at
+ * `revision + 1`. `base_version` stays. The caller holds `lockDraft`'s lock and
+ * has checked the revision, so no conditional is needed. Throws
+ * `DraftConflictError` when the row is gone.
+ */
+export async function writeRestoredDraft(
+  processId: ProcessId,
+  input: { body: unknown; layout: unknown; updatedBy: string },
+  tx: SQL,
+): Promise<Draft> {
+  const updated = (await tx`
+    UPDATE drafts SET body = ${input.body}, layout = ${input.layout}, revision = revision + 1,
+      updated_by = ${input.updatedBy}, updated_at = now()
+    WHERE process_id = ${processId}
+    RETURNING process_id, body, layout, revision, base_version, updated_by, updated_at
+  ` as unknown) as DraftRow[];
+  if (!updated[0]) throw new DraftConflictError(processId);
+  return toDraft(updated[0]);
+}
+
+/**
+ * Removes the row and its save points in one transaction, and touches no
+ * `definitions` row. Reports whether a draft existed to remove. The draft goes
+ * first: that takes its row lock, so a save point insert that held the lock
+ * has committed before the points are deleted.
+ */
 export async function deleteDraft(processId: ProcessId, db: SQL = sql): Promise<boolean> {
-  const rows = (await db`DELETE FROM drafts WHERE process_id = ${processId} RETURNING process_id`) as unknown[];
-  return rows.length > 0;
+  return withTransaction(db, async (tx) => {
+    const rows = (await tx`DELETE FROM drafts WHERE process_id = ${processId} RETURNING process_id`) as unknown[];
+    await tx`DELETE FROM draft_save_points WHERE process_id = ${processId}`;
+    return rows.length > 0;
+  });
 }
 
 /**
