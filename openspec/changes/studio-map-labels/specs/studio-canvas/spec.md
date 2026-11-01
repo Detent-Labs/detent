@@ -41,11 +41,11 @@ the node's accessible name carries its words.
 
 ### Requirement: A way out's sentence wraps on its line
 
-A way out's sentence SHALL wrap over up to three lines. It SHALL centre on
-the midpoint of the way out's route. Its width SHALL follow the room on the
-segment that midpoint falls on, within a fixed floor and cap.
+A way out's sentence SHALL wrap over up to six lines. It SHALL sit on its
+way out's route, as near the route's midpoint as the room allows. Its width
+SHALL stay within a fixed floor and cap.
 
-A sentence longer than three lines SHALL end in an ellipsis. It SHALL carry
+A sentence longer than six lines SHALL end in an ellipsis. It SHALL carry
 the full sentence as its hover title, and only where the lines cut it.
 
 A press on the sentence SHALL select its way out, as a press on the line
@@ -55,19 +55,39 @@ does.
 
 - **WHEN** a way out's sentence reads "Only if Amount is greater than 1,000
   and Cost centre is “Finance”"
-- **THEN** the sentence shows whole over two or three lines
+- **THEN** the sentence shows whole over two or more lines
 - **AND** it has no hover title
 
-#### Scenario: A sentence past three lines keeps its full text
+#### Scenario: A sentence past six lines keeps its full text
 
-- **WHEN** a way out's sentence needs more than three lines at its width
-- **THEN** the third line ends in an ellipsis
+- **WHEN** a way out's sentence needs more than six lines at its width
+- **THEN** the sixth line ends in an ellipsis
 - **AND** the hover title carries the sentence untruncated
 
-#### Scenario: The sentence centres on the route
+#### Scenario: The sentence centres on the route where it has room
 
-- **WHEN** the canvas draws a sentence of one line and one of three lines
-- **THEN** each block's centre sits on its own route's midpoint
+- **WHEN** a way out's route crosses open canvas at its midpoint
+- **THEN** the sentence's block centres on that midpoint
+
+### Requirement: A way out's sentence clears the nodes, the stamps and the other sentences
+
+A sentence SHALL NOT cover a node, a stamp or another sentence where it can
+avoid them. A narrower width or a place further along its route avoids
+them. The sentence SHALL first narrow and take more lines, then slide along
+its route.
+
+#### Scenario: A sentence clears the nodes in a tight column gap
+
+- **WHEN** two steps stand side by side with the 60-unit gap Arrange leaves
+- **AND** the way out between them carries a 39-character sentence
+- **THEN** the sentence stands inside the gap, over more lines
+- **AND** it covers neither step's label nor any stamp
+
+#### Scenario: Two sentences in one gap stand apart
+
+- **WHEN** two ways out run through the same column gap, one above the other
+- **THEN** their sentences slide apart along their routes, and neither covers
+  the other
 
 ### Requirement: The connect handle explains its gesture
 
@@ -131,6 +151,20 @@ SHALL open nothing.
 
 - **WHEN** the author double-clicks a waypoint handle on the selected way out
 - **THEN** the waypoint goes, and the Map tab stays open
+
+### Requirement: The midpoint handle opens its way out on a double-click
+
+The selected way out's midpoint handle stands over its sentence. A
+double-click on that handle SHALL open the way out, as a double-click on its
+line does. It SHALL NOT add a waypoint.
+
+#### Scenario: The midpoint handle passes a double-click on
+
+- **WHEN** the author selected a way out, so its midpoint handle stands over
+  its sentence
+- **AND** the author double-clicks that handle
+- **THEN** the step page opens on the way out's source step, with Ways out
+  open
 
 ### Requirement: A step's key auto-derives from its label on the step page
 

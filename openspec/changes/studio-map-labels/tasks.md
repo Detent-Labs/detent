@@ -52,6 +52,16 @@
 - [ ] 3.9 There, record this change's open points under its own heading, starting from design.md's Non-Goals.
 - [ ] 3.10 Run `antislop check` on every Markdown file this group touched. Add no finding.
 
+## 5. Fix wave from the browser check
+
+- [ ] 5.1 Add `canvas/sentencePlacement.ts` with `placeSentences`, per design D5.
+- [ ] 5.2 Test it: a 60-unit column gap, two sentences in one gap, open canvas at the midpoint, the floor fallback.
+- [ ] 5.3 Draw each `EdgeLabel` at its placed box, with a six-line clamp, per D5.
+- [ ] 5.4 Give the midpoint handle a double-click that opens its way out, per D7 and the spec.
+- [ ] 5.5 Give the sentence a pointer press that moves the roving stop, as the line does.
+- [ ] 5.6 Fix `studio-canvas-node-a11y.test.tsx` and `docs/browser-checks.md` for the new placement and the six lines.
+- [ ] 5.7 Run typecheck, then the full suite with `DATABASE_URL` set, both in the foreground. Name any failing test.
+
 ## 4. Verification
 
 - [ ] 4.1 Run `bun run typecheck` and `bun run build`, and report the last lines of each.

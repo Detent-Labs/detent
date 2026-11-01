@@ -179,18 +179,35 @@ it marks an error.
 Alternative: SVG `<text>` with a measured `<rect>`. Rejected: SVG text does
 not wrap, and the canvas already hosts every label in a `<foreignObject>`.
 
-### D5. The way-out sentence: `EdgeLabel`, wrapped and centred
+### D5. The way-out sentence: `EdgeLabel`, placed clear of the nodes
 
-The sentence keeps the late pass after every node. Its host
-`<foreignObject>` is `width` wide and 52 units high, three 16-unit lines
-plus padding. It centres on the route's midpoint. A flex box centres the
-text block inside it, so one line and three lines share the midpoint.
+The sentence keeps the late pass after every node. The block reads
+`fonts.body` at 12px, line height 16px, in `colors.textMuted` on
+`colors.surface`. It clamps at six lines with `overflowWrap: anywhere`.
 
-The block reads `fonts.body` at 12px, line height 16px, in
-`colors.textMuted` on `colors.surface`. It clamps at three lines with
-`overflowWrap: anywhere`. The width is `min(200, max(120, segment − 24))`.
-The floor rises from 60 to 120, because a wrapped sentence at 60 units
-reads one word per line.
+The browser check measured why a box centred on the midpoint fails. Arrange
+leaves a 60-unit gap between columns and between rows. A 120-unit sentence
+centred there covers both neighbours' labels and their stamps. Such a gap is
+the common case.
+
+A pure function, `placeSentences` in `canvas/sentencePlacement.ts`, places
+every sentence the canvas draws at once. It reads geometry and nothing else:
+
+- Its input is each sentence's text, its route points and its midpoint. It
+  also takes the node rectangles and the stamp rectangles.
+- It estimates a block at 6.5 units per character and 16 units per line.
+  The text runs inside 3 units of padding a side, over at most six lines.
+- It tries widths from 200 down to 56 in steps of 8. At each width it tries
+  places along the route, the midpoint first. Then it steps 8 units at a
+  time, up to 120 units either way. Each place stays on the route.
+- It keeps the first box that meets no node, no stamp and no sentence it
+  already placed. Node rectangles grow by 2 units a side.
+- Where no box fits, the sentence takes the floor width at the midpoint.
+
+The host `<foreignObject>` is the chosen width wide and 96 units high, six
+lines. It centres on the chosen place, and a flex box centres the text block
+inside it. A short estimate then never clips a line. The canvas memoizes the
+placement on its inputs, so a pointer move does not re-run it.
 
 The host takes no pointer events. The text block takes them, so the empty
 host corners never swallow a press meant for a node. The text block carries
