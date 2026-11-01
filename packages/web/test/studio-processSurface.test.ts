@@ -159,7 +159,7 @@ describe("the process surface's frame around the header bar", () => {
   it("renders the structural banner after the bar", () => {
     const code = stripComments(read(SURFACE));
     const barAt = code.indexOf("<ProcessHeaderBar");
-    const bannerAt = code.indexOf("showsStructuralBanner(validation) &&");
+    const bannerAt = code.indexOf("structuralBannerStands(validation, openTab, jsonOpen) &&");
 
     expect(barAt).toBeGreaterThan(-1);
     expect(bannerAt).toBeGreaterThan(code.indexOf("/>", barAt));
@@ -194,7 +194,7 @@ describe("the Fix control's landing", () => {
   const slice = (code: string, from: string, to: string) => code.slice(code.indexOf(from), code.indexOf(to, code.indexOf(from)));
 
   it("points the rail's Fix at fixCheck, over the draft", () => {
-    expect(body()).toContain("onFix={(issue) => fixCheck(checkTarget(issue, draft))}");
+    expect(body()).toContain("onFix={(issue) => fixCheck(checkTarget(issue, draft), issueText(issue))}");
   });
 
   it("keeps openTabFromRow for a Read by row, with focus on the tab", () => {
@@ -208,8 +208,9 @@ describe("the Fix control's landing", () => {
   it("opens the JSON surface and asks for focus in one batch", () => {
     const fix = slice(body(), "const fixCheck = ", "useEffect(");
 
-    expect(fix).toContain("if (target.json) setJsonOpen(true);");
-    expect(fix).toContain("setPendingFocus({ tab: target.tab, elementId: target.focusId })");
+    expect(fix).toContain("setJsonOpen(true);");
+    expect(fix).toContain("setJsonNote(sentence);");
+    expect(fix).toContain("setPendingFocus(fixPendingFocus(target))");
   });
 
   it("leaves a field's and a source's focus to the Fields tab", () => {
@@ -223,11 +224,32 @@ describe("the Fix control's landing", () => {
 
   it("keys the focus effect on the tab and the request, acts on its own tab alone, and clears", () => {
     const code = body();
-    const effect = slice(code, "if (pendingFocus === undefined || pendingFocus.tab !== openTab) return;", "}, [openTab, pendingFocus]);");
+    const effect = slice(code, "if (!pendingFocusLands(pendingFocus, openTab, sectionRequest)) return;", "}, [openTab, pendingFocus, sectionRequest]);");
 
-    expect(code).toContain("}, [openTab, pendingFocus]);");
+    expect(code).toContain("}, [openTab, pendingFocus, sectionRequest]);");
     expect(effect).toContain("if (element === null) focusTabButton(openTab);");
+    expect(effect).toContain("else if (pendingFocus.toTop) focusAtTop(element);");
     expect(effect).toContain("setPendingFocus(undefined);");
+  });
+
+  it("leaves the JSON surface on any tab press, and drops the check's sentence with it", () => {
+    const code = body();
+    const press = slice(code, "onOpen={(target) => {", "jsonOpen={jsonOpen}");
+
+    expect(press).toContain("setJsonOpen(false);");
+    expect(press).toContain("setJsonNote(undefined);");
+    expect(press).toContain("goToTab(target)");
+    expect(press).toContain("leaveFormEditorFor(target)");
+  });
+
+  it("drops the check's sentence when the menu entry toggles the surface", () => {
+    const toggle = slice(body(), "onToggleJson={() => {", "onVersions=");
+
+    expect(toggle).toContain("setJsonNote(undefined);");
+  });
+
+  it("hands the JSON surface the check's sentence", () => {
+    expect(body()).toContain("<JsonView draft={draft} onApply={replace} note={jsonNote} />");
   });
 
   it("names no retired focus state", () => {

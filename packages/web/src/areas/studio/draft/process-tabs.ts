@@ -6,6 +6,8 @@ import type { Draft } from "./types";
 import { checkPlace, checkStep, type CheckSite } from "./checkSentence";
 import type { ProcessTab, TabTarget } from "../routing";
 import { fieldCheckZone, type FieldCheckZone } from "../panels/fieldCheckZone";
+import { namesStepKey } from "../panels/sectionIssues";
+import type { SectionRequest } from "../panels/stepSummaries";
 import type { OutsidePlace } from "../panels/readByRows";
 import type { SectionName } from "../panels/sectionsFor";
 
@@ -46,6 +48,8 @@ export function processTabCounts(draft: TabCountDraft, issues: readonly EditorIs
 
 /** The step page's name input, a Fix's landing and a new step's. */
 export const STEP_PAGE_NAME_ID = "step-page-name";
+/** The element id of the key input in More's Developer view. */
+export const STEP_PAGE_KEY_ID = "step-page-key";
 /** The process's name input in the header bar. */
 export const PROCESS_HEADER_NAME_ID = "process-header-name";
 /** The JSON surface's input. */
@@ -70,6 +74,38 @@ export interface CheckTarget extends TabTarget {
   json?: true;
 }
 
+/** A focus hand-off waiting for its tab's commit. `toTop` scrolls the element to
+ * its scroll box's top, so what opens under it stands in view. */
+export interface PendingFocus {
+  tab: ProcessTab;
+  elementId?: string;
+  toTop?: true;
+}
+
+/** The focus hand-off of a Fix. A section header alone scrolls to the top, since
+ * its body opens under it. The key input and the Name input keep the least
+ * scroll a plain focus takes. */
+export function fixPendingFocus(target: CheckTarget): PendingFocus {
+  const header = target.section !== undefined && target.focusId === sectionHeaderId(target.section);
+  return { tab: target.tab, elementId: target.focusId, ...(header ? { toTop: true } : {}) };
+}
+
+/**
+ * Whether a hand-off acts on this commit: its tab stands open, and the step page
+ * has taken any section request. The page takes one in its effect, and the
+ * section opens a commit later. A closed section's body is `hidden` until then,
+ * so the key input takes no focus, and the opening moves the headers below it.
+ * More's Developer view opens in that same effect, so the input stands ready on
+ * the commit that clears the request.
+ */
+export function pendingFocusLands(
+  pending: PendingFocus | undefined,
+  openTab: ProcessTab,
+  sectionRequest: SectionRequest | undefined,
+): pending is PendingFocus {
+  return pending !== undefined && pending.tab === openTab && sectionRequest === undefined;
+}
+
 /** What the Fields tab selects for a Fix, since its selection lives there. */
 export type FixRequest = Pick<CheckTarget, "fieldId" | "zone" | "dataSourceId">;
 
@@ -79,7 +115,8 @@ function onStepPage(issue: CheckSite, body: Draft, place: SectionName | "page"):
   const stepId = checkStep(body, issue)?.id;
   if (stepId === undefined) return { tab: "steps" };
   if (place === "page") return { tab: "steps", stepId, focusId: STEP_PAGE_NAME_ID };
-  const target: CheckTarget = { tab: "steps", stepId, section: place, focusId: sectionHeaderId(place) };
+  const focusId = place === "more" && namesStepKey(issue.loc) ? STEP_PAGE_KEY_ID : sectionHeaderId(place);
+  const target: CheckTarget = { tab: "steps", stepId, section: place, focusId };
   return issue.entityType === "path" ? { ...target, pathId: issue.entityId } : target;
 }
 

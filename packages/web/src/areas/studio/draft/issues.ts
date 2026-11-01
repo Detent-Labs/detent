@@ -38,8 +38,8 @@ function fieldAtPath(fields: DraftField[] | undefined, path: readonly number[]):
 // {loc, value, message} shape as "duration".
 // "view" covers checkViewFlags (draft/view-flags.ts) — the studio's own
 // findings over view.fields[], not an engine validator. It never blocks a
-// publish; see studio-checks-rail's "Every publish blocker is visible"
-// requirement.
+// publish; see studio-checks-rail's "The all-clear state stands only with no
+// open issue" requirement.
 export type IssueSource = "zod" | "cel" | "registry" | "duration" | "structural" | "view";
 export type EntityType = "process" | "field" | "dataSource" | "step" | "path" | "timer" | "action" | "contract";
 
@@ -54,8 +54,8 @@ export interface EditorIssue {
    * placing a check inside one entity needs the part that resolution drops.
    * The Fields view's zones read it through `panels/fieldCheckZone.ts`. */
   loc: string;
-  /** The message is one whole sentence for a person, so a list prints it with
-   * no source label. */
+  /** The message is one whole sentence for a person: the process's own name gap.
+   * The structural banner (`showsStructuralBanner`) does not stand for it. */
   plain?: true;
   /** One sentence an author can act on (`draft/checkSentence.ts`). `runValidation`
    * fills it for every issue; a hand-built issue may omit it. */
@@ -81,6 +81,20 @@ export function tokenize(loc: string): Token[] {
       if (!m) return { key: seg, idx: undefined };
       return { key: m[1], idx: m[3] !== undefined ? Number(m[3]) : undefined };
     });
+}
+
+/**
+ * The key names past the field a location names. The walk starts at the first
+ * `fields` token and follows the chain while it holds: `fields[i].fields[j]`
+ * nests by index, and `fields.<id>` names its field by the token after it. The
+ * first other key ends it, so a column key `fields` under `columnMapping` stays
+ * in the tail. A location with no `fields` token has none.
+ */
+export function tailAfterField(tokens: readonly Token[]): string[] {
+  let at = tokens.findIndex((token) => token.key === "fields");
+  if (at === -1) return [];
+  while (tokens[at]?.key === "fields") at += tokens[at]!.idx === undefined ? 2 : 1;
+  return tokens.slice(at).map((token) => token.key);
 }
 
 /**

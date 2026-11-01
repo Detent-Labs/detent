@@ -6,6 +6,7 @@ import {
   allChecksClear,
   groupChecksBySource,
   groupChecksBySubject,
+  heldBackKinds,
   issueSeverity,
   type CheckSubjectName,
 } from "../draft/checksRail";
@@ -18,18 +19,12 @@ const styles = stylex.create({
   // (`studio-focus-ring-clipping`, I-3). `max()` keeps today's value while
   // reading `focus.reach`, so the two move together. The scroll padding
   // keeps that same room mid-scroll, where the static padding cannot reach.
+  // The box draws no frame: the rail is the whole tab body.
   checksRail: {
     minWidth: 0,
     overflowY: "auto",
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: colors.border,
     padding: `max(${space.s3}, ${focus.reach})`,
     scrollPadding: focus.reach,
-  },
-  // `.studio-checks-rail h2`: a descendant selector on a bare `<h2>`.
-  checksRailHeading: {
-    marginTop: 0,
   },
   checksRailClear: {
     color: colors.text,
@@ -60,15 +55,9 @@ const styles = stylex.create({
     borderTopStyle: "solid",
     borderTopColor: colors.border,
   },
-  // The Title style (`DESIGN.md` Hierarchy) on an `h3`, which the global
-  // `h2` rule does not reach.
+  // The global `h2` rule is the Title style (`DESIGN.md` Hierarchy). This sets
+  // its margins alone.
   checksSubjectHeading: {
-    fontFamily: fonts.heading,
-    fontWeight: fonts.headingWeight,
-    fontSize: "0.85rem",
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-    color: colors.textMuted,
     marginBlockEnd: space.s1,
     marginBlockStart: 0,
     marginInline: 0,
@@ -85,19 +74,14 @@ const styles = stylex.create({
     borderTopStyle: "solid",
     borderTopColor: colors.border,
   },
-  // A wrapping flex row, so Fix drops under the sentence once the row's own
-  // width runs short of the sentence's basis plus the control.
+  // A wrapping flex row, so Fix drops under the sentence, flush left, below
+  // 40rem of the row's own width: the sentence's basis plus the gap and Fix.
+  // The baseline sets Fix on the sentence's first line.
   checksRowMain: {
     display: "flex",
     flexWrap: "wrap",
-    alignItems: "flex-start",
+    alignItems: "baseline",
     gap: space.s2,
-  },
-  checksRowText: {
-    flexGrow: 1,
-    flexShrink: 1,
-    flexBasis: "35rem",
-    minWidth: 0,
   },
   // The Legend style (`DESIGN.md` Hierarchy). The word carries the severity,
   // so the color never rests alone.
@@ -116,27 +100,13 @@ const styles = stylex.create({
     color: colors.textMuted,
   },
   sentence: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: "36rem",
+    minWidth: 0,
     margin: 0,
     fontSize: "0.9rem",
     overflowWrap: "anywhere",
-  },
-  // The authoring command (`DESIGN.md` Buttons): a ghost button in slate,
-  // mono at 11px. It composes over `btn btn-ghost`, whose accent it replaces.
-  command: {
-    flexShrink: 0,
-    fontFamily: fonts.mono,
-    fontSize: 11,
-    color: {
-      default: colors.textMuted,
-      ":hover": colors.text,
-      ":active": colors.text,
-    },
-    textAlign: "left",
-    backgroundColor: {
-      default: "transparent",
-      ":hover": colors.surfaceMuted,
-      ":active": `color-mix(in srgb, ${colors.text} 14%, transparent)`,
-    },
   },
   developer: {
     marginBlockStart: space.s2,
@@ -148,6 +118,11 @@ const styles = stylex.create({
     fontSize: 11,
     color: colors.textMuted,
     cursor: "pointer",
+  },
+  // A row's summary stands tight under the sentence, with the row's own padding
+  // below it.
+  developerSummaryOnRow: {
+    paddingBlock: 0,
   },
   developerBox: {
     marginBlockStart: space.s1,
@@ -226,47 +201,39 @@ const SUBJECT_KEYS: Record<CheckSubjectName, CatalogKey> = {
   publishing: "checksRail.subject.publishing",
 };
 
-/** The command style with `btn btn-ghost` joined into one `className`, since
- * a `className` written after a spread of `stylex.props` would replace it. */
-function commandProps() {
-  const compiled = stylex.props(styles.command);
-  return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
-}
-
 /** A closed disclosure over machine values, in the mono face. */
-function DeveloperView({ children }: { children: ReactNode }) {
+function DeveloperView({ children, summaryStyle }: { children: ReactNode; summaryStyle?: stylex.StyleXStyles }) {
   return (
     <details {...stylex.props(styles.developer)}>
-      <summary {...stylex.props(styles.developerSummary)}>{t("checksRail.developerView")}</summary>
+      <summary {...stylex.props(styles.developerSummary, summaryStyle)}>{t("checksRail.developerView")}</summary>
       <div {...stylex.props(styles.developerBox)}>{children}</div>
     </details>
   );
 }
 
-/** One open issue: its severity word, its sentence and the Fix control, then
- * the closed Developer view holding the source, the raw message and the
- * location. */
+/** One open issue: its severity word, then its sentence and the Fix control in
+ * one row, then the closed Developer view holding the source, the raw message
+ * and the location. Fix is the row's one act, so it takes the secondary button
+ * rather than the authoring command. */
 function CheckRow({ issue, onFix }: { issue: EditorIssue; onFix?: (issue: EditorIssue) => void }) {
   const sentenceId = useId();
   const severity = issueSeverity(issue);
   return (
     <li {...stylex.props(styles.checksRow)}>
+      <span {...stylex.props(styles.severity, severity === "blocker" ? styles.severityBlocker : styles.severityAdvisory)}>
+        {t(severity === "blocker" ? "checks.severity.blocker" : "checks.severity.advisory")}
+      </span>
       <div {...stylex.props(styles.checksRowMain)}>
-        <div {...stylex.props(styles.checksRowText)}>
-          <span {...stylex.props(styles.severity, severity === "blocker" ? styles.severityBlocker : styles.severityAdvisory)}>
-            {t(severity === "blocker" ? "checks.severity.blocker" : "checks.severity.advisory")}
-          </span>
-          <p id={sentenceId} {...stylex.props(styles.sentence)}>
-            {issueText(issue)}
-          </p>
-        </div>
+        <p id={sentenceId} {...stylex.props(styles.sentence)}>
+          {issueText(issue)}
+        </p>
         {onFix && (
-          <button type="button" {...commandProps()} aria-describedby={sentenceId} onClick={() => onFix(issue)}>
+          <button type="button" className="btn btn-secondary" aria-describedby={sentenceId} onClick={() => onFix(issue)}>
             {t("checksRail.fix")}
           </button>
         )}
       </div>
-      <DeveloperView>
+      <DeveloperView summaryStyle={styles.developerSummaryOnRow}>
         <p {...stylex.props(styles.developerLine, styles.issueSourceLabel)}>{issue.source}</p>
         <p {...stylex.props(styles.developerLine)}>{issue.message}</p>
         {issue.loc !== "" && <p {...stylex.props(styles.developerLine)}>{issue.loc}</p>}
@@ -277,16 +244,17 @@ function CheckRow({ issue, onFix }: { issue: EditorIssue; onFix?: (issue: Editor
 
 /** What has not run, in one line. While any check holds back it says more
  * checks run once the author fixes the rows above, and what publishing checks
- * on its own. Otherwise it says the second part alone. */
-function HeldBackLine({ heldBack }: { heldBack: readonly IssueSource[] }) {
+ * on its own. Otherwise it says the second part alone. `kinds` lists the held-back
+ * sources with no row of their own. */
+function HeldBackLine({ holdsBack, kinds }: { holdsBack: boolean; kinds: readonly IssueSource[] }) {
   return (
     <div>
-      <p {...stylex.props(styles.checksLine)}>{t(heldBack.length > 0 ? "checksRail.heldBackLine" : "checksRail.publishLine")}</p>
+      <p {...stylex.props(styles.checksLine)}>{t(holdsBack ? "checksRail.heldBackLine" : "checksRail.publishLine")}</p>
       <DeveloperView>
-        {heldBack.length > 0 && (
+        {kinds.length > 0 && (
           <p {...stylex.props(styles.developerLine)}>
             {t("checksRail.heldBackKinds")}{" "}
-            {heldBack.map((source, i) => (
+            {kinds.map((source, i) => (
               <span key={source}>
                 {i > 0 && ", "}
                 <span {...stylex.props(styles.issueSourceLabel)}>{source}</span>
@@ -316,7 +284,8 @@ export function ChecksRail({ validation, canPublish, onFix, narrowedTo, onShowEv
   const shown = narrowedTo ? validation.issues.filter((i) => narrowedTo.entityIds.includes(i.entityId)) : validation.issues;
   const groups = groupChecksBySource(validation);
   const clear = allChecksClear(groups);
-  const heldBack = groups.filter((g) => g.heldBack).map((g) => g.source);
+  const holdsBack = groups.some((g) => g.heldBack);
+  const kinds = heldBackKinds(groups, shown);
   const subjects = groupChecksBySubject({ issues: shown });
   // A draft with no step: one sentence when nothing is open, else the sentence
   // first and the subjects under it.
@@ -324,7 +293,6 @@ export function ChecksRail({ validation, canPublish, onFix, narrowedTo, onShowEv
 
   return (
     <aside {...stylex.props(styles.checksRail)} aria-label={t("checksRail.heading")}>
-      <h2 {...stylex.props(styles.checksRailHeading)}>{t("checksRail.heading")}</h2>
       <div id="studio-checks-rail-groups" {...stylex.props(styles.checksColumn)}>
         {narrowedTo && (
           <p {...stylex.props(styles.checksRailNarrowed)}>
@@ -353,7 +321,7 @@ export function ChecksRail({ validation, canPublish, onFix, narrowedTo, onShowEv
             if (issues.length === 0 && !line) return null;
             return (
               <section key={subject} {...stylex.props(styles.checksSubject)}>
-                <h3 {...stylex.props(styles.checksSubjectHeading)}>{t(SUBJECT_KEYS[subject])}</h3>
+                <h2 {...stylex.props(styles.checksSubjectHeading)}>{t(SUBJECT_KEYS[subject])}</h2>
                 {issues.length > 0 && (
                   <ul {...stylex.props(styles.checksList)}>
                     {issues.map((issue, i) => (
@@ -361,7 +329,7 @@ export function ChecksRail({ validation, canPublish, onFix, narrowedTo, onShowEv
                     ))}
                   </ul>
                 )}
-                {line && <HeldBackLine heldBack={heldBack} />}
+                {line && <HeldBackLine holdsBack={holdsBack} kinds={kinds} />}
               </section>
             );
           })}

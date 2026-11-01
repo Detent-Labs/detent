@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { checkTarget, formEditorReturnTab, placeAction, processTabCounts, sectionHeaderId, surfaceTab } from "../src/areas/studio/draft/process-tabs.js";
+import { checkTarget, fixPendingFocus, formEditorReturnTab, pendingFocusLands, placeAction, processTabCounts, sectionHeaderId, STEP_PAGE_KEY_ID, STEP_PAGE_NAME_ID, surfaceTab } from "../src/areas/studio/draft/process-tabs.js";
 import * as processTabs from "../src/areas/studio/draft/process-tabs.js";
 import { checkAnswer } from "../src/areas/studio/draft/checkSentence.js";
 import { checksDotState, groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
@@ -119,7 +119,8 @@ describe("checkTarget", () => {
     });
 
     it("opens More for a check on the step's key", () => {
-      expect(at("step", "step_a", "workflow.steps[0].key", BUILT_IN)).toMatchObject({ stepId: "step_a", section: "more" });
+      expect(at("step", "step_a", "workflow.steps[0].key", BUILT_IN)).toMatchObject({ stepId: "step_a", section: "more", focusId: STEP_PAGE_KEY_ID });
+      expect(at("step", "step_a", "workflow.steps[0].cancellable", UNKNOWN)).toMatchObject({ stepId: "step_a", section: "more", focusId: sectionHeaderId("more") });
     });
 
     it("opens the step alone for its name, its description and its kind, with focus on Name", () => {
@@ -364,5 +365,30 @@ describe("placeAction", () => {
 
   it("opens a form's step in the form editor", () => {
     expect(placeAction({ kind: "form", stepId: "step_c" })).toEqual({ kind: "form", stepId: "step_c" });
+  });
+});
+
+describe("a Fix's focus hand-off", () => {
+  it("scrolls a section header to the top, and nothing else", () => {
+    expect(fixPendingFocus({ tab: "steps", stepId: "s", section: "timers", focusId: sectionHeaderId("timers") })).toEqual({
+      tab: "steps",
+      elementId: sectionHeaderId("timers"),
+      toTop: true,
+    });
+    expect(fixPendingFocus({ tab: "steps", stepId: "s", section: "more", focusId: STEP_PAGE_KEY_ID })).toEqual({ tab: "steps", elementId: STEP_PAGE_KEY_ID });
+    expect(fixPendingFocus({ tab: "steps", stepId: "s", focusId: STEP_PAGE_NAME_ID })).toEqual({ tab: "steps", elementId: STEP_PAGE_NAME_ID });
+    expect(fixPendingFocus({ tab: "settings" })).toEqual({ tab: "settings", elementId: undefined });
+  });
+
+  it("waits for its tab", () => {
+    expect(pendingFocusLands({ tab: "steps" }, "checks", undefined)).toBe(false);
+    expect(pendingFocusLands({ tab: "steps" }, "steps", undefined)).toBe(true);
+    expect(pendingFocusLands(undefined, "steps", undefined)).toBe(false);
+  });
+
+  it("waits while the step page has not taken the section request, so a closed More's key input stands open", () => {
+    const pending = fixPendingFocus({ tab: "steps", stepId: "s", section: "more", focusId: STEP_PAGE_KEY_ID });
+    expect(pendingFocusLands(pending, "steps", { stepId: "s", section: "more" })).toBe(false);
+    expect(pendingFocusLands(pending, "steps", undefined)).toBe(true);
   });
 });

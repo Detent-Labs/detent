@@ -128,7 +128,7 @@ const ROWS: readonly Row[] = [
   { key: "checks.way.guard", loc: "S.paths[0].guard", message: "Unexpected token at 3", section: "paths", holds: "Approve" },
 
   { key: "checks.timer.durationOrDeadline", loc: "S.timers[0].duration", message: "exactly one of duration or deadline", section: "timers" },
-  { key: "checks.timer.duration", loc: "steps[0].timers[0].duration", message: GRAMMAR, place: "json" },
+  { key: "checks.timer.duration", loc: "steps[0].timers[0].duration", message: GRAMMAR, section: "timers" },
   { key: "checks.timer.tooLong", loc: "steps[0].timers[0].duration", message: OUT_OF_RANGE, section: "timers" },
   { key: "checks.timer.deadline", loc: "steps[0].timers[0].deadline", message: "expected string, got int", section: "timers" },
   { key: "checks.timer.wayGone", loc: "S.timers[0]", message: "timer targetPath is not an outgoing path of this step: path_gone", section: "timers" },
@@ -165,7 +165,7 @@ const ROWS: readonly Row[] = [
 
   { key: "checks.end.noOutcome", loc: "S.outcome", message: "contracted process: terminal step 's2' needs an outcome", on: 2, section: "howItEnds" },
   { key: "checks.end.noEndings", loc: "S.outcome", message: "contracted process: terminal step 's2' needs an outcome", on: 2, place: "contract", draft: NO_ENDINGS },
-  { key: "checks.end.unknownOutcome", loc: "S.outcome", message: "terminal outcome 'x' is not in contract.outcomes", on: 2, section: "howItEnds" },
+  { key: "checks.end.unknownOutcome", loc: "S.outcome", message: "terminal outcome 'x' is not in contract.outcomes", on: 2, section: "howItEnds", holds: "“x”" },
   { key: "checks.end.reservedOutcome", loc: "S.outcome", message: "outcome 'cancelled' is reserved for cancellation", on: 2, section: "howItEnds" },
 
   { key: "checks.form.fieldGone", loc: "S.view.fields[2].ref", message: "view ref does not resolve: field_gone", section: "form" },
@@ -217,6 +217,7 @@ const ROWS: readonly Row[] = [
   { key: "checks.fallback.field", loc: "fields[0].zzz", message: "A brand new message", place: "fields", holds: "Amount" },
   { key: "checks.fallback.source", loc: "dataSources[0].zzz", message: "A brand new message", place: "sources", holds: "customers" },
   { key: "checks.fallback.process", loc: "zzz", message: "A brand new message" },
+  { key: "checks.fallback.contract", loc: "contract.zzz", message: "A brand new message", place: "contract" },
 ];
 
 const locOf = (row: Row) => row.loc.replace(/^S(?=\.|$)/, `workflow.steps[${row.on ?? 0}]`);
@@ -252,6 +253,19 @@ describe("one sentence per key", () => {
     expect(t("checks.severity.advisory")).toBe("Worth a look");
     expect(t("checksRail.fix")).toBe("Fix");
     expect(t("checksRail.subject.publishing")).toBe("Before publishing");
+    expect(t("checks.process.key")).toBe("The process needs an internal name. On Settings, set it in the Developer view.");
+    expect(t("checks.process.duplicateFieldKey")).toBe("Two fields share one internal name. On the Fields tab, change one in its Developer view.");
+    expect(t("checks.step.key")).toBe("The internal name of “{step}” cannot be used. Under {section}, change it in the Developer view.");
+    expect(t("checks.step.reservedKey")).toBe("“{step}” uses an internal name kept for cancelled cases. Under {section}, change it in the Developer view.");
+    expect(t("checks.way.key")).toBe("The way out “{way}” of “{step}” has no internal name. Under {section}, type one in its Developer view.");
+    expect(t("checks.form.tabDuplicate")).toBe("Two tabs on the form of “{step}” share one internal name. Correct it in the JSON surface.");
+    expect(t("checks.field.key")).toBe("The internal name of “{field}” cannot be used. Under More, change it in the Developer view.");
+    expect(t("checks.timer.duration")).toBe("The length of a time limit on “{step}” cannot be read. Under {section}, remove it and add a new one.");
+    expect(t("checks.end.unknownOutcome")).toBe("“{step}” ends with “{value}”, which the process does not list. On Settings, add it under How it can end, or choose another under {section}.");
+    expect(t("checks.fallback.contract")).toBe("Something in what this process takes in or gives back does not pass a check. On the Checks tab, this check's Developer view names it.");
+    expect(t("checksRail.heldBackLine")).toBe("More checks run once you fix the rows above. Publishing also checks a few things this list cannot, and tells you if one fails.");
+    expect(t("checksRail.publishLine")).toBe("Publishing also checks a few things this list cannot, and tells you if one fails.");
+    expect(t("app.draftIncomplete")).toBe("Some checks cannot run yet. Open Checks and fix what it lists.");
   });
 });
 
@@ -266,7 +280,6 @@ describe("checkPlace", () => {
         "checks.process.cancelSink",
         "checks.process.unknownEntry",
         "checks.step.reservedId",
-        "checks.timer.duration",
         "checks.action.duration",
         "checks.assignment.group",
         "checks.form.tabsDeclared",
@@ -433,7 +446,7 @@ describe("a message no rule knows", () => {
     expect(check("path", "path_1").sentence).toContain("“Credit check”");
     expect(check("field", "field_inner").sentence).toContain("“Inner”");
     expect(check("dataSource", "ds_list").sentence).toContain("“customers”");
-    expect(check("contract", "contract").key).toBe("checks.contract.general");
+    expect(check("contract", "contract").key).toBe("checks.fallback.contract");
   });
 });
 
@@ -447,10 +460,35 @@ describe("rules that read the draft", () => {
     }
   });
 
-  it("reads a too-long limit the panel draws no input for as the JSON surface's", () => {
+  it("lands a too-long limit the panel draws no input for on Time limit", () => {
     const answer = answerFor(makeDraft(), "steps[0].timers[1].duration", OUT_OF_RANGE);
     expect(answer.key).toBe("checks.timer.duration");
-    expect(answer.place).toBe("json");
+    expect(answer.place).toBe("timers");
+    expect(answer.sentence).toBe("The length of a time limit on “Review” cannot be read. Under Time limit, remove it and add a new one.");
+  });
+
+  it("names the step's unlisted ending, and both places that repair it", () => {
+    const steps = [makeStep(0), makeStep(1), { ...makeStep(2), outcome: "archived" }];
+    const body = makeDraft({ workflow: { initialStep: "step_0", steps } });
+    expect(sentenceFor(body, "workflow.steps[2].outcome", "terminal outcome 'archived' is not in contract.outcomes")).toBe(
+      `“${STEP_NAMES[2]}” ends with “archived”, which the process does not list. On Settings, add it under How it can end, or choose another under How the case ends.`,
+    );
+  });
+
+  it("reads an empty target as one that leads nowhere yet, never as a removed step", () => {
+    expect(answerFor(makeDraft(), "workflow.steps[0].paths[0].to", "path target does not resolve: ").key).toBe("checks.way.noTarget");
+    expect(answerFor(makeDraft(), "workflow.steps[0].paths[0].to", "path target does not resolve: step_gone").key).toBe("checks.way.targetGone");
+  });
+
+  it("reads a column key named `fields` as a column mapping, not as a nested field", () => {
+    const answer = answerFor(makeDraft(), "fields[0].columnMapping.fields", "columnMapping key exceeds the 64-character bound");
+    expect(answer.key).toBe("checks.field.columnMapping");
+    expect(answerFor(makeDraft(), "fields[0].columnMapping.fields", "Invalid input: expected string, received number").key).toBe("checks.field.columnMapping");
+  });
+
+  it("reads a group's child by the whole chain", () => {
+    expect(sentenceFor(makeDraft(), "fields[2].fields[0].key", TOO_SMALL)).toContain("“Inner”");
+    expect(answerFor(makeDraft(), "fields[2].fields[0].key", TOO_SMALL).key).toBe("checks.field.key");
   });
 
   it("reads a two-way transition's sentence with its way out and no section", () => {
@@ -563,13 +601,29 @@ describe("the slots", () => {
   it("reads two unnamed steps by their numbers", () => {
     const steps = [makeStep(0), unnamed({ id: "step_a" }), unnamed({ id: "step_b" })];
     const body = makeDraft({ workflow: { initialStep: "step_0", steps } });
-    expect(sentenceFor(body, "workflow.steps[1].label", MISSING)).toContain("(unnamed step 2)");
-    expect(sentenceFor(body, "workflow.steps[2].label", MISSING)).toContain("(unnamed step 3)");
+    expect(sentenceFor(body, "workflow.steps[1].label", MISSING)).toContain("“Step 2”");
+    expect(sentenceFor(body, "workflow.steps[2].label", MISSING)).toContain("“Step 3”");
   });
 
-  it("reads one unnamed step as the plain placeholder, and a step with no id too", () => {
-    const body = makeDraft({ workflow: { initialStep: "step_0", steps: [unnamed({ id: undefined })] } });
-    expect(sentenceFor(body, "workflow.steps[0].label", MISSING)).toContain("“(unnamed step)”");
+  it("reads one unnamed step by its number, and a step with no id too", () => {
+    const one = makeDraft({ workflow: { initialStep: "step_0", steps: [makeStep(0), unnamed({ id: "step_a" })] } });
+    expect(sentenceFor(one, "workflow.steps[1].label", MISSING)).toContain("“Step 2”");
+    const noId = makeDraft({ workflow: { initialStep: "step_0", steps: [unnamed({ id: undefined })] } });
+    expect(sentenceFor(noId, "workflow.steps[0].label", MISSING)).toContain("“Step 1”");
+  });
+
+  it("keeps the step text map's form for a repeated label", () => {
+    const steps = [makeStep(0), { ...makeStep(1), label: { en: STEP_NAMES[0] } }];
+    const body = makeDraft({ workflow: { initialStep: "step_0", steps } });
+    expect(sentenceFor(body, "workflow.steps[1].label", MISSING)).toContain(`“${STEP_NAMES[0]} (step 2)”`);
+  });
+
+  it("reads a new draft afresh, since a mutation clones the draft", () => {
+    const first = makeDraft({ workflow: { initialStep: "step_0", steps: [unnamed({ id: "step_a" })] } });
+    expect(sentenceFor(first, "workflow.steps[0].label", MISSING)).toContain("“Step 1”");
+    const next = structuredClone(first);
+    next.workflow!.steps![0]!.label = { en: "Renamed" };
+    expect(sentenceFor(next, "workflow.steps[0].key", TOO_SMALL)).toContain("“Renamed”");
   });
 
   it("reads names in the base locale", () => {
@@ -588,7 +642,7 @@ describe("the slots", () => {
       dataSources: [{ id: "ds_a", key: 5 }],
       workflow: { initialStep: "step_0", steps: [{ id: "step_0", label: { en: 7 }, paths: [{ id: "path_a", label: 5 }] }] },
     });
-    expect(sentenceFor(body, "workflow.steps[0].label", BAD_STRING)).toContain("“(unnamed step)”");
+    expect(sentenceFor(body, "workflow.steps[0].label", BAD_STRING)).toContain("“Step 1”");
     expect(sentenceFor(body, "workflow.steps[0].paths[0].trigger", BAD_OPTION)).toContain("“(unnamed way out)”");
     expect(sentenceFor(body, "fields[0].key", BAD_STRING)).toContain("“(unnamed field)”");
     expect(sentenceFor(body, "dataSources[0].zzz", "x")).toContain("“(unnamed source)”");
@@ -635,7 +689,7 @@ describe("runValidation fills the sentence", () => {
     const { issues } = run(draft([{ ...review, label: {} }, end]));
     const issue = issues.find((i) => i.loc === "workflow.steps[0].label")!;
     expect(issue.message).toContain("missing baseLocale");
-    expect(issue.sentence).toBe("“(unnamed step)” needs a name. Type it in the Name box at the top of its page.");
+    expect(issue.sentence).toBe("“Step 1” needs a name. Type it in the Name box at the top of its page.");
   });
 
   it("reads a guard the parser rejects", () => {

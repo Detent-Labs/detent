@@ -175,3 +175,21 @@ describe("the two checks that open More", () => {
     expect(namesFieldTechnical("workflow.steps[0].technical")).toBe(false);
   });
 });
+
+describe("the field chain", () => {
+  it("reads a column key named `fields` as part of the mapping", () => {
+    expect(fieldCheckZone("fields[0].columnMapping.fields")).toBe("columnMapping");
+    expect(fieldCheckZone("fields[0].columnMapping.fields.x")).toBe("columnMapping");
+  });
+
+  it("follows a group's own chain to its child", () => {
+    expect(fieldCheckZone("fields[0].fields[1].validation.pattern")).toBe("validation");
+    expect(fieldCheckZone("fields[0].fields[1].fields[2].type")).toBe("kind");
+    expect(fieldCheckZone("fields[0].fields[1].columnMapping.fields")).toBe("columnMapping");
+    expect(namesFieldKey("fields[0].fields[1].key")).toBe(true);
+  });
+
+  it("names no zone for a location with no field token", () => {
+    expect(fieldCheckZone("workflow.steps[0].onEntry[0].config.x")).toBeUndefined();
+  });
+});

@@ -6,6 +6,7 @@ import {
   checksDotState,
   groupChecksBySource,
   groupChecksBySubject,
+  heldBackKinds,
   issueSeverity,
 } from "../src/areas/studio/draft/checksRail.js";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
@@ -397,6 +398,10 @@ describe("groupChecksBySubject", () => {
     expect(subjectOf(at({ entityType: "process", loc: "workflow.initialStep" }))).toBe("steps");
   });
 
+  it("sends the compile pass's own steps location to steps", () => {
+    expect(subjectOf(at({ entityType: "process", loc: "steps[0].view.fields[13].group" }))).toBe("steps");
+  });
+
   it("sends a process issue located under fields or dataSources to fields", () => {
     expect(subjectOf(at({ entityType: "process", loc: "fields" }))).toBe("fields");
     expect(subjectOf(at({ entityType: "process", loc: "dataSources[1].key" }))).toBe("fields");
@@ -433,6 +438,18 @@ describe("groupChecksBySubject", () => {
     const total = groupChecksBySubject({ issues }).reduce((n, s) => n + s.issues.length, 0);
 
     expect(total).toBe(issues.length);
+  });
+});
+
+describe("heldBackKinds", () => {
+  const group = (source: EditorIssue["source"], heldBack: boolean) => ({ source, heldBack, issues: [] });
+
+  it("lists each held-back source with no row", () => {
+    expect(heldBackKinds([group("cel", true), group("registry", true), group("view", false)], [])).toEqual(["cel", "registry"]);
+  });
+
+  it("drops a source that printed a row of its own", () => {
+    expect(heldBackKinds([group("cel", true), group("registry", true)], [{ source: "cel" }])).toEqual(["registry"]);
   });
 });
 

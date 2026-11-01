@@ -139,6 +139,14 @@ describe("A page mounting on a request", () => {
   });
 });
 
+describe("The key input's landing", () => {
+  it("carries the id a key check's Fix focuses", () => {
+    const keyed = /<input[^>]*id="step-page-key"[^>]*>/.exec(render())?.[0];
+
+    expect(keyed).toContain('value="intake"');
+  });
+});
+
 describe("The page's request effect", () => {
   const source = readFileSync(new URL("../src/areas/studio/panels/StepPage.tsx", import.meta.url).pathname, "utf8");
   const effect = source.slice(source.indexOf("if (!requestHere) return;"), source.indexOf("[requestHere, requestedSection, keyChecked, sectionRequest, onSectionOpened]"));

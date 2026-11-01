@@ -43,6 +43,16 @@ type FocusTarget = {
 };
 
 /**
+ * Focuses a control and scrolls it to its scroll box's top, so what opens under
+ * it stands in view. The surface root's handler below takes the focus first and
+ * scrolls by the least distance, so this scroll comes last.
+ */
+export function focusAtTop(element: Pick<HTMLElement, "focus" | "scrollIntoView">): void {
+  element.focus({ preventScroll: true });
+  element.scrollIntoView({ block: "start" });
+}
+
+/**
  * A surface root's `onFocusCapture` handler (`studio-focus-ring-clipping`).
  * A Tab-key focus leaves a partly visible control where it stands, with its
  * ring cut at the scroll box's edge. `nearest` scrolls every scroll box

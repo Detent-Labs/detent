@@ -68,7 +68,7 @@ describe("A narrowed checks rail", () => {
     const html = renderToStaticMarkup(<ChecksRail validation={validation} canPublish={true} narrowedTo={NARROWED} />);
 
     expect(html).toContain("Before publishing");
-    expect(html).toContain("Publishing also checks each plugin&#x27;s settings");
+    expect(html).toContain("Publishing also checks a few things this list cannot");
   });
 
   it("reads the held-back state off the whole draft, not the rows shown", () => {

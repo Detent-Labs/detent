@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
-import { showsStructuralBanner } from "../src/areas/studio/draft/startGaps.js";
+import { showsStructuralBanner, structuralBannerStands } from "../src/areas/studio/draft/startGaps.js";
 import { newStep } from "../src/areas/studio/draft/createStep.js";
 import { t } from "../src/areas/studio/catalog.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
@@ -74,5 +74,25 @@ describe("the start gaps of a fresh draft", () => {
     expect(v.noStepYet).toBe(true);
     expect(v.issues).toHaveLength(0);
     expect(showsStructuralBanner(v)).toBe(false);
+  });
+});
+
+describe("structuralBannerStands", () => {
+  const open = { issues: [{ entityType: "step", entityId: "step_a", message: "bad", source: "zod", loc: "workflow.steps[0].paths" }] } as Parameters<typeof structuralBannerStands>[0];
+
+  it("leaves the Checks tab, where it only repeats the list", () => {
+    expect(structuralBannerStands(open, "checks", false)).toBe(false);
+  });
+
+  it("stands on every other tab", () => {
+    for (const tab of ["map", "steps", "fields", "forms", "settings"] as const) expect(structuralBannerStands(open, tab, false)).toBe(true);
+  });
+
+  it("stands on the JSON surface over the Checks tab, where no list shows", () => {
+    expect(structuralBannerStands(open, "checks", true)).toBe(true);
+  });
+
+  it("stands nowhere without a Zod issue", () => {
+    expect(structuralBannerStands({ issues: [] }, "steps", false)).toBe(false);
   });
 });

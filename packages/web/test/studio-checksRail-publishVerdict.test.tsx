@@ -49,7 +49,7 @@ describe("The checks rail's all-clear box", () => {
     const html = renderToStaticMarkup(<ChecksRail validation={clear} canPublish={true} />);
 
     expect(html).toContain("Before publishing");
-    expect(html).toContain("Publishing also checks each plugin&#x27;s settings and any entry the studio cannot see.");
+    expect(html).toContain("Publishing also checks a few things this list cannot, and tells you if one fails.");
     expect(html).not.toContain("More checks run");
     expect(html).not.toContain("Must fix");
     expect(html).not.toContain("Steps");

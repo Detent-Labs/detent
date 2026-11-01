@@ -91,7 +91,9 @@ export function describePublishRefusal(error: ClientError, draft: Draft): Publis
   const detail = [error.kind, ...error.issues.map((i) => (i.loc === "" ? i.message : `${i.loc}: ${i.message}`))].join("\n");
   const sentences: string[] = [];
   for (const issue of error.issues) {
-    const answer = checkAnswer(draft, { loc: issue.loc, message: issue.message, ...resolveLoc(draft, issue.loc) });
+    // The schema validator joins its path with dots, as in `workflow.steps.0.paths`.
+    const loc = issue.loc.replace(/\.(\d+)(?=\.|$)/g, "[$1]");
+    const answer = checkAnswer(draft, { loc, message: issue.message, ...resolveLoc(draft, loc) });
     const sentence = answer.key.startsWith("checks.fallback.") ? t("checks.publishRefusedFallback") : answer.sentence;
     if (!sentences.includes(sentence)) sentences.push(sentence);
   }

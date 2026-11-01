@@ -5,7 +5,7 @@ import { flattenDraftFields } from "./fields";
 import { performedByFor, type PerformedBy } from "./performedBy";
 import { timeLimitParts } from "./time-limit";
 import { isDraftViewField, type DraftViewEntry } from "./view-layout";
-import { tokenize, type EditorIssue, type Token } from "./issues";
+import { tailAfterField, tokenize, type EditorIssue, type Token } from "./issues";
 import { t, type CatalogKey } from "../catalog.js";
 import { sectionByEntityId, sectionOfIssue, sectionOfOutputTarget } from "../panels/sectionIssues.js";
 import { sectionLabel, sectionsFor, type SectionName } from "../panels/sectionsFor.js";
@@ -110,13 +110,6 @@ function fieldAt(body: Draft, tokens: readonly Token[], entityId: string): Draft
     list = found?.fields;
   }
   return found ?? all.find((field) => field.id === entityId);
-}
-
-/** The key names past the field a `fields[i].fields[j]` or `fields.<id>` location names. */
-function tailAfterField(tokens: readonly Token[]): string[] {
-  const anchor = tokens.map((token) => token.key).lastIndexOf("fields");
-  if (anchor === -1) return [];
-  return tokens.slice(tokens[anchor]!.idx === undefined ? anchor + 2 : anchor + 1).map((token) => token.key);
 }
 
 function readSite(body: Draft, check: CheckSite): Site {
@@ -239,8 +232,10 @@ function expressionSite(site: Site): Aim | undefined {
   return undefined;
 }
 
-function endingAim(site: Site, key: CatalogKey): Aim {
-  return (site.body.contract?.outcomes ?? []).length === 0 ? onContract("checks.end.noEndings") : inSection(key, "howItEnds");
+function endingAim(site: Site, key: CatalogKey, named?: string): Aim {
+  if ((site.body.contract?.outcomes ?? []).length === 0) return onContract("checks.end.noEndings");
+  const outcome = typeof site.step?.outcome === "string" ? site.step.outcome : named;
+  return { ...inSection(key, "howItEnds"), ...(outcome === undefined ? {} : { value: outcome }) };
 }
 
 function pluginTypeAim(site: Site): Aim | undefined {
@@ -252,14 +247,14 @@ function pluginTypeAim(site: Site): Aim | undefined {
 }
 
 function durationAim(site: Site): Aim {
-  return inJson(!site.actionTail && site.names[0] === "timers" ? "checks.timer.duration" : "checks.action.duration");
+  return !site.actionTail && site.names[0] === "timers" ? inSection("checks.timer.duration", "timers") : inJson("checks.action.duration");
 }
 
 function tooLongAim(site: Site): Aim {
   const index = tokenIndex(site, "timers");
   const timer = index === undefined ? undefined : site.step?.timers?.[index];
   const parts = typeof timer?.duration === "string" ? timeLimitParts(timer.duration) : undefined;
-  return parts === undefined ? inJson("checks.timer.duration") : inSection("checks.timer.tooLong", "timers");
+  return inSection(parts === undefined ? "checks.timer.duration" : "checks.timer.tooLong", "timers");
 }
 
 function patternAim(site: Site): Aim {
@@ -313,7 +308,7 @@ const LITERAL_RULES: readonly LiteralRule[] = [
   { match: /^duplicate data source keys$/, aim: { key: "checks.process.duplicateSourceKey", place: "sources" } },
   { match: /^data source key '.*' collides with a reserved CEL namespace$/, aim: onSource("checks.source.reservedName") },
   { match: /^field dataSource does not resolve: .*$/, aim: onField("checks.field.sourceGone") },
-  { match: /^path target does not resolve: .*$/, aim: inSection("checks.way.targetGone", "paths") },
+  { match: /^path target does not resolve: (.*)$/, aim: (_site, match) => inSection(match[1] === "" ? "checks.way.noTarget" : "checks.way.targetGone", "paths") },
   { match: /^view ref does not resolve: .*$/, aim: inSection("checks.form.fieldGone", "form") },
   { match: /^timer targetPath is not an outgoing path of this step: .*$/, aim: inSection("checks.timer.wayGone", "timers") },
   {
@@ -321,7 +316,7 @@ const LITERAL_RULES: readonly LiteralRule[] = [
     aim: (site) => inSection("checks.action.fieldGone", site.step && sectionOfOutputTarget(site.step, site.message)),
   },
   { match: /^contracted process: terminal step '.*' needs an outcome$/, aim: (site) => endingAim(site, "checks.end.noOutcome") },
-  { match: /^terminal outcome '.*' is not in contract\.outcomes$/, aim: (site) => endingAim(site, "checks.end.unknownOutcome") },
+  { match: /^terminal outcome '(.*)' is not in contract\.outcomes$/, aim: (site, match) => endingAim(site, "checks.end.unknownOutcome", match[1]) },
   { match: /^declared outcome '(.*)' has no terminal step$/, aim: (_site, match) => onContract("checks.contract.unusedOutcome", match[1]) },
   { match: /^reserved cancel-sink step id may not be authored$/, aim: inJson("checks.step.reservedId") },
   { match: /^reserved cancel-sink step key may not be authored$/, aim: inSection("checks.step.reservedKey", "more") },
@@ -422,7 +417,7 @@ function stepPropertyRule(site: Site): Aim | undefined {
       return undefined;
     case "timers":
       if (site.rest[0]?.idx === undefined) return undefined;
-      if (second === "duration") return inJson("checks.timer.duration");
+      if (second === "duration") return inSection("checks.timer.duration", "timers");
       if (second === "onFire" && site.names[2] === "targetPath") return inSection("checks.timer.wayGone", "timers");
       return inSection("checks.timer.general", "timers");
     default:
@@ -506,18 +501,39 @@ function fallback(site: Site, sectionLost = false): CheckAnswer {
     case "source":
       return settle(site, onSource("checks.fallback.source"), 4);
     case "contract":
-      return settle(site, onContract("checks.contract.general"), 4);
+      return settle(site, onContract("checks.fallback.contract"), 4);
     case "process":
       return settle(site, { key: "checks.fallback.process" }, 4);
   }
 }
 
-function stepSlot(body: Draft, step: DraftStep): string {
+/** Each draft's step slots. A mutation clones the draft (`store.tsx`), so one
+ * draft's map stays true, and a pass over many issues builds it once. */
+const STEP_SLOTS = new WeakMap<Draft, Map<DraftStep, string>>();
+
+/** The text each step prints in a sentence: `stepTextMap`'s, except that an
+ * unnamed step reads its rail number, whether or not another step is unnamed. */
+function stepSlots(body: Draft): Map<DraftStep, string> {
+  const cached = STEP_SLOTS.get(body);
+  if (cached) return cached;
   const base = baseLocaleOf(body);
+  const steps = stepsOf(body);
   // A label's entry is any JSON value until Zod has run over it.
-  const readable = (s: DraftStep): DraftStep => (typeof s.label?.[base] === "string" ? s : { ...s, label: {} });
-  const text = step.id === undefined ? undefined : stepTextMap(stepsOf(body).map(readable), base, base).get(step.id);
-  return text ?? stepText(readable(step), base, base);
+  const readable = steps.map((s) => (typeof s.label?.[base] === "string" ? s : { ...s, label: {} }));
+  const texts = stepTextMap(readable, base, base);
+  const unnamed = t("steps.unnamedStep");
+  const slots = new Map<DraftStep, string>();
+  steps.forEach((step, i) => {
+    const plain = stepText(readable[i]!, base, base);
+    if (plain === unnamed) slots.set(step, fill(t("stepPage.stepNumber"), { number: String(i + 1) }));
+    else slots.set(step, (step.id === undefined ? undefined : texts.get(step.id)) ?? plain);
+  });
+  STEP_SLOTS.set(body, slots);
+  return slots;
+}
+
+function stepSlot(body: Draft, step: DraftStep): string {
+  return stepSlots(body).get(step) ?? t("steps.unnamedStep");
 }
 
 function wayLabel(site: Site): string {
@@ -548,19 +564,19 @@ function settle(site: Site, aim: Aim, tier: CheckAnswer["tier"]): CheckAnswer {
   const text = t(aim.key);
   if (!step && text.includes("{step}")) return fallback(site);
 
-  return {
-    key: aim.key,
-    tier,
-    place: aim.place ?? section ?? undefined,
-    sentence: fill(text, {
-      ...(step ? { step: stepSlot(site.body, step) } : {}),
-      ...(section && step ? { section: t(sectionLabel(section, kindOf(step))) } : {}),
-      way: wayLabel(site),
-      field: fieldLabel(site),
-      source: sourceName(site),
-      value: aim.value ?? "",
-    }),
+  // A slot reads the draft only where the template holds it.
+  const slots: Record<string, string> = {};
+  const slot = (name: string, read: () => string) => {
+    if (text.includes(`{${name}}`)) slots[name] = read();
   };
+  if (step) slot("step", () => stepSlot(site.body, step));
+  if (section && step) slot("section", () => t(sectionLabel(section, kindOf(step))));
+  slot("way", () => wayLabel(site));
+  slot("field", () => fieldLabel(site));
+  slot("source", () => sourceName(site));
+  slot("value", () => aim.value ?? "");
+
+  return { key: aim.key, tier, place: aim.place ?? section ?? undefined, sentence: fill(text, slots) };
 }
 
 /** The four tiers, stopping at the first answer. */

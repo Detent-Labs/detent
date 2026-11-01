@@ -47,7 +47,7 @@ const outsideDeveloperViews = (html: string) => html.replace(/<details[\s\S]*?<\
 /** The inner markup of each Developer view, in document order. */
 const developerViews = (html: string) => [...html.matchAll(/<details[^>]*>([\s\S]*?)<\/details>/g)].map((m) => m[1]);
 
-const heading = (name: string) => new RegExp(`<h3[^>]*>${name}</h3>`);
+const heading = (name: string) => new RegExp(`<h2[^>]*>${name}</h2>`);
 
 describe("The subjects", () => {
   it("prints issues from two sources under one Steps heading and names no source", () => {
@@ -62,7 +62,7 @@ describe("The subjects", () => {
     const outside = outsideDeveloperViews(html);
 
     expect(html.match(heading("Steps"))).not.toBeNull();
-    expect(html.match(/<h3/g)).toHaveLength(2);
+    expect(html.match(/<h2/g)).toHaveLength(2);
     expect(outside).toContain("First sentence.");
     expect(outside).toContain("Second sentence.");
     expect(outside).not.toContain("structural");
@@ -87,8 +87,8 @@ describe("The subjects", () => {
         ],
       }),
     );
-    const fields = html.indexOf("Fields</h3>");
-    const publishing = html.indexOf("Before publishing</h3>");
+    const fields = html.indexOf("Fields</h2>");
+    const publishing = html.indexOf("Before publishing</h2>");
 
     expect(fields).toBeGreaterThan(-1);
     expect(html.indexOf("Field sentence.")).toBeGreaterThan(fields);
@@ -108,8 +108,8 @@ describe("The subjects", () => {
       }),
     );
 
-    expect(html.indexOf("Steps</h3>")).toBeLessThan(html.indexOf("Fields</h3>"));
-    expect(html.indexOf("Fields</h3>")).toBeLessThan(html.indexOf("Before publishing</h3>"));
+    expect(html.indexOf("Steps</h2>")).toBeLessThan(html.indexOf("Fields</h2>"));
+    expect(html.indexOf("Fields</h2>")).toBeLessThan(html.indexOf("Before publishing</h2>"));
   });
 
   it("stands the first step's row above the second step's", () => {
@@ -202,6 +202,38 @@ describe("The Fix control", () => {
   });
 });
 
+describe("The row's form", () => {
+  const row = () => render(validation({ issues: [issue()] }), { onFix: () => {} });
+
+  it("reads the word, then the sentence, then Fix, then the Developer view", () => {
+    const html = row();
+
+    expect(html.indexOf("Must fix")).toBeLessThan(html.indexOf("A sentence."));
+    expect(html.indexOf("A sentence.")).toBeLessThan(html.indexOf(">Fix<"));
+    expect(html.indexOf(">Fix<")).toBeLessThan(html.indexOf("<details"));
+  });
+
+  it("prints Fix as the literal secondary button, with no compiled class beside it", () => {
+    expect(row()).toMatch(/<button type="button" class="btn btn-secondary" aria-describedby="[^"]+">Fix<\/button>/);
+  });
+
+  it("stands the word above the row that holds the sentence and Fix", () => {
+    const html = row();
+    const wrapper = html.lastIndexOf("<div", html.indexOf("A sentence."));
+
+    expect(html.indexOf("Must fix")).toBeLessThan(wrapper);
+    expect(html.indexOf(">Fix<")).toBeLessThan(html.indexOf("</div>", wrapper));
+  });
+
+  it("names the rail on its aside, and draws no heading over it", () => {
+    const html = row();
+
+    expect(html).toContain('aria-label="Checks"');
+    expect(html).not.toMatch(/<h2[^>]*>Checks<\/h2>/);
+    expect(html).not.toContain("<h3");
+  });
+});
+
 describe("A row's Developer view", () => {
   it("stands closed and holds the source, the raw message and the location", () => {
     const html = render(validation({ issues: [issue({ source: "cel", loc: "workflow.steps[0].paths[0].guard" })] }));
@@ -230,7 +262,7 @@ describe("A row's Developer view", () => {
 
 describe("The line under Before publishing", () => {
   const HELD = "More checks run once you fix the rows above.";
-  const ALONE = "Publishing also checks each plugin&#x27;s settings and any entry the studio cannot see.";
+  const ALONE = "Publishing also checks a few things this list cannot, and tells you if one fails.";
 
   it("says more checks run later while a Zod-invalid draft holds the rest back", () => {
     const html = render(
@@ -280,6 +312,20 @@ describe("The line under Before publishing", () => {
     expect(html).not.toContain("No open issues.");
   });
 
+  it("drops a source that printed a row of its own from the list, and keeps the line", () => {
+    const html = render(
+      validation({
+        dimensions: { ...RAN, structural: "not-run" },
+        issues: [issue({ source: "cel", entityType: "step" })],
+      }),
+    );
+    const lineView = developerViews(html).at(-1)!;
+
+    expect(html).toContain(HELD);
+    expect(lineView).not.toContain(">cel<");
+    expect(lineView).toContain(">registry<");
+  });
+
   it("says the second part alone when nothing holds back, and still lists the two checks publishing holds", () => {
     const html = render(validation());
     const lineView = developerViews(html).at(-1)!;
@@ -305,7 +351,7 @@ describe("The start state", () => {
     const html = render(validation({ zodValid: false, noStepYet: true, dimensions: { ...RAN, duration: "not-run", structural: "not-run" } }));
 
     expect(html).toContain("No step yet.");
-    expect(html).not.toContain("<h3");
+    expect(html).not.toContain("<h2");
     expect(html).not.toContain("<details");
     expect(html).not.toContain("<li");
   });

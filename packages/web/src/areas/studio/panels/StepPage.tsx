@@ -30,7 +30,7 @@ import { nextStepKey, nextCollaborationOverride } from "./stepsPanelLogic.js";
 import { formCounts } from "./formCardRows.js";
 import { sectionLabel, sectionsFor, type SectionName } from "./sectionsFor.js";
 import { headingIssues, issuesBySection, mastheadIssues, namesStepKey } from "./sectionIssues.js";
-import { sectionHeaderId, STEP_PAGE_NAME_ID } from "../draft/process-tabs.js";
+import { sectionHeaderId, STEP_PAGE_KEY_ID, STEP_PAGE_NAME_ID } from "../draft/process-tabs.js";
 import {
   defaultOpenSection,
   nextOpenSection,
@@ -959,6 +959,7 @@ export function StepPage({
           <label {...stylex.props(styles.fieldLabel, styles.developerKey)}>
             <span {...stylex.props(styles.fieldLabelText)}>{t("stepSections.keyField")}</span>
             <input
+              id={STEP_PAGE_KEY_ID}
               type="text"
               {...stylex.props(styles.monoInput)}
               value={step.key ?? ""}

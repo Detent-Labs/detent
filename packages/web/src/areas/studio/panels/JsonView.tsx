@@ -31,11 +31,24 @@ const styles = stylex.create({
     color: colors.refusal,
     whiteSpace: "pre-line",
   },
+  // A warning callout: refusal text beside a 3px rule in the advisory role
+  // (`DESIGN.md`, Warning Callout).
+  note: {
+    color: colors.refusal,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.advisory,
+    paddingLeft: space.s2,
+    marginBlockStart: 0,
+    marginBlockEnd: space.s2,
+  },
 });
 
 interface JsonViewProps {
   draft: Draft;
   onApply: (draft: Draft) => void;
+  /** The sentence of the check whose Fix opened this surface, if one did. */
+  note?: string;
 }
 
 /**
@@ -45,7 +58,7 @@ interface JsonViewProps {
  * fresh from the current draft. Typing has no effect on the draft until
  * Apply succeeds.
  */
-export function JsonView({ draft, onApply }: JsonViewProps) {
+export function JsonView({ draft, onApply, note }: JsonViewProps) {
   const [text, setText] = useState(() => formatDraftText(draft));
   const [error, setError] = useState<string | null>(null);
 
@@ -61,6 +74,7 @@ export function JsonView({ draft, onApply }: JsonViewProps) {
 
   return (
     <div className="studio-json-view">
+      {note !== undefined && <p {...stylex.props(styles.note)}>{note}</p>}
       <label>
         {t("jsonView.label")}
         <textarea

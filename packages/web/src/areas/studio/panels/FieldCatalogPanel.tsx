@@ -334,17 +334,10 @@ const styles = stylex.create({
     paddingBlock: 2,
     paddingInline: space.s2,
   },
-  // The check list in a section: flush left, no marker, the refusal tone the
-  // heading above it takes. Handed to `IssueItems`, so the checks rail's own
-  // list keeps whatever it has.
+  // The check list in a section stands the section's full width. Handed to
+  // `IssueItems`, which holds the list's form.
   zoneIssueList: {
-    listStyle: "none",
-    marginBlock: 0,
-    marginInline: 0,
-    padding: 0,
     width: "100%",
-    color: colors.refusal,
-    fontSize: "0.9rem",
   },
   // Remove field: below a hairline of its own, de-emphasized (`.btn-ghost`),
   // the card's least frequent action.

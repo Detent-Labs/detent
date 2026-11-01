@@ -25,9 +25,10 @@ import { useFetchOnce } from "../panels/shared/useFetchOnce.js";
 import { stepTextMap } from "../panels/shared/optionText.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
 import { DEFAULT_TAB, FIELDS_VIEWS, SETTINGS_VIEWS, type ProcessTab, type Route, type TabView } from "../routing.js";
-import { checkTarget, formEditorReturnTab, placeAction, processTabCounts, STEP_PAGE_NAME_ID, surfaceTab, type CheckTarget, type FixRequest } from "../draft/process-tabs.js";
+import { checkTarget, fixPendingFocus, formEditorReturnTab, pendingFocusLands, placeAction, processTabCounts, STEP_PAGE_NAME_ID, surfaceTab, type CheckTarget, type FixRequest, type PendingFocus } from "../draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
-import { showsStructuralBanner } from "../draft/startGaps.js";
+import { structuralBannerStands } from "../draft/startGaps.js";
+import { issueText } from "../draft/issues.js";
 import { initialSaveState, type DraftSaveState } from "./draftSaveLogic.js";
 import { isDraftDirty, justPublishedAfter } from "./draftToolbarState.js";
 import { CanvasView } from "../canvas/CanvasView.js";
@@ -52,7 +53,7 @@ import { moveTo } from "../draft/list-ops.js";
 import { JsonView } from "../panels/JsonView.js";
 import { describeCaughtError } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
-import { scrollKeyboardFocusIntoView } from "../focusScroll.js";
+import { focusAtTop, scrollKeyboardFocusIntoView } from "../focusScroll.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
 import type { SectionRequest } from "../panels/stepSummaries.js";
 import type { NavigateOptions } from "../../../shell/routing.js";
@@ -308,12 +309,6 @@ interface EditScreenProps {
   onDirtyChange?: (dirty: boolean) => void;
 }
 
-/** A focus hand-off waiting for its tab's commit. */
-interface PendingFocus {
-  tab: ProcessTab;
-  elementId?: string;
-}
-
 interface ProcessSurfaceProps {
   processId: string;
   formStepId?: string;
@@ -413,6 +408,9 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // none, and the overflow entry names its state either way (design.md's open
   // question).
   const [jsonOpen, setJsonOpen] = useState(false);
+  // The sentence of the check whose Fix opened the JSON surface. It clears when
+  // the surface leaves, by the menu entry or by a tab press.
+  const [jsonNote, setJsonNote] = useState<string | undefined>(undefined);
   // The tab that opened the form editor: the editor stands in its body, and
   // leaving returns there (`studio-forms-overview`, `studio-form-editor`).
   // The editor's address carries no tab of its own, and this surface stays
@@ -963,8 +961,11 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // route's own update, so one commit opens the place, and the effect below
   // finds it. A field or a source sets no pending focus: selection lives in the
   // Fields tab, which focuses the sentence once its card reads the request.
-  const fixCheck = (target: CheckTarget) => {
-    if (target.json) setJsonOpen(true);
+  const fixCheck = (target: CheckTarget, sentence: string) => {
+    if (target.json) {
+      setJsonOpen(true);
+      setJsonNote(sentence);
+    }
     if (target.tab !== openTab) goToTab(target.tab, target.view);
     if (target.stepId !== undefined) onSelectStep(target.stepId, target.pathId);
     if (target.stepId !== undefined && target.section !== undefined) setSectionRequest({ stepId: target.stepId, section: target.section });
@@ -972,18 +973,19 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
       setFixRequest({ fieldId: target.fieldId, zone: target.zone, dataSourceId: target.dataSourceId });
       return;
     }
-    setPendingFocus({ tab: target.tab, elementId: target.focusId });
+    setPendingFocus(fixPendingFocus(target));
   };
   // Keyed on `pendingFocus` as well as the tab, so a request on the open tab
-  // lands too. It acts once its tab stands open, on the commit that holds the
-  // element, and clears, so a later tab switch pulls no focus.
+  // lands too. It acts on the commit that holds the element, open and in place
+  // (`pendingFocusLands`), and clears, so a later tab switch pulls no focus.
   useEffect(() => {
-    if (pendingFocus === undefined || pendingFocus.tab !== openTab) return;
+    if (!pendingFocusLands(pendingFocus, openTab, sectionRequest)) return;
     const element = pendingFocus.elementId === undefined ? null : document.getElementById(pendingFocus.elementId);
     if (element === null) focusTabButton(openTab);
+    else if (pendingFocus.toTop) focusAtTop(element);
     else element.focus();
     setPendingFocus(undefined);
-  }, [openTab, pendingFocus]);
+  }, [openTab, pendingFocus, sectionRequest]);
   // What the Checks tab narrows to, resolved from the step the badge named.
   // A step the draft no longer holds narrows nothing: the filter drops rather
   // than showing an empty list nobody can widen back by pressing a badge.
@@ -1118,11 +1120,14 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
           justPublished={justPublished}
           onBack={() => navigate({ name: "processes" })}
           onOpenSettings={openSettings}
-          onToggleJson={() => setJsonOpen((open) => !open)}
+          onToggleJson={() => {
+            setJsonOpen((open) => !open);
+            setJsonNote(undefined);
+          }}
           onVersions={() => navigate({ name: "versions", processId })}
           onPlayer={() => navigate({ name: "play", processId })}
         />
-        {showsStructuralBanner(validation) && <p {...stylex.props(styles.draftIncomplete)}>{t("app.draftIncomplete")}</p>}
+        {structuralBannerStands(validation, openTab, jsonOpen) && <p {...stylex.props(styles.draftIncomplete)}>{t("app.draftIncomplete")}</p>}
         {/* Either button moves focus to the open tab, which the tab row holds
             over the form editor too. */}
         {stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} disabled={requestRunning} />}
@@ -1131,7 +1136,13 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
             open={openTab}
             counts={counts}
             checksBlocked={checksBlocked}
-            onOpen={(target) => (formStepId === undefined ? goToTab(target) : leaveFormEditorFor(target))}
+            onOpen={(target) => {
+              // A press on any tab leaves the JSON surface for that tab.
+              setJsonOpen(false);
+              setJsonNote(undefined);
+              if (formStepId === undefined) goToTab(target);
+              else leaveFormEditorFor(target);
+            }}
             jsonOpen={jsonOpen}
           />
           {/* The JSON surface stands in place of every tab body, never beside
@@ -1139,7 +1150,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
               open (`studio-json-view`). The six bodies below stay mounted and
               hidden, and a `hidden` subtree reaches neither the tab order nor
               the accessibility tree. */}
-          {jsonOpen && <JsonView draft={draft} onApply={replace} />}
+          {jsonOpen && <JsonView draft={draft} onApply={replace} note={jsonNote} />}
 
           {tabPanel(
             "map",
@@ -1260,7 +1271,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
               canPublish={canPublish}
               narrowedTo={checksNarrowedTo}
               onShowEvery={() => setChecksStepId(undefined)}
-              onFix={(issue) => fixCheck(checkTarget(issue, draft))}
+              onFix={(issue) => fixCheck(checkTarget(issue, draft), issueText(issue))}
             />,
           )}
           {/* The Settings tab: the process's own settings, its contract and

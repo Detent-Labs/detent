@@ -1,3 +1,5 @@
+import { tailAfterField, tokenize } from "../draft/issues.js";
+
 /**
  * Which section of the field card a check on the selected field belongs to,
  * read off the check's own `loc` (`EditorIssue.loc`). The card maps the six
@@ -40,8 +42,9 @@ const ZONE_BY_KEY: Record<string, FieldCheckZone> = {
  * .label` is a check on an option, not on a label, and reading from the far
  * end would call it one.
  *
- * `lastIndexOf` finds the anchor, so a check inside a group's child resolves
- * against the child. The anchor is also what keeps an unrelated `loc` out:
+ * The walk follows the `fields` chain, so a check inside a group's child
+ * resolves against the child, and a column key `fields` stays a column key. The
+ * chain is also what keeps an unrelated `loc` out:
  * `workflow.steps[0].onEntry[0].config.x` carries no `fields` token, so
  * nothing is scanned and the answer is `undefined`.
  */
@@ -79,15 +82,8 @@ export function namesFieldSource(loc: string): boolean {
   return segmentsAfterAnchor(loc)[0] === "dataSource";
 }
 
-/** The `loc` segments after the field its last `fields` token names, index
- * suffixes dropped, or none for a `loc` with no such token. A bare `fields`
- * token names its field by the id after it, as in `fields.field_x.dataSource`,
- * and `fields[0].dataSource` carries the field in its own index. */
+/** The `loc` segments past the field it names, index suffixes dropped, or none
+ * for a `loc` with no `fields` token. */
 function segmentsAfterAnchor(loc: string): string[] {
-  const raw = loc.split(".").filter((s) => s.length > 0);
-  const segments = raw.map((s) => s.replace(/\[\d+\]$/, ""));
-
-  const anchor = segments.lastIndexOf("fields");
-  if (anchor === -1) return [];
-  return segments.slice(raw[anchor] === "fields" ? anchor + 2 : anchor + 1);
+  return tailAfterField(tokenize(loc));
 }
