@@ -127,6 +127,26 @@ describe("the edit screen's Arrange", () => {
   });
 });
 
+describe("the process list's import preview", () => {
+  const screen = code("screens/ProcessesScreen.tsx");
+
+  it("a cancel runs cancelImport", () => {
+    expect(between(screen, "<PromotionPreviewDialog", "/>")).toContain("onCancel={cancelImport}");
+  });
+
+  it("cancelImport clears the preview and its messages, and sends no request", () => {
+    const cancelImport = between(screen, "const cancelImport =", "const askDiscard");
+    expect(cancelImport).toContain("setPending(undefined)");
+    expect(cancelImport).not.toContain("publishProcess(");
+    expect(cancelImport).not.toContain("await ");
+  });
+
+  it("publishProcess is called once, in confirmImport alone", () => {
+    expect(between(screen, "const confirmImport =", "const cancelImport")).toContain("await publishProcess(");
+    expect(screen.split("publishProcess(").length - 1).toBe(1);
+  });
+});
+
 describe("the process list's start picker", () => {
   const screen = code("screens/ProcessesScreen.tsx");
 

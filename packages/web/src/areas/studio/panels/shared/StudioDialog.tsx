@@ -180,8 +180,9 @@ const BusyContext = createContext(false);
  *
  * The keyboard hold listens on `document`, since the focus can stand on `body`,
  * where a listener on the dialog never hears Tab. A blur leaves it there, and a
- * click on a dialog's text leaves it on the dialog in Chromium. An empty list still takes the `preventDefault()`, so a busy dialog with both
- * controls disabled keeps the focus from leaving.
+ * click on a dialog's text leaves it on the dialog in Chromium. An empty list
+ * still takes the `preventDefault()`, so a busy dialog with both controls
+ * disabled keeps the focus from leaving.
  */
 function useStudioDialog(triggerRef: RefObject<HTMLElement | null>, initialFocusRef?: RefObject<HTMLElement | null>) {
   const dialogRef = useRef<HTMLDialogElement>(null);

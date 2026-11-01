@@ -2937,9 +2937,9 @@ Tab to Publish. Pass: it takes focus, unlike a natively disabled button. A
 screen reader reads the reason with the control, through `aria-describedby`.
 
 Now sign in as an account holding `system:publish` and open the same draft.
-Choose Publish. Pass: the dialog names the process, the process id, the
-revision and the next version. It also states that a published version can
-never change.
+Choose Publish. Pass: the dialog names the process and the next version.
+The process id and the revision wait in its closed Developer view. It also
+states that a published version can never change.
 
 Press Escape. Pass: the dialog closes and no request goes out. Choose Publish
 again and click the backdrop outside the dialog. Pass: the dialog stays put,
@@ -2955,8 +2955,8 @@ saves the unsaved changes first. Confirm. Pass: one `PUT` then one `POST`, and
 no second prompt between them.
 
 Open the `⋮` menu and choose Discard draft. Pass: a dialog opens naming the
-process and the revision, and stating that the published versions stay. Cancel. Pass: the draft is still
-open and unchanged.
+process and its last save, and stating that the published versions stay.
+Cancel. Pass: the draft is still open and unchanged.
 
 To see a refusal render, sign back in as `demo-developer` and open the draft.
 Publish through the browser console rather than through the gated control.

@@ -48,6 +48,36 @@ function buttonTag(html: string, label: string): string {
   return html.slice(html.lastIndexOf("<button", end), end + 1);
 }
 
+const FRAME_FILE = new URL("../src/areas/studio/panels/shared/StudioDialog.tsx", import.meta.url).pathname;
+
+/** The `heading: {...}` object literal of the frame's `stylex.create`, comments stripped. */
+function headingStyle(): string {
+  const source = readFileSync(FRAME_FILE, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  const start = source.indexOf("heading: {");
+  expect(start).toBeGreaterThan(-1);
+  return source.slice(start, source.indexOf("}", start) + 1);
+}
+
+describe("StudioDialog heading style", () => {
+  it("overrides the global h2's uppercase, tracking and slate, so the author's capitals print", () => {
+    // `shell/global.css` gives every `h2` uppercase, 0.08em tracking and the
+    // muted color. A compiled class outranks the element selector.
+    expect(readFileSync(new URL("../src/shell/global.css", import.meta.url).pathname, "utf8")).toMatch(/h2 \{[^}]*text-transform: uppercase/);
+    const block = headingStyle();
+    expect(block).toMatch(/textTransform: "none"/);
+    expect(block).toMatch(/letterSpacing: "-0\.015em"/);
+    expect(block).toMatch(/\bcolor: colors\.text\b/);
+  });
+
+  it("the style the pin reads is the one the heading element uses", () => {
+    expect(readFileSync(FRAME_FILE, "utf8")).toMatch(/<h2[^>]*styles\.heading/);
+  });
+
+  it("a heading style that keeps the global uppercase would fail the pin", () => {
+    expect(/textTransform: "none"/.test('heading: { fontSize: "1.25rem" }')).toBe(false);
+  });
+});
+
 describe("StudioDialog", () => {
   it("names itself through the heading and describes itself through the body", () => {
     const html = frame(<DialogNote>Only the draft goes.</DialogNote>, { confirm: <span /> });

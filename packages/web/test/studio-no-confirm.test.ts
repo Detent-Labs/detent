@@ -41,6 +41,13 @@ const NATIVE_PROMPT = /\bconfirm\s*\(/;
 /** The element, not `<dialogFoo`, and the method call under any receiver. */
 const DIALOG_SITE = /<dialog(?=[\s>/])|\bshowModal\s*\(/;
 
+/** Any identifier that names a dialog: `StudioDialog`, `RemoveStepDialog`, a
+ * `dialog` ref. `studio-app`: "Removing a way out asks nothing". */
+const DIALOG_NAME = /\w*[Dd]ialog\w*/;
+
+/** The file that removes a way out, which must mount no dialog. */
+const PATHS_PANEL = "panels/PathsPanel.tsx";
+
 interface SourceFile {
   /** Relative to `src/areas/studio`. */
   path: string;
@@ -107,5 +114,17 @@ describe("the studio raises no native prompt and opens one dialog form", () => {
     expect(DIALOG_SITE.test(stripComments("// renders a <dialog> and calls showModal()\nconst a = 1;"))).toBe(false);
     expect(DIALOG_SITE.test(stripComments("return <StudioDialog heading={h} />;"))).toBe(false);
     expect(DIALOG_SITE.test(stripComments("return <dialogFrame />;"))).toBe(false);
+  });
+
+  it("the paths panel removes a way out at once, with no dialog of any kind", () => {
+    const panel = files.find((f) => f.path === PATHS_PANEL);
+    expect(panel, `${PATHS_PANEL} not found`).toBeDefined();
+    expect(stripComments(panel!.source).match(DIALOG_NAME)).toBeNull();
+  });
+
+  it("a planted dialog name fails the paths-panel pin, a comment about one does not", () => {
+    expect(stripComments("import { StudioDialog } from './shared/StudioDialog.js';").match(DIALOG_NAME)).not.toBeNull();
+    expect(stripComments("return <RemovePathDialog onCancel={noop} />;").match(DIALOG_NAME)).not.toBeNull();
+    expect(stripComments("// removing a way out opens no dialog\nconst a = 1;").match(DIALOG_NAME)).toBeNull();
   });
 });

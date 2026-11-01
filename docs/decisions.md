@@ -865,24 +865,23 @@ recorded rather than fixed. The RAIL tags are local to this section.
   the tension sits in `DESIGN.md` itself.
 - **`.btn-ghost` text falls under 4.5:1 on its own washes.** The field
   catalog's Remove field trigger carries it
-  (`packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:1474`). Its
+  (`packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:1479`). Its
   accent text reads 4.53:1 at rest, 3.90:1 hovered and 3.45:1 pressed, in
   light. `destructive-buttons-show-the-accent` cleared the same shortfall for
   `.btn-destructive` with `--color-accent-on-muted`, and this one wants the
   same treatment. The dialogs' Cancel left the class with
   `studio-one-dialog-form`.
-- **Remove step and the field catalog's Remove field trigger have no
-  destructive treatment.** `packages/web/src/areas/studio/panels/StepPage.tsx:776`
-  renders `btn btn-secondary` and commits at once.
-  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:973` renders
+- **The field catalog's Remove field trigger has no destructive treatment.**
+  `packages/web/src/areas/studio/panels/FieldCatalogPanel.tsx:1479` renders
   `btn btn-ghost` and opens `RemoveFieldDialog` instead. `DESIGN.md` asks that
   a destructive action stay outlined in the accent. The field catalog's
   trigger also reads "Remove field" on every entity, group included; its own
-  dialog a moment later reads "Remove group".
+  dialog a moment later reads "Remove the group".
 
   Resolved in part by `studio-step-accordion`: Remove this step now draws
-  outlined in the accent and opens a confirmation dialog first. The field
-  catalog's Remove field trigger stays open.
+  outlined in the accent (`btn btn-secondary btn-destructive`,
+  `packages/web/src/areas/studio/panels/StepPage.tsx:1051`) and opens
+  `RemoveStepDialog` first. The field catalog's Remove field trigger stays open.
 - **A span-1 card's label collapses to zero width in a two-column form.**
   Measured at 1440x900 on the form editor canvas: `cost_center` draws eleven
   letters down one column. The member row spends about 315px on Move up, Move
@@ -1016,7 +1015,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   uppercase tracked slate (`DESIGN.md:339`). Zone headings compute 14.4px at
   800 in ink (`panels/FieldCatalogPanel.tsx:257`), and none takes the Title
   role (`DESIGN.md:333`). The Remove field button
-  (`panels/FieldCatalogPanel.tsx:973`) is an accent ghost
+  (`panels/FieldCatalogPanel.tsx:1479`) is an accent ghost
   (`packages/web/src/shell/tokens.css:221`), and its text starts 5px right of
   the column's flush-left edge. Risk (Low): the field editor sets type outside
   the roles `DESIGN.md` names.
@@ -2273,6 +2272,14 @@ to later changes. The DIALOG tag is local to this section.
   their place after a decline.
 
   Upgrade entry: read `event.currentTarget` where a handler has the event.
+- **DIALOG-8: Remove steps says nothing when the first step leaves.** The
+  single-step dialog says "The first remaining step takes its place".
+  `RemoveStepsDialog` prints no such note, while the start marker moves when the
+  first step is among those removed. Risk (Low): an author learns of the new
+  start only after the confirm.
+
+  Upgrade entry: a `reach.isInitial`-style fact on the selection and one catalog
+  sentence.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
