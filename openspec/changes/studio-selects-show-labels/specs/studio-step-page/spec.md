@@ -49,7 +49,8 @@ SHALL print a key or an id.
 A step SHALL read its label at the content locale, else at the base locale,
 else "(unnamed step)". A way out SHALL read its row heading. A repeated text
 SHALL add a count in draft order, as in "Review (2)". A way-out heading SHALL
-name its target by that counted text.
+name its target by that counted text. Each option SHALL store the entity's
+`id`.
 
 #### Scenario: "Leads to" lists step labels
 
@@ -91,7 +92,8 @@ and a called process's input mapping. No option SHALL print a key.
 
 A field SHALL read its label at the content locale, else "(unnamed field)". A called
 process's field SHALL read its label in that process's base locale. No group
-SHALL appear. A repeated text SHALL add a count in list order. A stored id
+SHALL appear. A repeated text SHALL add a count in list order. Each option
+SHALL store the field's `id`. A stored id
 that no list holds SHALL print with the "(not in the list)" mark.
 
 #### Scenario: An action's output mapping lists field labels

@@ -36,7 +36,7 @@
 - [ ] 3.10a Add a panel test: label options, unnamed step, "Review (2)" in both selects and in a heading.
 - [ ] 3.11 Add a TimersPanel render test: the way-out select offers "Freigeben → Abschluss" and no key.
 - [ ] 3.12 Move `studio-fieldExpressionMapEditor.test.tsx` to `targets`. Rewrite its key cases near lines 77 and 149.
-- [ ] 3.12a There, add: labelled options, no group, the unlisted id keeps its "(not in the list)" mark.
+- [ ] 3.12a There, add: labelled options, "Name (2)", no group, and the unlisted id's "(not in the list)" mark.
 - [ ] 3.13 Rewrite the key cases near lines 150 and 161 of `studio-subprocessSpecEditor.test.tsx` to labels.
 - [ ] 3.13a There, add: "Amount" and "Applicant" with no key, and no group the contract names.
 - [ ] 3.14 Run typecheck, then the full suite, both in the foreground. Name any failing test.
@@ -62,5 +62,5 @@
 ## Workflow follow-up
 
 - Run `openspec-verify-change`, then sync the specs and archive the change.
-- At sync, move the ADDED inputMapping successor to its removed predecessor's place.
+- At sync, move the four ADDED inputMapping successors to their removed predecessor's place.
 - Set the stage 64 status line in `ROADMAP.md`.
