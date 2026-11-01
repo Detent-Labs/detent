@@ -1805,8 +1805,8 @@ this section.
 
 - **NAMES-2: an unnamed card offers no selection beside its input.** A card
   with an empty label keeps its name input and offers no strip. The input says
-  what to do, and the Fields tab still edits the field. Change 11's field card
-  may answer whether such a card can take a selection.
+  what to do, and the Fields tab still edits the field. This needs its own
+  change.
 - **NAMES-4: a minted key can stay its kind's name.** The key lock counts a
   base version that has not loaded as published, and a failed fetch never
   loads. On such a process, naming a new field "Amount" keeps the key
@@ -1846,7 +1846,8 @@ local to this section.
   The class names `timer-row` and `mapping-row` have no rule. Their captions
   stand beside the controls. This needs its own change.
 - **SELECTS-10: CEL inputs stand beside the field-map selects.** They sit
-  outside a Developer view. These are stage 27's low-code sites. This needs its own change.
+  outside a Developer view. These are stage 27's low-code sites. This needs
+  its own change.
 - **SELECTS-11: the field border contrast already has an entry.** The audit
   measured 1.33:1 again. The 2026-09-11 design audits section holds the entry,
   "A field's border reads 1.32:1 in light and 1.64:1 in dark".
@@ -1937,10 +1938,10 @@ raised the last four.
   the "Read by" zone, in the other half of the editor. Risk (Low): an author
   must search for what moved.
 
-  Upgrade entry: name up to three places in the line, and tint the rewritten
-  rows in `panels/FieldCatalogPanel.tsx` with the usage tint.
+  Upgrade entry: name up to three places in the line, and mark the rewritten
+  rows in `panels/FieldCatalogPanel.tsx`.
 - **KEYFOLLOW-10: a condition on a field no step asks for can never match.** The
-  "Read by" zone lists it like any other. Nothing says the field stays empty.
+  "Read by" section lists it like any other. Nothing says the field stays empty.
   Risk (Medium): a way out that waits on such a field never opens.
 
   Upgrade entry: compare `panels/readByRows.ts`'s rows with the "Used in"
@@ -1977,9 +1978,9 @@ tag is local to this section.
   edge.
 - **ACCORDION-8: the Who acts body is the inline form of
   `PluginEnvelopeEditor`.** It prints schema-key labels, "Edit as JSON" and a
-  "Settings (JSON)" box outside a Developer view. Change 11 or a follow-up of
-  its own takes it. Risk (Medium): an author meets machine words where the
-  guided vocabulary promises plain ones.
+  "Settings (JSON)" box outside a Developer view. This needs its own change.
+  Risk (Medium): an author meets machine words where the guided vocabulary
+  promises plain ones.
 - **ACCORDION-9: a step-level check prints the validator's own text under a
   "ZOD" label.** A just-added step's name check lands on the masthead rather
   than under Name. Focus stays in the steps rail after "Add a step". Change 12
@@ -2143,8 +2144,12 @@ HEADER tag is local to this section.
 
 ## Open from studio-field-card (needs its own OpenSpec change)
 
-The change drew the selected field as one card in sections. It left twelve
+The change drew the selected field as one card in sections. It left thirty
 points to later changes. The FIELDCARD tag is local to this section.
+
+On 2026-11-01 the critique scored the card 25/40 (Acceptable) and the audit
+15/20 (Good). The CSP blocked the overlay again. FIELDCARD-13 to FIELDCARD-27
+come from those two reports.
 
 - **FIELDCARD-1: a choice rename moves no guard literal that compares the old
   value.** The stored value follows the name until the first publish. The
@@ -2190,8 +2195,11 @@ points to later changes. The FIELDCARD tag is local to this section.
   twice.
 - **FIELDCARD-8: the card's tests pin several behaviours by source text.**
   They match strings in `FieldCatalogPanel.tsx` instead of driving the
-  rendered card. Risk (Medium): a rename or a refactor breaks them with no
-  behaviour change.
+  rendered card. The matrix badge test reads a slice of the grid's source too.
+  The `openPlace` dispatch in `EditScreen.tsx` had no test at all. The pure
+  `placeAction` now covers its three outside kinds. The `field` kind stays an
+  effect the tests pin at the source. Risk (Medium): a rename or a refactor
+  breaks them with no behaviour change.
 
   Upgrade entry: render the card in a test and assert on the output.
 - **FIELDCARD-9: `FieldCatalogPanel.tsx` is about 1,520 lines.** The card,
@@ -2216,6 +2224,114 @@ points to later changes. The FIELDCARD tag is local to this section.
   open or closed against what the author last chose.
 
   Upgrade entry: hold the open state in the editor and derive the forced case.
+- **FIELDCARD-13: the envelope editor on Where values come from renders
+  unstyled.** The class `.plugin-envelope` of `PluginEnvelopeEditor` has no
+  rule. Its labels sit inline, and its JSON area stands 66px tall in the body
+  face. The audit rated it P1, and it predates this change. Risk (Medium): an
+  author meets a raw form inside the guided view.
+
+  Upgrade entry: give `panels/shared/PluginEnvelopeEditor.tsx` compiled
+  styles, with the label above the control.
+- **FIELDCARD-14: the authoring commands and a choice's Remove stand 33px
+  tall.** The 44px target size is out of reach. WCAG 2.5.8 passes, and the
+  studio is a desktop tool. Risk (Low): a touch press misses the command.
+
+  Upgrade entry: raise the block padding of the card's `command` style.
+- **FIELDCARD-15: the matrix checkboxes are 13px.** Risk (Low): a pointer
+  press misses the box.
+
+  Upgrade entry: size the cell checkbox in `panels/FieldMatrixGrid.tsx` to
+  1rem, inside its 1.75rem track.
+- **FIELDCARD-16: a mixed badge differs from an off badge by color alone.**
+  The "Already on" count stands only in the accessible name. Risk (Medium): an
+  author who cannot tell the colors apart reads a mixed column as off.
+
+  Upgrade entry: print a mark or the count on the mixed badge in
+  `panels/FieldMatrixGrid.tsx`.
+- **FIELDCARD-17: repeated commands lack row context in their names.**
+  "Open the form", "Show on the map" and "Open" repeat on every row. A matrix
+  column header's accessible name runs to about 250 characters. Risk (Medium):
+  a screen reader lists identical commands, and a long name per header.
+
+  Upgrade entry: add the row's step or place to each command's `aria-label`.
+  Move the header's bulk sentences into `aria-describedby`.
+- **FIELDCARD-18: a blank matrix cell has no accessible name.** Its dash is
+  `aria-hidden`. Risk (Low): a screen reader announces an empty cell.
+
+  Upgrade entry: name the cell with a catalog sentence that says the form
+  lacks the field.
+- **FIELDCARD-19: at 420x800 the view body gets 394px.** The header bar, the
+  tab row and the sub-row take the rest. Risk (Low): a narrow window shows a
+  small part of the card at once.
+
+  Upgrade entry: let the sub-row scroll with the view body below 30rem.
+- **FIELDCARD-20: no `h2` stands between the header bar's `h1` and the card's
+  `h3`.** Risk (Low): a screen reader's heading list skips a level.
+
+  Upgrade entry: give each tab body an `h2`, visually hidden where the tab row
+  already names it.
+- **FIELDCARD-21: the sub-row scrolls sideways at 420px with no edge fade.**
+  Each of its tabs takes `tabIndex` 0, with no roving tabindex. Risk (Low): an
+  author misses a view past the edge, and Tab stops on every view.
+
+  Upgrade entry: reuse the tab row's edge fade and roving tabindex in
+  `panels/SubRow.tsx`.
+- **FIELDCARD-22: the Kind picker lists 17 flat options.** It mixes value and
+  control in one list. The entry "custom (plugin)" stands outside a Developer
+  view. Risk (Medium): an author scans a long list of near twins.
+
+  Upgrade entry: group the options by value with `<optgroup>`, and move the
+  custom entry into a Developer view.
+- **FIELDCARD-23: the Validation editor inside More prints raw keys.** It
+  reads min, max, rule and a "(2)" summary. The Default value input carries
+  the caption "value". `studio-field-validation-form` and the default editor
+  keep their own words for now. Risk (Medium): machine words stand inside the
+  guided card.
+
+  Upgrade entry: a later change rewords
+  `panels/shared/FieldValidationEditor.tsx` and the default editor's caption.
+- **FIELDCARD-24: the "base locale" chip beside Name is a machine chip.** It
+  shows on a process with one locale too. Risk (Low): an author reads a
+  machine word that says nothing.
+
+  Upgrade entry: hide the chip while the process has one locale.
+- **FIELDCARD-25: the Remove field dialog prints counts, not names.** It says
+  "CEL expressions reading it". Change 13 owns the dialogs. Risk (Medium): an
+  author removes a field without seeing what reads it.
+
+  Upgrade entry: change 13's dialog work.
+- **FIELDCARD-26: a Read by row prints "A hand-written rule." for a guard the
+  builder cannot read.** An example is
+  `data.quantity * data.unit_price >= 10000.0`. Risk (Low): the row names its
+  place and says nothing about the rule.
+
+  Upgrade entry: change 16's expansion of the sentence reader.
+- **FIELDCARD-27: both entity rails carry the accessible name "Editors".** The
+  Catalog view's rail and the Where values come from view's rail share it.
+  Risk (Low): a screen reader user cannot tell the two apart.
+
+  Upgrade entry: name each rail after its view in `panels/EntityTabs.tsx`.
+- **FIELDCARD-28: removing a choice leaves a default naming its value.** A
+  hand edit of a stored value and a name-driven move carry the default along.
+  The removal in `removeChoice` leaves it. Risk (Low): the default names a
+  choice the field no longer offers.
+
+  Upgrade entry: clear the matching default in `FieldCatalogPanel.tsx`'s
+  `removeChoice`, in the same mutation.
+- **FIELDCARD-29: two seams lack a test of their own.** The provider path of
+  `usePublishedOptionValues` for a version mismatch has no test. The export
+  `DataSourceRow` exists for its test alone. Risk (Low): a regression in the
+  mismatch path stays unseen.
+
+  Upgrade entry: test the mismatch in `draft/publishedFields.tsx`, and test
+  `DataSourceRow` through `DataSourcesPanel`.
+- **FIELDCARD-30: More's heading takes the refusal tone for three checks
+  only.** A default, validation or mapping check turns it. A key or technical
+  check prints outside More, per D5. Risk (Low): an open More reads clean while
+  its key input holds a check.
+
+  Upgrade entry: decide in a later change whether those two checks turn the
+  heading too.
 - **The live specs still say "definition half".** Untouched `studio-app`
   requirements, such as the removal dialog's and the move requirement's
   scenarios, name the retired halves of the field editor. The sync of
