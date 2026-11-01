@@ -1018,7 +1018,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   rail stacks above the editor, capped at 20rem (`panels/EntityTabs.tsx:90`).
   Measured 2026-09-13: the editor pane stands 105px tall at 900x720, and 18px
   at 420x720 with its heading cut off. Measured 2026-09-26 at 400x800, "+ Add
-  field" raises the FIELDS-8 banner, and the pane shrinks to 8px. The new
+  field" raises the structural banner (CHECKS-20), and the pane shrinks to 8px. The new
   label input and its ring, 42px, then clip at both edges. No 2px rule
   separates the two scroll regions: the rail drops its right-hand border
   there (`:87`). Risk (Medium): the rail keeps its 20rem and the editor gets
@@ -1054,27 +1054,6 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 
   Since `forms-card-legend`, the Forms tab's card labels stand at `h2` under
   the header bar's `h1`. The repair matches that level or moves them with it.
-- **FIELDS-8: check messages speak the engine's layers.** Measured 2026-09-13,
-  the Fields tab showed `ZOD missing baseLocale ('en') entry` and
-  `field key must match /^[a-z_][a-z0-9_]*$/ to be a valid CEL identifier`.
-  A view entry naming an id no field carries — the shape an unfixed field
-  removal left then, and a JSON-view edit can still write today — showed
-  `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
-  longer look up. Adding an empty field raises the banner at
-  `screens/EditScreen.tsx:967` before the author types. The banner reads
-  `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`
-  (the banner now reads "Open Checks and fix this draft's structure, so every check can run."),
-  and it pushes the page down 35px at 1400px and 99px at 900px. The messages
-  come from `src/schema/definition.ts:1014`, `src/schema/compile.ts:612` and
-  `src/schema/definition.ts:1095`, and the "ZOD" label from
-  `panels/shared/IssueList.tsx:44`. Risk (Medium): an author reads Zod, CEL
-  grammar and raw ids where a plain sentence belongs.
-
-  Since `studio-fresh-draft-starts-clean` the process-name message reads a
-  sentence, and the field-label part stays open. Since
-  `studio-checks-by-subject` every such message reads a sentence at the spot
-  and on the Checks tab. The "ZOD" label and the raw text stand in the row's
-  Developer view alone.
 - **FIELDS-9: a group's editor leads with zones a group cannot use.** Its
   definition half shows "Where values come from"
   (`panels/FieldCatalogPanel.tsx:882`). It also shows a disabled "Default
@@ -2315,14 +2294,6 @@ every placement. Its task reviews left the points below. The CHECKS tag is
 local to this section. Paths under `panels/`, `draft/` and `screens/` start at
 `packages/web/src/areas/studio/`.
 
-- **CHECKS-1: a Fix on a JSON-surface sentence leaves the author on the JSON
-  surface with no way back but the menu.** Several sentences end "Correct it
-  in the JSON surface", and their Fix opens that surface and focuses its
-  input. The surface replaces the six tab bodies. Risk (Medium): an author
-  who has corrected the entry must find the `⋮` menu to return to the tabs.
-
-  Upgrade entry: add a return control to `panels/JsonView.tsx`, or let
-  `fixCheck` in `screens/EditScreen.tsx` remember the tab it left.
 - **CHECKS-2: the same-output sentence on an end step reads the step form.**
   An end step draws no When left list, so `draft/checkSentence.ts` names no
   section for `checks.action.sameOutput` there. Risk (Low): the sentence says
@@ -2340,13 +2311,47 @@ local to this section. Paths under `panels/`, `draft/` and `screens/` start at
 - **CHECKS-6: the 3px exclusion in `studio-guidedSurfaceStyle.test.ts` strips
   the whole `warning` block.** The test reads `StepPage.tsx` with that block
   cut out. Risk (Low): a second weight inside the block passes the test.
-- **CHECKS-7: no test covers two refusal cases.** When a located issue gets a
-  tier 4 answer, `describePublishRefusal` swaps in the refusal fallback. A
-  contract sentence must also stay as it is. Risk (Low): a rewrite of either
-  rule passes the suite.
 - **CHECKS-8: no test shows `errorDetail` clearing with the error.**
   `panels/DraftToolbar.tsx` and `panels/ProcessHeaderBar.tsx` hold both.
   Risk (Low): the server's old text could stand under a new refusal.
+- **CHECKS-9: the held-back line says "the rows above" with no row above.** A
+  narrowed list with no row on its step reaches it while another step holds
+  checks back. So does a compiling draft whose registry has not loaded.
+  Risk (Low): the spec's sentence reads false there, and a third key would repair
+  it.
+- **CHECKS-10: a sentence at the spot gives directions to where the author
+  stands.** One key serves the row and the placement, so a step page reads "Under
+  Who acts" inside Who acts. Risk (Low): the words read as a misplaced pointer.
+- **CHECKS-11: the blocked Publish stays filled, and one label covers several
+  issues.** Publish keeps its accent fill on a blocked draft. Its reason reads
+  "Blocked by an open issue" over several. Risk (Medium): the primary action
+  invites a press that cannot succeed.
+- **CHECKS-12: the Time limit section prints a raw unreadable length.** A length
+  the panel cannot read lands there, and the row shows the stored text. Risk
+  (Medium): the author reads a machine value where a sentence belongs.
+- **CHECKS-13: a key check offers no one-press repair.** The Fix focuses the key
+  input, and the author types a new value. Risk (Low): a reserved or empty key
+  could take a suggestion from the step's name.
+- **CHECKS-14: below 64rem the checks rail is a small scroll box.** The rail
+  caps with the tab body, so a long list scrolls in a short box. Risk (Medium):
+  two scrollbars compete on a narrow window.
+- **CHECKS-15: labels drift on Time limit and the field card.** A section's name
+  and a label on its body can differ from a sentence's word. Risk (Low): a
+  sentence points at a word the place does not print.
+- **CHECKS-16: the step page's Developer summary stands 17px tall.** An audit
+  measured it under the 24px target size. The row's summary stands clear of
+  other targets. Risk (Low): a pointer user has a narrow target on More.
+- **CHECKS-17: no "next check" walk.** After a Fix, the author returns to the
+  Checks tab for the next row. Risk (Low): a long list costs two presses a row.
+- **CHECKS-18: a JSON landing does not select the location.** Focus stands in
+  the input with the caret at the start, and the sentence names no line. Risk
+  (Medium): the author searches a long body by eye.
+- **CHECKS-19: a row's ZOD label and its two location forms.** The Developer view
+  prints the source in capitals, and a location reads `steps[0]` or
+  `workflow.steps[0]`. Risk (Low): a developer reads one place as two.
+- **CHECKS-20: the structural banner pushes the page down.** Measured 2026-09-13,
+  it adds 35px at 1400px and 99px at 900px, on every tab but Checks. Risk
+  (Low): the tab row jumps as a check opens or clears.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

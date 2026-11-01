@@ -49,7 +49,7 @@ bar, the tab row, then one tab body.
 | tab | one of the six. The authoring order runs Map, Steps, Fields, Forms, Checks and Settings | `routing.ts` |
 | sub-row | the strip of a tab's views under the tab row. The Fields tab's reads Catalog, Where fields appear and Where values come from. The Settings tab's reads Process, What it takes in and gives back, and Access | `panels/SubRow.tsx` |
 | structure surface | the six tab bodies together, the JSON surface's one alternative | `EditScreen.tsx`; gated by `structureActive`, a prop of `panels/ProcessHeaderBar.tsx` |
-| JSON surface | the raw definition view, the structure surface's one alternative | `panels/JsonView.tsx` |
+| JSON surface | the raw definition view, the structure surface's one alternative. A press on any tab leaves it. A Fix that opens it prints the check's sentence above the input | `panels/JsonView.tsx` |
 
 The open tab stands in the address, at `/studio/processes/:id/edit/:tab`. An
 open view adds one segment, as in `/edit/fields/matrix`. All six bodies stay
@@ -98,8 +98,8 @@ Every other term below belongs to one tab.
 | masthead | the step page's top zone. It holds the step number, the kind phrase, the name and the description. It also holds a name check under Name and any issue no section claims | `panels/StepPage.tsx` |
 | section | one subject group on the step page, one of six, open one at a time | `panels/sectionsFor.ts` |
 | section header | the button that opens and closes one section. It carries the section's name, a one-line summary and a mark | `panels/StepPage.tsx` |
-| Developer view | a disclosure over raw JSON, CEL or machine values. The step page's, in More, holds the step's key and JSON, and each way-out row's holds that way out's key. The change-list row, each process list row, the form editor and a condition or rule input hold one. A check row and the checks rail's line hold one each. The field card holds four: More's, Choices', the default value's and the validation rule's. The Settings tab's Process view and the Publish dialog hold the key, the process id and the revision. | `panels/StepPage.tsx`, `panels/PathsPanel.tsx`, `panels/ChecksRail.tsx`, `panels/ChangeList.tsx`, `panels/ProcessSettingsPanel.tsx`, `panels/ProcessHeaderBar.tsx`, `screens/ProcessesScreen.tsx`, `panels/FieldCatalogPanel.tsx`, `screens/FormEditorScreen.tsx`, `panels/shared/ConditionInput.tsx`, `panels/shared/RuleInput.tsx`, `panels/shared/DefaultValueEditor.tsx` |
-| sentence | the line that reads a condition in words. It stands under a condition input's rows and under a Read by row's place. On the canvas, a way out's sentence sits on its line, as "Otherwise" does | `panels/shared/ConditionInput.tsx`, `panels/shared/conditionLogic.ts::readerSentence`, `canvas/mapWords.ts` |
+| Developer view | a disclosure over raw JSON, CEL or machine values. The step page's, in More, holds the step's key and JSON, and each way-out row's holds that way out's key. The change-list row, each process list row, the form editor and a condition or rule input hold one. A check row and the checks rail's line hold one each. The field card holds four: More's, Choices', the default value's and the validation rule's. The Settings tab's Process view and the Publish dialog hold the key, the process id and the revision. A refused publish holds one over the server's own text, in the Publish dialog, the discard dialog and the banner. | `panels/StepPage.tsx`, `panels/PathsPanel.tsx`, `panels/ChecksRail.tsx`, `panels/ChangeList.tsx`, `panels/ProcessSettingsPanel.tsx`, `panels/ProcessHeaderBar.tsx`, `screens/ProcessesScreen.tsx`, `panels/FieldCatalogPanel.tsx`, `screens/FormEditorScreen.tsx`, `panels/shared/ConditionInput.tsx`, `panels/shared/RuleInput.tsx`, `panels/shared/DefaultValueEditor.tsx` |
+| sentence | the line that reads a condition in words. It stands under a condition input's rows and under a Read by row's place. On the canvas, a way out's sentence sits on its line, as "Otherwise" does. A check's sentence is the one line an open issue reads, on its check row and at its placement | `panels/shared/ConditionInput.tsx`, `panels/shared/conditionLogic.ts::readerSentence`, `canvas/mapWords.ts`, `draft/checkSentence.ts` |
 | Read by section | the field card's section that lists each expression reading the field, by place and sentence. Each row with a place carries an Open command | `panels/FieldCatalogPanel.tsx`, rows from `panels/readByRows.ts` |
 | rewrite line | the line under a field's label that says how many conditions a key change updated | `panels/FieldCatalogPanel.tsx` |
 | Fields views | the Fields tab's sub-row and its three bodies: Catalog, Where fields appear and Where values come from | `panels/FieldsTabViews.tsx` |
@@ -119,10 +119,10 @@ Every other term below belongs to one tab.
 | form canvas | the drop target where an author arranges a step's view entries into groups and tabs. Bare *canvas* names only the graph surface above | `screens/FormEditorScreen.tsx` |
 | form preview | the form editor's trailing pane, under the canvas at 80rem and below, mounting the renderer a participant meets | `panels/FormPreview.tsx` |
 | form tab strip | the row of a step form's own tabs, above the form canvas | `panels/FormTabStrip.tsx` |
-| checks rail | the validation issue list, grouped by subject | `panels/ChecksRail.tsx` |
-| check row | a row on the checks rail: the severity word, the sentence, Fix and its Developer view | `panels/ChecksRail.tsx` (`CheckRow`) |
+| checks rail | the validation issue list, grouped by subject. It draws no box and no visible heading, and stays a scroll box | `panels/ChecksRail.tsx` |
+| check row | a row on the checks rail: the severity word, then the sentence with Fix beside it, then its Developer view | `panels/ChecksRail.tsx` (`CheckRow`) |
 | severity word | the check row's kicker: Must fix or Worth a look | `panels/ChecksRail.tsx` |
-| Fix | the check row's command, landing on the place that owns the check | `panels/ChecksRail.tsx` |
+| Fix | the check row's one act, a secondary button, landing on the place that owns the check | `panels/ChecksRail.tsx` |
 | Access view | the Settings tab's view over the process's Developer, Owner and Reader access lists | `panels/AccessPanel.tsx` inside `panels/SettingsTab.tsx` |
 
 On the field card, More's Developer view holds the key input and the plugin
@@ -137,6 +137,8 @@ section* names a block of the field card.
 
 *issue* is the word for one validation result, whatever check raised it
 (`draft/issues.ts`'s `EditorIssue`, rendered by `panels/shared/IssueList.tsx`).
+
+The structural banner names Checks, so it stands on every tab but that one.
 
 The word **Developer** names three things here. `PRODUCT.md` calls the
 studio's own audience "process author", the word to use instead. A

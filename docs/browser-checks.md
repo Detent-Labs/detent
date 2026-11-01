@@ -1438,9 +1438,8 @@ Click it back on. Pass: both re-enable.
 
 Give a view entry `visible: false` and `required: true` through the
 JSON surface, then return to the field matrix. Pass: that cell carries a
-ring marker, the checks rail's Field matrix count reads 1, and the
-`view` group names the field, exactly as the form editor's own walk
-above already covers.
+ring marker, the Checks tab's count reads 1, and a Worth a look row names
+the field, exactly as the form editor's own walk above already covers.
 
 Tab to the grid with no cell activated. Pass: exactly one control across
 the whole grid carries `tabindex="0"` — the grid's own roving cell.
@@ -1663,7 +1662,8 @@ Source: `changes-tab-entity-change-list` task 6.1; `studio-narrow-widths` task
 5.32. `studio-checks-by-subject` moved the press from the row to its Fix
 control. The entry "Checks by subject" walks every landing.
 
-Open a draft with a check on a step's Ways out and a check on the process
+Open a draft with a check on a step's Ways out. Delete the process's `key` line
+on the JSON surface and press Apply, which raises the check on the process
 key. Reach the Checks tab by keyboard and press Enter on the
 Fix control of the Ways out row. Pass: Steps stands open on the owning step,
 Ways out stands open, and focus lands on the Ways out header.
@@ -2202,7 +2202,7 @@ Source: `validation-sequence-module` task 7.3.
 
 Open a draft naming an action type the server does not register. Open the
 checks rail. Pass: a row names the unregistered type. The line under Before
-publishing still says publishing checks each plugin's settings. Its Developer
+publishing still says publishing checks a few things this list cannot. Its Developer
 view holds the config note, since the config-validation half waits for the
 publish regardless.
 
@@ -6015,7 +6015,7 @@ carries two manual paths, "Submit for approval" and "Withdraw".
 
 Open the Steps tab and select that first step. In "Ways out", open "Submit for
 approval". Choose "Happens by itself" for its trigger. Build one row under "Only
-when": `quantity` greater than 5. Choose "A person chooses" for the trigger
+if": `quantity` greater than 5. Choose "A person chooses" for the trigger
 again.
 
 Pass: the "Only if" heading and the row stay on screen.
@@ -6097,7 +6097,7 @@ Pass: no row reads "Written by hand. Edit it as CEL."
 #### A new boolean row starts empty (E2-14)
 
 In the `purchase_requisition` draft, press "+ Add row" under any path's "Only
-when". Pick the boolean field "Covered by the cost center's remaining budget".
+if". Pick the boolean field "Covered by the cost center's remaining budget".
 
 Pass: the value select shows its empty choice as the selected one.
 
@@ -6513,8 +6513,7 @@ position and the look of the sentences. Use the production bundle.
 
 **1. An empty process opens clean.** On `/studio`, press **+ New process**
 and choose **Empty process**. Pass: no banner stands above the tabs. No text
-on the page reads "zod". A row's Developer view stands closed. The Checks
-tab's count reads 0.
+on the page reads "zod". The Checks tab's count reads 0.
 
 The reason line beside Publish states "Publish needs a first step". The Checks
 tab body shows "No step yet. Add the first
@@ -7209,16 +7208,20 @@ of any seeded process. Under `playwright-cli`, pass
 `-s=studio-checks-by-subject` on every call. Every step below runs at
 1440x900 unless it names another width.
 
-**1. Break the draft.** Empty one step's key in its Developer view. Clear
-another step's name, and clear a way out's target. On the Fields tab, clear a
-field's name, and add a data source with no name. On Settings, empty the
-process key. Open the Checks tab.
+**1. Break the draft.** Type `cancel_sink` as one step's key in its Developer
+view. Clear another step's name. Remove the step a way out leads to, so its row
+reads "(step removed)". On the Fields tab, clear a field's name, and add a data
+source with no name. On the JSON surface, delete the process's `key` line, and
+give a time limit the length `P1X`. Press Apply, then press the Checks tab.
 
-**2. Three subjects.** Pass: the rail prints Steps, Fields and Before
-publishing, each as a heading over a hairline. Pass: the first two list rows,
-and the third holds the line. Pass: a subject with no row prints no heading.
+Pass: the tab press leaves the JSON surface and opens Checks.
+
+**2. Three subjects.** Pass: the rail draws no box and no "Checks" heading.
+Pass: it prints Steps, Fields and Before publishing, each as a heading over a
+hairline. Pass: the first two list rows, and the third holds the line. Pass: a subject with no row prints no heading.
 Before publishing is the one exception, since it holds the line. Pass: the
-steps follow the draft's own order.
+steps follow the draft's own order. Pass: the structural banner stands on every
+tab but Checks.
 
 **3. The words.** Pass: each row opens with the word Must fix in the refusal
 color. Add a view flag finding through the JSON surface, for example a field
@@ -7228,34 +7231,49 @@ severity alone.
 
 **4. The sentences.** Pass: each row prints one sentence that names the step
 or field and the place to go. Pass: no row prints a path such as `steps[1]`, a
-validator's name or "Invalid input". Two unnamed steps read by their numbers.
-Pass: a long name wraps inside the column.
+validator's name or "Invalid input". An unnamed step reads its number, as in
+"Step 2", and no sentence reads "key". Pass: a long name wraps inside the column.
+
+Pass: Fix stands beside the sentence's first line as an outlined button, with
+the word above that row and the Developer view under it.
 
 **5. Fix lands, one row at a time.** Press Fix on each row below and read the
 focus ring. Return to Checks between rows.
 
 - A step's key: Steps opens on the step with More open and its Developer view
-  open. Focus stands on More's header.
+  open. Focus stands in the key input. Repeat with More closed and another
+  section open. Pass: the same landing.
 - A step's name: Steps opens on the step. Focus stands on the Name input.
 - The way out's target: Steps opens with Ways out open and the way out marked.
-  Focus stands on the Ways out header.
+  Focus stands on the Ways out header, at the scroll box's top, with the body
+  under it in view.
+- The time limit's length: Steps opens with Time limit open. Focus stands on its
+  header, and the sentence says to remove the limit and add a new one.
 - The field's name: Fields opens on Catalog with the field selected. Focus
-  stands on the sentence under Name.
+  stands on the sentence above the Name input, under the name line.
 - The data source: Fields opens on Where values come from with the source
   selected. Focus stands on the sentence in its editor.
 - The process key: Settings opens on the Process view. Focus stands on the
   Settings tab's own button.
 - The process name, once cleared: the tab stays. Focus stands on the name
   input in the header bar.
+- A sentence naming the JSON surface, for example a duplicate id: the surface
+  opens with the sentence above the input as a warning callout. Focus stands in
+  the input. Press any tab. Pass: that tab opens. Open the surface from the `⋮`
+  menu. Pass: no sentence stands above the input.
 
 Pass: each ring is the 2px accent ring, whole on every side. Pass: the ring on
 a sentence list is not clipped. Return to the Checks tab, then to the field.
 Pass: the field takes no focus on a second visit.
 
+Pass: each sentence at its spot stands beside a 3px rule, with no list marker,
+and reads the row's words. A Worth a look sentence prints in slate.
+
 **6. A mouse press and the keyboard.** Press Fix with the mouse on a Fields
-row. Pass: the same landing, with the focus ring showing. Reach the Fix control
-by Tab. Pass: it carries a ring, and a screen reader reads the sentence as its
-description.
+row. Pass: the same landing, and focus stands on the sentence. The ring shows
+for a keyboard press and on a text input, since it follows `:focus-visible`.
+Reach the Fix control by Tab. Pass: it carries a ring, and a screen reader reads
+the sentence as its description.
 
 **7. The Developer view.** Open a row's Developer view. Pass: it opens from
 closed. Pass: the source prints as a mono label, then the raw message, then the
@@ -7269,8 +7287,9 @@ closed until the check clears.
 starts "More checks run once you fix". Open the line's Developer view. Pass: it
 lists the held-back sources in mono, then the two held-back notes.
 
-Fix every row. Pass: the line drops its first sentence. It keeps the sentence
-that says publishing checks each plugin's settings.
+Pass: a source that printed a row of its own stands in no list. Fix every row.
+Pass: the line drops its first sentence, and keeps the one that says publishing
+checks a few things this list cannot.
 
 **9. The all clear.** With no row open, a 2px ink box reads "No open issues."
 and the publish sentence. Pass: Before publishing keeps the line.
@@ -7296,8 +7315,8 @@ focus stands on the new step's Name input.
 
 **13. The rail at 900px.** Resize to 900x800 with thirty rows open. Scroll the
 rail partway. Pass: the ring on a row's Fix control stays whole at the top and
-the bottom of the scroll. Pass: Fix wraps under the sentence once the row is
-narrow, with its ring whole.
+the bottom of the scroll. Pass: Fix wraps under the sentence, flush left, once
+the row is narrow, with its ring whole.
 
 Below 64rem, select the last step on the steps rail. Pass: the rail scrolls
 that row into view.

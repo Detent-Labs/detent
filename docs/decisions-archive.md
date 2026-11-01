@@ -1244,3 +1244,46 @@ system that resulted; this file explains why it took that shape.
   Resolved by `studio-checks-by-subject`: a check row's Fix selects the field
   on Fields, Catalog, and opens More where the check's zone asks. `fixCheck`
   carries the field through `fixRequest`.
+- **FIELDS-8: check messages speak the engine's layers.** Measured 2026-09-13,
+  the Fields tab showed `ZOD missing baseLocale ('en') entry` and
+  `field key must match /^[a-z_][a-z0-9_]*$/ to be a valid CEL identifier`.
+  A view entry naming an id no field carries — the shape an unfixed field
+  removal left then, and a JSON-view edit can still write today — showed
+  `view ref does not resolve: field_0fb5a2c4-0022-…`, an id the author can no
+  longer look up. Adding an empty field raises the banner at
+  `screens/EditScreen.tsx:967` before the author types. The banner reads
+  `Draft is not yet structurally valid — CEL, registry, duration, and cross-process checks are held back until it is (see the Zod issues below)`
+  (the banner now reads "Open Checks and fix this draft's structure, so every check can run."),
+  and it pushes the page down 35px at 1400px and 99px at 900px. The messages
+  come from `src/schema/definition.ts:1014`, `src/schema/compile.ts:612` and
+  `src/schema/definition.ts:1095`, and the "ZOD" label from
+  `panels/shared/IssueList.tsx:44`. Risk (Medium): an author reads Zod, CEL
+  grammar and raw ids where a plain sentence belongs.
+
+  Since `studio-fresh-draft-starts-clean` the process-name message reads a
+  sentence, and the field-label part stays open. Since
+  `studio-checks-by-subject` every such message reads a sentence at the spot
+  and on the Checks tab. The "ZOD" label and the raw text stand in the row's
+  Developer view alone.
+
+  Resolved by `studio-checks-by-subject`: every such message reads a sentence
+  at the spot and on the Checks tab, and the raw text stands in a Developer view.
+  CHECKS-20 keeps the banner's push on the page.
+- **CHECKS-1: a Fix on a JSON-surface sentence leaves the author on the JSON
+  surface with no way back but the menu.** Several sentences end "Correct it
+  in the JSON surface", and their Fix opens that surface and focuses its
+  input. The surface replaces the six tab bodies. Risk (Medium): an author
+  who has corrected the entry must find the `⋮` menu to return to the tabs.
+
+  Upgrade entry: add a return control to `panels/JsonView.tsx`, or let
+  `fixCheck` in `screens/EditScreen.tsx` remember the tab it left.
+
+  Resolved by `studio-checks-by-subject`: a press on any tab leaves the JSON
+  surface for that tab, and the check's sentence clears with it.
+- **CHECKS-7: no test covers two refusal cases.** When a located issue gets a
+  tier 4 answer, `describePublishRefusal` swaps in the refusal fallback. A
+  contract sentence must also stay as it is. Risk (Low): a rewrite of either
+  rule passes the suite.
+
+  Resolved by `studio-checks-by-subject`: `studio-publishErrors.test.ts` covers
+  the swap on a step and on the contract, with `checks.fallback.contract` behind it.
