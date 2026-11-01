@@ -157,6 +157,19 @@ describe("FieldExpressionMapEditor markup", () => {
     expect(html).toContain("REMOVE");
   });
 
+  it("names the row's select, value input and remove control after the row's field", () => {
+    const targets = fieldTargets(df([{ id: "field_c", key: "credit_score", type: "number", label: { en: "Credit score" } }]), "en", "en");
+    const html = render({ field_c: EXPR("result.score") }, { targets });
+    expect(html).toMatch(new RegExp(`<select[^>]*aria-label="${studioCatalog.en["mapping.targetLabel"]}"`));
+    expect(html).toMatch(/<input[^>]*aria-label="Value for Credit score"[^>]*value="result.score"/);
+    expect(html).toMatch(/<button[^>]*aria-label="Remove: Credit score"[^>]*>REMOVE</);
+    expect(html).not.toContain("credit_score");
+  });
+
+  it("names a row whose stored id the list lacks by that id", () => {
+    expect(render({ field_gone: EXPR("x") })).toContain('aria-label="Remove: field_gone"');
+  });
+
   it("disables add while addDisabled is set", () => {
     expect(render({}, { addDisabled: true })).toMatch(/<button[^>]*disabled=""[^>]*>ADD</);
   });

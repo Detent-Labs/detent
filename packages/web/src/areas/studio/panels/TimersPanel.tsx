@@ -10,7 +10,8 @@ import { deadlinePatch } from "../draft/timer-deadline.js";
 import { maxTimeLimitCount, timeLimitDuration, timeLimitInRange, timeLimitParts, type TimeLimitUnit } from "../draft/time-limit.js";
 import { t, type CatalogKey } from "../catalog.js";
 import { ExpressionInput } from "./shared/ExpressionInput";
-import { numberRepeats, stepText, wayOutHeading } from "./shared/optionText";
+import { numberRepeats, stepTextMap, wayOutHeading } from "./shared/optionText";
+import { StudioSelect } from "./shared/StudioSelect";
 import { IssueList } from "./shared/IssueList";
 import { ActionListEditor } from "./ActionListEditor";
 import type { ConfigFieldDescriptor } from "../api/types.js";
@@ -172,13 +173,9 @@ export function TimersPanel({
   const list = timers ?? [];
 
   // A way out reads as its row heading in the Ways out section, counted when
-  // two headings match. The step texts are counted over the whole draft first,
-  // so a heading names its target exactly as "Leads to" does.
-  const stepOptionTexts = numberRepeats(steps, (s) => stepText(s, contentLocale, baseLocale));
-  const stepTexts = new Map<string, string>();
-  steps.forEach((s, i) => {
-    if (s.id !== undefined) stepTexts.set(s.id, stepOptionTexts[i] ?? "");
-  });
+  // two headings match. The heading reads the step texts the Ways out section
+  // reads, so it names its target exactly as "Leads to" does.
+  const stepTexts = stepTextMap(steps, contentLocale, baseLocale);
   const pathTexts = numberRepeats(paths, (p) => wayOutHeading(p, stepTexts));
 
   const addTimer = () => {
@@ -230,7 +227,7 @@ export function TimersPanel({
 
             <label>
               {t("timers.targetPathCaption")}
-              <select
+              <StudioSelect
                 value={timer.onFire?.targetPath ?? ""}
                 onChange={(e) =>
                   updateTimer(index, {
@@ -247,7 +244,7 @@ export function TimersPanel({
                     {pathTexts[i]}
                   </option>
                 ))}
-              </select>
+              </StudioSelect>
             </label>
 
             <ActionListEditor

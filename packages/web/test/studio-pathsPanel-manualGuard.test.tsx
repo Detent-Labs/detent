@@ -279,20 +279,50 @@ describe("the step selects list labels", () => {
 
 describe("two steps sharing a label", () => {
   const steps = [
-    { id: "step_1", key: "review", type: "task", label: { en: "Review" } },
-    { id: "step_2", key: "review_2", type: "task", label: { en: "Review" } },
+    { id: "step_1", key: "antrag", type: "task", label: { en: "Antrag" } },
+    { id: "step_2", key: "review", type: "task", label: { en: "Review" } },
+    { id: "step_3", key: "done", type: "task", label: { en: "Done" } },
+    { id: "step_4", key: "archive", type: "task", label: { en: "Archive" } },
+    { id: "step_5", key: "close", type: "task", label: { en: "Close" } },
+    { id: "step_6", key: "review_2", type: "task", label: { en: "Review" } },
   ] as unknown as DraftStep[];
-  const html = renderSteps(steps, [{ id: "path_1", key: "again", label: "Again", to: "step_2" }]);
+  const html = renderSteps(steps, [{ id: "path_1", key: "again", label: "Again", to: "step_6" }]);
+  const expected = ["Antrag", "Review (step 2)", "Done", "Archive", "Close", "Review (step 6)"];
 
-  it("count the second in both selects, in draft order", () => {
-    expect(selectAfter(html, ">Leads to<").slice(1).map(([, text]) => text)).toEqual(["Review", "Review (2)"]);
-    expect(selectAfter(html, ">Where the new way out leads<").slice(1).map(([, text]) => text)).toEqual([
-      "Review",
-      "Review (2)",
-    ]);
+  it("carry their steps-rail numbers in both selects", () => {
+    expect(selectAfter(html, ">Leads to<").slice(1).map(([, text]) => text)).toEqual(expected);
+    expect(selectAfter(html, ">Where the new way out leads<").slice(1).map(([, text]) => text)).toEqual(expected);
   });
 
-  it("name the second by its count in a way out's heading", () => {
-    expect(rowHeading(html)).toBe("Again → Review (2)");
+  it("name the second by its rail number in a way out's heading", () => {
+    expect(rowHeading(html)).toBe("Again → Review (step 6)");
+  });
+});
+
+describe("two unnamed steps", () => {
+  const steps = [
+    { id: "step_1", key: "antrag", type: "task", label: { en: "Antrag" } },
+    { id: "step_2", key: "x", type: "task", label: { en: "" } },
+    { id: "step_3", key: "y", type: "task", label: { en: "  " } },
+  ] as unknown as DraftStep[];
+  const html = renderSteps(steps, [{ id: "path_1", key: "go", label: "Go", to: "step_3" }]);
+
+  it("carry their steps-rail numbers in both selects", () => {
+    const expected = ["Antrag", "(unnamed step 2)", "(unnamed step 3)"];
+    expect(selectAfter(html, ">Leads to<").slice(1).map(([, text]) => text)).toEqual(expected);
+    expect(selectAfter(html, ">Where the new way out leads<").slice(1).map(([, text]) => text)).toEqual(expected);
+    expect(rowHeading(html)).toBe("Go → (unnamed step 3)");
+  });
+});
+
+describe("a default way-out label", () => {
+  const steps = [
+    { id: "step_1", key: "pruefung", type: "task", label: { en: "Prüfung" } },
+    { id: "step_2", key: "capture", type: "task", label: { en: "Capture" } },
+  ] as unknown as DraftStep[];
+
+  it("names its target once in the heading", () => {
+    const html = renderSteps(steps, [{ id: "path_1", key: "p", label: "Prüfung → Capture", to: "step_2" }]);
+    expect(rowHeading(html)).toBe("Prüfung → Capture");
   });
 });

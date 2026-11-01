@@ -6732,12 +6732,13 @@ reads a step's label. No option shows a key or an id.
 
 Open "Where the new way out leads". Pass: its options read the same labels.
 
-**2. Two steps named alike take a count.** Rename a second step to the first
-step's label, such as "Review". Open "Leads to". Pass: the options read
-"Review" and "Review (2)", in the order of the steps rail.
+**2. Two steps named alike take their rail numbers.** Rename a second step to
+the first step's label, such as "Review". Open "Leads to". Pass: each of the
+two options reads "Review (step N)", N being that step's number in the steps
+rail.
 
 Read the heading of the way out that leads to the second step. Pass: it ends
-in "→ Review (2)".
+in "→ Review (step N)" with that step's rail number.
 
 **3. A step with no label reads as unnamed.** Drop a new step on the canvas
 and clear its label. Open "Leads to" on another step. Pass: the new step's
@@ -6764,6 +6765,11 @@ the step's Developer view. Pass: the key reads `pruefung`.
 
 Add a step named "Abschluss". Add a way out from "Prüfung" to "Abschluss".
 Open that way out's Developer view. Pass: the key reads `pruefung-abschluss`.
+
+**8. A field-map row names its controls.** Add a row under "Values it writes
+back". Point it at a field labelled "Credit score". Read the row in the
+accessibility tree. Pass: the select reads "Field". The value input reads
+"Value for Credit score", and the remove control reads "Remove: Credit score".
 
 Discard the draft from the process list and accept the browser's confirm.
 Under `playwright-cli`, `dialog-accept` answers it.

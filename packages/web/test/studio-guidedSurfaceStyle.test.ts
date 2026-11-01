@@ -185,6 +185,7 @@ describe("what StyleX drops", () => {
 
 describe("the path row's name leads its key, and the target select is styled", () => {
   const FILE = "src/areas/studio/panels/PathsPanel.tsx";
+  const STUDIO_SELECT = "src/areas/studio/panels/shared/StudioSelect.tsx";
 
   it("renders the name field before the key field", () => {
     const source = stripComments(read(FILE));
@@ -207,31 +208,30 @@ describe("the path row's name leads its key, and the target select is styled", (
   });
 
   it("drops the select's own chevron in favor of a decorative one, layered over the trailing edge", () => {
-    const source = stripComments(read(FILE));
+    const source = stripComments(read(STUDIO_SELECT));
 
     const selectBlock = styleBlock(source, "select");
+    expect(selectBlock).toMatch(/width: "100%"/);
     expect(selectBlock).toMatch(/appearance: "none"/);
 
     const iconBlock = styleBlock(source, "selectIcon");
     expect(iconBlock).toMatch(/position: "absolute"/);
     expect(iconBlock).toMatch(/color: colors\.textMuted/);
     expect(iconBlock).toMatch(/pointerEvents: "none"/);
+
+    expect([...source.matchAll(/<ChevronDown size=\{18\} strokeWidth=\{1\.75\} aria-hidden="true" \/>/g)]).toHaveLength(1);
   });
 
-  it("wraps both target selects — the path row's and the add-path selector's — in the studio select pattern", () => {
-    const source = stripComments(read(FILE));
-
-    // `styles\.select\)` alone, not `styles.selectWrap)`/`styles.selectIcon)`:
-    // the closing paren right after "select" picks out only the bare style.
-    const selectWrapCount = [...source.matchAll(/stylex\.props\(styles\.selectWrap\)/g)].length;
-    const selectCount = [...source.matchAll(/stylex\.props\(styles\.select\)/g)].length;
-    const iconCount = [...source.matchAll(/stylex\.props\(styles\.selectIcon\)/g)].length;
-    const chevronCount = [...source.matchAll(/<ChevronDown size=\{18\} strokeWidth=\{1\.75\} aria-hidden="true" \/>/g)].length;
-
-    expect(selectWrapCount).toBe(2);
-    expect(selectCount).toBe(2);
-    expect(iconCount).toBe(2);
-    expect(chevronCount).toBe(2);
+  it("shows the studio select for both target selects and the time limit's way-out select", () => {
+    // Both panels show the one shared component and keep no copy of its styles.
+    for (const [file, count] of [
+      [FILE, 2],
+      ["src/areas/studio/panels/TimersPanel.tsx", 1],
+    ] as const) {
+      const source = stripComments(read(file));
+      expect({ file, uses: [...source.matchAll(/<StudioSelect\b/g)].length }).toEqual({ file, uses: count });
+      expect({ file, copy: /selectWrap|selectIcon|ChevronDown/.test(source) }).toEqual({ file, copy: false });
+    }
   });
 });
 

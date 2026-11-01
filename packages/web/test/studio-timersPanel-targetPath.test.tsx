@@ -103,6 +103,36 @@ describe("the time limit's way-out select", () => {
     expect(options.slice(1).map(([, text]) => text)).toEqual(["Freigeben → Abschluss", "Freigeben → Abschluss (2)"]);
   });
 
+  it("offers a default label that already names its target once", () => {
+    const options = wayOutOptions(render([{ id: "path_1", key: "p", label: "Prüfung → Abschluss", to: "step_2" }]));
+    expect(options[1]).toEqual(["path_1", "Prüfung → Abschluss"]);
+  });
+
+  it("names a repeated target step by its steps-rail number", () => {
+    const html = renderToStaticMarkup(
+      <DraftContext.Provider value={context}>
+        <TimersPanel
+          timers={[TIMER]}
+          paths={[{ id: "path_1", key: "a", label: "Weiter", to: "step_2" }] as unknown as DraftPath[]}
+          steps={[STEPS[0]!, { ...STEPS[0]!, id: "step_2" } as DraftStep]}
+          fields={[]}
+          onChange={() => {}}
+          contentLocale="en"
+          baseLocale="en"
+        />
+      </DraftContext.Provider>,
+    );
+    expect(wayOutOptions(html)[1]).toEqual(["path_1", "Weiter → Prüfung (step 2)"]);
+  });
+
+  it("takes the studio select, its chevron trailing the select", () => {
+    const html = render([{ id: "path_1", key: "a", label: "Freigeben", to: "step_2" }]);
+    const at = html.indexOf(studioCatalog.en["timers.targetPathCaption"].replace(/'/g, "&#x27;"));
+    const rest = html.slice(at);
+    expect(rest).toMatch(/^[^<]*<span[^>]*><select\b/);
+    expect(rest.slice(rest.indexOf("</select>"))).toMatch(/^<\/select><span[^>]*><svg[^>]*lucide-chevron-down/);
+  });
+
   it("reads an unnamed way out and a missing target by their placeholders", () => {
     const options = wayOutOptions(render([{ id: "path_1", key: "loose", label: "", to: undefined }]));
     expect(options[1]).toEqual(["path_1", "(unnamed way out) → (no step yet)"]);

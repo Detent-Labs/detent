@@ -1910,7 +1910,8 @@ this section.
 ## Open from studio-selects-show-labels (needs its own OpenSpec change)
 
 The change made the step page's selects print labels and made derived keys
-transliterate umlauts. It left six points to later changes. The SELECTS tag is
+transliterate umlauts. It left fourteen points to later changes. The final
+review and the design audit raised SELECTS-7 to SELECTS-14. The SELECTS tag is
 local to this section.
 
 - **SELECTS-1: the steps rail still falls back to a step key.** An unnamed
@@ -1932,6 +1933,30 @@ local to this section.
 - **SELECTS-6: a key derived before this change stops following its label.**
   A draft keyed `pr_fung` no longer counts as derived. A rename of "Prüfung"
   leaves that key alone. The change accepts this, since nothing is deployed.
+- **SELECTS-7: three more sites still fall back to a field key.** The
+  contract's input and output checkboxes print `f.key ?? f.id`
+  (`ContractPanel.tsx:67`, `:81`). The data source column map's target select
+  prints a key (`FieldCatalogPanel.tsx:1124`). The usage list reads a step key
+  (`draft/field-usage.ts:38`). Change 11 owns the Fields and Settings bodies.
+- **SELECTS-8: three letters still split a derived key.** The letters ı, đ and
+  þ have no decomposition, so `transliterate` drops them. A later change extends
+  the letter map.
+- **SELECTS-9: the time-limit and mapping rows keep unstyled literal classes.**
+  The class names `timer-row` and `mapping-row` have no rule. Their captions
+  stand beside the controls. Change 10 owns the step page's sections.
+- **SELECTS-10: CEL inputs stand beside the field-map selects.** They sit
+  outside a Developer view. These are stage 27's low-code sites. Change 10 or
+  change 11 settles them.
+- **SELECTS-11: the field border measures 1.33:1 against the ground.** The
+  fault is systemic. It belongs to `DESIGN.md`'s field tokens and reaches
+  every screen.
+- **SELECTS-12: the arrow glyph renders small in the fallback face.** The
+  `system-ui` stack draws "→" below the text size. It lasts until Archivo
+  ships.
+- **SELECTS-13: a target another row holds shows disabled with no reason.**
+  A field-map select greys that option out. No text says another row holds it.
+- **SELECTS-14: the "How it ended" select lists outcome names as typed.** Each
+  option prints the contract's outcome name. No label stands in for it.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
