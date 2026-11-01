@@ -42,6 +42,12 @@ describe("the start gaps of a fresh draft", () => {
     expect(showsStructuralBanner(v)).toBe(false);
   });
 
+  it("clears the name sentence once the process has a name", () => {
+    const unnamed = run(withEndStep({ key: "invoice", label: { en: "" } }));
+    expect(unnamed.issues.map((i) => i.sentence)).toEqual([t("issues.processNeedsName")]);
+    expect(run(withEndStep({ key: "invoice", label: { en: "Invoice" } })).issues).toEqual([]);
+  });
+
   it("reads a named process with a step as clean", () => {
     const v = run(withEndStep({ key: "invoice", label: { en: "Invoice" } }));
     expect(v.noStepYet).toBeUndefined();

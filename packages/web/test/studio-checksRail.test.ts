@@ -284,6 +284,28 @@ describe("6.12 an unwritten technical field reaches the view group even when str
   });
 });
 
+it("a clear rail predicts a clean publish for a chaining site whose target declares the field", () => {
+  const body = baseDraft();
+  (body.workflow!.steps![0] as unknown as { onEntry?: unknown[] }).onEntry = [
+    {
+      id: "action_chain",
+      type: "process.start",
+      config: { processId: "proc_target", inputMapping: { field_t: { lang: "cel", src: "data.amount" } } },
+    },
+  ];
+  const target = {
+    key: "target",
+    label: { en: "Target" },
+    baseLocale: "en",
+    fields: [{ id: "field_t", key: "amount", label: { en: "Amount" }, type: "number" }],
+    workflow: { initialStep: "step_t", steps: [{ id: "step_t", key: "t", label: { en: "T" }, type: "task", terminal: true }] },
+  } as unknown as ProcessBody;
+
+  const result = runValidation(body, undefined, {}, { ["action_chain" as ActionId]: target });
+  expect(result.chainingSiteStatus["action_chain" as ActionId]).toBe("checked");
+  expect(result.issues.filter((i) => i.source === "cel" || i.source === "registry")).toEqual([]);
+});
+
 it("6.14 a process.start action with no matching loadedChainingTargets entry reads not-checked, with no clear-pass CEL entry", () => {
   const body = baseDraft();
   (body.workflow!.steps![0] as unknown as { onEntry?: unknown[] }).onEntry = [

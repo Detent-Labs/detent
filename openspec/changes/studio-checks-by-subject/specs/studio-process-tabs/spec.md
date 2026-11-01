@@ -137,7 +137,8 @@ draft carries some other Zod issue.
 <!-- Base wording stays verbatim in a MODIFIED block. -->
 The banner SHALL stand below the header bar. It SHALL read one sentence that
 says what to do and prints no engine word: no "Zod", no "CEL", no "registry". It
-SHALL NOT stand while the Checks tab is open, where it only repeats the list.
+SHALL NOT stand while the Checks tab's body is open, where it only repeats the
+list. The JSON surface stands in place of that body, so the banner stands there.
 
 This banner SHALL NOT take the bordered, rotated stamp treatment. This
 screen already reserves that treatment for a load or a request that comes
@@ -188,6 +189,11 @@ failed request. So that one-shape rule does not reach it.
 - **WHEN** an author adds a first task step that has no name and no way out
 - **THEN** the banner stands, since those two gaps lie outside the start
   gaps
+
+#### Scenario: The banner stands over the JSON surface
+
+- **WHEN** the JSON surface stands open from the Checks tab on an invalid draft
+- **THEN** the banner stands
 
 #### Scenario: The banner leaves the Checks tab
 

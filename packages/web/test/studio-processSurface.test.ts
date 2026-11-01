@@ -189,6 +189,23 @@ describe("the process surface's frame around the header bar", () => {
  * keeps it working is one batch and one effect, read off the source; the focus
  * itself is walked in the browser.
  */
+describe("the structural banner", () => {
+  it("takes the refusal color as plain text, with no stamp", () => {
+    const style = read(SURFACE).match(/draftIncomplete: \{[^}]*\}/)?.[0] ?? "";
+    expect(style).toContain("color: colors.refusal");
+    expect(style).not.toContain("borderWidth");
+    expect(style).not.toContain("rotate");
+  });
+});
+
+describe("the JSON surface's note", () => {
+  it("clears on an Apply", () => {
+    const mount = read(SURFACE).match(/<JsonView[\s\S]*?\/>/)?.[0] ?? "";
+    expect(mount.indexOf("setJsonNote(undefined)")).toBeGreaterThan(-1);
+    expect(mount.indexOf("setJsonNote(undefined)")).toBeLessThan(mount.indexOf("replace(next)"));
+  });
+});
+
 describe("the Fix control's landing", () => {
   const body = () => stripComments(read(SURFACE));
   const slice = (code: string, from: string, to: string) => code.slice(code.indexOf(from), code.indexOf(to, code.indexOf(from)));
@@ -249,7 +266,7 @@ describe("the Fix control's landing", () => {
   });
 
   it("hands the JSON surface the check's sentence", () => {
-    expect(body()).toContain("<JsonView draft={draft} onApply={replace} note={jsonNote} />");
+    expect(body()).toContain("note={jsonNote}");
   });
 
   it("names no retired focus state", () => {

@@ -7216,7 +7216,7 @@ source with no name.
 On the JSON surface, delete the process's `key` line, and give a time limit the
 length `P1X`. Press Apply, then press the Checks tab.
 
-Pass: the tab press leaves the JSON surface and opens Checks.
+Pass: the tab press leaves the JSON surface and opens Checks. Pass: at 1024px and 420px nothing scrolls sideways.
 
 **2. Three subjects.** Pass: the rail draws no box and no "Checks" heading.
 Pass: it prints Steps, Fields and Before publishing, each as a heading over a

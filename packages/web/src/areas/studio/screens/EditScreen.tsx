@@ -1150,7 +1150,16 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
               open (`studio-json-view`). The six bodies below stay mounted and
               hidden, and a `hidden` subtree reaches neither the tab order nor
               the accessibility tree. */}
-          {jsonOpen && <JsonView draft={draft} onApply={replace} note={jsonNote} />}
+          {jsonOpen && (
+            <JsonView
+              draft={draft}
+              onApply={(next) => {
+                setJsonNote(undefined);
+                replace(next);
+              }}
+              note={jsonNote}
+            />
+          )}
 
           {tabPanel(
             "map",

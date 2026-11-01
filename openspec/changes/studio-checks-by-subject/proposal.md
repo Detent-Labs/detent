@@ -25,7 +25,7 @@ Principle 5 of `docs/studio-ui-concept.md` says a check result is a sentence at 
   - The steps rail scrolls to the current row (ACCORDION-11, first half).
   - The Publish dialog and a refused publish print sentences (HEADER-7, first half).
   - The guard heading reads "Only if" (MAPLABELS-5).
-- The step page's failed child file load gets an alert role, which is this change's part of the 22 failure renders.
+- The step page's failed child file load gets an alert role, which is this change's part of the 22 renders that lacked one.
 
 ## Capabilities
 
@@ -43,6 +43,8 @@ None.
 - `studio-condition-builder`: the guard heading reads "Only if".
 - `studio-json-view`: a Fix control is a second way in.
 - `web-styling`: the advisory exemption narrows to the timers panel.
+- `studio-app`: the step's issue count stands on the rail row, and a key check counts at More.
+- `studio-canvas`: the step's key field stands in the Developer view.
 
 ## Impact
 

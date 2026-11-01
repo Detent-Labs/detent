@@ -267,7 +267,7 @@ The rail draws no box and no visible "Checks" heading. The `aside` keeps its nam
 | Step, its key | Steps, the step, More open, its Developer view open | the key input |
 | Step, name, description or kind | Steps, the step | the Name input |
 | Way out | Steps, the step, Ways out open, the row marked | Ways out's header |
-| Timer | Steps, the step, Time limit open, except a date no builder holds | its header |
+| Timer | Steps, the step, Time limit open | its header |
 | Action | Steps, the step, the owning section open | its header |
 | Process, `workflow.initialStep` | Steps | the Steps tab |
 | Field | Fields, Catalog, the field selected, More open where the zone asks | the sentence at the zone |
