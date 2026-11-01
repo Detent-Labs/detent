@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import {
   FIELD_KINDS,
@@ -11,7 +11,7 @@ import {
 } from "workflow-engine/schema";
 import { FieldForm } from "form-ui";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
-import type { DraftOf } from "../draft/types";
+import type { Draft, DraftOf } from "../draft/types";
 import { useDraft, type Mutate } from "../draft/store";
 import { t, type CatalogKey } from "../catalog.js";
 import { removeAt, updateAt } from "../draft/list-ops";
@@ -27,22 +27,29 @@ import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { flattenDraftFields } from "../draft/fields";
 import { firstWorkedStepId } from "../draft/performedBy.js";
-import { writeGroupKey, writeGroupLabel } from "../draft/view-group-sync.js";
 import { usePublishedFieldIds } from "../draft/publishedFields.js";
-import { countKeyReaders } from "../draft/key-readers.js";
+import { countKeyRewrites } from "../draft/key-readers.js";
+import { writeFieldKey } from "../draft/fieldKey.js";
+import { writeFieldLabel } from "../draft/fieldLabel.js";
 import {
   ADD_FIRST_FIELD_ID,
   droppedByKindChange,
   fieldKeyNoticeId,
+  fieldKeyRefusalId,
   fieldLabelInputId,
+  keyCommitProblem,
+  keyFollowsLabel,
   keyInputStep,
   keyNoticeFor,
+  keyRefusalFor,
   labelChangePatch,
   moveControlId,
   moveTargetsFor,
   removeControlId,
+  rewriteLineFor,
+  type KeyCommitProblem,
 } from "./fieldCatalogLogic.js";
-import { fieldCheckZone, type FieldCheckZone } from "./fieldCheckZone.js";
+import { fieldCheckZone, namesFieldKey, type FieldCheckZone } from "./fieldCheckZone.js";
 import { fieldKindLabel } from "../draft/field-type-labels";
 import {
   applyRequiredOverride,
@@ -339,8 +346,9 @@ const styles = stylex.create({
     borderLeftColor: colors.advisory,
     paddingLeft: space.s2,
   },
-  // The key notice counts readers: an advisory, not a refusal. It keeps the
-  // advisory rule, reads in muted ink and sits close under the Key input.
+  // The key notice says where the key comes from: an advisory, not a
+  // refusal. It keeps the advisory rule, reads in muted ink and sits close
+  // under the Key input.
   studioNotice: {
     color: colors.textMuted,
     borderLeftWidth: 3,
@@ -349,6 +357,19 @@ const styles = stylex.create({
     paddingLeft: space.s2,
     marginBlockStart: space.s1,
     marginBlockEnd: 0,
+  },
+  // A refused key commit's sentence, close under the Key input.
+  studioRefusalAtInput: {
+    marginBlockStart: space.s1,
+    marginBlockEnd: 0,
+  },
+  // The rewrite line prints in ink, the way a success confirmation prints.
+  // The region always renders, so it takes no space until it holds text.
+  rewriteLine: {
+    margin: 0,
+  },
+  rewriteLineShown: {
+    marginBlockStart: space.s1,
   },
   // The stale-column warning takes the whole line under the row instead of
   // squeezing beside three controls.
@@ -389,57 +410,131 @@ function isCustomType(type: DraftField["type"]): type is DraftOf<FieldDef>["type
   return typeof type === "object" && type !== null;
 }
 
-interface FieldKeyInputProps {
-  field: DraftField;
-  mutate: Mutate;
-  onChange: (patch: Partial<DraftField>) => void;
-  /** Fires on a group key's commit, which bypasses `onChange`. `FieldEditor`
-   * counts a definition-half write there, so its usage rows still tint. */
-  onWrite?: () => void;
-  /** The id of the notice below the input, while one shows. */
-  describedBy?: string;
+/** What one key commit did: the text the input keeps, the refusal it shows,
+ * whether it wrote the draft, and how many expressions that write rewrote. */
+export interface KeyCommitResult {
+  typed: string | undefined;
+  problem?: KeyCommitProblem;
+  wrote: boolean;
+  rewrote: number;
 }
 
 /**
- * The key input, inside `FieldEditor`'s definition half, for the selected
- * field at any nesting depth. It holds the typed text locally and commits it
- * on blur or Enter, in one write, so typing writes nothing and a half-typed
- * key never reaches the draft. Text equal to the field's key writes nothing.
- *
- * A non-group field writes `{ key }` through `onChange` and leaves every CEL
- * expression that reads the old key as it stands. A group's key is what view
- * entries store, so changing it rewrites them
- * (`view-group-sync.ts::writeGroupKey`) in one `mutate`. `field.id` finds the
- * group inside the mutate's draft clone, at any depth.
+ * One commit of a field's key input, at any nesting depth. A commit with no
+ * typed text, or the field's own key, writes nothing. A commit
+ * `keyCommitProblem` refuses keeps the typed text and writes nothing. Any
+ * other commit writes through `writeFieldKey`, which moves the expressions
+ * reading the old key in the same write, or the view entries naming a
+ * group's key. The count comes from the draft before the write
+ * (`countKeyRewrites`), since a `mutate` recipe's return never reaches here.
  */
-function FieldKeyInput({ field, mutate, onChange, onWrite, describedBy }: FieldKeyInputProps) {
+export function commitKeyInput(draft: Draft, mutate: Mutate, field: DraftField, typed: string | undefined): KeyCommitResult {
+  const current = field.key ?? "";
+  const next = keyInputStep(typed, { kind: "commit" }, current).write;
+  const fieldId = field.id;
+  if (next === undefined || fieldId === undefined) return { typed: undefined, wrote: false, rewrote: 0 };
+  const problem = keyCommitProblem(draft, field, next);
+  if (problem !== undefined) return { typed, problem, wrote: false, rewrote: 0 };
+  const rewrote = field.type === "group" ? 0 : countKeyRewrites(draft, fieldId, current, next);
+  mutate((d) => writeFieldKey(d, fieldId, next));
+  return { typed: undefined, wrote: true, rewrote };
+}
+
+/**
+ * One label write from the field catalog, at any nesting depth, through
+ * `writeFieldLabel`: the form editor's write, so a key the label moves takes
+ * its readers along. Answers how many expressions the write rewrote, counted
+ * from the draft before the write. A group's label rewrites view entries and
+ * no expression, so it answers 0.
+ */
+export function writeLabelFromCatalog(
+  draft: Draft,
+  mutate: Mutate,
+  field: DraftField,
+  label: DraftField["label"],
+  baseLocale: string,
+  published: ReadonlySet<string> | undefined,
+): number {
+  const fieldId = field.id;
+  if (fieldId === undefined) return 0;
+  const key = field.type === "group" ? undefined : labelChangePatch(draft, field, label, baseLocale, published).key;
+  const rewrote = key === undefined ? 0 : countKeyRewrites(draft, fieldId, field.key ?? "", key);
+  mutate((d) => writeFieldLabel(d, fieldId, label, baseLocale, published));
+  return rewrote;
+}
+
+interface FieldKeyInputProps {
+  field: DraftField;
+  /** The sentence on where the key comes from (`keyNoticeFor`), or none. */
+  notice: string | undefined;
+  /** Fires after a commit that wrote the draft, with its rewrite count.
+   * `FieldEditor` counts a definition-half write there and sets its rewrite
+   * line. */
+  onCommitted: (rewrote: number) => void;
+}
+
+/**
+ * The key input inside the Developer view of `FieldEditor`'s "What this field
+ * asks", for the selected field at any nesting depth. It holds the typed text
+ * locally and commits it on blur or Enter, in one write, so typing writes
+ * nothing and a half-typed key never reaches the draft. Escape drops the
+ * typed text. A refused commit keeps the text and shows its sentence under
+ * the input until the next keystroke. The notice follows the refusal, and the
+ * input names both in `aria-describedby`.
+ */
+function FieldKeyInput({ field, notice, onCommitted }: FieldKeyInputProps) {
+  const { draft, mutate } = useDraft();
   const [typed, setTyped] = useState<string | undefined>(undefined);
-  const groupId = field.type === "group" ? field.id : undefined;
+  const [problem, setProblem] = useState<KeyCommitProblem | undefined>(undefined);
+  const currentKey = field.key ?? "";
+  const fieldId = field.id;
   const commit = () => {
-    const step = keyInputStep(typed, { kind: "commit" }, field.key ?? "");
-    setTyped(step.typed);
-    const next = step.write;
-    if (next === undefined) return;
-    if (groupId === undefined) {
-      onChange({ key: next });
-      return;
-    }
-    onWrite?.();
-    mutate((d) => writeGroupKey(d, groupId, next));
+    const result = commitKeyInput(draft, mutate, field, typed);
+    setTyped(result.typed);
+    setProblem(result.problem);
+    if (result.wrote) onCommitted(result.rewrote);
   };
+  const refusalId = problem !== undefined && fieldId !== undefined ? fieldKeyRefusalId(fieldId) : undefined;
+  const noticeId = notice !== undefined && fieldId !== undefined ? fieldKeyNoticeId(fieldId) : undefined;
+  const describedBy = [refusalId, noticeId].filter((id) => id !== undefined).join(" ");
   return (
-    <input
-      type="text"
-      spellCheck={false}
-      {...stylex.props(styles.studioMono)}
-      value={typed ?? field.key ?? ""}
-      aria-describedby={describedBy}
-      onChange={(e) => setTyped(keyInputStep(typed, { kind: "type", text: e.target.value }, field.key ?? "").typed)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") commit();
-      }}
-    />
+    <>
+      <label {...stylex.props(styles.fieldRowLabel)}>
+        {t("fieldCatalog.keyLabel")}
+        <input
+          type="text"
+          spellCheck={false}
+          autoComplete="off"
+          translate="no"
+          {...stylex.props(styles.studioMono)}
+          value={typed ?? currentKey}
+          aria-invalid={problem !== undefined ? true : undefined}
+          aria-describedby={describedBy === "" ? undefined : describedBy}
+          onChange={(e) => {
+            setProblem(undefined);
+            setTyped(keyInputStep(typed, { kind: "type", text: e.target.value }, currentKey).typed);
+          }}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") {
+              setProblem(undefined);
+              setTyped(keyInputStep(typed, { kind: "escape" }, currentKey).typed);
+            }
+          }}
+        />
+      </label>
+      {problem !== undefined && (
+        <p id={refusalId} {...stylex.props(styles.studioWarning, styles.studioRefusalAtInput)}>
+          {keyRefusalFor(problem)}
+        </p>
+      )}
+      {notice !== undefined && (
+        <p id={noticeId} {...stylex.props(styles.studioNotice)}>
+          {notice}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -660,11 +755,14 @@ function FieldEditor({
 }: FieldEditorProps) {
   const { draft, mutate, contentLocale, validation } = useDraft();
   const published = usePublishedFieldIds();
-  // A group has no `data` entry, so no expression reads its key as one.
-  const keyReaders = useMemo(
-    () => (field.type === "group" ? 0 : countKeyReaders(draft, field.key ?? "")),
-    [draft, field.type, field.key],
-  );
+
+  // How many expressions the last key change rewrote, while one rewrote any.
+  // `FieldCatalogPanel` mounts this editor once per field id, so another
+  // field opens with none.
+  const [rewritten, setRewritten] = useState<number | undefined>(undefined);
+  const noteRewrites = (rewrote: number) => {
+    if (rewrote > 0) setRewritten(rewrote);
+  };
 
   // How many times the definition half has been written since this field was
   // selected. It rides in the usage rows' React key, so each write remounts
@@ -729,24 +827,23 @@ function FieldEditor({
 
   const baseLocale = draft.baseLocale ?? "en";
   const fieldId = field.id;
-  /** Deduped against the whole catalog, including every group's nested
-   * children (design.md: `FieldDef.key` is one flat CEL namespace). A key
-   * that a CEL expression reads, or that the base version holds, stays
-   * (`fieldCatalogLogic.ts::isFieldKeyLocked`). A group's label goes through
-   * `writeGroupLabel`, so the key it derives rewrites the view entries naming
-   * the old one. */
+  /** The label write the form editor shares (`writeFieldLabel`). A key the
+   * label still derives follows it until the base version holds the field
+   * (`fieldCatalogLogic.ts::isFieldKeyLocked`), and takes the expressions
+   * reading the old key along. A group's label goes through `writeGroupLabel`,
+   * so the key it derives rewrites the view entries naming the old one. */
   const updateLabel = (label: DraftField["label"]) => {
-    if (field.type === "group" && fieldId !== undefined) {
-      setDefinitionWrites((n) => n + 1);
-      mutate((d) => writeGroupLabel(d, fieldId, label, baseLocale));
-      return;
-    }
-    onChange(labelChangePatch(draft, field, label, baseLocale, published));
+    setDefinitionWrites((n) => n + 1);
+    noteRewrites(writeLabelFromCatalog(draft, mutate, field, label, baseLocale, published));
   };
   const keyNotice =
     field.type === "group"
       ? undefined
-      : keyNoticeFor(field.key ?? "", keyReaders, fieldId !== undefined && published?.has(fieldId) === true);
+      : keyNoticeFor(
+          field.key ?? "",
+          published === undefined ? undefined : fieldId !== undefined && published.has(fieldId),
+          keyFollowsLabel(draft, field),
+        );
   const usage = fieldId ? fieldUsage(draft, fieldId, contentLocale, baseLocale) : [];
   const visibleState = fieldId ? fieldVisibleOverrides(draft, fieldId) : ({ kind: "none" } as const);
   const requiredState = fieldId ? fieldRequiredOverrides(draft, fieldId) : ({ kind: "none" } as const);
@@ -787,6 +884,10 @@ function FieldEditor({
   const fieldIssues = validation.issues.filter((i) => i.entityId === fieldId);
   const zoned = (zone: FieldCheckZone) => fieldIssues.filter((i) => fieldCheckZone(i.loc) === zone);
   const unplaced = fieldIssues.filter((i) => fieldCheckZone(i.loc) === undefined);
+  // The key's Developer view opens while a check on the key stands, so the
+  // check stands beside its control. The author's own toggle holds otherwise.
+  const keyChecked = zoned("asks").some((i) => namesFieldKey(i.loc));
+  const [keyViewOpen, setKeyViewOpen] = useState(false);
 
   const requiredDisabled = technicalChecked || requiredState.kind === "none";
 
@@ -822,6 +923,9 @@ function FieldEditor({
                     : t("fieldCatalog.translationGap").replace("{count}", String(fieldLocaleGaps(field, contentLocale, baseLocale)))}
               </span>
             </div>
+            <p role="status" aria-live="polite" {...stylex.props(styles.rewriteLine, rewritten !== undefined && styles.rewriteLineShown)}>
+              {rewriteLineFor(rewritten)}
+            </p>
             {missingTranslationWarning(field.label, contentLocale, draft.baseLocale) && (
               <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>
             )}
@@ -834,21 +938,21 @@ function FieldEditor({
                 {missingTranslationWarning(field.description, contentLocale, draft.baseLocale)}
               </p>
             )}
-            <label {...stylex.props(styles.fieldRowLabel)}>
-              {t("fieldCatalog.keyLabel")}
+            <details
+              {...stylex.props(styles.studioDevview)}
+              open={keyViewOpen || keyChecked}
+              onToggle={(e) => setKeyViewOpen(e.currentTarget.open)}
+            >
+              <summary {...stylex.props(styles.studioDevviewSummary)}>{t("fieldCatalog.developerView")}</summary>
               <FieldKeyInput
                 field={field}
-                mutate={mutate}
-                onChange={onChange}
-                onWrite={() => setDefinitionWrites((n) => n + 1)}
-                describedBy={keyNotice === undefined || fieldId === undefined ? undefined : fieldKeyNoticeId(fieldId)}
+                notice={keyNotice}
+                onCommitted={(rewrote) => {
+                  setDefinitionWrites((n) => n + 1);
+                  noteRewrites(rewrote);
+                }}
               />
-            </label>
-            {keyNotice !== undefined && fieldId !== undefined && (
-              <p id={fieldKeyNoticeId(fieldId)} {...stylex.props(styles.studioNotice)}>
-                {keyNotice}
-              </p>
-            )}
+            </details>
             {fieldId !== undefined && (
               <MoveFieldControl
                 fieldId={fieldId}

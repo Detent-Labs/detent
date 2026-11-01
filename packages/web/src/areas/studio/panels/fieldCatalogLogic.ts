@@ -1,5 +1,5 @@
 import type { FieldControl, FieldFormat } from "workflow-engine/schema";
-import { t } from "../catalog.js";
+import { t, type CatalogKey } from "../catalog.js";
 import { deriveKey, dedupeKey, shouldAutoDeriveKey } from "../draft/deriveKey.js";
 import { draftFields, flattenDraftFields, type DraftField } from "../draft/fields.js";
 import { resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text.js";
@@ -84,15 +84,16 @@ export const CEL_LITERAL_KEYS: ReadonlySet<string> = new Set(["in", "true", "fal
  * - the CEL literal words, `CEL_LITERAL_KEYS`.
  *
  * The last two parts apply to a field that is not a `group`. `group` names
- * whether the field is one; it defaults to the type of the field carrying
- * `exceptId`. The comparison is by id, so with `exceptId` `undefined` a field
- * with no id counts as the field itself. A key-less field adds nothing, so a
- * label beside one does not derive `_2`.
+ * whether the field is one, and defaults to `false`. A mint has no field in
+ * the draft yet, so with `exceptId` `undefined` every field counts, a field
+ * with no id included. A key-less field adds nothing, so a label beside one
+ * does not derive `_2`.
  */
-export function takenFieldKeys(draft: Draft, exceptId?: string, group?: boolean): Set<string> {
+export function takenFieldKeys(draft: Draft, exceptId?: string, group = false): Set<string> {
   const fields = draftFields(draft);
-  const taken = new Set(fields.filter((f) => f.id !== exceptId).map((f) => f.key ?? "").filter((key) => key !== ""));
-  if (group ?? fields.find((f) => f.id === exceptId)?.type === "group") return taken;
+  const others = exceptId === undefined ? fields : fields.filter((f) => f.id !== exceptId);
+  const taken = new Set(others.map((f) => f.key ?? "").filter((key) => key !== ""));
+  if (group) return taken;
   const carried = new Set(fields.map((f) => f.key ?? ""));
   for (const key of readKeys(draft)) if (!carried.has(key)) taken.add(key);
   for (const word of CEL_LITERAL_KEYS) taken.add(word);
@@ -142,7 +143,7 @@ export function keyCommitProblem(
   draft: Draft,
   field: DraftField,
   typed: string,
-): "empty" | "grammar" | "literal" | "taken" | undefined {
+): KeyCommitProblem | undefined {
   if (field.type === "group") return undefined;
   if (typed === "") return "empty";
   if (!FIELD_KEY_GRAMMAR.test(typed)) return "grammar";
@@ -168,8 +169,9 @@ export function keyFollowsLabel(draft: Draft, field: DraftField): boolean {
   return key === base || new RegExp(`^${base}_[0-9]+$`).test(key);
 }
 
-/** What happens to a key input: the author types, or blur or Enter commits. */
-export type KeyInputEvent = { kind: "type"; text: string } | { kind: "commit" };
+/** What happens to a key input: the author types, blur or Enter commits, or
+ * Escape drops the typed text. */
+export type KeyInputEvent = { kind: "type"; text: string } | { kind: "commit" } | { kind: "escape" };
 
 /**
  * One step of a key input. It holds the typed text until a commit, and
@@ -177,7 +179,7 @@ export type KeyInputEvent = { kind: "type"; text: string } | { kind: "commit" };
  * only changes the text, and a commit hands back the key to write: `write`
  * is `undefined` when nothing was typed or the text equals `currentKey`. A
  * commit clears the typed text, so the blur that follows an Enter writes
- * nothing.
+ * nothing. Escape clears it too and writes nothing.
  */
 export function keyInputStep(
   typed: string | undefined,
@@ -185,25 +187,52 @@ export function keyInputStep(
   currentKey: string,
 ): { typed: string | undefined; write?: string } {
   if (event.kind === "type") return { typed: event.text };
-  if (typed === undefined || typed === currentKey) return { typed: undefined };
+  if (event.kind === "escape" || typed === undefined || typed === currentKey) return { typed: undefined };
   return { typed: undefined, write: typed };
 }
 
+/** Why a key commit cannot work (`keyCommitProblem`). */
+export type KeyCommitProblem = "empty" | "grammar" | "literal" | "taken";
+
+const KEY_REFUSAL: Record<KeyCommitProblem, CatalogKey> = {
+  empty: "fieldCatalog.keyEmpty",
+  grammar: "fieldCatalog.keyGrammar",
+  literal: "fieldCatalog.keyLiteral",
+  taken: "fieldCatalog.keyTaken",
+};
+
+/** The sentence a refused key commit shows under the key input. */
+export const keyRefusalFor = (problem: KeyCommitProblem): string => t(KEY_REFUSAL[problem]);
+
 /**
- * The sentence under a field's key input, or `undefined` for none. `readers`
- * counts the CEL expressions that read `data.<key>` (`countKeyReaders`) and
- * `published` says the draft's base version holds the field. Readers win over
- * publication. An empty key has neither, so it shows nothing.
+ * The sentence in a field's Developer view on where its key comes from, or
+ * `undefined` for none. `published` says the draft's base version holds the
+ * field, and is `undefined` while the base version loads. `follows` is
+ * `keyFollowsLabel`'s answer. Publication wins over following. An empty key
+ * shows nothing.
  */
-export function keyNoticeFor(key: string, readers: number, published: boolean): string | undefined {
-  if (key === "") return undefined;
-  if (readers === 1) return t("fieldCatalog.keyReadByOne");
-  if (readers > 1) return t("fieldCatalog.keyReadByMany").replace("{count}", () => String(readers));
-  return published ? t("fieldCatalog.keyPublished") : undefined;
+export function keyNoticeFor(key: string, published: boolean | undefined, follows: boolean): string | undefined {
+  if (key === "" || published === undefined) return undefined;
+  if (published) return t("fieldCatalog.keyPublished");
+  return t(follows ? "fieldCatalog.keyFollows" : "fieldCatalog.keyByHand");
+}
+
+/**
+ * The line under a field's label row after a key change, or the empty string
+ * while no write has rewritten an expression. `count` is the number of
+ * expressions the last such write rewrote.
+ */
+export function rewriteLineFor(count: number | undefined): string {
+  if (count === undefined || count < 1) return "";
+  if (count === 1) return t("fieldCatalog.rewroteOne");
+  return t("fieldCatalog.rewroteMany").replace("{count}", () => String(count));
 }
 
 /** The id a field's key notice takes, so its key input names it in `aria-describedby`. */
 export const fieldKeyNoticeId = (fieldId: string) => `studio-field-key-notice-${fieldId}`;
+
+/** The id a refused key commit's sentence takes, for the same reason. */
+export const fieldKeyRefusalId = (fieldId: string) => `studio-field-key-refusal-${fieldId}`;
 
 /**
  * Which of a field's two presentation keys a switch to `kind` must drop.

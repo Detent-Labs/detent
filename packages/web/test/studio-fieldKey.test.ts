@@ -3,6 +3,7 @@ import { writeFieldKey } from "../src/areas/studio/draft/fieldKey.js";
 import { writeFieldLabel } from "../src/areas/studio/draft/fieldLabel.js";
 import { draftFields, type DraftField } from "../src/areas/studio/draft/fields.js";
 import { countKeyRewrites } from "../src/areas/studio/draft/key-readers.js";
+import { commitKeyInput } from "../src/areas/studio/panels/FieldCatalogPanel.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 import {
   isFieldKeyLocked,
@@ -189,10 +190,23 @@ describe("A field key never reads as a CEL literal", () => {
   });
 
   it("refuses a commit of true, which writes nothing", () => {
-    const d = draftOf([amountField()]);
+    const d = draftOf([amountField()], "data.amount > 1000.0");
+    const before = structuredClone(d);
+    let calls = 0;
+    const result = commitKeyInput(
+      d,
+      (recipe) => {
+        calls += 1;
+        recipe(d);
+      },
+      fieldIn(d, "field_amount"),
+      "true",
+    );
 
-    expect(keyCommitProblem(d, fieldIn(d, "field_amount"), "true")).toBe("literal");
-    expect(fieldIn(d, "field_amount").key).toBe("amount");
+    expect(result.problem).toBe("literal");
+    expect(result.typed).toBe("true");
+    expect(calls).toBe(0);
+    expect(d).toEqual(before);
   });
 
   it("counts every literal word as taken for a field, and none for a group", () => {
@@ -200,7 +214,7 @@ describe("A field key never reads as a CEL literal", () => {
 
     for (const word of ["in", "true", "false", "null"]) {
       expect(takenFieldKeys(d, "field_amount").has(word)).toBe(true);
-      expect(takenFieldKeys(d, "field_group").has(word)).toBe(false);
+      expect(takenFieldKeys(d, "field_group", true).has(word)).toBe(false);
     }
   });
 });
@@ -428,6 +442,20 @@ describe("takenFieldKeys", () => {
 
     expect([...takenFieldKeys(d, "field_new")].sort()).toEqual(["amount", "false", "in", "limit", "null", "true"]);
     expect([...takenFieldKeys(d, "field_amount")].sort()).toEqual(["false", "in", "limit", "null", "true"]);
+  });
+
+  it("counts every field's key for a mint, a field with no id included", () => {
+    const d = draftOf([amountField(), { key: "unsaved", type: "string", label: { en: "" } }]);
+
+    expect(takenFieldKeys(d).has("unsaved")).toBe(true);
+    expect(takenFieldKeys(d).has("amount")).toBe(true);
+  });
+
+  it("reads a field's rule unless told the field is a group, whatever type exceptId carries", () => {
+    const d = draftOf([{ id: "field_group", key: "items", type: "group", label: { en: "Items" }, fields: [] }], "data.limit > 1.0");
+
+    expect([...takenFieldKeys(d, "field_group")].sort()).toEqual(["false", "in", "limit", "null", "true"]);
+    expect([...takenFieldKeys(d, "field_group", true)]).toEqual([]);
   });
 
   it("holds only other fields' keys for a group, minted or existing", () => {
