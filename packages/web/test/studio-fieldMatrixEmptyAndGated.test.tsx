@@ -52,7 +52,7 @@ const render = (draft: Draft, hideInert = false) =>
 describe("the field matrix's empty state", () => {
   it("says so in words when the process declares no field", () => {
     const html = render(NO_FIELDS);
-    expect(html).toContain("declares no field");
+    expect(html).toContain("has no field yet");
     expect(html).not.toContain("<table");
   });
 
@@ -61,8 +61,8 @@ describe("the field matrix's empty state", () => {
     // inert, so Hide-inert takes the last column away.
     const html = render(ALL_INERT, true);
     expect(html).not.toContain("<table");
-    expect(html).toContain("Hide inert columns is on");
-    expect(html).not.toContain("declares no field");
+    expect(html).toContain("Hide steps with no form is on");
+    expect(html).not.toContain("has no field yet");
   });
 
   it("draws the grid for that same process with the filter off", () => {
@@ -104,9 +104,9 @@ describe("the field matrix's empty state", () => {
 });
 
 describe("a gated cell's reason", () => {
-  it("says the definition contract rejects the flag on a technical field", () => {
+  it("says a technical field cannot take the mark", () => {
     const html = render(TECHNICAL);
-    expect(html).toContain("definition contract rejects this flag");
+    expect(html).toContain("A technical field cannot take this mark");
   });
 
   it("puts the reason in the title a pointer user reads", () => {
@@ -119,7 +119,7 @@ describe("a gated cell's reason", () => {
   it("keeps the flag's own word ahead of the reason", () => {
     const html = render(TECHNICAL);
     const labels = [...html.matchAll(/aria-label="([^"]*)"/g)].map((m) => m[1]!);
-    const gated = labels.filter((l) => l.includes("definition contract"));
+    const gated = labels.filter((l) => l.includes("cannot take this mark"));
     expect(gated.length).toBeGreaterThan(0);
     for (const l of gated) expect(l).toMatch(/^(Required|Read-only)\. /);
   });

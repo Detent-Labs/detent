@@ -495,7 +495,7 @@ const NUMBER = new Intl.NumberFormat("en", { maximumFractionDigits: 20 });
  * closed list, "yes" or "no" for a boolean, a formatted number, a date or a
  * date-time as its stored text, and free text in curly quotes.
  */
-function summarizeValue(row: Extract<Row, { kind: "cmp" }>, operand: Operand | undefined): string {
+export function summarizeValue(row: Extract<Row, { kind: "cmp" }>, operand: Operand | undefined): string {
   const option = operand?.options?.find((o) => o.value === row.value);
   if (option) return option.label;
   if (operand?.celType === "bool") return boolChoiceOf(row.value) === "true" ? t("condition.yes") : t("condition.no");
@@ -528,12 +528,19 @@ function summarizeRow(row: Row, byPath: Map<string, Operand>): string {
 export function summarizeCondition(condition: Condition, operands: Operand[]): string {
   const byPath = new Map(operands.map((o) => [o.path, o]));
   const clauses = condition.rows.filter((r) => isComplete(r, byPath)).map((r) => summarizeRow(r, byPath));
+  return joinClauses(clauses, condition.joiner);
+}
+
+/** The clauses folded through the catalog's join phrase, `""` for none.
+ * Exported for `ruleLogic.ruleSentence`, which reads the same phrases. */
+export function joinClauses(clauses: readonly string[], joiner: Condition["joiner"]): string {
   if (!clauses.length) return "";
-  const join = t(condition.joiner === "&&" ? "condition.join.and" : "condition.join.or");
+  const join = t(joiner === "&&" ? "condition.join.and" : "condition.join.or");
   return clauses.reduce((left, right) => fill(join, { left, right }));
 }
 
-const capitalize = (s: string): string => s.charAt(0).toLocaleUpperCase("en") + s.slice(1);
+/** Exported for `ruleLogic.ruleSentence`, which opens its sentence the same way. */
+export const capitalize = (s: string): string => s.charAt(0).toLocaleUpperCase("en") + s.slice(1);
 
 /**
  * The builder's sentence under its rows, in one of four states. `condition` is

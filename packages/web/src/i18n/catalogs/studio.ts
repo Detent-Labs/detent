@@ -520,7 +520,7 @@ export const en = {
   // developer-view copy. Only its captions read words: its readout prints
   // the CEL source beside the rows ("Writes <code>…</code>").
   "ruleBuilder.thisAnswer": "this answer",
-  "ruleBuilder.empty": "No rule — nothing is checked.",
+  "ruleBuilder.empty": "No rule yet: every answer passes.",
   "ruleBuilder.and": "and",
   "ruleBuilder.valueKindLabel": "compare against",
   "ruleBuilder.valueKindLiteral": "a value",
@@ -668,17 +668,17 @@ export const en = {
 
   "fieldMatrix.heading": "Field matrix",
   "fieldMatrix.scrollRegionLabel": "Field matrix grid",
-  "fieldMatrix.hatchedCell": "No view on this step",
-  "fieldMatrix.hideInertToggle": "Hide inert columns",
-  "fieldMatrix.countLine": "{declared} field entries · {fields} fields × {steps} steps · {cells} cells the visible steps do not declare",
-  "fieldMatrix.legendBulk": "A bulk badge sets the whole column or row it sits on.",
-  "fieldMatrix.legendDefault": "A control left at its default writes no key.",
-  "fieldMatrix.legendCel": "CEL marks an expression, not a fixed value.",
-  "fieldMatrix.legendBlank": "A dash marks a field this step does not declare.",
-  "fieldMatrix.legendFlagged": "A flagged cell already stands in Checks as an issue.",
-  "fieldMatrix.legendTechnical": "The technical marker means the engine, not a participant, writes this field.",
-  "fieldMatrix.legendColors": "Each checkbox's color names its own flag:",
-  "fieldMatrix.columnInertNote": "No view — inert",
+  "fieldMatrix.hatchedCell": "No form on this step",
+  "fieldMatrix.hideInertToggle": "Hide steps with no form",
+  "fieldMatrix.countLine": "{declared} placements · {fields} fields × {steps} steps · {cells} empty cells",
+  "fieldMatrix.legendBulk": "A badge sets the whole column or row it sits on.",
+  "fieldMatrix.legendDefault": "An unchecked box writes nothing.",
+  "fieldMatrix.legendCel": "Condition means a rule decides in place of a fixed yes or no.",
+  "fieldMatrix.legendBlank": "A dash marks a field this step's form does not hold.",
+  "fieldMatrix.legendFlagged": "A marked cell stands in Checks.",
+  "fieldMatrix.legendTechnical": "Technical means the process fills the field in by itself.",
+  "fieldMatrix.legendColors": "Each box's color names its mark:",
+  "fieldMatrix.columnInertNote": "No form",
   "fieldMatrix.rowTypeLabel": "Type",
   "fieldMatrix.flaggedCellMark": "Flagged in Checks",
   // The blast radius a bulk press carries. The studio has no undo for a bulk
@@ -687,9 +687,9 @@ export const en = {
   // these sentences, so no sentence gets assembled from fragments. A count
   // never modifies a bare noun here either, so one wording serves one cell
   // and twenty without a second key per number.
-  "fieldMatrix.bulkSetColumn": "Sets this flag on step {name}. Cells it writes: {total}. Already set: {set}.",
-  "fieldMatrix.bulkClearColumn": "Clears this flag from step {name}. Cells it writes: {total}.",
-  "fieldMatrix.bulkSetRow": "Sets this flag for field {name}. Cells it writes: {total}. Already set: {set}.",
+  "fieldMatrix.bulkSetColumn": "Turns this on for every field on step {name}. Cells it writes: {total}. Already on: {set}.",
+  "fieldMatrix.bulkClearColumn": "Turns this off for every field on step {name}. Cells it writes: {total}.",
+  "fieldMatrix.bulkSetRow": "Turns this on for {name} on every step that asks for it. Cells it writes: {total}. Already on: {set}.",
   // The matrix drew a header row above nothing at all, which
   // `design-language.md` forbids: "An empty state says so in words. It never
   // shows as an empty table." The two causes need different words, because
@@ -698,13 +698,13 @@ export const en = {
   // the headers joined the roving model, so it needs a name: an author
   // arriving there by arrow key otherwise lands on silence.
   "fieldMatrix.cornerLabel": "Fields, down the side. Steps, across the top.",
-  "fieldMatrix.emptyNoFields": "This process declares no field yet, so the matrix has nothing to line up.",
-  "fieldMatrix.emptyNoColumns": "Hide inert columns is on, and it leaves no step to show. Turn it off to see them.",
+  "fieldMatrix.emptyNoFields": "This process has no field yet, so there is nothing to line up.",
+  "fieldMatrix.emptyNoColumns": "Hide steps with no form is on, and it leaves no step to show. Turn it off to see them.",
   // A gated checkbox carried `aria-disabled` and swallowed the click without
   // a word. Each case says which rule gates it.
-  "fieldMatrix.gatedNotWritten": "Nothing writes this field before this step, so the flag would strand the participant.",
-  "fieldMatrix.gatedTechnical": "The definition contract rejects this flag on a technical field.",
-  "fieldMatrix.bulkClearRow": "Clears this flag from field {name}. Cells it writes: {total}.",
+  "fieldMatrix.gatedNotWritten": "Nothing fills this field before this step, so the mark would strand the participant.",
+  "fieldMatrix.gatedTechnical": "A technical field cannot take this mark.",
+  "fieldMatrix.bulkClearRow": "Turns this off for {name} on every step that asks for it. Cells it writes: {total}.",
   "fieldMatrix.technicalRowMark": "Technical",
 
   // The step page's eight section headers (`studio-step-page`). "Time
@@ -1275,6 +1275,35 @@ export const en = {
   "error.network": "Could not reach the server. Check your connection and try again.",
   "error.serverError": "The server hit an error. Try again.",
   "error.generic": "Something went wrong. Try again.",
+
+  // The field card (`studio-field-card`): its section headings, the choice
+  // rows and the Asked on and Read by commands.
+  "fieldCard.nameLabel": "Name",
+  "fieldCard.kindHeading": "Kind",
+  "fieldCard.choicesHeading": "Choices",
+  "fieldCard.askedOnHeading": "Asked on",
+  "fieldCard.moreHeading": "More",
+  "fieldCard.choiceNamePlaceholder": "Name of the choice",
+  "fieldCard.addChoice": "+ Add a choice",
+  "fieldCard.removeChoice": "Remove",
+  "fieldCard.choiceValueLabel": "Stored value",
+  "fieldCard.choiceValueFollows": "The value follows the name until the first publish.",
+  "fieldCard.choiceValuePublished": "This field is in a published version. The name no longer sets its values.",
+  "fieldCard.choicesFromSource": "The choices come from {source}.",
+  "fieldCard.choicesFromSourceNote": "Pick another source under More.",
+  "fieldCard.choicesEmpty": "No choice yet, so a participant types freely. Add one to offer a list instead.",
+  "fieldCard.hiddenMark": "Not asked",
+  "fieldCard.unnamedChoice": "(unnamed choice)",
+  "fieldCard.openForm": "Open the form",
+  "fieldCard.openPlace": "Open",
+  "fieldCard.requiredEverywhere": "Required on every step that asks for it",
+  "fieldCard.noSourceOption": "Nowhere: this field lists its own choices",
+  "fieldCard.technicalLabel": "Technical: the process fills this in by itself",
+  "fieldMatrix.markCondition": "Condition",
+  "fieldMatrix.rowKindLabel": "Kind",
+  "defaultValue.computedNote": "A rule computes this default.",
+  "defaultValue.developerView": "Developer view",
+  "formsTab.legendGroup": "Group",
 } as const;
 
 export type CatalogKey = keyof typeof en;

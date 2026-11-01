@@ -68,6 +68,12 @@ describe("fieldUsage", () => {
     expect(rows[1]).toEqual({ stepId: "step_b", stepLabel: "B", modes: ["readonly"] });
   });
 
+  it("answers an empty label for an unlabelled step, never its key", () => {
+    const d = draft();
+    delete (d.workflow!.steps![0] as { label?: unknown }).label;
+    expect(fieldUsage(d, "field_vendor", "en", "en")[0]).toEqual({ stepId: "step_a", stepLabel: "", modes: ["required"] });
+  });
+
   it("returns nothing for a field no step's view references", () => {
     expect(fieldUsage(draft(), "field_group", "en", "en")).toEqual([]);
   });

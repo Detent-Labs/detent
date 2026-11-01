@@ -117,7 +117,11 @@ describe("readByRows", () => {
 
   it("reads a guard as its way out and its sentence", () => {
     const row = readByRows(everyPlace(), "amount", "en").find((r) => r.place.startsWith("On Review: way out"));
-    expect(row).toEqual({ place: "On Review: way out Approve → Book", sentence: "Amount is greater than 1,000." });
+    expect(row).toEqual({
+      place: "On Review: way out Approve → Book",
+      sentence: "Amount is greater than 1,000.",
+      target: { kind: "wayOut", stepId: "step_review", pathId: "path_approve" },
+    });
   });
 
   it("names the step a way out leaves, so two steps' like-named way outs read apart", () => {
@@ -143,6 +147,40 @@ describe("readByRows", () => {
     ]);
   });
 
+  it("gives each place kind its target and the fallbacks none", () => {
+    const targets = Object.fromEntries(readByRows(everyPlace(), "amount", "en").map((r) => [r.place, r.target]));
+    expect(targets).toEqual({
+      "The rule for Amount": { kind: "field", fieldId: "field_amount" },
+      "The default value of Nested": { kind: "field", fieldId: "field_nested" },
+      "The rule for Nested": { kind: "field", fieldId: "field_nested" },
+      "When Review asks for Note": { kind: "form", stepId: "step_review" },
+      "When Review requires Note": { kind: "form", stepId: "step_review" },
+      "When Note is read-only on Review": { kind: "form", stepId: "step_review" },
+      "The rule for Note on Review": { kind: "form", stepId: "step_review" },
+      "When Review shows a note": { kind: "form", stepId: "step_review" },
+      "Another rule on Review": undefined,
+      "The time limit on Review": { kind: "step", stepId: "step_review" },
+      "On Review: way out Approve → Book": { kind: "wayOut", stepId: "step_review", pathId: "path_approve" },
+      "Values passed to the called process on Check credit": { kind: "step", stepId: "step_call" },
+      "Values copied back from the called process on Check credit": { kind: "step", stepId: "step_call" },
+      "Another rule in this process": undefined,
+    });
+  });
+
+  it("draws no target key on a fallback row", () => {
+    const rows = readByRows(everyPlace(), "amount", "en");
+    for (const place of ["Another rule on Review", "Another rule in this process"]) {
+      expect("target" in rows.find((r) => r.place === place)!).toBe(false);
+    }
+  });
+
+  it("reaches the way out by the path's id, not its position", () => {
+    const draft = everyPlace();
+    draft.workflow!.steps![0]!.paths!.unshift({ id: "path_first", key: "first", label: "First", to: "step_book", trigger: "manual" } as never);
+    const row = readByRows(draft, "amount", "en").find((r) => r.place.startsWith("On Review: way out"));
+    expect(row?.target).toEqual({ kind: "wayOut", stepId: "step_review", pathId: "path_approve" });
+  });
+
   it("names the step and the field of a form condition", () => {
     const draft = everyPlace();
     expect(readByRows(draft, "amount", "en").map((r) => r.place)).toContain("When Review asks for Note");
@@ -157,7 +195,9 @@ describe("readByRows", () => {
         steps: [{ id: "step_review", key: "review", label: { en: "Review" }, type: "task", timers: [{ id: "timer_a", deadline: cel("data.due") }] }],
       },
     } as unknown as Draft;
-    expect(readByRows(draft, "due", "en")).toEqual([{ place: "The time limit on Review" }]);
+    expect(readByRows(draft, "due", "en")).toEqual([
+      { place: "The time limit on Review", target: { kind: "step", stepId: "step_review" } },
+    ]);
   });
 
   it("reads source that does not parse as a hand-written rule", () => {
@@ -189,7 +229,7 @@ describe("readByRows", () => {
   });
 
   it("prints no CEL, no key and no id", () => {
-    const text = JSON.stringify(readByRows(everyPlace(), "amount", "en"));
+    const text = JSON.stringify(readByRows(everyPlace(), "amount", "en").map(({ target: _target, ...row }) => row));
     expect(text).not.toContain("data.");
     expect(text).not.toContain("amount");
     expect(text).not.toContain("field_");

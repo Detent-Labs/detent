@@ -137,8 +137,23 @@ describe("flag vocabulary", () => {
       ["formsTab.legendConditional", "Required if a condition holds"],
       ["formsTab.legendSection", "Section"],
       ["formsTab.legendHeight", "Taller asks for more"],
-      ["fieldMatrix.legendFlagged", "A flagged cell already stands in Checks as an issue."],
+      ["fieldMatrix.legendFlagged", "A marked cell stands in Checks."],
       ["fieldCatalog.dataSourceLabel", "Values come from"],
+    ]);
+  });
+
+  it("names the field card's marks and the matrix's words", () => {
+    expectRows([
+      ["formsTab.legendGroup", "Group"],
+      ["fieldMatrix.markCondition", "Condition"],
+      ["fieldMatrix.rowKindLabel", "Kind"],
+      ["fieldMatrix.hideInertToggle", "Hide steps with no form"],
+      ["fieldMatrix.columnInertNote", "No form"],
+      ["fieldCard.hiddenMark", "Not asked"],
+      ["fieldCard.openForm", "Open the form"],
+      ["fieldCard.openPlace", "Open"],
+      ["fieldCard.requiredEverywhere", "Required on every step that asks for it"],
+      ["ruleBuilder.empty", "No rule yet: every answer passes."],
     ]);
   });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
+import type { CmpOp } from "../src/areas/studio/panels/shared/conditionLogic.js";
 import {
   buildRuleOperands,
   fieldValueOperandsFor,
@@ -7,9 +8,12 @@ import {
   isRuleRowComplete,
   newRuleRow,
   ruleOperandSignature,
+  ruleSentence,
   ruleValueOf,
   toRuleCel,
   type RuleCondition,
+  type RuleRow,
+  type RuleValue,
   type RuleOperand,
 } from "../src/areas/studio/panels/shared/ruleLogic.js";
 
@@ -239,5 +243,84 @@ describe("ruleOperandSignature", () => {
     const a = operandsFor({ ...field("amount", "number"), label: { en: "One" } } as DraftField);
     const b = operandsFor({ ...field("amount", "number"), label: { en: "Two" } } as DraftField);
     expect(ruleOperandSignature(a)).toBe(ruleOperandSignature(b));
+  });
+});
+
+describe("buildRuleOperands numbering", () => {
+  it("numbers a second and later other field sharing a label, in catalog order", () => {
+    const own = field("amount", "number");
+    const named = (key: string, label: string) => field(key, "number", { label: { en: label } });
+    const ops = operandsFor(own, [named("a", "Name"), named("b", "Name"), named("c", "Total"), named("d", "Name")]);
+    expect(ops.map((o) => o.label)).toEqual(["this answer", "Name", "Name (2)", "Total", "Name (3)"]);
+  });
+
+  it("keeps 'this answer' first and uncounted although another field carries its label", () => {
+    const own = field("amount", "number");
+    const ops = operandsFor(own, [field("x", "number", { label: { en: "this answer" } }), field("y", "number", { label: { en: "this answer" } })]);
+    expect(ops.map((o) => o.label)).toEqual(["this answer", "this answer", "this answer (2)"]);
+  });
+
+  it("counts a label shared with the field under edit as unique among the others", () => {
+    const own = field("amount", "number", { label: { en: "Name" } });
+    const ops = operandsFor(own, [field("other", "number", { label: { en: "Name" } })]);
+    expect(ops.map((o) => o.label)).toEqual(["this answer", "Name"]);
+  });
+});
+
+describe("ruleSentence", () => {
+  const amount = field("amount", "number");
+  const budget = field("budget", "number", { label: { en: "Budget" } });
+  const ops = operandsFor(amount, [budget, field("limit", "number", { label: { en: "Budget" } })]);
+  const cmp = (op: CmpOp, value: RuleValue, operand = "data.amount"): RuleRow => ({ kind: "cmp", operand, op, value });
+
+  it("reads a literal comparison as a sentence", () => {
+    const c: RuleCondition = { rows: [cmp(">=", { kind: "literal", value: 1000 })] };
+    expect(ruleSentence(c, ops, "data.amount >= 1000.0")).toBe("This answer is at least 1,000.");
+  });
+
+  it("prints the other field's label as the value of a field comparison", () => {
+    const c: RuleCondition = { rows: [cmp("<=", { kind: "field", path: "data.budget" })] };
+    expect(ruleSentence(c, ops, undefined)).toBe("This answer is at most Budget.");
+  });
+
+  it("prints the counted label of a repeated field", () => {
+    const c: RuleCondition = { rows: [cmp("<=", { kind: "field", path: "data.limit" })] };
+    expect(ruleSentence(c, ops, undefined)).toBe("This answer is at most Budget (2).");
+  });
+
+  it("joins the complete rows by 'and' and skips an unfinished row", () => {
+    const c: RuleCondition = {
+      rows: [
+        cmp(">", { kind: "literal", value: 0 }),
+        cmp("<", { kind: "literal", value: undefined }),
+        cmp("<", { kind: "literal", value: 10 }),
+      ],
+    };
+    expect(ruleSentence(c, ops, undefined)).toBe("This answer is greater than 0 and this answer is less than 10.");
+  });
+
+  it("reads a raw row as a hand-written rule", () => {
+    const c = fromRuleCel("data.amount > 0.0 || data.amount < -5.0", ops)!;
+    expect(ruleSentence(c, ops, "data.amount > 0.0 || data.amount < -5.0")).toBe("A hand-written rule.");
+  });
+
+  it("reads no row and nothing stored as every answer passing", () => {
+    expect(ruleSentence({ rows: [] }, ops, undefined)).toBe("No rule yet: every answer passes.");
+    expect(ruleSentence({ rows: [] }, ops, "  ")).toBe("No rule yet: every answer passes.");
+  });
+
+  it("holds the stored rule while the author finishes a row", () => {
+    const c: RuleCondition = { rows: [cmp(">", { kind: "literal", value: undefined })] };
+    expect(ruleSentence(c, ops, "data.amount > 5.0")).toBe("Until you finish the row, the condition stays: this answer is greater than 5.");
+  });
+
+  it("asks for a finished row over an unfinished one with nothing stored", () => {
+    const c: RuleCondition = { rows: [cmp(">", { kind: "literal", value: undefined })] };
+    expect(ruleSentence(c, ops, undefined)).toBe("Finish a row to set the condition.");
+  });
+
+  it("prints no CEL", () => {
+    const c: RuleCondition = { rows: [cmp(">=", { kind: "field", path: "data.budget" })] };
+    expect(ruleSentence(c, ops, "data.amount >= data.budget")).not.toContain("data.");
   });
 });

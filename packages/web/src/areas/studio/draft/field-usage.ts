@@ -11,10 +11,8 @@ import { t } from "../catalog.js";
 /** One step whose view references the field, and which of `visible` /
  * `required` / `readonly` that step's view entry carries — regardless of
  * whether the value is a literal or an expression. `stepLabel` is the
- * step's resolved label in the caller's locale, falling back to `""` (the
- * key or an empty string) the same way `flattenRailFields`'s own `key`
- * does — the caller applies the unnamed-step catalog fallback, exactly as
- * `PanelsScreen` already does for an unnamed field's rail row. */
+ * step's resolved label in the caller's locale, `""` when it has none (never
+ * the step's key) — the caller applies the unnamed-step catalog fallback. */
 export interface FieldUsageRow {
   stepId: string;
   stepLabel: string;
@@ -35,7 +33,7 @@ export function fieldUsage(draft: Draft, fieldId: string, locale: string, baseLo
       if (entry.ref !== fieldId) continue;
       rows.push({
         stepId: step.id,
-        stepLabel: resolveDraftLocalizedText(step.label, locale, baseLocale) ?? step.key ?? "",
+        stepLabel: resolveDraftLocalizedText(step.label, locale, baseLocale) ?? "",
         modes: FLAG_KEYS.filter((k) => k in entry),
       });
     }

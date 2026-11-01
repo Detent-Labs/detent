@@ -143,3 +143,18 @@ describe("PublishedFieldIdsProvider", () => {
     expect(deps?.[1]).toContain("processId");
   });
 });
+
+describe("watchPublishedFieldIds option values", () => {
+  it("reports the choice values beside the ids", async () => {
+    const { calls, fetchBody } = stubFetch();
+    const seen: { ids: string[]; values: string[] }[] = [];
+
+    watchPublishedFieldIds(fetchBody, "proc_a", 3, "tok", (ids, optionValues) =>
+      seen.push({ ids: [...ids], values: [...(optionValues.get("field_a") ?? [])] }),
+    );
+    calls[0]!.resolve(body({ id: "field_a", options: [{ value: "open" }] }));
+    await flush();
+
+    expect(seen).toEqual([{ ids: ["field_a"], values: ["open"] }]);
+  });
+});

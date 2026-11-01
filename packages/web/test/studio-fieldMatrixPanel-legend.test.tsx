@@ -33,7 +33,7 @@ describe("FieldMatrixPanel's legend", () => {
     // <span> count — the seventh entry's swatches are spans of their own.
     const entryCount = (legendMatch![1].match(/<span data-legend-entry/g) ?? []).length;
     expect(entryCount).toBe(7);
-    expect(html).toContain("The technical marker means the engine, not a participant, writes this field.");
+    expect(html).toContain("Technical means the process fills the field in by itself.");
   });
 
   it("renders the seventh entry's three swatches, each reading its own --color-flag-* token", () => {
@@ -42,7 +42,7 @@ describe("FieldMatrixPanel's legend", () => {
         <FieldMatrixPanel />
       </DraftProvider>,
     );
-    expect(html).toContain("color names its own flag:");
+    expect(html).toContain("color names its mark:");
     expect(html).toContain('class="matrixLegendSwatchColor matrixLegendSwatchVisible"');
     expect(html).toContain('class="matrixLegendSwatchColor matrixLegendSwatchRequired"');
     expect(html).toContain('class="matrixLegendSwatchColor matrixLegendSwatchReadonly"');

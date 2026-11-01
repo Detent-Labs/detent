@@ -765,8 +765,8 @@ export const FieldMatrixGrid = memo(function FieldMatrixGrid({
                   onBlur={activated && focus.col === -1 && focus.row === rowIndex ? onCellBlur : undefined}
                 >
                   <span {...stylex.props(styles.matrixFieldKey)}>{row.key === "" ? t("panelsScreen.unnamedField") : row.key}</span>
-                  <span {...stylex.props(styles.matrixFieldType)} aria-label={`${t("fieldMatrix.rowTypeLabel")}: ${row.type}`}>
-                    {row.type}
+                  <span {...stylex.props(styles.matrixFieldType)} aria-label={`${t("fieldMatrix.rowTypeLabel")}: ${row.kind}`}>
+                    {row.kind}
                   </span>
                   {technicalIds.has(row.id) && (
                     <span className="studio-matrix-row-technical" title={t("fieldMatrix.legendTechnical")}>

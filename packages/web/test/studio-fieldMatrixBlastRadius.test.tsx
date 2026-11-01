@@ -52,7 +52,7 @@ describe("a bulk badge's blast radius", () => {
   });
 
   it("names the field a row badge acts on", () => {
-    expect(labels.some((l) => l.includes("field vendor"))).toBe(true);
+    expect(labels.some((l) => l.includes("for vendor on every step"))).toBe(true);
   });
 
   it("gives two badges for one flag different names", () => {
@@ -64,10 +64,10 @@ describe("a bulk badge's blast radius", () => {
 
   it("states both counts on a mixed target", () => {
     // The field's row spans two cells and one already carries `required`.
-    const row = labels.find((l) => l.startsWith("Required.") && l.includes("field vendor"));
+    const row = labels.find((l) => l.startsWith("Required.") && l.includes("for vendor on every step"));
     expect(row).toBeDefined();
     expect(row).toContain("Cells it writes: 2");
-    expect(row).toContain("Already set: 1");
+    expect(row).toContain("Already on: 1");
   });
 
   it("states the clearing count on a full target", () => {
@@ -81,7 +81,7 @@ describe("a bulk badge's blast radius", () => {
 
   it("puts the same sentence in the title a pointer user reads", () => {
     const titles = [...html.matchAll(/title="([^"]*)"/g)].map((m) => m[1]!);
-    const row = labels.find((l) => l.startsWith("Required.") && l.includes("field vendor"))!;
+    const row = labels.find((l) => l.startsWith("Required.") && l.includes("for vendor on every step"))!;
     expect(titles).toContain(row);
   });
 

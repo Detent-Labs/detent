@@ -12,6 +12,7 @@ import type { FieldId, Step } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import type { DraftField } from "../draft/fields";
 import { flattenDraftFields } from "../draft/fields";
+import { fieldKindWord, isUnmatchedKind } from "../draft/field-type-labels";
 import { flattenRailFields } from "../draft/panel-rail";
 import { isDraftViewField, type DraftViewField } from "../draft/view-layout";
 import { effectiveFlag, FLAG_DEFAULT, gatedKeys, setFlag, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
@@ -19,13 +20,6 @@ import type { BoolOrExpr } from "./shared/overrideMode";
 import { isExpression } from "./shared/overrideMode";
 
 type DraftStep = DraftOf<Step>;
-
-/** A field's `type` is either a literal type name or a `{ type, config }`
- * plugin envelope. The row header shows the envelope's own `type`, and an
- * empty string for a field whose type the author has not chosen yet. */
-function rowTypeLabel(type: DraftField["type"]): string {
-  return (typeof type === "string" ? type : type?.type) ?? "";
-}
 
 /** One row of the grid. `depth` caps at 1, matching `flattenRailFields`. A
  * group row draws no differently in state from any other row (design.md
@@ -35,19 +29,23 @@ export interface FieldMatrixRow {
   key: string;
   depth: 0 | 1;
   isGroup: boolean;
-  type: string;
+  /** The kind word the kind picker shows (`fieldKindWord`). The raw triple
+   * when `unmatched`. */
+  kind: string;
+  /** True when `kind` is the raw triple, a machine value drawn in mono. */
+  unmatched: boolean;
 }
 
 /**
  * Rows in catalog order, `flattenRailFields`' own depth-first walk and depth
- * cap, with `isGroup` and `type` joined in from `flattenDraftFields`. No new
+ * cap, with `isGroup`, `kind` and `unmatched` joined in from `flattenDraftFields`. No new
  * traversal: both walks already visit the catalog in the same order.
  */
 export function matrixRows(fields: DraftField[] | undefined): FieldMatrixRow[] {
   const byId = new Map(flattenDraftFields(fields).map((f) => [f.id, f]));
   return flattenRailFields(fields).map((row) => {
     const field = byId.get(row.id as FieldId);
-    return { ...row, isGroup: field?.type === "group", type: rowTypeLabel(field?.type) };
+    return { ...row, isGroup: field?.type === "group", kind: fieldKindWord(field ?? {}), unmatched: isUnmatchedKind(field ?? {}) };
   });
 }
 
