@@ -256,6 +256,9 @@ participant opens the form.
 The example uses no data source. Its `dataSources` array is empty, and
 `booking_status` carries its options inline.
 
+The studio derives a choice's stored value from its name until a published
+version holds that choice. A field's key follows its label the same way.
+
 Two types ship. Pick the type from the picker, then between the two by who
 owns the values.
 

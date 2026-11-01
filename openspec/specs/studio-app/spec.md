@@ -947,6 +947,7 @@ the new version number. The Settings tab's Developer view SHALL hold its
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 <!-- antislop: allow synonym-rotation -->
 
+<!-- Why: the heading repeats the live spec's wording, which a MODIFIED block must match. -->
 ### Requirement: The panels screen is a routed sub-state of the edit screen
 
 <!-- antislop: allow trailing-negation synonym-rotation -->
@@ -1012,8 +1013,8 @@ body, and no empty band sits below it.
 
 #### Scenario: A view has its own address
 
-- **WHEN** the author opens Where values come from on the Settings tab
-- **THEN** the address bar reads `/processes/:id/edit/settings/sources`, and
+- **WHEN** the author opens Where values come from on the Fields tab
+- **THEN** the address bar reads `/processes/:id/edit/fields/sources`, and
   loading that path directly opens the same view
 
 #### Scenario: The Changes and Paths views have addresses too
@@ -1077,8 +1078,7 @@ issue mark says whether that entity is wrong. Only the issue mark takes the
 refusal tone. A row SHALL have no issue mark while its entity has no issue.
 
 Two views SHALL each stand an entity rail beside the open editor. They are
-the Fields tab's Catalog view and the Settings tab's Where values come from
-view. The rail SHALL list that view's own entities, and an Add entry too. Choosing an entity SHALL select it. The tab SHALL open that one entity's
+the Fields tab's Catalog view and its Where values come from view. The rail SHALL list that view's own entities, and an Add entry too. Choosing an entity SHALL select it. The tab SHALL open that one entity's
 editor.
 
 The Add entry SHALL add an entity, through the call the panel's own add control
@@ -1139,8 +1139,8 @@ icon's tooltip, and it SHALL stay part of the entry's accessible name. A
 nested entry's accessible name SHALL also carry the name of the group that
 holds its field. The indent shows that group to a sighted author alone.
 
-The row SHALL NOT print the field's key. The key stays in the definition
-half's "What this field asks" zone, once an author selects that field. The
+The row SHALL NOT print the field's key. The key stays in the field
+card's More, in its Developer view, once an author selects that field. The
 engine's own exact-match value already lives there. The Data sources rail
 entry names its data source through the same rail-row name element. An
 over-long data source key SHALL truncate on its one line the identical way.
@@ -1237,9 +1237,9 @@ empty-key field did before.
 
 #### Scenario: A newly chosen field's editor opens at its top
 
-- **WHEN** the author scrolls a field's editor down to its "Validation" zone
+- **WHEN** the author scrolls a field's card down to its "Validation" part
 - **AND** the author picks another field in the rail
-- **THEN** the editor shows that field's "What this field asks" zone at its
+- **THEN** the editor shows that field's card at its
   top
 
 #### Scenario: The Fields rail adds a field
@@ -1521,11 +1521,12 @@ printed as JSON.
 
 ### Requirement: The field catalog's definition half offers a Technical control
 
-The field catalog's definition half SHALL offer a Technical checkbox for
-the selected field. A field nested inside a group SHALL offer it in that
-field's own editor. Checking it SHALL write `technical: true`. Unchecking it
-SHALL delete the `technical` key. Every other view-flag control in the studio
-already follows that same convention for its own default value.
+The field card's More SHALL offer a Technical checkbox for the selected
+field. Its label reads "Technical: the process fills this in by itself". A
+field nested inside a group SHALL offer it in that field's own card.
+Checking it SHALL write `technical: true`. Unchecking it SHALL delete the
+`technical` key. Every other view-flag control in the studio already
+follows that same convention for its own default value.
 
 A group's child holds a value of its own, and a structural source can
 write it. The compile rule and the rail's own finding both read the
@@ -1586,7 +1587,7 @@ field. Offering the control there would only invite a rejected publish.
 
 - **WHEN** the developer selects a field nested inside a `type: "group"`
   field
-- **THEN** that field's own definition half offers the Technical checkbox
+- **THEN** that field's own card offers the Technical checkbox, in More
 
 #### Scenario: A group field disables the Technical control
 
@@ -1905,9 +1906,9 @@ another field opens.
 
 ### Requirement: A field's key input stands in a Developer view
 
-The field editor's "What this field asks" zone SHALL hold a "Developer
-view" disclosure, closed when the field opens. It SHALL hold the key input
-under "Key". No key input SHALL stand outside it, for a `group` too.
+The field card's More SHALL hold a "Developer view" disclosure, closed
+when the field opens, as its last part. It SHALL hold the key input under
+"Key". No key input SHALL stand outside it, for a `group` too.
 
 #### Scenario: The key stands behind the Developer view
 
@@ -2020,14 +2021,14 @@ view entries naming it". None of the refusals applies to it.
 
 ### Requirement: The field editor lists what reads the field
 
-The field editor's effect half SHALL hold a "Read by" zone under "Used in".
-A `group` has no such zone. The zone SHALL list one row per CEL expression
+The field card SHALL hold a "Read by" section after Asked on. A `group`
+has no such section. The section SHALL list one row per CEL expression
 that reads `data.<key>`, in draft order. It counts the way a key change
 does.
 
 A row SHALL name its place in the author's words. A condition's row SHALL
 add its sentence (`studio-condition-builder`). No row
-SHALL print CEL, a key or an id. With no reader the zone SHALL read "No
+SHALL print CEL, a key or an id. With no reader the section SHALL read "No
 condition reads this field."
 
 #### Scenario: A guard reads as its way out and its sentence
@@ -2035,20 +2036,20 @@ condition reads this field."
 - **WHEN** a way out "Approve → Book" on the step "Review" carries the guard
   `data.amount > 1000.0`
 - **AND** the field `amount` carries the label "Amount"
-- **THEN** the "Read by" zone of "Amount" holds a row "On Review: way out
+- **THEN** the "Read by" section of "Amount" holds a row "On Review: way out
   Approve → Book"
 - **AND** that row reads "Amount is greater than 1,000."
 
 #### Scenario: A field nothing reads says so
 
 - **WHEN** no expression reads `data.amount`
-- **THEN** the "Read by" zone of "Amount" reads "No condition reads this
+- **THEN** the "Read by" section of "Amount" reads "No condition reads this
   field."
 
 #### Scenario: The zone prints no CEL
 
 - **WHEN** three expressions read `data.amount`
-- **THEN** the "Read by" zone of "Amount" contains no `data.`
+- **THEN** the "Read by" section of "Amount" contains no `data.`
 
 ### Requirement: A Read by row names each kind of place
 
@@ -2065,7 +2066,7 @@ A condition's place SHALL read:
 
 - **WHEN** the step "Review" asks for the field "Note" only when
   `data.amount > 0.0`
-- **THEN** the "Read by" zone of "Amount" holds a row "When Review asks for
+- **THEN** the "Read by" section of "Amount" holds a row "When Review asks for
   Note"
 
 ### Requirement: A Read by row names a value's place
@@ -2081,7 +2082,7 @@ Any other place SHALL read:
 
 - **WHEN** the step "Review" carries a time limit whose deadline reads
   `data.due`
-- **THEN** the "Read by" zone of the field `due` holds a row "The time limit
+- **THEN** the "Read by" section of the field `due` holds a row "The time limit
   on Review"
 
 ### Requirement: The field matrix lists every catalog field against every workflow step
@@ -2397,30 +2398,35 @@ That same reduced opacity still applies to it.
 
 ### Requirement: Column headers name the step and flag steps with no view
 
-Each column header SHALL show the step's `key` alongside its resolved
-label. Where a step declares no `view` at all, its column header SHALL
-carry an explicit note stating so. That column also draws hatched.
+Each column header SHALL show the step's resolved label alone, or
+"(unnamed step)". No column header SHALL print the step's `key`. Where a
+step declares no `view` at all, its column header SHALL carry the note "No
+form". That column also draws hatched.
 
 #### Scenario: A column header shows the step's key and label
 
 - **WHEN** the developer opens the field matrix
-- **THEN** every column header shows that step's `key` and its
-  resolved label
+- **THEN** every column header shows that step's resolved label
+- **AND** none shows a `key`
 
 #### Scenario: A step with no view carries a note in its own header
 
 - **WHEN** a workflow step declares no `view`
-- **THEN** that step's column header carries a note stating it
-  declares no view
+- **THEN** that step's column header carries the note "No form"
 
 ### Requirement: Row headers name the field and its type
 
-Each row header SHALL show the field's `key` alongside its `type`.
+Each row header SHALL show the field's resolved label, or "(unnamed
+field)". Its kind word SHALL stand beside it, the word the kind picker
+shows. A field
+whose members name no kind SHALL show its raw triple in the mono face. No
+row header SHALL print the field's `key` or its base `type`.
 
 #### Scenario: A row header shows the field's key and type
 
 - **WHEN** the developer opens the field matrix
-- **THEN** every row header shows that field's `key` and its `type`
+- **THEN** every row header shows that field's label and its kind word
+- **AND** none shows a `key` or a bare `type`
 
 ### Requirement: The field matrix marks a technical field's row header
 
@@ -2469,6 +2475,8 @@ badge SHALL NOT write one there, even where the column's other rows are eligible
 Where every eligible cell already carries the flag's non-default value, the badge
 SHALL turn that flag off across those cells. It turns the flag on otherwise.
 
+<!-- antislop: allow negation-habit -->
+<!-- Why: copied byte for byte from the live requirement. -->
 A column or row with no live cell SHALL carry no bulk toggle badge.
 
 The matrix SHALL NOT stand a single badge whose own eligible cell set is empty.
@@ -2482,10 +2490,11 @@ two go. The rule also removes a badge from a row whose cells the studio gates fo
 any other reason.
 
 A column header's `visible`/`required`/`readonly` badges SHALL sit in three fixed
-positions, one per flag, in that order. Those positions SHALL match the fixed
-positions the same three flags hold in the column's own cells below. A badge can
-be absent because its eligible set is empty. Its position SHALL stay empty then,
-rather than let the remaining badges shift into it.
+slots, one per flag. The slots follow the order the same three flags hold in the
+column's own cells below. A badge prints its flag's word. The slots therefore
+stand wider than the checkbox columns beneath and share no pixel edge with them. A badge can be
+absent because its eligible set is empty. Its slot SHALL stay empty then, rather
+than let the remaining badges shift into it.
 
 #### Scenario: A column's bulk badge sets every eligible cell in that step
 
@@ -2507,9 +2516,12 @@ rather than let the remaining badges shift into it.
 - **THEN** it changes no cell whose relevant flag carries a CEL expression
 - **AND** it changes no cell whose `visible` resolves to `false`
 
+<!-- antislop: allow negation-habit -->
+<!-- Why: copied byte for byte from the live scenario. -->
 #### Scenario: A column with no live cell carries no bulk badge
 
 - **WHEN** a workflow step declares no `view`
+<!-- antislop: allow negation-habit -->
 - **THEN** that step's column header carries no bulk toggle badge
 
 #### Scenario: A bulk badge skips a cell gated by the required/readonly rule
@@ -2551,13 +2563,14 @@ rather than let the remaining badges shift into it.
 - **AND** no cell's field declares `technical: true`
 - **THEN** that row header offers no `required` toggle badge
 
+<!-- The heading keeps the live spec's wording, since a MODIFIED block keeps every scenario; the badge keeps its slot order, not a pixel edge. -->
 #### Scenario: A column header with only one eligible badge still aligns with its column's checkboxes
 
 - **WHEN** every one of a column's live cells is a technical field
 - **AND** `visible` stays eligible there, while `required` and `readonly`
   have no eligible cell
 - **THEN** that column header carries the `visible` badge alone
-- **AND** the `visible` badge sits in the same fixed position a `visible`
+- **AND** the `visible` badge sits in the first slot, the order a `visible`
   checkbox holds in that column's cells
 - **AND** the badge does not shift toward where `required` or `readonly`
   would otherwise sit
@@ -2566,18 +2579,16 @@ rather than let the remaining badges shift into it.
 
 ### Requirement: The three bulk flag badges render at one shared width
 
-Each bulk flag badge the field matrix draws SHALL render at one shared
-fixed width. The width SHALL be the same for `visible`, `required` and
-`readonly` alike. It SHALL fit the widest badge. The two-character
-`readonly` badge then reads as a member of the group, not a narrower
-badge. This holds on the panels screen's column and row headers
-wherever they carry a bulk badge.
+Each bulk flag badge the field matrix draws SHALL take its own word's
+width, on one line. The widest word, Read-only, then stands widest, and no
+word wraps. This holds on the column and row headers wherever they carry a
+bulk badge.
 
 #### Scenario: The readonly badge is no narrower than its neighbors
 
 - **WHEN** the field matrix draws a column or row header whose eligible
   set holds more than one flag
-- **THEN** each badge renders at the same width as its neighbors
+- **THEN** the `readonly` badge is as wide as its word
 - **AND** the `readonly` badge is no narrower than the `visible` or
   `required` badge
 
@@ -2588,8 +2599,8 @@ wherever they carry a bulk badge.
 The Field matrix tab mounts the only field matrix, and this requirement covers
 it.
 
-The field matrix SHALL carry a toolbar above the grid. The toolbar SHALL carry a
-toggle that hides every step with no `view` at all from the grid, when engaged.
+The field matrix SHALL carry a toolbar above the grid. Its toggle "Hide steps
+with no form" hides every step with no `view` from the grid while engaged.
 The toggle SHALL affect only the grid's columns. It SHALL leave every row in
 place.
 
@@ -2599,10 +2610,10 @@ through it, the undeclared-cell count. The one case below is its only exception.
 The fourth number subtracts the first from a grid of cells, so the two must count
 the same thing.
 
-- the number of declared field entries
+- the number of placements, the declared field entries
 - the field count
 - the count of steps the grid currently draws
-- the number of cells among those steps that carry no entry
+- the number of empty cells, those among those steps with no entry
 
 That case moves two of the four numbers. Where a note is the first entry in a
 step that declared no `view`, that step stops being inert. It then joins the
@@ -2615,38 +2626,38 @@ none. The note itself still counts as no entry and occupies no cell.
 
 #### Scenario: Hiding inert columns removes steps with no view
 
-- **WHEN** the author engages the "Hide inert columns" toggle on a draft
+- **WHEN** the author engages the "Hide steps with no form" toggle on a draft
   where 3 of 13 steps declare no view
 - **THEN** the grid draws 10 columns, and none of them belongs to a step with
   no view
 
 #### Scenario: The toggle leaves every row in place
 
-- **WHEN** the author engages the "Hide inert columns" toggle
+- **WHEN** the author engages the "Hide steps with no form" toggle
 - **THEN** the grid still draws every catalog field as a row
 
 #### Scenario: The count line reflects the currently drawn columns
 
 - **WHEN** a draft carries 54 field entries, 22 fields and 13 steps, of which
   3 declare no view
-- **AND** the author engages the "Hide inert columns" toggle
-- **THEN** the count line reads 54 field entries, 22 fields, 10 steps, and
-  166 cells the visible steps do not declare
+- **AND** the author engages the "Hide steps with no form" toggle
+- **THEN** the count line reads 54 placements, 22 fields, 10 steps, and
+  166 empty cells
 
 #### Scenario: A note moves none of the four numbers
 
 - **WHEN** a step that already declares a view in that same draft gains three
   note entries
-- **THEN** the count line still reads 54 field entries and 166 undeclared
-  cells, because a note occupies no cell
+- **THEN** the count line still reads 54 placements and 166 empty cells,
+  because a note occupies no cell
 
 #### Scenario: A note in a viewless step joins the drawn columns
 
 - **WHEN** a note is the first entry in one of that same draft's 3 steps
   declaring no `view`
-- **AND** the author engages the "Hide inert columns" toggle
-- **THEN** the count line reads 54 field entries, 22 fields, 11 steps, and
-  188 cells the visible steps do not declare
+- **AND** the author engages the "Hide steps with no form" toggle
+- **THEN** the count line reads 54 placements, 22 fields, 11 steps, and
+  188 empty cells
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
@@ -2654,22 +2665,24 @@ none. The note itself still counts as no entry and occupies no cell.
 
 ### Requirement: The panels screen's field matrix toolbar explains its marks with a legend
 
-The Field matrix tab mounts the only field matrix, and this requirement covers
-it.
+The Field matrix view mounts the only field matrix, and this requirement
+covers it.
 
-The toolbar SHALL carry a legend. The legend SHALL explain seven marks:
+The toolbar SHALL carry a legend. The legend SHALL explain seven marks, in
+the author's words:
 
-- a bulk badge sets the whole column or row it sits on
-- a cell with no key written reads the engine's own default
-- what the CEL stamp marks
-- what a blank cell's dash means
-- what the flagged-cell marker means
-- what the technical-field row-header marker means
-- which color maps to `visible`, which to `required`, and which to `readonly`
+- a badge sets the whole column or row it sits on
+- an unchecked box writes nothing
+- Condition means a rule decides in place of a fixed yes or no
+- a dash marks a field this step's form does not hold
+- a marked cell stands in Checks
+- Technical means the process fills the field in by itself
+- which color maps to Asked, which to Required, and which to Read-only
 
-The seventh entry SHALL carry a swatch in each of the three checkbox colors
-beside that color's flag name. A swatch SHALL use the exact color the live cells'
-checkboxes use for that flag. The legend defines no separate color of its own.
+No legend entry SHALL print "CEL", "view", "key" or "engine". The seventh
+entry SHALL carry a swatch in each of the three checkbox colors beside that
+flag's word. A swatch SHALL use the exact color the live cells' checkboxes
+use for that flag. The legend defines no separate color of its own.
 
 #### Scenario: The legend is visible without further interaction
 
@@ -2679,7 +2692,7 @@ checkboxes use for that flag. The legend defines no separate color of its own.
 
 #### Scenario: The legend's color entry matches the grid's own colors
 
-- **WHEN** the author compares the legend's `visible`/`required`/`readonly`
+- **WHEN** the author compares the legend's Asked, Required and Read-only
   swatches against a live cell's checkboxes
 - **THEN** each swatch's color equals that flag's checkbox color in the grid
 
@@ -2826,27 +2839,28 @@ grid.
 
 ### Requirement: The field matrix's count line counts field entries
 
-The matrix toolbar's count line SHALL lead with the total of field entries
-across every step in the draft. A live cell represents one of that same
-total. A note entry SHALL count as none of them. The count answers how much
-a step binds to the catalog, and a note binds to nothing.
+The matrix toolbar's count line SHALL lead with the total of placements,
+under that word. A placement is a field entry on any step in the draft. A
+live cell represents one of that same total. A note entry SHALL count as
+none of them. The count answers how much a step binds to the catalog, and a
+note binds to nothing.
 
 #### Scenario: The entity count matches the live-cell total
 
 - **WHEN** the author opens Where fields appear on a draft with 54 field
   entries across its steps
-- **THEN** the toolbar's count line reads 54 field entries
+- **THEN** the toolbar's count line reads 54 placements
 
 #### Scenario: A note leaves the field matrix count alone
 
 - **WHEN** a draft holds one step whose view carries two field entries and
   three notes
-- **THEN** the toolbar's count line reads 2 field entries
+- **THEN** the toolbar's count line reads 2 placements
 
 #### Scenario: A step holding notes alone contributes no entity count
 
 - **WHEN** a draft holds one step whose view carries notes alone
-- **THEN** that step raises the toolbar's field-entry count by none
+- **THEN** that step raises the toolbar's placement count by none
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
@@ -3414,8 +3428,8 @@ component styles. It SHALL read as a field under the area's field rule.
 <!-- Why: carried from the live requirement, with the mono rule scoped to the key. -->
 Both views SHALL render their editors under the design language's field
 rule. The rule `.steps-panel label` states it in the area today. A
-label SHALL sit above its control. A `key` SHALL print in mono, because
-the engine matches it exactly. A hairline SHALL divide rail rows, and a
+label SHALL sit above its control. A field's `key` SHALL print in mono and
+a data source's name in the body face. A hairline SHALL divide rail rows, and a
 rule SHALL sit under a view's heading. No corner SHALL take a radius.
 
 #### Scenario: A field editor states its labels above its controls
@@ -3426,7 +3440,7 @@ rule SHALL sit under a view's heading. No corner SHALL take a radius.
 
 #### Scenario: A key prints in mono
 
-- **WHEN** the developer opens the Fields view on any field
+- **WHEN** the developer opens the Fields view on any field, and its More
 - **THEN** the field's key prints in the mono face
 
 #### Scenario: The Data sources view takes the same rule
@@ -3435,175 +3449,494 @@ rule SHALL sit under a view's heading. No corner SHALL take a radius.
 - **THEN** each label sits above its own control, a hairline divides the
   rail rows, and no corner takes a radius
 
-### Requirement: The Fields view divides into a definition half and an effect half
+### Requirement: The Fields view draws one card in sections
 
-<!-- antislop: allow synonym-rotation -->
-<!-- "edit" names an author working one field; "change" names one write to the draft. -->
-The Fields view SHALL edit one field through two halves under one
-heading. The definition half comes first, the effect half second. The
-view SHALL have no tab set.
+The Catalog view SHALL draw the selected field as one card in one column.
+The card SHALL cap at 52rem and stand flush left beside the entity rail. The
+card SHALL open with its name line, then the Name and Description inputs. Then its sections SHALL read Kind,
+Choices, Asked on, Read by and More, in that order.
 
-The definition half says what the field is. It SHALL hold five zones, plus
-a sixth for a group field. Their order reads "What this field asks", "What
-kind of field", "Where values come from", "Default value", "Validation". Each
-zone SHALL sit under its own heading, with a rule between it and its
-neighbour.
+A group field SHALL add
+"Fields inside this group" before More and have no Read by. Remove field
+SHALL close the card. The view SHALL draw no half, no zone and no tab set.
 
-A group field's definition half SHALL hold a sixth zone after "Validation",
-named "Fields inside this group". That zone SHALL draw none of the group's
-fields, since the entity rail lists them. It SHALL hold one control, which
-adds a field at the end of the group. The tab SHALL then select that new field.
+#### Scenario: The card reads top to bottom
 
-Keyboard focus SHALL then land in the new field's label input, since a new
-field needs its label first. The rail SHALL bring the new field's entry into
-view where it sits outside the rail's visible part. It SHALL scroll no further
-than that, and it SHALL NOT animate the scroll.
+- **WHEN** the developer opens the Fields view on a `string` field
+- **THEN** the name line prints the field's name, and the Name input
+  follows it with no section heading between them
+- **AND** the headings Kind, Choices, Asked on, Read by and More follow in
+  that order
+- **AND** no heading reads "What this field asks", "What kind of field",
+  "Used in" or "Ask for this"
 
-"What this field asks" holds the label and the line that says what a key
-change updated. The description, a Developer view holding the key, and the
-move control follow, in that order. "What kind of field" holds the kind picker and
-the Technical control. "Where values come from" holds the data source and
-the options.
+#### Scenario: A group's card has no Read by
 
-The effect half says where the field acts in the process. It SHALL hold
-five zones. In order they read "Used in", "Read by", "Only ask this when",
-"Ask for this" and "Column mapping". A group's effect half has no "Read by".
-The same heading and rule treatment holds.
+- **WHEN** the developer opens the Fields view on a `group` field
+- **THEN** the card shows "Fields inside this group" directly before More
+- **AND** no Read by heading renders
 
-"Used in" lists every step whose view references the field, with the
-modes those references set. "Read by" lists the expressions that read it.
-"Only ask this when" holds the condition.
-"Ask for this" holds the requiredness.
-
-Neither half SHALL sit behind a disclosure. Both SHALL show as the view
-opens. A closed disclosure over the usage list is what this change
-removes. Returning one would undo the change. The key's Developer view
-covers the key alone.
-
-A change in the definition half SHALL tint the affected row in the
-effect half. That tint SHALL be the only motion the two halves carry.
-
-#### Scenario: The view draws two halves and no tab set
+#### Scenario: Each section stands under a ruled heading
 
 - **WHEN** the developer opens the Fields view on any field
-- **THEN** the definition half and the effect half both show, side by
-  side under one heading
-- **AND** no tab set renders
+- **THEN** each heading after Kind carries a 1px hairline above it
+- **AND** Remove field stands last, under a hairline of its own
 
-#### Scenario: A definition change tints its effect row
 
-- **WHEN** the developer changes the label of a field two step views
-  reference
-- **THEN** both rows for those steps tint in the effect half
+### Requirement: A group's card adds a field inside it
 
-#### Scenario: The move control stands under the key
+A group field's "Fields inside this group" section SHALL draw none of the
+group's fields. The entity rail lists them. It SHALL hold one
+control, which adds a field at the end of the group. The tab SHALL then
+select that new field, and keyboard focus SHALL land in its Name input. The
+rail SHALL bring the new entry into view where it sits outside the rail's
+visible part. It SHALL use no animated scroll and SHALL scroll no further.
 
-- **WHEN** the developer opens the Fields view on any field
-- **THEN** "What this field asks" holds the move control directly under the
-  Developer view that holds the key
-- **AND** the control names the group that holds the field, or the top level
-
-#### Scenario: A group's own zone adds a field and selects it
+#### Scenario: A group's own section adds a field and selects it
 
 - **WHEN** the developer uses the control in a group field's "Fields inside
-  this group" zone
+  this group" section
 - **THEN** the group's `fields` array carries one more field, at its end
-- **AND** the tab selects that field and shows its own two halves
-- **AND** keyboard focus sits in that field's label input
+- **AND** the tab selects that field and shows its own card
+- **AND** keyboard focus sits in that field's Name input
 
 #### Scenario: The rail brings a new field in a long group into view
 
 - **WHEN** a group holds 18 fields, and the rail shows the group's entry but
   not its last field's entry
-- **AND** the developer uses the control in that group's "Fields inside this
-  group" zone
+- **AND** the developer uses the control in that group's section
 - **THEN** the rail shows the new field's entry, carrying the current mark
 - **AND** the rail reaches that position at once, with no smooth scroll
 
 #### Scenario: A new entry the rail already shows moves no rail
 
 - **WHEN** the rail shows a group's last field and the entry after it
-- **AND** the developer uses the control in that group's "Fields inside this
-  group" zone
+- **AND** the developer uses the control in that group's section
 - **THEN** the rail keeps its scroll position
 - **AND** the new field's entry carries the current mark
 
-#### Scenario: Only a group field holds the sixth zone
+#### Scenario: Only a group field holds the section
 
 - **WHEN** the developer opens the Fields view on a group field, then on a
   `string` field
-- **THEN** the group field's definition half shows "Fields inside this group"
-  directly after "Validation"
-- **AND** the `string` field's definition half shows no such zone
+- **THEN** the group's card shows "Fields inside this group" before More
+- **AND** the `string` field's card shows no such section
 
-#### Scenario: Read by stands second in the effect half
 
-- **WHEN** the developer opens the Fields view on a field that is not a group
-- **THEN** the effect half's zones open with "Used in", "Read by", "Only
-  ask this when" and "Ask for this"
+### Requirement: The Choices section shows for a field that can take choices
+
+The card SHALL draw the Choices section for a field whose `control` is a
+picker. It SHALL draw it for a `string` or `list` field with no `format`
+too. It SHALL draw it for any field already carrying `options` or a
+`dataSource`. Any other field with neither SHALL draw no Choices section. A field with no choice and no source SHALL
+read "No choice yet, so a participant types freely. Add one to offer a list
+instead." above the add control.
+
+#### Scenario: A text field offers choices
+
+- **WHEN** the developer opens the Fields view on a `string` field with no
+  `options`
+- **THEN** the Choices section shows the sentence that a participant types
+  freely, and "+ Add a choice"
+
+#### Scenario: A number field draws no Choices section
+
+- **WHEN** the developer opens the Fields view on a `number` field with no
+  `options` and no `dataSource`
+- **THEN** no Choices heading renders
+
+#### Scenario: A date field draws no Choices section
+
+- **WHEN** the developer opens the Fields view on a `{type: "string",
+  format: "date"}` field with no `options`
+- **THEN** no Choices heading renders
+
+
+### Requirement: A choice reads by its name alone
+
+Each choice SHALL draw as one row holding the choice's name input and a
+Remove command. No value input SHALL stand in the row. The section SHALL
+end with "+ Add a choice". The section SHALL hold a closed Developer view
+listing each choice's stored value in a mono input captioned "Stored value".
+A new choice SHALL start with an empty name and an empty value.
+
+#### Scenario: A choice row holds its name alone
+
+- **WHEN** the developer opens a field carrying the options `open` and
+  `closed`, labelled Open and Closed
+- **THEN** the Choices section shows two rows, each with one name input and
+  a Remove command
+- **AND** neither row shows `open` or `closed` outside the Developer view
+
+#### Scenario: The Developer view shows the stored values
+
+- **WHEN** the developer opens the Choices section's Developer view
+- **THEN** it lists "Stored value" inputs reading `open` and `closed`, in
+  the mono face
+
+
+### Requirement: A choice's value follows its name until the first publish
+
+A choice's stored value SHALL follow its name the way a field's key follows
+its label. A value the prior name derived SHALL take the new name's
+derivation, stepped past the sibling values. An empty value SHALL take it
+too. A value typed in the Developer view SHALL stay.
+
+Once a choice's value
+stands in a published version, that value SHALL NOT move. A choice added
+after the publish follows its name. A moved value SHALL carry the field's
+own `default` along where it equals the old value.
+
+#### Scenario: Naming a new choice sets its value
+
+- **WHEN** the developer adds a choice and types "In review" as its name
+- **THEN** the draft's option carries `value: "in_review"`
+
+#### Scenario: Renaming a choice moves a derived value
+
+- **WHEN** a choice named "In review" carries the value `in_review`
+- **AND** the developer renames it "Under review"
+- **THEN** the option's value reads `under_review`
+
+#### Scenario: A hand-set value stays
+
+- **WHEN** the developer types `rv` into a choice's "Stored value" input and
+  then renames the choice
+- **THEN** the option's value stays `rv`
+
+#### Scenario: A second choice steps past a sibling's value
+
+- **WHEN** two choices are both named "Yes"
+- **THEN** the second carries the value `yes_2`
+
+#### Scenario: A published choice's value stays
+
+- **WHEN** the draft's base version holds the field with the choice `open`
+- **AND** the developer renames that choice
+- **THEN** the option's value stays `open`
+- **AND** the Developer view reads "This field is in a published version. The
+  name no longer sets its values."
+
+#### Scenario: A choice added to a published field follows its name
+
+- **WHEN** the draft's base version holds the field without the choice
+- **AND** the developer adds a choice and names it "In review"
+- **THEN** the option's value reads `in_review` and follows a later rename
+- **AND** the Developer view keeps the published sentence while any choice
+  stays locked
+
+#### Scenario: A moved value carries the default along
+
+- **WHEN** a field carries `default: "in_review"` and the choice `in_review`
+- **AND** the developer renames that choice "Under review"
+- **THEN** the field's `default` reads `under_review`
+
+
+### Requirement: A field bound to a source states where its choices come from
+
+A field carrying a `dataSource` SHALL draw no choice row and no add control.
+Its Choices section SHALL read "The choices come from {source}." with the
+source's name, then "Pick another source under More."
+
+#### Scenario: A bound field names its source
+
+- **WHEN** a field binds the data source named "Cost centres"
+- **THEN** its Choices section reads "The choices come from Cost centres."
+- **AND** no name input and no "+ Add a choice" renders
+
+
+### Requirement: Asked on lists each step's marks as words
+
+The Asked on section SHALL list one row per step whose form holds the
+field, in draft order. A row SHALL name the step, or "(unnamed step)". It
+SHALL print the marks Required, Read-only and Not asked as words in the
+body face. They stand for a literal `required: true`, `readonly: true` and
+`visible: false`. A `required` or `readonly` expression SHALL print no mark. No row
+SHALL print a flag key or the mono face.
+
+#### Scenario: A row prints its marks as words
+
+- **WHEN** a field's entry on the step Review carries `required: true` and
+  its entry on Approve carries `readonly: true`
+- **THEN** the Asked on rows read "Review" with Required and "Approve" with
+  Read-only
+- **AND** no row prints `required` or `readonly`
+
+#### Scenario: A hidden entry reads Not asked
+
+- **WHEN** a field's entry on the step Review carries `visible: false`
+- **THEN** that row prints the mark Not asked
+
+#### Scenario: A conditional requiredness prints no mark
+
+- **WHEN** a field's entry on Review carries `required: data.amount > 0.0`
+- **THEN** the Review row prints no Required mark and no sentence for it
+
+
+### Requirement: An Asked on row reads a step's own condition as a sentence
+
+Where a step's entry carries a `visible` expression, its Asked on row SHALL
+add that condition as a sentence. It stands under the step's name, as a
+Read by row's does. An entry with no expression SHALL add no sentence. The rows
+therefore read each step's condition while the steps disagree.
+
+#### Scenario: A conditional entry reads its sentence
+
+- **WHEN** a field's entry on Review carries `visible: data.amount > 0.0`
+- **AND** the field `amount` carries the label "Amount"
+- **THEN** the Review row reads "Amount is greater than 0."
+
+#### Scenario: Disagreeing steps each read their own condition
+
+- **WHEN** the entry on Review carries one `visible` expression and the
+  entry on Approve carries another
+- **THEN** each row reads its own sentence
+- **AND** the Only ask this when control under them states that the steps
+  disagree
+
+
+### Requirement: An Asked on row opens the form and the map
+
+Each Asked on row SHALL carry two authoring commands at its trailing edge.
+"Open the form" SHALL open that step's form editor. "Show on the map" SHALL
+open the Map tab with that step selected.
+
+#### Scenario: Open the form reaches the step's form
+
+- **WHEN** the developer presses "Open the form" on the Review row
+- **THEN** the form editor opens for Review
+
+#### Scenario: Show on the map selects the step
+
+- **WHEN** the developer presses "Show on the map" on the Review row
+- **THEN** the Map tab opens with Review selected
+
+
+### Requirement: A Read by row opens the place it names
+
+Each Read by row whose place the studio can open SHALL carry the authoring
+command "Open". A way out's row SHALL open the Steps tab on that step with
+that way out marked. A form condition's row and a step rule's row SHALL open
+that step's form editor. A time limit's row and a child mapping's row SHALL
+open the Steps tab on that step. A field rule's row and a default's row
+SHALL select that field and open its More. A fallback place SHALL have no
+command.
+
+#### Scenario: A way out's row opens its step
+
+- **WHEN** the developer presses "Open" on the row "On Review: way out
+  Approve → Book"
+- **THEN** the Steps tab opens on Review with that way out marked
+
+#### Scenario: A field rule's row opens the other field
+
+- **WHEN** the developer presses "Open" on the row "The rule for Total"
+- **THEN** the rail selects Total and its card opens with More unfolded
+
+#### Scenario: A fallback row has no command
+
+- **WHEN** a Read by row reads "Another rule in this process"
+- **THEN** that row has no "Open" command
+
+
+### Requirement: More folds the rest of the card
+
+The card's More SHALL be one disclosure, closed when the field opens. It
+SHALL hold seven parts in order. They are Where values come from with the
+column mapping, Default value and Validation. Then the Technical marker,
+Move this field to, and How it will look. A Developer view closes it,
+holding the key input and a plugin-typed field's envelope.
+
+More SHALL open by itself while
+a check inside it stands. The author's own toggle SHALL hold otherwise.
+
+#### Scenario: More stands closed on open
+
+- **WHEN** the developer opens the Fields view on a field with no check
+- **THEN** More stands closed, and no Default value, Validation or key
+  input is visible
+
+#### Scenario: More holds its parts in order
+
+- **WHEN** the developer opens More
+- **THEN** Where values come from, Default value and Validation come first
+- **AND** the Technical checkbox, Move this field to, How it will look and
+  Developer view follow, in that order
+
+#### Scenario: A check inside More opens it
+
+- **WHEN** the selected field's validation pattern does not compile
+- **THEN** More stands open, and the check shows under Validation
+
+
+### Requirement: The source picker names each source
+
+The "Values come from" picker in More SHALL print its first option as
+"Nowhere: this field lists its own choices". Every other option SHALL print the
+data source's name, or "(unnamed source)". No option SHALL print an id.
+
+#### Scenario: The picker prints names
+
+- **WHEN** the draft declares a data source named "Cost centres" and one with
+  no name
+- **THEN** the picker offers "Nowhere: this field lists its own choices",
+  "Cost centres" and "(unnamed source)"
+- **AND** no option prints a `ds_` id
+
+
+### Requirement: The Technical marker reads as a sentence in More
+
+The Technical checkbox SHALL stand in More, labelled "Technical: the
+process fills this in by itself". It SHALL keep its clearing pass and
+its confirmation. A group field SHALL still disable it.
+
+#### Scenario: The marker stands in More under its sentence
+
+- **WHEN** the developer opens More on a `string` field
+- **THEN** a checkbox labelled "Technical: the process fills this in by
+  itself" stands after Validation
+
+
+### Requirement: Where values come from names a source in the author's words
+
+The data source view SHALL head its editor with the source's name, or
+"(unnamed source)". The name input SHALL carry the caption "Name" and take
+the body face. The engine matches nothing by a source's key. The removal
+dialog SHALL print the name in the body face too.
+
+#### Scenario: The editor heads with the name
+
+- **WHEN** the developer opens the source named "Cost centres"
+- **THEN** the editor's heading reads "Cost centres"
+- **AND** the input under "Name" reads "Cost centres" in the body face
+
+
+### Requirement: The source's kind picker prints names
+
+The kind picker SHALL stand under the legend "What kind of source". It SHALL
+print each registered type's name. The name for `db.list` reads "A data list
+an operator keeps". The name for `instance.query` reads "Cases of another
+process". A type the table does not name SHALL print its registry type.
+
+#### Scenario: The kind picker prints names
+
+- **WHEN** the registry reports `db.list` and `instance.query`
+- **THEN** the kind picker offers "A data list an operator keeps" and
+  "Cases of another process"
+
+#### Scenario: The rail names a source
+
+- **WHEN** a draft holds a source named "Cost centres" and one with no name
+- **THEN** the entity rail reads "Cost centres" and "(unnamed source)"
+
+
+### Requirement: The matrix badges print each mark's word
+
+Each bulk badge SHALL print the flag's one name: Asked, Required or
+Read-only. No badge SHALL print a letter code.
+
+#### Scenario: A badge reads its word
+
+- **WHEN** the developer reads a column header's badges
+- **THEN** they read Asked, Required and Read-only
+- **AND** none reads `VIS`, `REQ` or `RO`
+
+
+### Requirement: A condition mark reads Condition
+
+A live cell whose flag carries an expression SHALL show a mark reading
+"Condition" in place of that flag's control. The expression's source SHALL
+stay in the mark's tooltip and its muted source span, and nowhere else.
+
+#### Scenario: A CEL flag reads Condition
+
+- **WHEN** a live cell's `required` carries an expression
+- **THEN** the cell shows "Condition" where the Required box would stand
+- **AND** no cell prints the word "CEL"
+
+
+### Requirement: The Fields tab's editor scrolls with the tab body below 64rem
+
+Below 64rem the entity rail SHALL stand above the card, capped at 20rem.
+The card SHALL have no scroll box of its own. The view body SHALL scroll
+the card instead. The tab then holds two scroll boxes, the rail and the
+view body, and no third.
+
+#### Scenario: The card has no scroll box at 1024px
+
+- **WHEN** the developer opens the Fields view at 1024px wide
+- **THEN** the card's container reads `overflow-y: visible`
+- **AND** the view body scrolls the whole card
+
 
 ### Requirement: A field's checks stand at the zone each one belongs to
 
-The Fields view SHALL place a check on the selected field at the zone
-the check names. A check on the key stands in "What this field asks". A
-check on an option stands in "Where values come from". A check on a
-validation rule stands in "Validation".
+The Fields view SHALL place a check on the selected field at the section
+the check names. A check on the key, the name or the description stands
+at the card's top, beside the name line. A check on the kind stands under
+Kind. A check on an option or the source stands under Choices. A check on
+a default, a validation rule or a column mapping stands inside More, which
+opens for it.
 
-A check the view cannot place SHALL stand at the top of the definition
-half. No check SHALL go unshown for want of a matching zone.
+A check on the key or on the technical marker opens More too, so its
+control shows. The key's Developer view opens with it. The technical
+marker's check stands under Kind.
+
+A check the view cannot place SHALL stand at the top of the card. No check
+SHALL go unshown for want of a matching section.
 
 Placement SHALL read the check's own location in the body. A check
 carries that location today. The studio's issue model drops it, so this
 rule needs the model to carry it through. The `studio-app` capability
 states no shape for that model. What it states is the outcome: two
-checks on one field, naming two zones, stand apart.
+checks on one field, naming two sections, stand apart.
 
-A nested field's check SHALL stand in that field's own editor, at the
-zone the check names. The group's editor SHALL show the group's own checks
+A nested field's check SHALL stand in that field's own card, at the
+section the check names. The group's card SHALL show the group's own checks
 alone.
 
 The view SHALL have no consolidated check list of its own. The
 draft-wide roll-up and the publish gate sit in the docked summary the
 `studio-checks-rail` capability states.
 
-A zone holding a check SHALL take the refusal tone at its own heading.
-An author scanning the halves then sees which zone is wrong, with
+A section holding a check SHALL take the refusal tone at its own heading.
+An author scanning the card then sees which section is wrong, with
 nothing to open.
 
 #### Scenario: A key check stands at the key's zone
 
 - **WHEN** the selected field's key breaks the identifier grammar
-- **THEN** the check shows inside "What this field asks", and that
-  zone's heading takes the refusal tone
+- **THEN** the check shows at the card's top, beside the name line
+- **AND** More and its Developer view stand open, so the key input shows
 
 #### Scenario: An unplaceable check stands at the top
 
-- **WHEN** the selected field carries a check naming no zone the view
+- **WHEN** the selected field carries a check naming no section the view
   draws
-- **THEN** the check shows at the top of the definition half
+- **THEN** the check shows at the top of the card
 
 <!-- antislop: allow negation-habit -->
 <!-- The live heading and body, unchanged; the negation names what the rule forbids. -->
 #### Scenario: The view carries no consolidated list
 
 - **WHEN** the developer opens the Fields view on a field carrying two
-  checks in two zones
-- **THEN** each check shows at its own zone, and no list gathers both
+  checks in two sections
+- **THEN** each check shows at its own section, and no list gathers both
   in one place
 
 <!-- The heading keeps the live spec's wording, since a MODIFIED block keeps every scenario; the child row is now the child's own editor. -->
 #### Scenario: A group's child row keeps its own list
 
 - **WHEN** a field nested inside a group carries a check on its key
-- **THEN** selecting that field shows the check inside its own "What this
-  field asks" zone
+- **THEN** selecting that field shows the check at its own card's top
 - **AND** selecting the group shows the group's own checks alone
 
 ### Requirement: The effect half states its own empty state
 
-The effect half SHALL show an empty state for as long as no step view
-references the selected field. It SHALL say that no step asks for the
-field yet.
+The Asked on section SHALL show an empty state for as long as no step view
+references the selected field. It SHALL read "No step asks for this field
+yet." The requiredness checkbox and the Only ask this when control SHALL
+stay out while it shows.
 
 It SHALL offer the route from there to a step's form, "Put this field on a
 step". That route SHALL open the form editor (`studio-form-editor`) for the
@@ -3623,13 +3956,13 @@ field no step asks for yet is an unfinished draft, not a broken one.
 #### Scenario: An unused field draws the empty state
 
 - **WHEN** the developer selects a field no step view references
-- **THEN** the effect half says that no step asks for the field yet
+- **THEN** the Asked on section says that no step asks for the field yet
 - **AND** it offers the route to a step view, in the empty tone
 
 #### Scenario: The empty state clears when a step references the field
 
 - **WHEN** a step view gains a reference to the selected field
-- **THEN** the effect half lists that step, and the empty state goes
+- **THEN** the Asked on section lists that step, and the empty state goes
 
 #### Scenario: The route opens the first step's form
 
@@ -3649,39 +3982,37 @@ field no step asks for yet is an unfinished draft, not a broken one.
 #### Scenario: No step a person works offers no route
 
 - **WHEN** every step of the draft is an end or a call to another process
-- **THEN** the effect half offers no "Put this field on a step" control
+- **THEN** the Asked on section offers no "Put this field on a step" control
 
 ### Requirement: The Fields view's definition half states values, a default and a preview
 
-The two halves SHALL belong to the selected field alone, at any nesting
-depth. A field nested inside a group SHALL take the same two halves a
-top-level field takes. A group field's halves SHALL have no editor for any
-of its children. Inside the halves, only the group's preview draws them.
+<!-- The heading keeps the live spec's wording, since a MODIFIED block keeps every scenario; the halves are now one card. -->
+The card SHALL belong to the selected field alone, at any nesting depth. A
+field nested inside a group SHALL take the same card a top-level field
+takes. A group field's card SHALL have no editor for any of its children.
+Inside the card, only the group's preview draws them.
 
-Translation status SHALL show as a badge beside the label input. The
-badge SHALL name the current locale's missing count. The field SHALL
-have no separate translation-status list. Adding a language SHALL stay
+Translation status SHALL show as a badge beside the Name input. The badge
+SHALL name the current locale's missing count. The field SHALL have no
+separate translation-status list. Adding a language SHALL stay
 draft-scoped in the Process view's add-a-language control.
 
-"How it will look" SHALL sit in the definition half, inside a collapsed
-`<details>` disclosure. It SHALL start closed. The developer view SHALL
-keep its own existing, separate `<details>` disclosure, untouched by
-this change.
+"How it will look" SHALL sit inside More, in a collapsed `<details>`
+disclosure of its own. It SHALL start closed. The Developer view SHALL keep
+its own separate `<details>` disclosure, last in More.
 
-<!-- antislop: allow synonym-rotation -->
-<!-- Base wording stays verbatim in a MODIFIED block. -->
-Remove field SHALL sit below a rule at the definition half's end. It
-SHALL read as the half's least frequent action.
+Remove field SHALL sit below a hairline at the card's end. It SHALL read as
+the card's least frequent action.
 
-Every zone SHALL stay mounted while a field stays selected. A
+Every section SHALL stay mounted while a field stays selected. A
 disclosure SHALL keep its own open state for as long as the same field
 stays selected. Each builder holds an incomplete row the draft does not
-carry. The developer view holds a half-typed config in component state.
+carry. The Developer view holds a half-typed config in component state.
 
 <!-- antislop: allow sentence-length -->
 <!-- Why: the live requirement's own words, rewrapped so no code span breaks across a line. -->
-The Default value zone SHALL offer a literal input matching the field's
-type and its declared format. For a field carrying static `options`
+The Default value part of More SHALL offer a literal input matching the
+field's type and its declared format. For a field carrying static `options`
 that input SHALL be a `<select>` bound to those options, or the
 multi-value equivalent when the field's type is `list`.
 For a `string` field declaring a `format` it SHALL be that format's own
@@ -3691,36 +4022,37 @@ native input.
 <!-- Why: copied byte for byte from the live requirement. -->
 Either control SHALL offer no option when the field is
 `dataSource`-bound, since the draft carries no resolved rows for one.
-That is the same carve-out named below for the preview. The CEL toggle
-SHALL still work there. A field declaring `format: "person"` and
-neither `options` nor `dataSource` SHALL get the identical carve-out,
+That is the same carve-out named below for the preview. The Developer
+view's CEL input SHALL still work there. A field declaring `format: "person"`
+and neither `options` nor `dataSource` SHALL get the identical carve-out,
 whether its type is `string` or `list`: the draft resolves no
 `allowedGroups`-sourced people list either, since that resolution needs
-a live database read the draft editor does not have. The CEL toggle
+a live database read the draft editor does not have. The CEL input
 still works there too.
 
 <!-- antislop: allow sentence-length -->
 <!-- Why: copied byte for byte from the live requirement. -->
-The note the zone shows in the person case SHALL name the people list
+The note the part shows in the person case SHALL name the people list
 rather than a data source. The existing note names a data source by hand, and
 this field declares none; an author reading it would learn the wrong
 thing about their own draft.
 
-For a `file` field the whole Default value zone SHALL show disabled. It
+For a `file` field the whole Default value part SHALL show disabled. It
 SHALL state that the type accepts no default here. This mirrors "Only
 ask this when" 's own disabled state for a field no step view
 references.
 
-For a `group` field the whole Default value zone SHALL also show
+For a `group` field the whole Default value part SHALL also show
 disabled. It SHALL state that a group's own default is never read. A
 group has no slot of its own in the flat data payload. A literal
 or CEL default written there would silently never apply.
 
-Every other type gets a link-styled toggle. It SHALL switch the zone
-to a raw CEL text input for an expression default. This mirrors the
-toggle affordance the condition zone already uses. The zone SHALL NOT
-mount the guard-shaped condition-builder component. A default is a
-value rather than a boolean. It does not need a comparison-row builder.
+Every other type gets a Developer view under the literal input. It SHALL
+hold a raw CEL text input for an expression default.
+`studio-condition-builder`'s "A default value's expression stands in a
+Developer view" states it. The part SHALL NOT mount the guard-shaped condition-builder
+component. A default is a value rather than a boolean. It does not need a
+comparison-row builder.
 
 Writing through the literal input SHALL set the field's `default` key
 to that literal value. Writing through the CEL input SHALL set it to `{
@@ -3767,15 +4099,15 @@ reads a non-array value as an empty selection.
 #### Scenario: A group's children render without halves of their own
 
 - **WHEN** the developer selects a `group` field carrying two children
-- **THEN** the definition half draws no row for either child
+- **THEN** the card draws no row for either child
 - **AND** the rail still lists both children, indented under the group
 
 #### Scenario: A nested field takes the same two halves
 
 - **WHEN** the developer selects a `string` field nested inside a `group`
   field
-- **THEN** the view shows that field's definition half and effect half
-- **AND** the definition half shows the Default value zone and the preview
+- **THEN** the view shows that field's card
+- **AND** its More holds the Default value part and the preview
 
 #### Scenario: Translation status shows as a badge
 
@@ -3797,25 +4129,25 @@ reads a non-array value as an empty selection.
 #### Scenario: Remove field sits below a rule
 
 - **WHEN** the developer opens the Fields view on any field
-- **THEN** Remove field is the definition half's last control, below a
-  rule that separates it from every other control
+- **THEN** Remove field is the card's last control, below a hairline
+  that separates it from every other control
 
 #### Scenario: The definition half shows its zones ruled apart
 
 - **WHEN** the developer opens the Fields view on any field
-- **THEN** the five zone headings show, in the order the requirement
-  names
-- **AND** a rule sits between each zone and its neighbour
+- **THEN** the headings Kind, Choices, Asked on, Read by and More show,
+  in that order
+- **AND** a hairline sits above each heading after Kind
 
 #### Scenario: A literal default writes the field's raw value
 
 - **WHEN** the developer types `100` into a Number field's Default
-  value input, with the CEL toggle off
+  value input, with its Developer view closed
 - **THEN** the draft's field carries `default: 100`
 
 #### Scenario: A CEL default writes an expression
 
-- **WHEN** the developer switches the Default value zone to CEL and
+- **WHEN** the developer opens the Default value's Developer view and
   types `data.subtotal * 1.1`
 - **THEN** the draft's field carries `default: { lang: "cel", src:
   "data.subtotal * 1.1" }`
@@ -3829,53 +4161,55 @@ reads a non-array value as an empty selection.
 #### Scenario: A literal default on a Choice field uses its own options
 
 - **WHEN** the developer chooses one of a `string` field's own
-  `options` in its Default value zone, with the CEL toggle off
+  `options` in its Default value part, through the value input
 - **THEN** the draft's field carries `default` set to that option's
   value
 
 #### Scenario: A dataSource-bound field's default offers no option list
 
-- **WHEN** the developer opens the Default value zone on a
+- **WHEN** the developer opens the Default value part on a
   `dataSource`-bound `string` field
-- **THEN** the literal control offers no option, and the CEL toggle
-  still lets the developer write an expression default
+- **THEN** the literal control offers no option
+- **AND** the Developer view's CEL input still lets the developer write an
+  expression default
 
 #### Scenario: A bare person field's default offers no option list
 
-- **WHEN** the developer opens the Default value zone on a `{type:
+- **WHEN** the developer opens the Default value part on a `{type:
   "string", format: "person"}` field declaring neither `options` nor
   `dataSource`
-- **THEN** the literal control offers no option, and the CEL toggle
-  still lets the developer write an expression default
+- **THEN** the literal control offers no option
+- **AND** the Developer view's CEL input still lets the developer write an
+  expression default
 - **AND** the note names the people list rather than a data source
 
 #### Scenario: A bare person list's default offers no checkbox group
 
-- **WHEN** the developer opens the Default value zone on a `{type:
+- **WHEN** the developer opens the Default value part on a `{type:
   "list", format: "person"}` field declaring neither `options` nor
   `dataSource`
 <!-- antislop: allow sentence-length -->
 <!-- Why: copied byte for byte from the live requirement. -->
 - **THEN** the literal control offers no option, rather than a checkbox
-  group over an empty option set, and the CEL toggle still lets the
-  developer write an expression default
+  group over an empty option set, and the Developer view's CEL input still
+  lets the developer write an expression default
 
 #### Scenario: The Default value zone disables for a reference or file field
 
 - **WHEN** the developer opens the Fields view on a `file` field
-- **THEN** the Default value zone shows disabled, and states that the
+- **THEN** the Default value part shows disabled, and states that the
   type accepts no default here
 
 #### Scenario: A formatted string field's default uses that format's input
 
-- **WHEN** the developer opens the Default value zone on a
-  `{type: "string", format: "date"}` field, with the CEL toggle off
+- **WHEN** the developer opens the Default value part on a
+  `{type: "string", format: "date"}` field, with its Developer view closed
 - **THEN** the literal input is a native date input
 
 #### Scenario: The Default value zone disables for a group field
 
 - **WHEN** the developer opens the Fields view on a `group` field
-- **THEN** the Default value zone shows disabled, and states that a
+- **THEN** the Default value part shows disabled, and states that a
   group's own default is never read
 
 #### Scenario: The preview shows one field, read-only
@@ -3914,44 +4248,48 @@ reads a non-array value as an empty selection.
 
 ### Requirement: The Fields view's effect half states usage, a condition and requiredness
 
+<!-- The heading keeps the live spec's wording, since a MODIFIED block keeps every scenario; the effect half is now the Asked on section and More. -->
 <!-- antislop: allow trailing-negation -->
 <!-- Why: copied byte for byte from the live requirement. -->
-"Column mapping" SHALL show in the effect half only when the field's
-data source is mappable, per the existing `showsColumnMapping` rule.
-Its absence draws no rule of its own. It sits in the effect half
-because a column mapping writes into other fields. That is effect, not
-definition.
+"Column mapping" SHALL show inside More, under Where values come from,
+only when the field's data source is mappable. The existing
+`showsColumnMapping` rule decides that. Its absence draws no rule of its own. A column
+mapping writes into other fields, so it stands beside the source it reads.
 
-"Used in" SHALL list every step whose view references the field, with
-the modes those references set. A "Show on the map" control on a row
-SHALL open the Map tab with that step preselected.
+Asked on SHALL list every step whose view references the field, with the
+marks those references set as words. "Open the form" on a row SHALL open
+the step's form. "Show on the map" SHALL open the Map tab with that step
+preselected.
 
-"Only ask this when" is a third condition-builder site, alongside the
-path guard and the view-override sites `studio-condition-builder`
-already names. It SHALL read the `visible` overrides of every step
-view that references the field. When those views disagree, the row
-SHALL state that plainly. A `visible` override is `boolean` or an
+"Only ask this when" stands under the Asked on rows. It is a third
+condition-builder site, alongside the path guard and the view-override
+sites `studio-condition-builder` already names. It SHALL read the `visible`
+overrides of every step view that references the field.
+
+When those views disagree, the row SHALL state that plainly. Each Asked on
+row above it reads its own condition. A `visible` override is `boolean` or an
 expression. The row edits expressions alone. A referencing view holding
 a literal SHALL therefore count as a disagreement, and the row SHALL
 name it.
 
-When no step view references the field, the row SHALL show disabled.
-It SHALL state that no step asks for it yet.
+When no step view references the field, the row SHALL stay out. The
+section's empty state says that no step asks for it yet.
 
 The row's operand picker SHALL withhold `child.*`. No `visible` override
 admits `child`: the runtime resolves the flag with no child in scope.
 
 Updating the condition SHALL write the same override to every
-referencing view, and SHALL name the write before it happens. Where a
-referencing view holds a literal, the notice SHALL name that step.
+referencing view. The Asked on rows above it SHALL name every step the write
+reaches, before it happens. Where a referencing view holds a literal, the
+notice SHALL name that step.
 
 An unfinished row SHALL write nothing. Each referencing view's `visible`
 key SHALL stand as it did until the row is complete. That holds when the
 views disagree.
 
 The row SHALL carry a "Clear on <steps>" command in the builder's footer,
-beside the CEL toggle. It SHALL show only while some referencing view has a
-`visible` key. Pressing it SHALL drop the `visible` key from every
+beside the Developer view. It SHALL show only while some referencing view
+has a `visible` key. Pressing it SHALL drop the `visible` key from every
 referencing view. Its label SHALL name every step it clears, so the scope
 stands before the press.
 
@@ -3960,44 +4298,50 @@ the same terms. Removing a row the author just added, when no view holds a
 condition, SHALL change nothing. The field SHALL NOT keep a field-level
 condition.
 
-"Ask for this" SHALL read and write the `required` override of every
-step view that references the field. The catalog declares no `required`
-key of its own, so this control writes the view and never the field.
-That is the definition contract's own rule, and this control does not
-bend it.
+The checkbox "Required on every step that asks for it" SHALL read and
+write the `required` override. It reaches every step view that references
+the field. The catalog declares no `required` key of its own, so this control
+writes the view and never the field. That is the definition contract's own
+rule, and this control does not bend it.
 
-When those views disagree, the row SHALL state that plainly and name
-the differing step. Updating SHALL name the write before it happens,
-on the same terms the condition row takes. A technical field SHALL show
-the row disabled, since `technical` already forces `required: false` on
-every step. A field no step view references SHALL show it disabled too.
+When those views disagree, the checkbox's note SHALL state that plainly and
+name the differing step. The checkbox SHALL show indeterminate then.
+Updating SHALL name the write before it happens, on the same terms the
+condition row takes. A technical field SHALL show the checkbox disabled,
+since `technical` already forces `required: false` on every step. A field
+no step view references SHALL show no checkbox.
+
+A group field's Asked on section SHALL keep its rows and their commands.
+It SHALL show neither the checkbox nor "Only ask this when", since a group
+has no value.
 
 #### Scenario: A mappable field shows Column mapping in the effect half
 
 - **WHEN** the developer opens the Fields view on a field whose data
   source is mappable
-- **THEN** "Column mapping" shows in the effect half, ruled apart from
-  its neighbour
+- **THEN** "Column mapping" shows inside More, under Where values come
+  from
 
 #### Scenario: An unmappable field shows no Column mapping zone
 
 - **WHEN** the developer opens the Fields view on a field whose data
   source is not mappable
 - **THEN** no "Column mapping" heading renders, and its neighbour draws
-  no rule below it for a zone that isn't there
+  no rule below it for a part that isn't there
 
 #### Scenario: Used in lists steps and modes
 
 - **WHEN** a field's ref appears in two step views, one with
   `required` and one with `readonly`
-- **THEN** the usage list names both steps and both modes
+- **THEN** the Asked on rows name both steps, one marked Required and the
+  other Read-only
 
 #### Scenario: A condition writes every referencing view
 
 - **WHEN** the developer sets "Only ask this when" on a field that
   two step views reference
-- **THEN** both views carry the same `visible` override, and the row
-  named both steps before the write
+- **THEN** both views carry the same `visible` override, and the Asked on
+  rows named both steps before the write
 
 #### Scenario: Clearing the condition names its scope
 
@@ -4050,10 +4394,10 @@ every step. A field no step view references SHALL show it disabled too.
 
 #### Scenario: Ask for this writes every referencing view
 
-- **WHEN** the developer turns "Ask for this" on for a field that two
-  step views reference
-- **THEN** both views carry `required: true`, and the row named both
-  steps before the write
+- **WHEN** the developer checks "Required on every step that asks for it"
+  on a field that two step views reference
+- **THEN** both views carry `required: true`, and the Asked on rows named
+  both steps before the write
 
 #### Scenario: Ask for this names disagreeing views
 
@@ -4061,13 +4405,21 @@ every step. A field no step view references SHALL show it disabled too.
 <!-- Why: copied byte for byte from the live scenario. -->
 - **WHEN** one referencing view carries `required: true` and another
   carries no `required` key
-- **THEN** the row says the views disagree and names the differing step
+- **THEN** the checkbox's note says the views disagree and names the
+  differing step
 
 #### Scenario: A technical field disables Ask for this
 
 - **WHEN** the developer selects a field carrying `technical: true`
-- **THEN** "Ask for this" shows disabled, and the draft's view entries
-  keep no `required` key
+- **THEN** the requiredness checkbox shows disabled, and the draft's view
+  entries keep no `required` key
+
+#### Scenario: A group's card offers neither requiredness nor a condition
+
+- **WHEN** the developer selects a group field that two step views reference
+- **THEN** Asked on lists both steps, each with "Open the form" and "Show on
+  the map"
+- **AND** it shows no requiredness checkbox and no "Only ask this when"
 
 ### Requirement: A field moves into a group and out of it from the catalog rail
 
@@ -4148,7 +4500,7 @@ tree SHALL keep whatever depth the move produces.
 That split is the rail-rendering rule the panels screen already states.
 
 A move SHALL keep the moved field selected. The view SHALL keep showing
-that field's own two halves.
+that field's own card.
 
 #### Scenario: A field moves into a group with a pointer
 
@@ -4282,43 +4634,47 @@ that field's own two halves.
 #### Scenario: The moved field stays selected
 
 - **WHEN** the developer moves the selected field into a group
-- **THEN** the view still shows that field's definition half and its
-  effect half
+- **THEN** the view still shows that field's card
 
 ### Requirement: An empty field catalog offers a start state
 
+<!-- antislop: allow negation-habit -->
+<!-- Why: copied byte for byte from the live requirement. -->
 The Fields view SHALL show a start state when the draft carries no
-field at all. That state SHALL replace both halves, since neither has a
-field to describe.
+field at all. That state SHALL replace the card, since it has no field to
+describe.
 
 The start state SHALL do more than report the count. It SHALL name what
 a field is for in this process. It SHALL carry the control that adds the
 first field. That control SHALL be the same call the rail's Add entry
 makes.
 
+<!-- antislop: allow trailing-negation -->
+<!-- Why: copied byte for byte from the live requirement. -->
 The start state SHALL take the empty tone. A draft with no field yet is
 a new draft, not a broken one.
 
 The state SHALL go as soon as the draft carries one field. The view
-SHALL then select that field and show its two halves.
+SHALL then select that field and show its card.
 
 #### Scenario: A fresh draft shows the start state
 
 - **WHEN** the developer opens the Fields view on a draft carrying no
   field
-- **THEN** the view shows the start state instead of the two halves
+- **THEN** the view shows the start state instead of a card
 - **AND** it carries a control that adds the first field
 
 #### Scenario: Adding the first field leaves the start state
 
 - **WHEN** the developer chooses the start state's add control
 - **THEN** the draft carries one field, the view selects it, and it
-  shows that field's definition half and effect half
+  shows that field's card
 
 #### Scenario: The start state takes the empty tone
 
 - **WHEN** the developer opens the Fields view on a draft carrying no
   field
+<!-- antislop: allow negation-habit -->
 - **THEN** the start state carries no refusal tone and no issue mark
 
 ### Requirement: The field catalog picks a named field kind
@@ -4872,8 +5228,8 @@ kinds are these:
 - the plugin config values that name a removed field's id
 
 The facts SHALL state no row for a kind the removal does not carry. The dialog
-SHALL name no step, no expression and no config by itself. The "Used in" zone
-already lists the steps.
+SHALL name no step, no expression and no config by itself. The Asked on
+section already lists the steps.
 
 #### Scenario: A group states the fields inside it and its steps
 

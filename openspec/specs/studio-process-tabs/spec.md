@@ -132,7 +132,8 @@ Every address the eleven-tab row answered SHALL still open a place. The
 address `/edit/canvas` SHALL open Map. The address `/edit/paths` SHALL open
 Steps. The address `/edit/matrix` SHALL open the Fields tab's matrix view.
 
-The addresses `/edit/dataSources`, `/edit/contract` and `/edit/access` SHALL
+The address `/edit/dataSources` SHALL open the Fields tab's Where values
+come from view. The addresses `/edit/contract` and `/edit/access` SHALL
 open their Settings view. The address `/edit/changes` SHALL open the Versions
 screen. The retired `/edit/panels/:view` addresses SHALL follow the same map.
 
@@ -160,7 +161,7 @@ screen. The retired `/edit/panels/:view` addresses SHALL follow the same map.
 #### Scenario: A retired tab address opens the new place
 
 - **WHEN** an author opens `/studio/processes/p1/edit/dataSources`
-- **THEN** the Settings tab is the open one, on Where values come from
+- **THEN** the Fields tab is the open one, on Where values come from
 
 #### Scenario: The retired Changes address opens the Versions screen
 
@@ -234,10 +235,12 @@ open, and `hidden` reveals one. A sub-row entry SHALL print no count.
 
 ### Requirement: The Fields tab carries the catalog and the matrix as views
 
-The Fields tab's sub-row SHALL read Catalog and Where fields appear, in
-that order. Catalog SHALL hold the entity rail and the field editor. Where
-fields appear SHALL hold the field matrix with its toolbar, its count line
-and its legend. The tab's count SHALL count the catalog's fields.
+The Fields tab's sub-row SHALL read Catalog, Where fields appear and Where
+values come from, in that order. Catalog SHALL hold the entity rail and the
+field card. Where fields appear SHALL hold the field matrix with its
+toolbar, its count line and its legend. Where values come from SHALL hold
+the data sources' entity rail and the open source's editor. The tab's
+count SHALL count the catalog's fields.
 
 #### Scenario: The matrix opens as a view of Fields
 
@@ -251,12 +254,18 @@ and its legend. The tab's count SHALL count the catalog's fields.
 - **THEN** the Hide-inert toggle, the count line and the legend stand above
   the grid
 
+#### Scenario: The data sources open as a view of Fields
+
+- **WHEN** an author opens the Fields tab and picks Where values come from
+- **THEN** the data sources' rail and editor fill the body under the sub-row
+- **AND** the Fields tab stays the open one
+
 ### Requirement: The Settings tab gathers the process-wide settings
 
 <!-- antislop: allow paragraph-length sentence-length -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
-The Settings tab's sub-row SHALL read Process, Where values come from, What
-it takes in and gives back, and Access. The Process view SHALL hold five settings. They are the base
+The Settings tab's sub-row SHALL read Process, What it takes in and gives
+back, and Access. The data sources stand on the Fields tab. The Process view SHALL hold five settings. They are the base
 language, the content-locale switcher, the add-a-language control, the
 cancellable setting and the two collaboration defaults. The content-locale
 switcher and the add-a-language control set the language the studio edits in
@@ -287,9 +296,10 @@ Access view SHALL also carry the link to manage assignment groups.
 
 #### Scenario: The data sources keep their rail and editor
 
-- **WHEN** an author opens Where values come from
+- **WHEN** an author opens Where values come from on the Fields tab
 - **THEN** the entity rail lists every data source and an Add entry
 - **AND** the open data source's editor stands beside it
+- **AND** the Settings tab's sub-row offers no such view
 
 #### Scenario: The contract and the access lists keep their editors
 
@@ -302,6 +312,35 @@ Access view SHALL also carry the link to manage assignment groups.
 
 - **WHEN** the JSON surface is the active surface
 - **THEN** no Settings control is reachable until the author leaves it
+
+### Requirement: The contract view reads in the author's words
+
+The What it takes in and gives back view SHALL open on one checkbox,
+"Other processes can call this one". No heading SHALL stand over it. Its three
+lists SHALL read "What it takes in", "What it gives back" and "How it can
+end". The two field lists SHALL print each field's label, or "(unnamed
+field)", never a key or an id. An ending's name SHALL print in the mono
+face, since a caller's guard matches it exactly. The add control SHALL
+read "+ Add an ending".
+
+#### Scenario: The view opens on its sentence
+
+- **WHEN** an author opens What it takes in and gives back
+- **THEN** the first control reads "Other processes can call this one"
+- **AND** no heading reads "Contract"
+
+#### Scenario: The field lists print labels
+
+- **WHEN** the draft declares the field "Amount" with the key `amount`
+- **AND** the process is callable
+- **THEN** "What it takes in" and "What it gives back" each list "Amount"
+- **AND** neither prints `amount`
+
+#### Scenario: An ending prints in mono
+
+- **WHEN** the contract declares the outcome `approved`
+- **THEN** "How it can end" lists `approved` in the mono face
+
 
 ### Requirement: The Developer view on Settings holds the draft's machine values
 

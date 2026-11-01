@@ -101,10 +101,6 @@ export const en = {
   "fieldCatalog.typeDropsControlConfirm": "The new type doesn't allow this field's control. Switch anyway and drop it?",
   "fieldCatalog.typeDropsBothConfirm": "The new type allows neither this field's format nor its control. Switch anyway and drop both?",
   "fieldCatalog.noneOption": "(none)",
-  "fieldCatalog.optionValuePlaceholder": "value",
-  "fieldCatalog.optionLabelPlaceholder": "label",
-  "fieldCatalog.removeOption": "remove",
-  "fieldCatalog.addOption": "+ Add option",
   "fieldCatalog.addSubField": "+ Add field to this group",
   "fieldCatalog.customTypeLabel": "custom type",
   "fieldCatalog.developerView": "Developer view",
@@ -112,7 +108,6 @@ export const en = {
   "fieldCatalog.baseLocaleMark": "base locale",
   "fieldCatalog.translationComplete": "translated",
   "fieldCatalog.translationGap": "{count} missing",
-  "fieldCatalog.technicalLabel": "Technical",
   "fieldCatalog.technicalClearConfirm":
     "Checking Technical will clear {count} required/readonly key(s) across this draft's steps. Continue?",
   "fieldCatalog.previewHeading": "How it will look",
@@ -120,30 +115,23 @@ export const en = {
     "This field's choices come from a data source. They resolve when a participant reaches this step, not here.",
   "fieldCatalog.previewPersonResolvesAtRuntime":
     "This field's people list comes from the groups this process allows. It resolves when a participant reaches this step, not here.",
-  "fieldCatalog.usedInHeading": "Used in",
   "fieldCatalog.usedInEmpty": "No step asks for this field yet.",
   "fieldCatalog.showOnCanvas": "Show on the map",
   "fieldCatalog.readByHeading": "Read by",
   "fieldCatalog.readByEmpty": "No condition reads this field.",
   "fieldCatalog.onlyAskWhenHeading": "Only ask this when",
-  "fieldCatalog.conditionNoSteps": "No step asks for this field yet, so there is nothing to condition.",
-  "fieldCatalog.conditionScopeNote": "Writes to: {steps}.",
   "fieldCatalog.conditionClear": "Clear on {steps}",
   "fieldCatalog.conditionDivergentNote": "These steps currently disagree: {steps}.",
   "fieldCatalog.conditionLiteralNote": "This replaces a literal condition on: {steps}.",
   "fieldCatalog.whereValuesHeading": "Where values come from",
   "fieldCatalog.validationHeading": "Validation",
-  "fieldCatalog.whatAsksHeading": "What this field asks",
-  "fieldCatalog.whatKindHeading": "What kind of field",
-  "fieldCatalog.askForThisHeading": "Ask for this",
-  // The five control labels of the definition half. They read as words rather
-  // than as the JSON members they write, because the zone headings around them
-  // are plain questions and a raw `dataSource` beside "Where values come from"
-  // put two vocabularies in one zone. The JSON view stays the place that
-  // spells the member names (design.md: the developer's vocabulary no longer
-  // leads). Each one is a word an author reads, so none is mono.
+  // The field card's control labels. They read as words rather than as the
+  // JSON members they write, because the section headings around them are
+  // plain words and a raw `dataSource` beside "Where values come from" put two
+  // vocabularies in one section. The JSON view stays the place that spells the
+  // member names (design.md: the developer's vocabulary no longer leads). Each
+  // one is a word an author reads, so none is mono.
   "fieldCatalog.kindLabel": "Kind",
-  "fieldCatalog.labelLabel": "Label",
   "fieldCatalog.descriptionLabel": "Description",
   "fieldCatalog.keyLabel": "Key",
   "fieldCatalog.keyFollows": "The key follows the label until the first publish.",
@@ -156,14 +144,9 @@ export const en = {
   "fieldCatalog.rewroteOne": "Updated 1 condition.",
   "fieldCatalog.rewroteMany": "Updated {count} conditions.",
   "fieldCatalog.dataSourceLabel": "Values come from",
-  "fieldCatalog.requiredLabel": "Required",
-  "fieldCatalog.requiredNoSteps": "No step asks for this field yet, so there is nothing to require.",
   "fieldCatalog.requiredTechnicalNote":
     "The process writes this field itself, so no step view may ask a participant for it.",
-  "fieldCatalog.requiredScopeNote": "Writes to: {steps}.",
   "fieldCatalog.requiredDivergentNote": "These steps currently disagree: {steps}.",
-  "fieldCatalog.definitionHalfLabel": "What this field is",
-  "fieldCatalog.effectHalfLabel": "Where it acts in the process",
   "fieldCatalog.effectEmptyRoute": "Put this field on a step",
   "fieldCatalog.startHeading": "This process collects nothing yet",
   "fieldCatalog.startBody":
@@ -209,8 +192,6 @@ export const en = {
   "defaultValue.heading": "Default value",
   "defaultValue.literalLabel": "value",
   "defaultValue.celLabel": "CEL expression",
-  "defaultValue.editAsCel": "Edit as CEL",
-  "defaultValue.useValue": "Use a value",
   "defaultValue.clear": "Clear default",
   "defaultValue.unparseable": "This does not parse as CEL.",
   "defaultValue.groupDisabledNote": "A group's own default is never read. Set defaults on its children instead.",
@@ -222,7 +203,6 @@ export const en = {
 
   "fieldValidation.notEvaluated": "not evaluated for this field type",
 
-  "dataSources.heading": "Data sources",
   "dataSources.empty": "No data sources yet.",
   "dataSources.addDataSource": "+ Add data source",
   "dataSources.removeDataSource": "Remove data source",
@@ -236,8 +216,12 @@ export const en = {
   "dataSources.removeDialogCancel": "Cancel",
   "dataSources.pickListKey": "Pick a data list",
   "dataSources.dataListLabel": "data list",
-  "dataSources.keyCaption": "Key",
-  "dataSources.pluginLegend": "Data source plugin",
+  "dataSources.nameCaption": "Name",
+  "dataSources.kindLegend": "What kind of source",
+  // The kind picker's names. A type this table misses prints its registry type.
+  "dataSourceKind.db.list": "A data list an operator keeps",
+  "dataSourceKind.instance.query": "Cases of another process",
+  "dataSourceKind.static": "A list typed into this process",
   // `{list}` is the data list key the draft names.
   "dataSources.unknownListWarning":
     "The server has no data list '{list}'. Publishing still works. The field's options stay empty until an operator creates the list.",
@@ -344,14 +328,13 @@ export const en = {
   "actions.removeOutputMapping": "Remove",
   "actions.resultCelPlaceholder": "result CEL",
 
-  "contract.heading": "Contract",
-  "contract.callableCheckbox": "this process is subprocess-callable",
-  "contract.inputFieldsLegend": "inputFields",
-  "contract.outputFieldsLegend": "outputFields",
-  "contract.outcomesLegend": "outcomes",
-  "contract.removeOutcome": "remove",
-  "contract.newOutcomePlaceholder": "new outcome name",
-  "contract.addOutcome": "+ Add outcome",
+  "contract.callableCheckbox": "Other processes can call this one",
+  "contract.inputFieldsLegend": "What it takes in",
+  "contract.outputFieldsLegend": "What it gives back",
+  "contract.outcomesLegend": "How it can end",
+  "contract.removeOutcome": "Remove",
+  "contract.newOutcomePlaceholder": "Name of an ending",
+  "contract.addOutcome": "+ Add an ending",
 
   // The form editor. It replaced the override-row list, so the old `view.*`
   // keys went with it. The strip's captions read words ("Asked", "Required",
@@ -398,7 +381,6 @@ export const en = {
   "formEditor.removeNote": "Remove: the note",
   "formEditor.markRequired": "Required",
   "formEditor.markReadonly": "Read-only",
-  "formEditor.markCel": "CEL",
   "formEditor.stripLabel": "Selected field",
   "formEditor.selectAField": "Choose a field on the canvas to edit how this step presents it.",
   "formEditor.visible": "Asked",
@@ -430,8 +412,8 @@ export const en = {
   "formEditor.tabFromGroup": "The group decides the tab.",
 
   // The condition builder. Its rows and its sentence read words; the CEL
-  // stands only in its Developer view. `rawRow`, `unparseable`, `celReadout`
-  // and `celEmpty` serve the rule builder, which keeps a CEL readout.
+  // stands only in its Developer view. `rawRow` and `unparseable` serve the
+  // rule builder too.
   "condition.empty": "No condition yet: this always matches.",
   "condition.addRow": "+ Add row",
   "condition.removeRow": "Remove row",
@@ -446,8 +428,6 @@ export const en = {
   "condition.rawRow": "Written by hand. Edit it as CEL.",
   "condition.incomplete": "Needs a value before it is written.",
   "condition.joinerHint": "How the rows combine. Click to flip.",
-  "condition.celReadout": "Writes",
-  "condition.celEmpty": "nothing yet",
   "condition.unparseable": "This does not parse as CEL, so the builder cannot open it.",
   "condition.developerView": "Developer view",
   "condition.onlyWhenHeading": "Only when",
@@ -519,7 +499,7 @@ export const en = {
   // developer-view copy. Only its captions read words: its readout prints
   // the CEL source beside the rows ("Writes <code>…</code>").
   "ruleBuilder.thisAnswer": "this answer",
-  "ruleBuilder.empty": "No rule — nothing is checked.",
+  "ruleBuilder.empty": "No rule yet: every answer passes.",
   "ruleBuilder.and": "and",
   "ruleBuilder.valueKindLabel": "compare against",
   "ruleBuilder.valueKindLiteral": "a value",
@@ -577,12 +557,12 @@ export const en = {
   "fieldsViews.rowLabel": "Views of the fields",
   "fieldsViews.catalog": "Catalog",
   "fieldsViews.matrix": "Where fields appear",
+  "fieldsViews.sources": "Where values come from",
 
   // The Settings tab: its sub-row, then the Process view's controls
   // (`studio-process-tabs`).
   "settings.rowLabel": "Views of the settings",
   "settings.process": "Process",
-  "settings.sources": "Where values come from",
   "settings.contract": "What it takes in and gives back",
   "settings.access": "Access",
   "settings.baseLocale": "Base language",
@@ -628,7 +608,6 @@ export const en = {
   "formsTab.legendField": "Field",
   "formsTab.legendRequired": "Required",
   "formsTab.legendConditional": "Required if a condition holds",
-  "formsTab.legendSection": "Section",
   "formsTab.legendHeight": "Taller asks for more",
 
   // The form editor's trailing pane: what a participant meets
@@ -652,7 +631,7 @@ export const en = {
 
   "panelsScreen.railLabel": "Editors",
   "panelsScreen.unnamedField": "(unnamed field)",
-  "panelsScreen.unnamedDataSource": "(unnamed data source)",
+  "panelsScreen.unnamedDataSource": "(unnamed source)",
   "panelsScreen.issueMark": "issues",
   "panelsScreen.railEntryGroup": "in {group}",
   "panelsScreen.moveTargetLabel": "Move this field to",
@@ -667,18 +646,17 @@ export const en = {
 
   "fieldMatrix.heading": "Field matrix",
   "fieldMatrix.scrollRegionLabel": "Field matrix grid",
-  "fieldMatrix.hatchedCell": "No view on this step",
-  "fieldMatrix.hideInertToggle": "Hide inert columns",
-  "fieldMatrix.countLine": "{declared} field entries · {fields} fields × {steps} steps · {cells} cells the visible steps do not declare",
-  "fieldMatrix.legendBulk": "A bulk badge sets the whole column or row it sits on.",
-  "fieldMatrix.legendDefault": "A control left at its default writes no key.",
-  "fieldMatrix.legendCel": "CEL marks an expression, not a fixed value.",
-  "fieldMatrix.legendBlank": "A dash marks a field this step does not declare.",
-  "fieldMatrix.legendFlagged": "A flagged cell already stands in Checks as an issue.",
-  "fieldMatrix.legendTechnical": "The technical marker means the engine, not a participant, writes this field.",
-  "fieldMatrix.legendColors": "Each checkbox's color names its own flag:",
-  "fieldMatrix.columnInertNote": "No view — inert",
-  "fieldMatrix.rowTypeLabel": "Type",
+  "fieldMatrix.hatchedCell": "No form on this step",
+  "fieldMatrix.hideInertToggle": "Hide steps with no form",
+  "fieldMatrix.countLine": "{declared} placements · {fields} fields × {steps} steps · {cells} empty cells",
+  "fieldMatrix.legendBulk": "A badge sets the whole column or row it sits on.",
+  "fieldMatrix.legendDefault": "An unchecked box writes nothing.",
+  "fieldMatrix.legendCel": "Condition means a rule decides in place of a fixed yes or no.",
+  "fieldMatrix.legendBlank": "A dash marks a field this step's form does not hold.",
+  "fieldMatrix.legendFlagged": "A marked cell stands in Checks.",
+  "fieldMatrix.legendTechnical": "Technical means the process fills the field in by itself.",
+  "fieldMatrix.legendColors": "Each box's color names its mark:",
+  "fieldMatrix.columnInertNote": "No form",
   "fieldMatrix.flaggedCellMark": "Flagged in Checks",
   // The blast radius a bulk press carries. The studio has no undo for a bulk
   // write, so the badge states what a press touches before an author presses
@@ -686,9 +664,9 @@ export const en = {
   // these sentences, so no sentence gets assembled from fragments. A count
   // never modifies a bare noun here either, so one wording serves one cell
   // and twenty without a second key per number.
-  "fieldMatrix.bulkSetColumn": "Sets this flag on step {name}. Cells it writes: {total}. Already set: {set}.",
-  "fieldMatrix.bulkClearColumn": "Clears this flag from step {name}. Cells it writes: {total}.",
-  "fieldMatrix.bulkSetRow": "Sets this flag for field {name}. Cells it writes: {total}. Already set: {set}.",
+  "fieldMatrix.bulkSetColumn": "Turns this on for every field on step {name}. Cells it writes: {total}. Already on: {set}.",
+  "fieldMatrix.bulkClearColumn": "Turns this off for every field on step {name}. Cells it writes: {total}.",
+  "fieldMatrix.bulkSetRow": "Turns this on for {name} on every step that asks for it. Cells it writes: {total}. Already on: {set}.",
   // The matrix drew a header row above nothing at all, which
   // `design-language.md` forbids: "An empty state says so in words. It never
   // shows as an empty table." The two causes need different words, because
@@ -697,13 +675,13 @@ export const en = {
   // the headers joined the roving model, so it needs a name: an author
   // arriving there by arrow key otherwise lands on silence.
   "fieldMatrix.cornerLabel": "Fields, down the side. Steps, across the top.",
-  "fieldMatrix.emptyNoFields": "This process declares no field yet, so the matrix has nothing to line up.",
-  "fieldMatrix.emptyNoColumns": "Hide inert columns is on, and it leaves no step to show. Turn it off to see them.",
+  "fieldMatrix.emptyNoFields": "This process has no field yet, so there is nothing to line up.",
+  "fieldMatrix.emptyNoColumns": "Hide steps with no form is on, and it leaves no step to show. Turn it off to see them.",
   // A gated checkbox carried `aria-disabled` and swallowed the click without
   // a word. Each case says which rule gates it.
-  "fieldMatrix.gatedNotWritten": "Nothing writes this field before this step, so the flag would strand the participant.",
-  "fieldMatrix.gatedTechnical": "The definition contract rejects this flag on a technical field.",
-  "fieldMatrix.bulkClearRow": "Clears this flag from field {name}. Cells it writes: {total}.",
+  "fieldMatrix.gatedNotWritten": "Nothing fills this field before this step, so the mark would strand the participant.",
+  "fieldMatrix.gatedTechnical": "A technical field cannot take this mark.",
+  "fieldMatrix.bulkClearRow": "Turns this off for {name} on every step that asks for it. Cells it writes: {total}.",
   "fieldMatrix.technicalRowMark": "Technical",
 
   // The step page's eight section headers (`studio-step-page`). "Time
@@ -1274,6 +1252,36 @@ export const en = {
   "error.network": "Could not reach the server. Check your connection and try again.",
   "error.serverError": "The server hit an error. Try again.",
   "error.generic": "Something went wrong. Try again.",
+
+  // The field card (`studio-field-card`): its section headings, the choice
+  // rows and the Asked on and Read by commands.
+  "fieldCard.nameLabel": "Name",
+  "fieldCard.kindHeading": "Kind",
+  "fieldCard.choicesHeading": "Choices",
+  "fieldCard.askedOnHeading": "Asked on",
+  "fieldCard.moreHeading": "More",
+  "fieldCard.choiceNamePlaceholder": "Name of the choice",
+  "fieldCard.addChoice": "+ Add a choice",
+  "fieldCard.removeChoice": "Remove",
+  "fieldCard.choiceValueLabel": "Stored value",
+  "fieldCard.choiceValueFollows": "The value follows the name until the first publish.",
+  "fieldCard.choiceValuePublished": "This field is in a published version. The name no longer sets its values.",
+  "fieldCard.choicesFromSource": "The choices come from {source}.",
+  "fieldCard.choicesFromSourceNote": "Pick another source under More.",
+  "fieldCard.choicesEmpty": "No choice yet, so a participant types freely. Add one to offer a list instead.",
+  "fieldCard.hiddenMark": "Not asked",
+  "fieldCard.unnamedChoice": "(unnamed choice)",
+  "fieldCard.openForm": "Open the form",
+  "fieldCard.openPlace": "Open",
+  "fieldCard.requiredEverywhere": "Required on every step that asks for it",
+  "fieldCard.noSourceOption": "Nowhere: this field lists its own choices",
+  "fieldCard.technicalLabel": "Technical: the process fills this in by itself",
+  "fieldCard.kindNoteWithChoices": "One pick from the choices below.",
+  "fieldMatrix.markCondition": "Condition",
+  "fieldMatrix.rowKindLabel": "Kind",
+  "defaultValue.computedNote": "A rule computes this default.",
+  "defaultValue.developerView": "Developer view",
+  "formsTab.legendGroup": "Group",
 } as const;
 
 export type CatalogKey = keyof typeof en;

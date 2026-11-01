@@ -72,6 +72,35 @@ describe("matrixRows", () => {
   });
 });
 
+describe("matrixRows kind", () => {
+  const rows = matrixRows([
+    df({ id: "field_group", key: "g", type: "group", fields: [df({ id: "field_n", key: "n", type: "number" })] }),
+    df({ id: "field_text", key: "t", type: "string" }),
+    df({ id: "field_odd", key: "o", type: "number", format: "date" }),
+    df({ id: "field_plugin", key: "p", type: { type: "x.custom", config: {} } }),
+  ]);
+
+  it("prints the kind picker's word for a curated kind", () => {
+    expect(rows.slice(0, 3).map((r) => [r.kind, r.unmatched])).toEqual([
+      ["Group", false],
+      ["Number", false],
+      ["Text", false],
+    ]);
+  });
+
+  it("prints the raw triple for a kind no curated entry names, and flags it", () => {
+    expect(rows[3]).toMatchObject({ kind: "number / date", unmatched: true });
+  });
+
+  it("flags a plugin envelope as matched, with the custom word", () => {
+    expect(rows[4]).toMatchObject({ kind: "custom (plugin)", unmatched: false });
+  });
+
+  it("carries no base type", () => {
+    expect("type" in rows[0]!).toBe(false);
+  });
+});
+
 describe("cellState", () => {
   it("reads hatched for a step with no view at all", () => {
     expect(cellState(ds({ id: "step_a" }), "field_vendor")).toBe("hatched");

@@ -14,15 +14,21 @@
 import { parseAst, serializeAst } from "workflow-engine/cel/check";
 import type { DraftField } from "../../draft/fields";
 import { flattenDraftFields } from "../../draft/fields";
+import { t } from "../../catalog.js";
+import { fill, numberRepeats } from "./optionText";
 import {
+  capitalize,
   celLiteral,
   CMP_OPS,
   conjuncts,
   fieldOperand,
   isCelNode,
+  joinClauses,
   literalOf,
   memberPath,
+  OP_NAMES,
   operatorsFor,
+  summarizeValue,
   type CelNode,
   type CmpOp,
   type Operand,
@@ -51,6 +57,9 @@ function isSupportedCelType(t: string): boolean {
  * (the field being edited, so it needs no own entry twice), then every other
  * leaf catalog field. `field.key` empty yields no "this answer" entry — an
  * unnamed field authors no CEL identifier yet (`compile.ts::checkFieldKeyFormat`).
+ * A second and later other field sharing a label takes a count, in catalog
+ * order ("Name (2)"), the way the condition picker numbers its fields;
+ * "this answer" takes none.
  */
 export function buildRuleOperands(opts: {
   field: DraftField;
@@ -71,7 +80,8 @@ export function buildRuleOperands(opts: {
       const o = fieldOperand(f, "data", opts.locale, opts.baseLocale);
       return o && isSupportedCelType(o.celType) ? [o] : [];
     });
-  return [...thisAnswer, ...others];
+  const labels = numberRepeats(others, (o) => o.label);
+  return [...thisAnswer, ...others.map((o, i) => ({ ...o, label: labels[i]! }))];
 }
 
 /** The "another field" picker for a row's value side (task 4.7): every
@@ -181,4 +191,50 @@ export function newRuleRow(operands: RuleOperand[]): RuleRow {
  * builds, over this builder's own operand list. */
 export function ruleOperandSignature(operands: RuleOperand[]): string {
   return operands.map((o) => `${o.path}:${o.celType}`).join("|");
+}
+
+// --- the rule in words (studio-field-validation-form) ----------------------
+
+/** One complete row's clause. A field value prints the other field's label. A
+ * raw row reads as the catalog's phrase, never its CEL text. */
+function ruleClause(row: RuleRow, byPath: Map<string, RuleOperand>): string {
+  if (row.kind === "raw") return t("condition.clause.raw");
+  const operand = byPath.get(row.operand);
+  const value =
+    row.value.kind === "field"
+      ? (byPath.get(row.value.path)?.label ?? t("condition.unnamedField"))
+      : summarizeValue({ kind: "cmp", operand: row.operand, op: row.op, value: row.value.value }, operand);
+  return fill(t(`condition.clause.${OP_NAMES[row.op]}`), { field: operand?.clauseLabel ?? operand?.label ?? row.operand, value });
+}
+
+/** The complete rows' clauses joined by "and", `""` for none. */
+function summarizeRule(condition: RuleCondition, operands: RuleOperand[]): string {
+  const byPath = new Map(operands.map((o) => [o.path, o]));
+  return joinClauses(
+    condition.rows.filter((r) => isRuleRowComplete(r, byPath)).map((r) => ruleClause(r, byPath)),
+    "&&",
+  );
+}
+
+/**
+ * The rule builder's sentence under its rows, `conditionLogic.conditionSentence`'s
+ * twin over a `RuleCondition`, in the same four states. `stored` is the source
+ * the draft holds.
+ *
+ * - A complete row: the clauses, joined by "and", ending in a period.
+ * - No row and nothing stored: every answer passes (`ruleBuilder.empty`).
+ * - No complete row over a stored source: the stored rule holds until the
+ *   author finishes the row.
+ * - No complete row over nothing, or over a stored source with no clause to
+ *   read: the author finishes a row first.
+ */
+export function ruleSentence(condition: RuleCondition, operands: RuleOperand[], stored: string | undefined): string {
+  const clauses = summarizeRule(condition, operands);
+  if (clauses) return capitalize(fill(t("condition.sentence"), { condition: clauses }));
+  const hasStored = Boolean(stored?.trim());
+  if (!condition.rows.length && !hasStored) return t("ruleBuilder.empty");
+  const held = hasStored ? fromRuleCel(stored, operands) : null;
+  const heldClauses = held ? summarizeRule(held, operands) : "";
+  if (heldClauses) return capitalize(fill(t("condition.sentence.held"), { condition: heldClauses }));
+  return t("condition.sentence.none");
 }

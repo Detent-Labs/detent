@@ -68,7 +68,7 @@ describe("The sub-row", () => {
   });
 
   it("formats the view body's id one level under the tab body's", () => {
-    expect(subTabPanelDomId("settings", "sources")).toBe("studio-subtabpanel-settings-sources");
+    expect(subTabPanelDomId("fields", "sources")).toBe("studio-subtabpanel-fields-sources");
   });
 
   it("prints each label as the whole text of its entry, with no count inside", () => {

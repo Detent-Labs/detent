@@ -98,6 +98,57 @@ describe("the Steps tab holds two scroll boxes below the breakpoint", () => {
   });
 });
 
+// `studio-app`: "The Fields tab's editor scrolls with the tab body below
+// 64rem" (design.md D13). The step page's own values, pinned above, are the
+// model.
+describe("the Fields tab holds two scroll boxes below the breakpoint", () => {
+  const ENTITY_TABS = "src/areas/studio/panels/EntityTabs.tsx";
+  const FIELDS_VIEWS = "src/areas/studio/panels/FieldsTabViews.tsx";
+  const CARD = "src/areas/studio/panels/FieldCatalogPanel.tsx";
+
+  it("lets the rail and editor grid take its content's height under NARROW, in auto rows", () => {
+    const block = styleBlock(stripComments(read(ENTITY_TABS)), "layout");
+
+    expect(block).toContain('"20rem minmax(0, 1fr)"');
+    expect(block).toMatch(/gridTemplateRows: \{ default: "none", \[NARROW\]: "auto auto" \}/);
+    expect(block).toMatch(/height: \{ default: "100%", \[NARROW\]: "auto" \}/);
+    expect(block).toMatch(/overflow: \{ default: "hidden", \[NARROW\]: "visible" \}/);
+    // A zero flex basis pins the grid to the view's height, whatever its
+    // own `height` says; under NARROW it takes its content's height instead.
+    expect(block).toMatch(/flex: \{ default: "1 1 0", \[NARROW\]: "0 0 auto" \}/);
+  });
+
+  it("gives the editor no scroll box of its own under NARROW, and keeps its ring room", () => {
+    const block = styleBlock(stripComments(read(ENTITY_TABS)), "editor");
+
+    expect(block).toMatch(/overflowY: \{ default: "auto", \[NARROW\]: "visible" \}/);
+    expect(block).toMatch(/padding: focus\.reach/);
+  });
+
+  it("keeps the rail's 20rem cap under NARROW", () => {
+    const block = styleBlock(stripComments(read(ENTITY_TABS)), "rail");
+
+    expect(block).toMatch(/maxHeight: \{ default: "none", \[NARROW\]: "20rem" \}/);
+  });
+
+  it("scrolls the view body, with the ring room every studio scroll box keeps", () => {
+    const block = styleBlock(stripComments(read(FIELDS_VIEWS)), "view");
+
+    expect(block).toMatch(/overflowY: "auto"/);
+    expect(block).toMatch(/overscrollBehavior: "contain"/);
+    expect(block).toMatch(/padding: focus\.reach/);
+    expect(block).toMatch(/scrollPadding: focus\.reach/);
+  });
+
+  it("caps the card at the step page's 52rem column, flush left", () => {
+    const block = styleBlock(stripComments(read(CARD)), "card");
+
+    expect(block).toMatch(/maxWidth: "52rem"/);
+    expect(block).toMatch(/alignItems: "flex-start"/);
+    expect(block).not.toMatch(/overflow/);
+  });
+});
+
 describe("the field matrix grid takes the tab body's height", () => {
   const FIELD_MATRIX_PANEL = "src/areas/studio/panels/FieldMatrixPanel.tsx";
   const FIELD_MATRIX_GRID = "src/areas/studio/panels/FieldMatrixGrid.tsx";
@@ -597,6 +648,7 @@ describe("the authoring command turns its text to ink under the pointer", () => 
     ["src/areas/studio/panels/FormsTab.tsx", "openControl"],
     [STRIP, "control"],
     ["src/areas/studio/panels/ChangeList.tsx", "command"],
+    ["src/areas/studio/panels/FieldCatalogPanel.tsx", "command"],
   ] as const;
 
   for (const [file, name] of COMMANDS) {

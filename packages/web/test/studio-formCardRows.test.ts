@@ -356,7 +356,7 @@ describe("The Forms tab's legend", () => {
       "formsTab.legendField",
       "formsTab.legendRequired",
       "formsTab.legendConditional",
-      "formsTab.legendSection",
+      "formsTab.legendGroup",
       "formsTab.legendHeight",
     ]);
   });
@@ -380,7 +380,7 @@ describe("The Forms tab's legend", () => {
   });
 
   it("samples section with one 24px group break", () => {
-    expect(legendSamples("formsTab.legendSection")).toEqual([
+    expect(legendSamples("formsTab.legendGroup")).toEqual([
       { index: 0, groupBreak: true, height: 24, requirement: "optional" },
     ]);
   });

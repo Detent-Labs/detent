@@ -1,9 +1,10 @@
 import * as stylex from "@stylexjs/stylex";
-import { colors, fonts, space } from "form-ui/tokens.stylex";
+import { colors, space } from "form-ui/tokens.stylex";
 import type { DataSourceDef } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
+import { dataSourceKindLabel } from "../draft/guided-labels.js";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { useRegistry } from "./shared/useRegistry.js";
@@ -42,9 +43,6 @@ const styles = stylex.create({
     fontSize: "0.9rem",
     width: "100%",
   },
-  studioMono: {
-    fontFamily: fonts.mono,
-  },
   studioWarning: {
     color: colors.refusal,
     borderLeftWidth: 3,
@@ -65,22 +63,22 @@ interface DataSourceRowProps {
   onRemove: () => void;
 }
 
-function DataSourceRow({ ds, listKeys, registryTypes, registrySchemas, token, ownFields, onChange, onRemove }: DataSourceRowProps) {
+export function DataSourceRow({ ds, listKeys, registryTypes, registrySchemas, token, ownFields, onChange, onRemove }: DataSourceRowProps) {
   const warning = unknownListKeyWarning(ds.type, ds.config, listKeys);
   const listKey = listKeyOf(ds.config);
   return (
     <div {...stylex.props(styles.dataSourceRow)}>
       <label {...stylex.props(styles.dataSourceRowLabel)}>
-        {t("dataSources.keyCaption")}
+        {t("dataSources.nameCaption")}
         <input
           type="text"
-          {...stylex.props(styles.studioMono)}
           value={ds.key ?? ""}
           onChange={(e) => onChange({ key: e.target.value })}
         />
       </label>
       <PluginEnvelopeEditor
-        label={t("dataSources.pluginLegend")}
+        label={t("dataSources.kindLegend")}
+        typeLabel={dataSourceKindLabel}
         value={ds}
         onChange={onChange}
         registryTypes={registryTypes}
@@ -161,7 +159,7 @@ export function DataSourcesPanel({ token, selectedId, onAdd, onRemove }: Props) 
 
   return (
     <div className="data-sources-panel">
-      <h3 {...stylex.props(styles.panelHeading)}>{t("dataSources.heading")}</h3>
+      {ds !== undefined && <h3 {...stylex.props(styles.panelHeading)}>{ds.key || t("panelsScreen.unnamedDataSource")}</h3>}
       {ds === undefined ? (
         <p className="empty">{t("dataSources.empty")}</p>
       ) : (

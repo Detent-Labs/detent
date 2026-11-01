@@ -20,16 +20,16 @@ export const DEFAULT_TAB: ProcessTab = "map";
 const isProcessTab = (v: string): v is ProcessTab => (PROCESS_TABS as string[]).includes(v);
 
 /** The Fields tab's views, in sub-row order. */
-export type FieldsView = "catalog" | "matrix";
+export type FieldsView = "catalog" | "matrix" | "sources";
 /** The Settings tab's views, in sub-row order. */
-export type SettingsView = "process" | "sources" | "contract" | "access";
+export type SettingsView = "process" | "contract" | "access";
 /** A view of a tab that carries a sub-row. */
 export type TabView = FieldsView | SettingsView;
 
 /** The Fields tab's views, in sub-row order. */
-export const FIELDS_VIEWS: readonly FieldsView[] = ["catalog", "matrix"];
+export const FIELDS_VIEWS: readonly FieldsView[] = ["catalog", "matrix", "sources"];
 /** The Settings tab's views, in sub-row order. */
-export const SETTINGS_VIEWS: readonly SettingsView[] = ["process", "sources", "contract", "access"];
+export const SETTINGS_VIEWS: readonly SettingsView[] = ["process", "contract", "access"];
 
 /** Each tab's views, in sub-row order. A tab with no sub-row lists none. The
  * first entry is the view an address naming the tab alone opens. */
@@ -58,7 +58,7 @@ export const RETIRED_TAB_TARGET: Record<"canvas" | "paths" | "matrix" | "dataSou
   canvas: { tab: "map" },
   paths: { tab: "steps" },
   matrix: { tab: "fields", view: "matrix" },
-  dataSources: { tab: "settings", view: "sources" },
+  dataSources: { tab: "fields", view: "sources" },
   contract: { tab: "settings", view: "contract" },
   access: { tab: "settings", view: "access" },
 };
@@ -69,7 +69,7 @@ const isRetiredTab = (v: string): v is keyof typeof RETIRED_TAB_TARGET => Object
  * `changes` name is absent for the reason `RETIRED_TAB_TARGET` gives. */
 export const PANEL_VIEW_TARGET: Record<Exclude<PanelView, "changes">, TabTarget> = {
   fields: { tab: "fields" },
-  dataSources: { tab: "settings", view: "sources" },
+  dataSources: { tab: "fields", view: "sources" },
   contract: { tab: "settings", view: "contract" },
   matrix: { tab: "fields", view: "matrix" },
   paths: { tab: "steps" },

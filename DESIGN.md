@@ -677,10 +677,26 @@ own.
   takes the authoring command style, at 4px block padding and a 24px minimum
   height. The authoring command elsewhere takes 8px.
 
+### The Field Card
+
+- One column, capped at 52rem and flush left beside the entity rail. It
+  follows the step page's reading column.
+- The name line is a level-3 heading. The Name and Description inputs follow
+  it, with no section heading between.
+- Each section heading takes the Title style over a 1px hairline. Kind has no
+  hairline.
+- A section's rows take the register style. Authoring commands stand at the
+  trailing edge.
+- More is a native disclosure. Its summary takes the Title style.
+- The Developer view stands last, inside More.
+
 ### The Field Matrix
 
 - A grid in a 1px hairline box, with sticky column and row headers on paper.
-- A column header takes the Legend style over the step key in mono.
+- A column header takes the Legend style over the step's label.
+- The bulk badges print the words Asked, Required and Read-only in the body
+  face. Each badge takes its word's width on one line. A conditional flag
+  prints the stamp "Condition".
 - A 2px divider sits under the column headers and beside the row headers.
 - A cell takes a 1px hairline on its bottom and right edges, and 4px by 8px
   padding. Its focus ring sits inside, at -2px.
@@ -758,10 +774,8 @@ the content.
 
 ### Motion
 
-The page holds still. No component declares a transition. One animation
-exists. When an author writes in the field catalog, the steps that write
-reached flash the accent at 18%. The flash fades out over 1.2s. Under reduced
-motion it never runs, and a global rule cuts every animation to 0.01ms.
+The page holds still. No component declares a transition or an animation. A
+global rule cuts any animation to 0.01ms under reduced motion.
 
 **The Still Page Rule.** A state changes at once. A new animation counts as a
 design change.

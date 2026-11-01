@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { checkTarget, formEditorReturnTab, processTabCounts, surfaceTab, type TabCountStep } from "../src/areas/studio/draft/process-tabs.js";
+import { checkTarget, formEditorReturnTab, placeAction, processTabCounts, surfaceTab, type TabCountStep } from "../src/areas/studio/draft/process-tabs.js";
 import * as processTabs from "../src/areas/studio/draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
 import type { EditorIssue, EntityType } from "../src/areas/studio/draft/issues.js";
@@ -118,7 +118,7 @@ describe("checkTarget", () => {
   });
 
   it("opens the Settings tab's sources view for a data source issue", () => {
-    expect(target("dataSource", "ds_1")).toEqual({ tab: "settings", view: "sources" });
+    expect(target("dataSource", "ds_1")).toEqual({ tab: "fields", view: "sources" });
   });
 
   it("opens the Settings tab's contract view for a contract issue", () => {
@@ -232,5 +232,23 @@ describe("surfaceTab", () => {
 
   it("answers Steps on a direct load of the form editor's address", () => {
     expect(surfaceTab("map", "step_1", undefined)).toBe("steps");
+  });
+});
+
+// design.md D4: a Read by row's "Open" on a place outside the Fields tab.
+describe("placeAction", () => {
+  it("opens the Steps tab on a way out's step, with the way out marked", () => {
+    expect(placeAction({ kind: "wayOut", stepId: "step_a", pathId: "path_1" })).toEqual({
+      kind: "tab",
+      target: { tab: "steps", stepId: "step_a", pathId: "path_1" },
+    });
+  });
+
+  it("opens the Steps tab on a step, with no way out marked", () => {
+    expect(placeAction({ kind: "step", stepId: "step_b" })).toEqual({ kind: "tab", target: { tab: "steps", stepId: "step_b" } });
+  });
+
+  it("opens a form's step in the form editor", () => {
+    expect(placeAction({ kind: "form", stepId: "step_c" })).toEqual({ kind: "form", stepId: "step_c" });
   });
 });

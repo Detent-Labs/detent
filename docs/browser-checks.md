@@ -1415,9 +1415,10 @@ Open Studio, `purchase-requisition`, at `/edit/fields/matrix`, the Fields
 tab's Where fields appear view. Pass: 22 rows, `line_item` drawn as a group header
 over its four children, indented once. Pass: 13 columns, in the process's
 own step order. Pass: three columns hatch. They are `approval_routing`,
-`issue_po` and `receipt_check`, the three steps with no view at all. Each
-column header shows the step's `key` beside its label; each row header
-shows the field's `key` beside its `type`.
+`issue_po` and `receipt_check`, the three steps with no view at all.
+
+Each column header shows the step's label alone. Each row header shows the
+field's label with its kind word beneath. No header prints a key.
 
 Pass: a toolbar sits above the grid. It carries a "Hide inert columns"
 toggle, a count line reading "54 field entries · 22 fields × 13 steps ·
@@ -1429,7 +1430,7 @@ them `approval_routing`, `issue_po` or `receipt_check`. The count line
 now reads 10 steps and 166 cells. Every row still draws.
 
 Select the "draft" column's Required bulk badge. Pass: it presses, and
-every live, non-CEL, non-gated cell in that column reads `required`
+every live, unconditional, non-gated cell in that column reads `required`
 true. Select it again. Pass: every one of those cells clears its
 `required` key.
 
@@ -1465,21 +1466,21 @@ Open `subprocess-loan-parent` for one more check: badge-to-checkbox
 alignment (`field-matrix-badge-alignment`). Mark `result`
 (`field_l_result`) Technical and place it on `submit`'s form, exactly as
 the Technical fields check below does. `submit`'s column now has one
-live cell, and `visible` is its only eligible flag. Through the JSON
+live cell, and Asked is its only eligible flag. Through the JSON
 surface, add one more view entry to the `check` step: `amount`, with no
 `required` or `readonly` override. `check`'s column now has all three
-flags eligible. Neither edit needs to survive past this check. Pass:
-`submit`'s column shows one badge, `visible`, sitting directly above its
-own checkbox column with no drift. Pass: `check`'s column shows all
-three badges, each sitting directly above its own checkbox column with
-no drift, and the two ineligible slots in `submit`'s column leave the
-`visible` badge's position unchanged rather than centering it.
+flags eligible. Neither edit needs to survive past this check.
+
+Pass: `submit`'s column shows one badge, Asked, in the first slot. Pass:
+`check`'s column shows Asked, Required and Read-only in slot order. The two
+ineligible slots in `submit`'s column leave Asked in place. The word badges
+stand wider than the checkbox columns beneath, so only the slot order
+aligns.
 
 On `check`'s three-badge column, confirm equal badge width
-(`field-matrix-badge-equal-width`). Pass: the `readonly` (`RO`) badge
-renders exactly as wide as `visible` (`VIS`) and `required` (`REQ`) — no
-narrower, no wider — while each badge still sits above its own checkbox
-column.
+(`field-matrix-badge-equal-width`). Pass: the Read-only badge renders
+exactly as wide as Asked and Required, to the pixel. Each
+badge prints its word.
 
 ### Technical fields (`technical-field-marker`)
 
@@ -1768,8 +1769,7 @@ that field's editor and the rail marks it current.
 
 Click a nested child (`item_description`, under `line_item`). Pass: the rail
 marks `item_description` alone and leaves `line_item`'s entry unmarked. The
-view shows `item_description`'s own editor, with its two halves, and that
-editor opens at its top.
+view shows `item_description`'s own card, and that card opens at its top.
 
 Click "+ Add field" (either the rail's own entry or the panel's own button;
 both call the same handler). Pass: a new "(unnamed field)" entry appears
@@ -1781,8 +1781,8 @@ Click "Remove field". Pass: no dialog opens, since the new field has no
 reach. The field `invoice`, the top-level entry just before it, becomes
 selected, with keyboard focus on its rail entry.
 
-Open Settings, then Where values come from. Pass: the Fields rail leaves, and
-the data sources rail stands in its place. The two never stand at once. The
+Open the Fields tab's Where values come from view. Pass: the Fields rail
+leaves, and the data sources rail stands in its place. The two never stand at once. The
 new rail lists `approved_vendors` and an "+ Add data source" entry.
 
 Click "+ Add data source". Pass: a new "(unnamed data source)" appears,
@@ -2173,26 +2173,22 @@ Open a draft with several fields (`purchase_requisition`) and go to
 Pass: the rail lists each field by its resolved label alone. No row prints
 a key.
 
-Select a field. Pass: the Field tab shows key, label, description, type
-and the Technical checkbox without opening anything. A badge beside the
-label reads "base locale". "How it will look" and "Used in" both start
-closed.
+Select a field. Pass: the card shows its name line, the Name and Description
+inputs and the Kind picker without opening anything. A badge beside the Name
+input reads "base locale". More stands closed.
 
-Open "How it will look". Pass: it expands in place. Switch to the Rules
-tab, then back to Field. Pass: the preview is still open, and the Field
-tab's own content is the only content on screen. Values and Rules render
-nothing while another tab is active.
+Open More, then "How it will look". Pass: it expands in place, and the rest of
+the card stays on screen.
 
-Switch to the Values tab on a `string` field with static options. Pass:
-three ruled zones show in order: "Where values come from", "Default
-value", "Column mapping". The third shows only when the field's data
-source is mappable. Choose an option in the Default value zone's own
-`value` control, then switch to the JSON surface. Pass: the field's
-`default` key carries that option's value.
+Select a `string` field with static options and open More. Pass: the
+sub-headings read "Where values come from", "Default value" and "Validation",
+in that order. The column mapping shows only when the field's data source is
+mappable. Choose an option in the Default value's own control, then switch to
+the JSON surface. Pass: the field's `default` key carries that option's value.
 
-Click "Edit as CEL" in the Default value zone and type an expression.
-Pass: no parse error shows, and the JSON surface's `default` key now
-carries `{ lang: "cel", src: "<the typed text>" }`.
+Open the Default value's Developer view and type a CEL expression. Pass: no
+parse error shows, and the JSON surface's `default` key now carries
+`{ lang: "cel", src: "<the typed text>" }`.
 
 A CSS bug surfaced during this walk. It is the same defect class as the
 `.shell-menu` one above. `.field-tab-panel` carried an unconditional
@@ -2512,7 +2508,7 @@ render. `test/reporting-routes.test.ts` covers the 400 and
 
 Source: `instance-query-data-source` tasks 6.1-6.5.
 
-Open a draft's Where values come from view, on the Settings tab. Press
+Open a draft's Where values come from view, on the Fields tab. Press
 "+ Add data source". Select `instance.query` in the type picker. Pass: the
 purpose-built form replaces both the generated form and the raw JSON
 textarea, for this type alone. Switch the type to `db.list` and back. Pass:
@@ -2576,7 +2572,7 @@ mark outside the `<label>`, in `InstanceQueryForm.tsx`.
 Source: `type-data-comparison-literals` tasks 4.1-4.5.
 
 Publish a target process with a number field `priority`, a boolean field and
-a string field. Open Settings, then Where values come from, on a second
+a string field. Open the Fields tab's Where values come from view on a second
 draft. Add an
 `instance.query` data source there. Pick the target process.
 
@@ -2905,8 +2901,8 @@ picked from the ones this process allows."
 Expand "How it will look". Pass: one note renders, never two, and it is the
 person one. The disabled sample control holds a `user_` sample.
 
-Open the Values tab. Pass: the Default value zone renders the person note
-in place of the data source note. The "Edit as CEL" control still works.
+Open More. Pass: the Default value sub-heading renders the person note in
+place of the data source note. The Developer view's CEL input still works.
 
 Select the list field. Pass: it renders a format picker at all, which a
 `list` field never did before this change. That picker offers "(none)" and
@@ -3472,7 +3468,7 @@ today.
 Pick `Line Item`. Pass: `po_status` indents under `Line Item`, its fifth
 child, and the rail marks `po_status` alone. The live region reads "PO
 Status moved into Line Item." Focus stays on the same control, and the
-editor still shows `po_status`'s two halves.
+card still shows `po_status`.
 
 Pick "Top level" on that same control. Pass: `po_status` un-indents, back
 to a top-level row after `invoice`. The region reads "PO Status moved out
@@ -3591,7 +3587,7 @@ None of the 51 rows carries a select of any kind. No row offers a keyboard
 route to move a field. The Fields view's move gesture walk above covers
 that route through the editor instead.
 
-Open Settings, then Where values come from, on the same draft. Pass: its
+Open the Fields tab's Where values come from view on the same draft. Pass: its
 rail column also measures 20rem, the width the Catalog view's holds too.
 Check the computed width in devtools, or confirm the two rails share one
 right edge.
@@ -3617,13 +3613,13 @@ and 44 fields.
 
 Choose "Forward to this address" in "Data backup and email". Pass: that
 entry alone carries the current mark (`aria-current`), and the group's own
-entry and its siblings carry none. The view shows the field's own two
-halves, definition and effect. The entry's accessible name carries "in Data
+entry and its siblings carry none. The view shows the field's own
+card. The entry's accessible name carries "in Data
 backup and email", though the rail prints no group name.
 
-Scroll that field's editor down to its "Validation" zone, then choose
-"Hardware". Pass: the new editor opens at its top, at "What this field
-asks". It shows the "Fields inside this group" zone below "Validation".
+Scroll that field's card down to More, then choose "Hardware". Pass: the
+new card opens at its top, at the name line. A group field shows the
+"Fields inside this group" section below Asked on.
 
 Scroll the rail so "Processing (Fabrikam)" (18 fields) shows and its last field,
 "Backup data deleted on", does not. Choose "Processing (Fabrikam)", then press
@@ -3658,8 +3654,7 @@ the field before it, becomes selected, with keyboard focus on its rail
 entry. "Notification" now holds two fields, "Remarks" and "Submitted by".
 
 Choose "Remarks" in the rail, then change its key to `my-field`. Pass: the
-check stands inside its own "What this field asks" zone, and that zone's
-heading takes the refusal tone. Its own rail entry carries the issue mark,
+check stands beside the name line, and the Developer view in More opens. Its own rail entry carries the issue mark,
 and the "Notification" entry and editor carry none for it.
 
 Choose "Permissions". In its own move control, "Move this field to", pick
@@ -3717,7 +3712,7 @@ Developer view. Pass: the view stands closed on open, and it reads "The key
 follows the label until the first publish." Key reads `budget`.
 
 On the Steps tab, give a way out of the first step an "Only if" that reads
-Budget. Return to the Fields tab and choose Budget. Pass: the "Read by" zone
+Budget. Return to the Fields tab and choose Budget. Pass: the Read by section
 holds one row, "On {first step}: way out {way out}". A sentence about Budget
 stands under it.
 
@@ -3757,9 +3752,9 @@ screen reader reads it out on Enter and on Tab alike.
 Type one more character. Pass: the callout goes. Press Escape to put `qty`
 back.
 
-Open the "Read by" zone of `qty`. Pass: it lists two rows, each with a place
+Open the Read by section of `qty`. Pass: it lists two rows, each with a place
 and a sentence in words. No row prints `data.`, a key or an id. Choose a field
-nothing reads, such as `justification`. Pass: the zone reads "No condition
+nothing reads, such as `justification`. Pass: the section reads "No condition
 reads this field."
 
 Press Publish, then Show in the dialog's Changes row. Pass: a Fields row for
@@ -6048,7 +6043,7 @@ Pass: "Withdraw" has no condition line in that preview.
 
 Open a draft of `purchase_requisition`. On the Fields tab's Where fields
 appear view, find the `cost_center` row and clear the "visible" box under
-Manager Approval. Open `Cost Center` on the Catalog view. Its "Only ask this when" zone says the
+Manager Approval. Open `Cost Center` on the Catalog view. Its Asked on section says the
 steps disagree and names Manager Approval.
 
 Pass: a "Clear on <steps>" command stands in the footer, above the Developer
@@ -6087,8 +6082,8 @@ Open another tab, then return to the Steps tab and the same path.
 Pass: the sentence still reads "Until you finish the row, the condition
 stays: Quantity is greater than 5."
 
-Repeat the edit once on a field with a rule. Open `Quantity` on the Fields tab
-and its Validation zone. Under `rule`, build one row that compares this answer
+Repeat the edit once on a field with a rule. Open `Quantity` on the Fields tab.
+Open More. Under Validation's `rule`, build one row that compares this answer
 with `5`. Then pick another field as the row's operand.
 
 Pass: the row turns dashed and shows its incomplete flag.
@@ -6172,8 +6167,8 @@ the draft.
 
 #### The operand picker lists labels under headings
 
-Open the Fields tab and the Catalog view. Select `Cost Center` and open its
-"Only ask this when" zone. Press "+ Add row". Open the row's field select.
+Open the Fields tab and the Catalog view. Select `Cost Center` and find the
+"Only ask this when" condition in its Asked on section. Press "+ Add row". Open the row's field select.
 
 Pass: the headings read "Fields", "The case" and "The person", in that order.
 Under "Fields" the options carry labels alone, with no key in parentheses.
@@ -6358,7 +6353,7 @@ on the admin Data lists screen. Reload the draft after the lists exist.
 
 #### The JSON text follows the config (E2-8)
 
-Open Settings, then Where values come from, and select `countries`. Its "config (JSON)"
+Open the Fields tab's Where values come from view, and select `countries`. Its "config (JSON)"
 textarea reads `{}`.
 
 Pick `countries` in the "data list" select.
@@ -6397,7 +6392,7 @@ Pass: the number and unit controls show, reading 1 and hours.
 
 #### A data source removal clears its references (E2-15, FIELDS-15)
 
-On Where values come from, add a data source and press "Remove data source".
+On the Fields tab's Where values come from view, add a data source and press "Remove data source".
 
 Pass: it leaves at once, with no dialog, and the focus lands on a rail row.
 
@@ -6577,8 +6572,8 @@ Type a new key. Pass: the draft changes and the row heading stays the same.
 
 **6. The flags read one name.** Open the step's form editor and select a placed
 field. Pass: the strip reads Asked, Required, Read-only and Width. On the
-Fields tab, open the same field. Pass: the "Ask for this" checkbox reads
-Required.
+Fields tab, open the same field. Pass: the Asked on section's checkbox reads
+"Required on every step that asks for it".
 
 Read the legend on the Forms tab. Pass: it reads Required. Read the legend on
 the Where fields appear view. Pass: its color entry reads Asked, Required and
@@ -6659,19 +6654,19 @@ and choose "Create draft".
 Checks and Settings, in that order. Map stands open, and the canvas fills its
 body.
 
-**2. Where fields appear.** Open Fields. Pass: a sub-row reads Catalog and
-Where fields appear, and Catalog stands open. Choose Where fields appear.
+**2. Where fields appear.** Open Fields. Pass: a sub-row reads Catalog, Where
+fields appear and Where values come from, and Catalog stands open. Choose Where fields appear.
 Pass: the address ends in `/edit/fields/matrix`.
 
 Reload the page. Pass: the same view opens again. Resize the window to
 1440x900. Pass: the grid's bottom edge sits on the tab body's own bottom edge.
 
-**3. Settings.** Open Settings. Pass: a sub-row reads Process, Where values
-come from, What it takes in and gives back, and Access. Process stands open.
+**3. Settings.** Open Settings. Pass: a sub-row reads Process, What it
+takes in and gives back, and Access. Process stands open.
 Pass: the Process view prints no key and no process id.
 
 Open the Process view's Developer view. Pass: the key input and the process
-id stand there, in the mono face. Open each of the other three views in turn.
+id stand there, in the mono face. Open each of the other two views in turn.
 Pass: each view opens its own editor, and the sub-row marks the open entry.
 
 <!-- antislop: allow passive-voice -- the quote is the checkbox's own label -->
@@ -6684,8 +6679,8 @@ reads `true`.
 Leave the JSON surface and check both boxes again. Open the JSON surface once
 more. Pass: both keys read `true`.
 
-**5. The data sources rail.** Open Where values come from in a 1280x600
-window. Add data sources until the rail runs past its box. Scroll the rail.
+**5. The data sources rail.** Open the Fields tab's Where values come from
+view in a 1280x600 window. Add data sources until the rail runs past its box. Scroll the rail.
 Pass: the rail scrolls inside its own box, and the editor beside it holds
 still.
 
@@ -6697,7 +6692,7 @@ Pass: each one lands on the place beside it.
 | `/edit/canvas` | Map |
 | `/edit/paths` | Steps |
 | `/edit/matrix` | Fields, Where fields appear |
-| `/edit/dataSources` | Settings, Where values come from |
+| `/edit/dataSources` | Fields, Where values come from |
 | `/edit/contract` | Settings, What it takes in and gives back |
 | `/edit/access` | Settings, Access |
 | `/edit/changes` | the Versions screen |
@@ -6816,8 +6811,8 @@ editor leaves, and Steps opens on the step that card names. Pass: the focus
 stands on the tab button "Steps".
 
 **8. Put this field on a step.** Open the Fields tab and its Catalog view.
-Press "+ Add field". Name the new field "Spare" and select it. Pass: the "Used in"
-zone reads "No step asks for this field yet." beside "Put this field on a
+Press "+ Add field". Name the new field "Spare" and select it. Pass: the Asked on
+section reads "No step asks for this field yet." beside "Put this field on a
 step".
 
 Press that control. Pass: the form editor opens for "Submit the Exit
@@ -7123,4 +7118,84 @@ opens on "Route by Amount". The press moved the keyboard's stop to that way
 out, as a press on its line does.
 
 Discard both drafts from the process list and accept the browser's confirm.
+Under `playwright-cli`, `dialog-accept` answers it.
+
+### The field card (`studio-field-card`)
+
+Source: `studio-field-card` tasks 6.7 to 6.13. The bun tests pin every word
+the card prints and the order of its sections. A card's width, its scroll
+and a stacked layout need a real browser.
+
+See this file's "Before you start" section. Use the production build on this
+checkout's own engine port. Seed the database and sign in as
+`demo-superuser@example.test`, password `seed-demo-password`.
+
+<!-- antislop: allow long-words -->
+<!-- Why: "Purchase Requisition" is the seeded process's name, quoted as the list prints it. -->
+Create a draft of "Purchase Requisition". Under `playwright-cli`, pass
+`-s=studio-field-card` on every call. Every step below runs at 1440x900 unless
+it names another width.
+
+**1. The sections.** Open the draft's Fields tab. Pass: the sub-row reads
+Catalog, Where fields appear and Where values come from.
+
+Select a choice field. Pass: the card reads Name, Kind, Choices, Asked on,
+Read by and More, top to bottom. More stands closed. The column stays flush
+left beside the entity rail and measures at most 52rem.
+
+**2. Choices follow their names.** Press "+ Add a choice" on a choice field.
+Name it "In review". Open the Choices section's Developer view. Pass: the
+stored value reads `in_review`.
+
+Rename the choice to "In progress". Pass: the stored value follows the name.
+
+Open a choice field that a published version holds. Open the Choices
+section's Developer view. Pass: the sentence reads "This field is in a
+published version. The name no longer sets its values."
+
+Rename a choice that version holds. Pass: its stored value stays.
+
+**3. Asked on.** Open a field that two steps ask for. Pass: each row prints
+the step's label, then Required, Read-only or Not asked as words. A row with a
+condition prints its sentence on its own line.
+
+Press "Open the form" on one row. Pass: the form editor opens for that step.
+
+Return to the Fields tab. Press the checkbox "Required on every step that asks
+for it". Pass: both steps' views write `required`.
+
+**4. Read by opens the place.** Open a field that a way out reads. Press
+"Open" on that Read by row. Pass: the Steps tab opens on that step with the
+way out marked.
+
+Return to the Fields tab. Open a field that another field's rule reads. Press
+"Open" on that row. Pass: the rail selects the other field, and its More
+stands open.
+
+**5. Where values come from.** Open the Fields tab's Where values come from
+view. Pass: the editor heads with the source's name. Its key input takes the
+caption Name. The kind picker prints "A data list an operator keeps" and
+"Cases of another process".
+
+Open the Settings tab. Pass: the sub-row holds three entries: Process, What it
+takes in and gives back, and Access. Load `/edit/settings/sources`. Pass: the
+Process view opens.
+
+**6. The matrix reads in words.** Open Where fields appear. Pass: a column
+header prints the step's label alone. A row header prints the field's label
+with its kind word. No header prints a key.
+
+Pass: each bulk badge prints Asked, Required or Read-only on one line, at its
+word's width, so Read-only stands widest. A conditional flag prints the stamp
+Condition. The legend prints no "CEL".
+
+Open the Forms tab. Pass: the legend reads Group for a form's group.
+
+**7. Narrow widths.** Resize the window to 1024x800. Pass: the entity rail
+stands above the card, and the Fields view body scrolls the whole card. In
+devtools the card's container reads `overflow-y: visible`.
+
+Resize to 420px. Pass: nothing scrolls sideways.
+
+Discard the draft from the process list and accept the browser's confirm.
 Under `playwright-cli`, `dialog-accept` answers it.

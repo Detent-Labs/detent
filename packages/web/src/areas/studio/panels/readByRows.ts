@@ -15,11 +15,24 @@ import { buildOperands, readerSentence, type Operand } from "./shared/conditionL
 import { fill, plainStepTextMap, stepText, stepTextMap, wayOutHeading } from "./shared/optionText";
 import { t, type CatalogKey } from "../catalog.js";
 
+/** The place a Read by row's "Open" command reaches (design.md D4). */
+export type ReadByTarget =
+  | { kind: "wayOut"; stepId: string; pathId: string }
+  | { kind: "form"; stepId: string }
+  | { kind: "step"; stepId: string }
+  | { kind: "field"; fieldId: string };
+
+/** A target outside the Fields tab: the tab itself selects a `field` one. */
+export type OutsidePlace = Exclude<ReadByTarget, { kind: "field" }>;
+
 export interface ReadByRow {
   /** Where the expression sits, in the author's words. */
   place: string;
   /** The condition as a sentence, for the seven condition places only. */
   sentence?: string;
+  /** Where "Open" goes. Absent for a fallback place, and for a place whose
+   * step, way out or field carries no id yet. */
+  target?: ReadByTarget;
 }
 
 type Path = readonly (string | number)[];
@@ -29,6 +42,7 @@ interface Place {
   key: CatalogKey;
   slots: Record<string, string>;
   condition: boolean;
+  target?: ReadByTarget;
 }
 
 const VIEW_FLAG_PLACES: Record<string, CatalogKey> = {
@@ -65,11 +79,16 @@ export function readByRows(draft: Draft, key: string, contentLocale: string): Re
   const stepPlace = (step: DraftStep, rest: Path): Place => {
     const onStep = { step: stepText(step, contentLocale, baseLocale) };
     const [section, index] = rest;
+    const stepId = step.id;
+    const onStepTarget = (kind: "form" | "step"): { target?: ReadByTarget } =>
+      stepId === undefined ? {} : { target: { kind, stepId } };
 
     if (section === "paths" && typeof index === "number" && endsAs(rest, 2, ["guard"])) {
       const path = step.paths?.[index];
       const wayOut = path ? wayOutHeading(path, stepTexts, plainTexts) : t("paths.unnamedPath");
-      return { key: "readBy.wayOut", slots: { ...onStep, wayOut }, condition: true };
+      const wayOutTarget: { target?: ReadByTarget } =
+        stepId !== undefined && path?.id !== undefined ? { target: { kind: "wayOut", stepId, pathId: path.id } } : {};
+      return { key: "readBy.wayOut", slots: { ...onStep, wayOut }, condition: true, ...wayOutTarget };
     }
 
     if (section === "view" && index === "fields" && typeof rest[2] === "number") {
@@ -77,20 +96,27 @@ export function readByRows(draft: Draft, key: string, contentLocale: string): Re
       const field = { ...onStep, field: fieldText(entry?.ref !== undefined ? byId.get(entry.ref) : undefined) };
       const flag = rest[3];
       if (rest.length === 4 && flag === "visible" && entry?.kind === "note") {
-        return { key: "readBy.noteShown", slots: onStep, condition: true };
+        return { key: "readBy.noteShown", slots: onStep, condition: true, ...onStepTarget("form") };
       }
       if (rest.length === 4 && typeof flag === "string" && flag in VIEW_FLAG_PLACES) {
-        return { key: VIEW_FLAG_PLACES[flag]!, slots: field, condition: true };
+        return { key: VIEW_FLAG_PLACES[flag]!, slots: field, condition: true, ...onStepTarget("form") };
       }
-      if (endsAs(rest, 3, ["validation", "rule"])) return { key: "readBy.stepRule", slots: field, condition: true };
+      if (endsAs(rest, 3, ["validation", "rule"])) {
+        return { key: "readBy.stepRule", slots: field, condition: true, ...onStepTarget("form") };
+      }
     }
 
     if (section === "timers" && typeof index === "number" && endsAs(rest, 2, ["deadline"])) {
-      return { key: "readBy.timeLimit", slots: onStep, condition: false };
+      return { key: "readBy.timeLimit", slots: onStep, condition: false, ...onStepTarget("step") };
     }
 
     if (section === "subprocess" && rest.length === 3 && (index === "inputMapping" || index === "outputMapping")) {
-      return { key: index === "inputMapping" ? "readBy.childIn" : "readBy.childOut", slots: onStep, condition: false };
+      return {
+        key: index === "inputMapping" ? "readBy.childIn" : "readBy.childOut",
+        slots: onStep,
+        condition: false,
+        ...onStepTarget("step"),
+      };
     }
 
     return { key: "readBy.otherOnStep", slots: onStep, condition: false };
@@ -108,8 +134,9 @@ export function readByRows(draft: Draft, key: string, contentLocale: string): Re
     }
     if (at === 0) return undefined;
     const slots = { field: fieldText(field) };
-    if (endsAs(path, at, ["validation", "rule"])) return { key: "readBy.fieldRule", slots, condition: true };
-    if (endsAs(path, at, ["default"])) return { key: "readBy.default", slots, condition: false };
+    const target: { target?: ReadByTarget } = field?.id === undefined ? {} : { target: { kind: "field", fieldId: field.id } };
+    if (endsAs(path, at, ["validation", "rule"])) return { key: "readBy.fieldRule", slots, condition: true, ...target };
+    if (endsAs(path, at, ["default"])) return { key: "readBy.default", slots, condition: false, ...target };
     return undefined;
   };
 
@@ -129,6 +156,7 @@ export function readByRows(draft: Draft, key: string, contentLocale: string): Re
     const place = placeOf(path);
     const row: ReadByRow = { place: fill(t(place.key), place.slots) };
     if (place.condition) row.sentence = readerSentence(src, operands);
+    if (place.target !== undefined) row.target = place.target;
     return row;
   });
 }

@@ -191,8 +191,8 @@ content will appear, with no skeleton and no spinner. See `DESIGN.md`'s
 Error, Emptiness, Waiting section for the banner and boundary-fallback
 detail.
 
-**Motion.** No component declares a transition. The field catalog's usage
-tint is the one animation. A new one counts as a design change.
+**Motion.** No component declares a transition or an animation. A new one
+counts as a design change.
 
 ## Rules for building
 

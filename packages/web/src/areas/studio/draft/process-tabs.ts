@@ -3,6 +3,7 @@ import type { DraftViewEntry } from "./view-layout";
 import type { EditorIssue } from "./issues";
 import { flattenRailFields } from "./panel-rail";
 import type { ProcessTab, TabTarget } from "../routing";
+import type { OutsidePlace } from "../panels/readByRows";
 
 /** An action as the Checks hand-off reads it: its id alone. */
 interface TabCountAction {
@@ -30,7 +31,7 @@ export interface TabCountDraft {
 
 /**
  * What each tab prints beside its name (`studio-process-tabs`). `undefined`
- * is a tab that prints no number: Map draws a graph, and Settings holds four
+ * is a tab that prints no number: Map draws a graph, and Settings holds three
  * views of process-wide settings, so neither has a total to report.
  *
  * Forms counts the steps that carry a view, the whole set the Forms tab
@@ -105,7 +106,7 @@ export function checkTarget(
     case "field":
       return { tab: "fields", view: "catalog" };
     case "dataSource":
-      return { tab: "settings", view: "sources" };
+      return { tab: "fields", view: "sources" };
     case "contract":
       return { tab: "settings", view: "contract" };
     case "process":
@@ -138,4 +139,25 @@ export function formEditorReturnTab(openedFrom: ProcessTab | undefined): Process
  */
 export function surfaceTab(routeTab: ProcessTab, formStepId: string | undefined, formOrigin: ProcessTab | undefined): ProcessTab {
   return formStepId !== undefined ? formEditorReturnTab(formOrigin) : routeTab;
+}
+
+/** What a Read by row's "Open" on a place outside the Fields tab does: open
+ * a step's form in the form editor, or open a tab on a target. */
+export type PlaceAction = { kind: "form"; stepId: string } | { kind: "tab"; target: CheckTarget };
+
+/**
+ * The dispatch behind a Read by row's "Open" (design.md D4). A form opens the
+ * form editor on its step. A way out opens the Steps tab on its step with that
+ * way out marked, and a step opens the Steps tab on that step. A `field`
+ * target never reaches here: the Fields tab selects it itself.
+ */
+export function placeAction(place: OutsidePlace): PlaceAction {
+  switch (place.kind) {
+    case "form":
+      return { kind: "form", stepId: place.stepId };
+    case "wayOut":
+      return { kind: "tab", target: { tab: "steps", stepId: place.stepId, pathId: place.pathId } };
+    case "step":
+      return { kind: "tab", target: { tab: "steps", stepId: place.stepId } };
+  }
 }

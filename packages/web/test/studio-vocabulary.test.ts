@@ -135,17 +135,31 @@ describe("flag vocabulary", () => {
       ["formEditor.noteText", "Text"],
       ["formsTab.legendField", "Field"],
       ["formsTab.legendConditional", "Required if a condition holds"],
-      ["formsTab.legendSection", "Section"],
+      ["formsTab.legendGroup", "Group"],
       ["formsTab.legendHeight", "Taller asks for more"],
-      ["fieldMatrix.legendFlagged", "A flagged cell already stands in Checks as an issue."],
+      ["fieldMatrix.legendFlagged", "A marked cell stands in Checks."],
       ["fieldCatalog.dataSourceLabel", "Values come from"],
+    ]);
+  });
+
+  it("names the field card's marks and the matrix's words", () => {
+    expectRows([
+      ["formsTab.legendGroup", "Group"],
+      ["fieldMatrix.markCondition", "Condition"],
+      ["fieldMatrix.rowKindLabel", "Kind"],
+      ["fieldMatrix.hideInertToggle", "Hide steps with no form"],
+      ["fieldMatrix.columnInertNote", "No form"],
+      ["fieldCard.hiddenMark", "Not asked"],
+      ["fieldCard.openForm", "Open the form"],
+      ["fieldCard.openPlace", "Open"],
+      ["fieldCard.requiredEverywhere", "Required on every step that asks for it"],
+      ["ruleBuilder.empty", "No rule yet: every answer passes."],
     ]);
   });
 
   it("gives each view flag one name on the strip, the Forms tab and the Fields tab", () => {
     expect(t("formEditor.required")).toBe("Required");
     expect(t("formsTab.legendRequired")).toBe(t("formEditor.required"));
-    expect(t("fieldCatalog.requiredLabel")).toBe(t("formEditor.required"));
     expect(t("formEditor.readonly")).toBe("Read-only");
     expect(t("formEditor.visible")).toBe("Asked");
   });
@@ -186,6 +200,33 @@ describe("Change list vocabulary", () => {
       ["changeList.order.onFire", "When it runs out order"],
       ["changeList.order.dataSources", "Order of where values come from"],
       ["changeList.order.outcomes", "Order of how it can end"],
+    ]);
+  });
+});
+
+describe("data source and contract vocabulary", () => {
+  it("names the sources' view, name, kind legend and kinds in the author's words", () => {
+    expectRows([
+      ["fieldsViews.sources", "Where values come from"],
+      ["dataSources.nameCaption", "Name"],
+      ["dataSources.kindLegend", "What kind of source"],
+      ["dataSourceKind.db.list", "A data list an operator keeps"],
+      ["dataSourceKind.instance.query", "Cases of another process"],
+      ["dataSourceKind.static", "A list typed into this process"],
+      ["panelsScreen.unnamedDataSource", "(unnamed source)"],
+    ]);
+  });
+
+  it("words the contract view as what the process takes in and gives back", () => {
+    expectRows([
+      ["settings.contract", "What it takes in and gives back"],
+      ["contract.callableCheckbox", "Other processes can call this one"],
+      ["contract.inputFieldsLegend", "What it takes in"],
+      ["contract.outputFieldsLegend", "What it gives back"],
+      ["contract.outcomesLegend", "How it can end"],
+      ["contract.newOutcomePlaceholder", "Name of an ending"],
+      ["contract.addOutcome", "+ Add an ending"],
+      ["contract.removeOutcome", "Remove"],
     ]);
   });
 });

@@ -47,7 +47,7 @@ bar, the tab row, then one tab body.
 | tab row | the row of six tabs over the body | `panels/ProcessTabRow.tsx` |
 | edge fade | the fade at an edge of the tab row with more tabs past it | `panels/ProcessTabRow.tsx` |
 | tab | one of the six. The authoring order runs Map, Steps, Fields, Forms, Checks and Settings | `routing.ts` |
-| sub-row | the strip of a tab's views under the tab row. The Fields tab's reads Catalog and Where fields appear. The Settings tab's reads Process, Where values come from, What it takes in and gives back, and Access | `panels/SubRow.tsx` |
+| sub-row | the strip of a tab's views under the tab row. The Fields tab's reads Catalog, Where fields appear and Where values come from. The Settings tab's reads Process, What it takes in and gives back, and Access | `panels/SubRow.tsx` |
 | structure surface | the six tab bodies together, the JSON surface's one alternative | `EditScreen.tsx`; gated by `structureActive`, a prop of `panels/ProcessHeaderBar.tsx` |
 | JSON surface | the raw definition view, the structure surface's one alternative | `panels/JsonView.tsx` |
 
@@ -70,6 +70,8 @@ state line, and only while the draft is dirty. `panels/ProcessHeaderBar.tsx`
 renders all of them. The *draft toolbar* retired: `DraftToolbar.tsx` no longer
 mounts, and only its `useDraftToolbarActions` hook survives.
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: "Discard draft" and the card's "Remove field" are two control labels the UI prints. -->
 The `⋮` menu holds two groups. Views carries the JSON surface, Versions and
 Player. Draft carries Discard draft.
 
@@ -96,16 +98,18 @@ Every other term below belongs to one tab.
 | masthead | the step page's top zone. It holds the step number, the kind phrase, the name, the description, and the issues no section claims | `panels/StepPage.tsx` |
 | section | one subject group on the step page, one of six, open one at a time | `panels/sectionsFor.ts` |
 | section header | the button that opens and closes one section. It carries the section's name, a one-line summary and a mark | `panels/StepPage.tsx` |
-| Developer view | a disclosure over raw JSON, CEL or machine values. The step page's, in More, holds the step's key and JSON, and each way-out row's holds that way out's key. The change-list row, each process list row, the form editor and a condition or rule input hold one. A field's own editor keeps its key there, under "What this field asks". The Settings tab's Process view and the Publish dialog hold the key, the process id and the revision. Every Developer view stands closed on open, bar a condition input's, which opens by itself over unparseable source. | `panels/StepPage.tsx`, `panels/PathsPanel.tsx`, `panels/ChangeList.tsx`, `panels/ProcessSettingsPanel.tsx`, `panels/ProcessHeaderBar.tsx`, `screens/ProcessesScreen.tsx`, `panels/FieldCatalogPanel.tsx`, `screens/FormEditorScreen.tsx`, `panels/shared/ConditionInput.tsx`, `panels/shared/RuleInput.tsx` |
+| Developer view | a disclosure over raw JSON, CEL or machine values. The step page's, in More, holds the step's key and JSON, and each way-out row's holds that way out's key. The change-list row, each process list row, the form editor and a condition or rule input hold one. The field card holds four: More's, Choices', the default value's and the validation rule's. The Settings tab's Process view and the Publish dialog hold the key, the process id and the revision. Every Developer view stands closed on open, bar three that the paragraph under this table lists. | `panels/StepPage.tsx`, `panels/PathsPanel.tsx`, `panels/ChangeList.tsx`, `panels/ProcessSettingsPanel.tsx`, `panels/ProcessHeaderBar.tsx`, `screens/ProcessesScreen.tsx`, `panels/FieldCatalogPanel.tsx`, `screens/FormEditorScreen.tsx`, `panels/shared/ConditionInput.tsx`, `panels/shared/RuleInput.tsx`, `panels/shared/DefaultValueEditor.tsx` |
 | sentence | the line that reads a condition in words. It stands under a condition input's rows and under a Read by row's place. On the canvas, a way out's sentence sits on its line, as "Otherwise" does | `panels/shared/ConditionInput.tsx`, `panels/shared/conditionLogic.ts::readerSentence`, `canvas/mapWords.ts` |
-| Read by zone | the field editor's effect-half zone under "Used in". It lists each expression that reads the field, by place and sentence | `panels/FieldCatalogPanel.tsx`, rows from `panels/readByRows.ts` |
+| Read by section | the field card's section that lists each expression reading the field, by place and sentence. Each row with a place carries an Open command | `panels/FieldCatalogPanel.tsx`, rows from `panels/readByRows.ts` |
 | rewrite line | the line under a field's label that says how many conditions a key change updated | `panels/FieldCatalogPanel.tsx` |
-| Fields views | the Fields tab's sub-row and its two bodies, Catalog and Where fields appear | `panels/FieldsTabViews.tsx` |
+| Fields views | the Fields tab's sub-row and its three bodies: Catalog, Where fields appear and Where values come from | `panels/FieldsTabViews.tsx` |
 | entity rail | the left column of the Catalog and Where values come from views: one row per entity | `panels/EntityTabs.tsx` |
-| field catalog | the Catalog view's editor over the process's field definitions | `panels/FieldCatalogPanel.tsx` |
+| field catalog | the Catalog view: the entity rail and the field card | `panels/FieldCatalogPanel.tsx` |
+| field card | the Catalog view's editor over the selected field. Its sections run: the name line, Name and Description, Kind, Choices, Asked on, Read by, More. A group field adds Fields inside this group. Remove field closes the card, under its own hairline | `panels/FieldCatalogPanel.tsx` |
+| card section | one headed block of the field card, under a Title-style heading and a hairline. Kind has no hairline | `panels/FieldCatalogPanel.tsx` (`CardSection`) |
 | field matrix | the Fields tab's Where fields appear view: a grid of every field against every step | `panels/FieldMatrixPanel.tsx`, `panels/FieldMatrixGrid.tsx` |
-| Settings tab | the tab holding the process-wide settings in four views. The Process view holds the base language, the content-locale switcher and the add-locale control. It also holds the cancellable setting, the collaboration defaults and a Developer view. After a publish, that Developer view adds the version and the definition hash | `panels/SettingsTab.tsx`, `panels/ProcessSettingsPanel.tsx` |
-| data sources | the Settings tab's Where values come from view, over the process's data source definitions | `panels/DataSourcesPanel.tsx` inside `panels/SettingsTab.tsx` |
+| Settings tab | the tab holding the process-wide settings in three views. The Process view holds the base language, the content-locale switcher and the add-locale control. It also holds the cancellable setting, the collaboration defaults and a Developer view. After a publish, that Developer view adds the version and the definition hash | `panels/SettingsTab.tsx`, `panels/ProcessSettingsPanel.tsx` |
+| data sources | the Fields tab's Where values come from view, over the process's data source definitions | `panels/DataSourcesPanel.tsx`, mounted by `panels/EntityTabs.tsx::DataSourcesTab` inside `panels/FieldsTabViews.tsx` |
 | contract | the Settings tab's What it takes in and gives back view, over the `ProcessContract`: input fields, output fields, outcomes | `panels/ContractPanel.tsx` inside `panels/SettingsTab.tsx` |
 | change list | the folded register of entity rows the Publish dialog and the Versions screen both draw over `describeChanges`'s output | `panels/ChangeList.tsx`, `panels/PublishChanges.tsx` |
 | Forms tab | the tab holding one card per step that declares a view, with a legend above the cards | `panels/FormsTab.tsx` |
@@ -118,9 +122,14 @@ Every other term below belongs to one tab.
 | checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
 | Access view | the Settings tab's view over the process's Developer, Owner and Reader access lists | `panels/AccessPanel.tsx` inside `panels/SettingsTab.tsx` |
 
-The word *section* also names a form's group on the Forms tab's legend. The
-form editor's palette says *Group*. The table's row names the step page's
-subject group.
+On the field card, More's Developer view holds the key input and the plugin
+envelope. Choices' holds the stored values. Three Developer views open by
+themselves. A condition or rule input's opens over unparseable source. The
+default value's opens over an expression default. More's opens on a key check.
+
+The Forms tab's legend and the form editor's palette both say *Group* for a
+form's group. The *section* row names the step page's subject group. A *card
+section* names a block of the field card.
 
 *issue* is the word for one validation result, whatever check raised it
 (`draft/issues.ts`'s `EditorIssue`, rendered by `panels/shared/IssueList.tsx`).
@@ -180,7 +189,7 @@ The field matrix splits into two components: a bare grid and a wrapper. The
 bare grid, `FieldMatrixGrid`, holds the headers, the cells, the keyboard
 model and the bulk badges. The wrapper, `FieldMatrixPanel`, adds the toolbar
 and the legend, and turns the badges on through the grid's `showBulkBadges`
-prop (`FieldMatrixGrid.tsx:485`, `:505`). Only the wrapper mounts the bare
+prop (`FieldMatrixGrid.tsx:481`, `:514`). Only the wrapper mounts the bare
 grid.
 
 ### The player
@@ -268,6 +277,8 @@ only in a Developer view. A caption never prints a JSON property name.
 | outcome | how it ended |
 | required / readonly / visible | Required / Read-only / Asked |
 | contract | what this process takes in and gives back |
+| options / option value | choices / a choice's stored value |
+| `db.list` / `instance.query` / `static` | a data list an operator keeps / cases of another process / a list typed into this process |
 
 The capability `studio-guided-vocabulary` carries the same table. A change to
 one changes the other.

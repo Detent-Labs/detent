@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { fieldCheckZone } from "../src/areas/studio/panels/fieldCheckZone.js";
+import { fieldCheckZone, namesFieldKey, namesFieldTechnical } from "../src/areas/studio/panels/fieldCheckZone.js";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
@@ -109,5 +109,24 @@ describe("EditorIssue carries the check's own location", () => {
     expect(issue?.loc).toBe("fields[0].fields[0].key");
     expect(issue?.entityId).toBe("field_amount");
     expect(fieldCheckZone(issue!.loc)).toBe("asks");
+  });
+});
+
+// design.md D5: a check on the key or on the Technical marker opens the
+// card's More, where each control stands.
+describe("the two checks that open More", () => {
+  it("names the key and the Technical marker on the field itself, a nested one included", () => {
+    expect(namesFieldKey("fields[2].key")).toBe(true);
+    expect(namesFieldKey("fields[0].fields[1].key")).toBe(true);
+    expect(namesFieldTechnical("fields[2].technical")).toBe(true);
+    expect(namesFieldTechnical("fields[0].fields[1].technical")).toBe(true);
+    expect(fieldCheckZone("fields[2].technical")).toBe("kind");
+  });
+
+  it("names neither for an option's label or another key", () => {
+    expect(namesFieldTechnical("fields[2].options[0].label")).toBe(false);
+    expect(namesFieldTechnical("fields[2].type")).toBe(false);
+    expect(namesFieldKey("fields[2].label")).toBe(false);
+    expect(namesFieldTechnical("workflow.steps[0].technical")).toBe(false);
   });
 });

@@ -6,7 +6,6 @@ import type { SettingsView, TabView } from "../routing.js";
 import { areaHref, type NavigateOptions } from "../../../shell/routing.js";
 import { AccessPanel } from "./AccessPanel.js";
 import { ContractPanel } from "./ContractPanel.js";
-import { DataSourcesTab } from "./EntityTabs.js";
 import { ProcessSettingsPanel } from "./ProcessSettingsPanel.js";
 import { SubRow, subTabDomId, subTabPanelDomId } from "./SubRow.js";
 
@@ -19,10 +18,9 @@ const styles = stylex.create({
     flex: "1 1 auto",
     minHeight: 0,
   },
-  // A view body: a column flex that scrolls on its own. The data sources grid
-  // declares `height: 100%`, and this body's own height is what it fills.
-  // A scroll box clips at its padding edge, so it pads the focus ring's reach
-  // and keeps that room when a focus scroll stops short of either end
+  // A view body: a column flex that scrolls on its own. A scroll box clips at
+  // its padding edge, so it pads the focus ring's reach and keeps that room
+  // when a focus scroll stops short of either end
   // (`studio-focus-ring-clipping`).
   view: {
     display: "flex",
@@ -65,19 +63,17 @@ interface Props {
   lastPublish?: { version: number; definitionHash: string };
   /** Cross-area navigation, for the assignment-groups link. */
   go: (href: string, opts?: NavigateOptions) => void;
-  /** True while the Settings tab stands open and the JSON surface does not. */
-  visible: boolean;
   onUnauthorized: () => void;
 }
 
 /**
- * The Settings tab: a sub-row over the process's own settings, its data
- * sources, its contract and its access lists (`studio-process-tabs`: "The
- * Settings tab gathers the process-wide settings"). Every view body stays
- * mounted, and `hidden` reveals one, so the contract editor keeps a
- * half-typed outcome name across a switch.
+ * The Settings tab: a sub-row over the process's own settings, its
+ * contract and its access lists (`studio-process-tabs`: "The Settings tab
+ * gathers the process-wide settings"). Every view body stays mounted, and
+ * `hidden` reveals one, so the contract editor keeps a half-typed outcome
+ * name across a switch.
  */
-export function SettingsTab({ view, onOpenView, token, roles, processId, revision, lastPublish, go, visible, onUnauthorized }: Props) {
+export function SettingsTab({ view, onOpenView, token, roles, processId, revision, lastPublish, go, onUnauthorized }: Props) {
   const groupsLinkProps = stylex.props(styles.groupsLink);
   const body = (id: SettingsView) => {
     const hide = view !== id;
@@ -95,7 +91,6 @@ export function SettingsTab({ view, onOpenView, token, roles, processId, revisio
         tab="settings"
         views={[
           { id: "process", label: t("settings.process") },
-          { id: "sources", label: t("settings.sources") },
           { id: "contract", label: t("settings.contract") },
           { id: "access", label: t("settings.access") },
         ]}
@@ -105,9 +100,6 @@ export function SettingsTab({ view, onOpenView, token, roles, processId, revisio
       />
       <div {...body("process")}>
         <ProcessSettingsPanel processId={processId} revision={revision} lastPublish={lastPublish} />
-      </div>
-      <div {...body("sources")}>
-        <DataSourcesTab token={token} visible={visible && view === "sources"} />
       </div>
       <div {...body("contract")}>
         <ContractPanel />

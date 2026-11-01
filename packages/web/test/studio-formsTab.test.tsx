@@ -286,7 +286,7 @@ describe("The Forms tab's legend", () => {
       "Field",
       "Required",
       "Required if a condition holds",
-      "Section",
+      "Group",
       "Taller asks for more",
     ]);
   });

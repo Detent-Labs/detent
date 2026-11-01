@@ -9,7 +9,7 @@
  *
  * Three rules say the accent is wrong here, and the last one is measurable:
  *
- * 1. The legend twelve pixels away names one color per flag. A REQ badge
+ * 1. The legend twelve pixels away names one color per flag. A Required badge
  *    filled with the accent contradicts the key that explains it.
  * 2. `design-language.md` rule 3: the accent marks state and the one primary
  *    action per screen. Publish already holds it.
@@ -159,5 +159,44 @@ describe("the pressed bulk badge", () => {
       const flagRatio = contrast(text, token(css, `color-flag-${flag}`, "light"));
       expect(flagRatio - accent, `${flag} margin over the accent`).toBeGreaterThan(1.9);
     }
+  });
+});
+
+describe("the bulk badge grid", () => {
+  const grid = read(GRID);
+  const block = (name: string) => {
+    const start = grid.indexOf(`${name}: {`);
+    expect(start).toBeGreaterThan(-1);
+    return grid.slice(start, grid.indexOf("\n  },", start));
+  };
+
+  it("sizes each badge to its own word, so Read-only stands widest", () => {
+    // Chrome sizes `1fr` tracks of a shrink-to-fit grid in a table cell to
+    // each track's own max-content, so no shared width materialises. The
+    // tracks read `max-content` and the badge sets no width of its own.
+    const flags = block("matrixFlags");
+    expect(flags).toContain('gridTemplateColumns: "repeat(3, max-content)"');
+    expect(flags).not.toContain("1fr");
+    expect(flags).not.toContain("1.75rem");
+    expect(block("matrixFlagBadge")).not.toMatch(/\bwidth:/);
+  });
+
+  it("keeps the cells' checkbox grid at three fixed 1.75rem tracks", () => {
+    expect(grid).toContain('gridTemplateColumns: "repeat(3, 1.75rem)"');
+  });
+
+  it("keeps each word on one line, and never clips it", () => {
+    // "Read-only" wrapped onto two lines at 1440. `nowrap` keeps each word
+    // whole.
+    expect(block("matrixFlagBadge")).toContain('whiteSpace: "nowrap"');
+    expect(block("matrixFlagBadge")).not.toContain("overflow");
+  });
+
+  it("prints the No form column note at 11px, the tracked-label floor", () => {
+    expect(block("matrixColNote")).toContain('fontSize: "11px"');
+  });
+
+  it("gives the scroll wrapper a region role beside its name", () => {
+    expect(grid).toMatch(/matrixScroll\)\}\s*role="region"\s*tabIndex=\{0\}\s*aria-label=\{t\("fieldMatrix\.scrollRegionLabel"\)\}/);
   });
 });

@@ -9,7 +9,7 @@ import { t } from "../../catalog.js";
 import { ExpressionInput } from "./ExpressionInput";
 import { RuleBuilder } from "./RuleBuilder";
 import { commitDecision } from "./conditionLogic";
-import { buildRuleOperands, fromRuleCel, ruleOperandSignature, toRuleCel, type RuleCondition } from "./ruleLogic";
+import { buildRuleOperands, fromRuleCel, ruleOperandSignature, ruleSentence, toRuleCel, type RuleCondition } from "./ruleLogic";
 
 const styles = stylex.create({
   conditionInput: {
@@ -18,51 +18,53 @@ const styles = stylex.create({
     gap: space.s2,
     minWidth: 0,
   },
-  conditionFooter: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: space.s2,
+  // A note (`DESIGN.md` Inputs / Fields): no box, a 2px hairline rule on its
+  // left, 12px from the text, in the written face and in ink. The same note
+  // `ConditionInput` draws under its rows.
+  ruleSentence: {
+    margin: 0,
+    paddingLeft: space.s3,
+    borderLeftWidth: 2,
+    borderLeftStyle: "solid",
+    borderLeftColor: colors.border,
+    fontFamily: fonts.body,
+    color: colors.text,
+    minWidth: 0,
+    maxWidth: "60ch",
+    overflowWrap: "anywhere",
   },
-  conditionParseError: {
+  ruleUnparseable: {
     margin: 0,
     color: colors.refusal,
     fontSize: "0.85rem",
   },
-  conditionMode: {
-    backgroundColor: "transparent",
-    color: colors.accent,
-    padding: 0,
-    flex: "none",
+  // The condition input's Developer view, duplicated: an area's component
+  // never reads another component's style object.
+  developer: {
+    paddingBlock: space.s2,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
   },
-  // `.condition-mode-disclosure[aria-expanded="true"]`: a JS-computed choice
-  // reading the same `aria-expanded` the button already carries.
-  conditionModeExpanded: {
-    color: colors.text,
-  },
-  conditionReadout: {
-    display: "flex",
-    alignItems: "baseline",
-    gap: space.s2,
-    margin: 0,
-    minWidth: 0,
-    flex: "1 1 20ch",
-  },
-  conditionReadoutLabel: {
-    fontFamily: fonts.body,
-    fontSize: "11px",
+  developerSummary: {
+    cursor: "pointer",
+    fontSize: 11,
     textTransform: "uppercase",
-    letterSpacing: "0.06em",
+    letterSpacing: "0.1em",
     color: colors.textMuted,
-    flex: "none",
   },
-  // `.condition-readout code`: a descendant selector on a bare `<code>`.
-  conditionReadoutCode: {
-    fontFamily: fonts.mono,
-    fontSize: "0.85rem",
+  celField: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    marginBlockStart: space.s2,
     minWidth: 0,
-    overflowWrap: "anywhere",
+  },
+  celCaption: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
   },
 });
 
@@ -75,12 +77,13 @@ interface Props {
 }
 
 /**
- * `rule`'s surface (task 4.5, `studio-field-validation-form`): the row
- * builder, its CEL readout, and a "Developer view" disclosure holding the
- * raw CEL input — `ConditionInput`'s row model, over `ruleLogic` instead of
- * `conditionLogic`. Stays a separate component per design.md: this site's
- * default operand and its field-against-field comparison have no
- * counterpart on a path guard or a view override.
+ * `rule`'s surface (`studio-field-validation-form`), in `ConditionInput`'s
+ * shape: the row builder, the rule read back as a sentence under it, and the
+ * CEL input in a closed "Developer view" disclosure at the foot. Source that
+ * does not parse draws a notice in place of the rows and the sentence, and
+ * opens the disclosure. Stays a separate component: this site's default
+ * operand and its field-against-field comparison have no counterpart on a
+ * path guard or a view override.
  */
 export function RuleInput({ field, value, onChange }: Props) {
   const { draft, contentLocale } = useDraft();
@@ -106,21 +109,18 @@ export function RuleInput({ field, value, onChange }: Props) {
   const seededFrom = useRef<{ src: string | undefined; signature: string } | null>(null);
   const [condition, setCondition] = useState<RuleCondition | null>(() => fromRuleCel(src, operands));
 
+  // Opens on a read that does not parse, at mount or on a later re-seed. Once
+  // the text parses it stays open, so the input the author types in never
+  // moves; only the author closes it.
+  const [developerOpen, setDeveloperOpen] = useState(condition === null);
+
   const seeded = seededFrom.current;
   if (!seeded || seeded.src !== src || seeded.signature !== signature) {
     seededFrom.current = { src, signature };
-    setCondition(fromRuleCel(src, operands));
+    const read = fromRuleCel(src, operands);
+    setCondition(read);
+    if (read === null) setDeveloperOpen(true);
   }
-
-  // Seeded from whether the source parsed at mount, so a rule that opens
-  // unreadable stays on the CEL input while the author repairs it.
-  // `unparseable` stays the null guard below: `src` can also turn unreadable
-  // from outside, through the JSON surface.
-  const [devOpen, setDevOpen] = useState(condition === null);
-  const unparseable = condition === null;
-  // While no row contributes, the draft may still hold a rule that an
-  // unfinished edit left standing, and the readout says so.
-  const preview = condition ? (toRuleCel(condition, operands) ?? src) : src;
 
   const commit = (next: RuleCondition) => {
     setCondition(next);
@@ -132,48 +132,37 @@ export function RuleInput({ field, value, onChange }: Props) {
     onChange(written === undefined ? undefined : { lang: "cel", src: written });
   };
 
-  if (devOpen || unparseable) {
-    return (
-      <div className={`condition-input rule-input ${stylex.props(styles.conditionInput).className}`}>
-        <ExpressionInput
-          value={value}
-          onChange={(next) => {
-            seededFrom.current = null; // let the builder re-read what was typed
-            onChange(next);
-          }}
-        />
-        <div {...stylex.props(styles.conditionFooter)}>
-          {unparseable && (
-            <p {...stylex.props(styles.conditionParseError)} role="status">
-              {t("condition.unparseable")}
-            </p>
-          )}
-          <button
-            type="button"
-            {...stylex.props(styles.conditionMode, styles.conditionModeExpanded)}
-            aria-expanded={true}
-            onClick={() => setDevOpen(false)}
-            disabled={unparseable}
-          >
-            {t("condition.developerView")}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className={`condition-input rule-input ${stylex.props(styles.conditionInput).className}`}>
-      <RuleBuilder condition={condition} operands={operands} onChange={commit} />
-      <div {...stylex.props(styles.conditionFooter)}>
-        <p {...stylex.props(styles.conditionReadout)}>
-          <span {...stylex.props(styles.conditionReadoutLabel)}>{t("condition.celReadout")}</span>
-          <code {...stylex.props(styles.conditionReadoutCode)}>{preview ?? t("condition.celEmpty")}</code>
+    <div {...stylex.props(styles.conditionInput)}>
+      {condition === null ? (
+        <p {...stylex.props(styles.ruleUnparseable)} role="status">
+          {t("condition.unparseable")}
         </p>
-        <button type="button" {...stylex.props(styles.conditionMode)} aria-expanded={false} onClick={() => setDevOpen(true)}>
-          {t("condition.developerView")}
-        </button>
-      </div>
+      ) : (
+        <>
+          <RuleBuilder condition={condition} operands={operands} onChange={commit} />
+          <p {...stylex.props(styles.ruleSentence)}>
+            {ruleSentence(condition, operands, src)}
+          </p>
+        </>
+      )}
+      <details
+        {...stylex.props(styles.developer)}
+        open={developerOpen}
+        onToggle={(e) => setDeveloperOpen(e.currentTarget.open)}
+      >
+        <summary {...stylex.props(styles.developerSummary)}>{t("condition.developerView")}</summary>
+        <label {...stylex.props(styles.celField)}>
+          <span {...stylex.props(styles.celCaption)}>{t("condition.celCaption")}</span>
+          <ExpressionInput
+            value={value}
+            onChange={(next) => {
+              seededFrom.current = null; // let the builder re-read what was typed
+              onChange(next);
+            }}
+          />
+        </label>
+      </details>
     </div>
   );
 }

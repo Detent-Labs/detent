@@ -1,24 +1,23 @@
 /**
- * Which zone of the Fields view a check on the selected field belongs to,
- * read off the check's own `loc` (`EditorIssue.loc`). A check on the key
- * stands in "What this field asks", a check on an option in "Where values
- * come from", a check on a validation rule in "Validation".
+ * Which section of the field card a check on the selected field belongs to,
+ * read off the check's own `loc` (`EditorIssue.loc`). The card maps the six
+ * zones onto its sections (design.md D5): `asks` stands beside the name
+ * line, `kind` under Kind, `values` under Choices, and `default`,
+ * `validation` and `columnMapping` inside More, which opens for them.
  *
- * Answers `undefined` for a `loc` naming no zone this view draws. The caller
- * stands such a check at the top of the definition half, so no check goes
- * unshown for want of a matching zone (studio-app: "A field's checks stand at
- * the zone each one belongs to").
+ * Answers `undefined` for a `loc` naming no zone. The card stands such a check
+ * at its top, so no check goes unshown for want of a matching section
+ * (studio-app: "A field's checks stand at the zone each one belongs to").
  *
- * Pure and view-free: the ids below are keys the view maps to its own
- * headings, not the headings themselves. Four zones the view draws take no id
- * here — "Used in", "Only ask this when" and "Ask for this" describe a view
- * entry, which anchors on its own step rather than on the selected field, and
- * a check on the whole catalog anchors on the process.
+ * Pure and view-free: the ids below are keys the card maps to its own
+ * sections, not the headings themselves. Asked on describes view entries,
+ * which anchor on their own step rather than on the selected field, and a
+ * check on the whole catalog anchors on the process.
  */
 export type FieldCheckZone = "asks" | "kind" | "values" | "default" | "validation" | "columnMapping";
 
 /** The field-declaration key each zone owns. A key absent here names no zone,
- * which is the top-of-half fallback rather than a gap. */
+ * which is the card's top fallback rather than a gap. */
 const ZONE_BY_KEY: Record<string, FieldCheckZone> = {
   key: "asks",
   label: "asks",
@@ -56,11 +55,20 @@ export function fieldCheckZone(loc: string): FieldCheckZone | undefined {
 
 /**
  * Whether a check's `loc` names the field's own key, read off the same anchor
- * `fieldCheckZone` reads. The field editor opens its key's Developer view
- * while such a check stands.
+ * `fieldCheckZone` reads. The card opens More and its Developer view while
+ * such a check stands, so the key input shows beside the check.
  */
 export function namesFieldKey(loc: string): boolean {
   return segmentsAfterAnchor(loc)[0] === "key";
+}
+
+/**
+ * Whether a check's `loc` names the field's own `technical` marker. Its zone
+ * is `kind`, so it prints under Kind, and the card opens More, where the
+ * Technical checkbox stands.
+ */
+export function namesFieldTechnical(loc: string): boolean {
+  return segmentsAfterAnchor(loc)[0] === "technical";
 }
 
 /** The `loc` segments after its last `fields` token, index suffixes dropped,

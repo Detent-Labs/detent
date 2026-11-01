@@ -1113,3 +1113,77 @@ system that resulted; this file explains why it took that shape.
 
   Closed by `studio-header-two-rows`: the input carries the accessible name
   "Process name".
+- **SENTENCE-1: the rule builder keeps its CEL readout and toggle.**
+  `panels/shared/RuleInput.tsx` still prints its "Writes" line and its CEL
+  toggle. The Fields tab then holds two builders that read differently.
+  Change 11 owns the rule builder and brings it to the sentence.
+
+  Resolved by `studio-field-card` on 2026-11-01: `RuleInput.tsx` reads as a sentence under the builder. The CEL input stands in a closed Developer view, and the "Writes" line and the toggle are gone.
+- **SENTENCE-4: the rule builder's other-field picker shows labels alone.**
+  The shared `fieldOperand` drops the key, and it adds none of the condition
+  picker's duplicate numbering. Two fields with one label then read the same
+  there. Change 11 can number them, or show the field card's names.
+
+  Resolved by `studio-field-card` on 2026-11-01: the rule builder's other-field picker prints labels and numbers repeated labels through `numberRepeats`, as the condition picker does.
+- **SENTENCE-6: the divergent "Only ask this when" names no condition.**
+  When the steps disagree, the zone names the steps and nothing else. The
+  Developer view's CEL box stands empty. An author who builds a row then
+  replaces conditions they cannot read. Change 11's field card can list
+  each step's condition as a sentence.
+
+  Resolved by `studio-field-card` on 2026-11-01: the Asked on section lists each step's condition as a sentence, so a divergent condition names every step that holds one.
+- **NAMES-1: the Forms tab's legend says "Section" and the palette says
+  "Group".** The form editor's palette names the kind "Group", as the Fields
+  tab does. The Forms tab's legend still reads "Section" for the same group
+  break. Change 11 owns the wording across the Fields tab and can settle which
+  word wins.
+
+  Resolved by `studio-field-card` on 2026-11-01: the Forms tab's legend reads "Group", the word the palette uses.
+- **SELECTS-3: the Fields tab's data source select prints `ds.key ?? ds.id`.**
+  The select shows a key where the step selects show a label. Change 11 owns
+  the Sources view and can settle the wording.
+
+  Resolved by `studio-field-card` on 2026-11-01: the field's source picker prints each source's name, or "(unnamed source)".
+- **SELECTS-7: three more sites still fall back to a field key.** The
+  contract's input and output checkboxes print `f.key ?? f.id`
+  (`ContractPanel.tsx:67`, `:81`). The data source column map's target select
+  prints a key (`FieldCatalogPanel.tsx:1124`). The usage list reads a step key
+  (`draft/field-usage.ts:38`). Change 11 owns the Fields and Settings bodies.
+
+  Resolved by `studio-field-card` on 2026-11-01: the contract's checkboxes print field labels, the column map's target select prints labels, and the Asked on rows read a step's label.
+- **KEYFOLLOW-9: a "Read by" row offers no way to its condition.** The "Used
+  in" rows carry "Show on the map", and a "Read by" row has no control.
+  Risk (Low): an author opens the Steps tab and finds the way out by hand.
+
+  Upgrade entry: change 11 (`studio-field-card`) gives each row a control that
+  opens the section holding the condition.
+
+  Resolved by `studio-field-card` on 2026-11-01: each Read by row with a place carries an "Open" command that lands on the place holding the condition.
+- **KEYFOLLOW-11: at 1024px the field editor scrolls in a short band.** Below
+  64rem the entity rail stacks above the editor. Measured on 2026-11-01 at
+  1024x800, the editor scrolls inside a 225px box. The label and the "Read by"
+  zone then stand about 1,060px apart. Risk (Low): the rewrite line and the
+  conditions it counts never stand on screen together.
+
+  Upgrade entry: changes 10 and 11 own the stacked layout, as `RAIL-7` records
+  for the Steps tab.
+
+  Resolved for the Steps tab by `studio-step-accordion`: below 64rem the step
+  page scrolls with the tab body. The entry RAIL-7 now stands in
+  `docs/decisions-archive.md`. The Fields tab half stays with change 11
+  (`studio-field-card`).
+
+  Resolved by `studio-field-card` on 2026-11-01: below 64rem the Fields tab stacks, and the field card scrolls with the Fields view body.
+- **MAPLABELS-10: the field matrix's row headers print keys alone.** The
+  Catalog view prints labels beside them. This half of the archived "Show on
+  the canvas" entry stays open. Change 11 owns the matrix's words.
+
+  Resolved by `studio-field-card` on 2026-11-01: the matrix's row header prints the field's label and a kind word, and its column header prints the step's label.
+- **FIELDS-25: the effect half prints one step list twice.** "Only ask this
+  when" and "Ask for this" each open with "Writes to:" and the full step list
+  (`panels/FieldCatalogPanel.tsx:1023`, `:1061`). Measured 2026-09-24 at
+  1300x900 on the group "Personal details": each list names all 12 steps and
+  wraps to five lines. Risk (Low): each zone's own control sits below five
+  lines of the same names.
+
+  Resolved by `studio-field-card` on 2026-11-01: both scope notes went; the Asked on rows name the steps.

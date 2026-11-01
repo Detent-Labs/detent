@@ -1270,12 +1270,6 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
 
   Name the fix: separate the two commands, with spacing and a rule between
   them, or move Remove field into the field's own heading row.
-- **FIELDS-25: the effect half prints one step list twice.** "Only ask this
-  when" and "Ask for this" each open with "Writes to:" and the full step list
-  (`panels/FieldCatalogPanel.tsx:1023`, `:1061`). Measured 2026-09-24 at
-  1300x900 on the group "Personal details": each list names all 12 steps and
-  wraps to five lines. Risk (Low): each zone's own control sits below five
-  lines of the same names.
 - **FIELDS-26: a changed option value leaves CEL comparisons on the old
   string.** A change or deletion of an option `value` on a field leaves every
   CEL comparison such as `data.priority == "high"` on the old string. The
@@ -1758,18 +1752,12 @@ this section.
     `:3055`, `:3066` and `:3160`.
   - In the same spec, "Paths tab" stands at `:273`, `:1623` and `:3030`.
 
-- **The Settings tab's inherited bodies still speak the engine's words.** The
-  `/impeccable critique` of `studio-six-tabs` (2026-10-31) found the sub-row
-  in the author's words and three bodies under it in the engine's. Where
-  values come from opens on the heading "Data sources", a mono key, a plugin
-  row with labels beside the controls, and a "Settings (JSON)" text area.
-  What it takes in and gives back opens on "Contract", then `inputFields`
-  and `outputFields` as a wall of checkboxes. Access asks for `user_xxx or
-  group_xxx`. Change 11 (`studio-field-card`) moves the sources into the
-  Fields sub-row. No change in stage 64 owns the contract editor or the
-  access lists. The critique's sketch: one checkbox sentence "Another
-  process can call this one", two fieldsets in the entity-rail row style,
-  outcomes as ruled rows; a picker over users and groups by display name.
+- **The Settings tab's Access view still speaks the engine's words.** The
+  `/impeccable critique` of `studio-six-tabs` (2026-10-31) found Access asking
+  for `user_xxx or group_xxx`. `studio-field-card` moved the sources and the
+  contract into the author's words. No change in stage 64 owns the access
+  lists. The critique's sketch: a picker over users and groups by display
+  name.
 - **Forced colors drop the open mark on every tab strip.** Under
   `forced-colors: active` the sub-row's inset `box-shadow` and the tab
   row's `::after` bar both vanish, and weight 800 stays the only cue. The
@@ -1782,26 +1770,13 @@ The change made the condition builder read as a sentence. It left eleven
 points to later changes. Its critique and audit of 2026-10-31 raised the
 last six. The SENTENCE tag is local to this section.
 
-- **SENTENCE-1: the rule builder keeps its CEL readout and toggle.**
-  `panels/shared/RuleInput.tsx` still prints its "Writes" line and its CEL
-  toggle. The Fields tab then holds two builders that read differently.
-  Change 11 owns the rule builder and brings it to the sentence.
 - **SENTENCE-2: a list clause is not good grammar.** It reads "The person's
   roles contains “manager”". The clause cannot know whether a label is
   plural. Change 16 revisits the phrasing of list clauses.
-- **SENTENCE-4: the rule builder's other-field picker shows labels alone.**
-  The shared `fieldOperand` drops the key, and it adds none of the condition
-  picker's duplicate numbering. Two fields with one label then read the same
-  there. Change 11 can number them, or show the field card's names.
 - **SENTENCE-5: a boolean `!=` row reads "Approved is not yes".** The `ne`
   clause takes the value word "yes" or "no" from the value select. The phrase
   is stiff but exact. A later wording pass can give booleans their own pair
   of clauses.
-- **SENTENCE-6: the divergent "Only ask this when" names no condition.**
-  When the steps disagree, the zone names the steps and nothing else. The
-  Developer view's CEL box stands empty. An author who builds a row then
-  replaces conditions they cannot read. Change 11's field card can list
-  each step's condition as a sentence.
 - **SENTENCE-8: the unparseable notice does not name the fault.** It says
   the condition cannot show as rows and points to the Developer view. The
   parse message itself never shows, and "+ Add row" goes with the rows.
@@ -1822,15 +1797,10 @@ The change named fields on the form editor's cards and stood the editor under
 the tab row. It left seven points to later changes. The NAMES tag is local to
 this section.
 
-- **NAMES-1: the Forms tab's legend says "Section" and the palette says
-  "Group".** The form editor's palette names the kind "Group", as the Fields
-  tab does. The Forms tab's legend still reads "Section" for the same group
-  break. Change 11 owns the wording across the Fields tab and can settle which
-  word wins.
 - **NAMES-2: an unnamed card offers no selection beside its input.** A card
   with an empty label keeps its name input and offers no strip. The input says
-  what to do, and the Fields tab still edits the field. Change 11's field card
-  may answer whether such a card can take a selection.
+  what to do, and the Fields tab still edits the field. This needs its own
+  change.
 - **NAMES-4: a minted key can stay its kind's name.** The key lock counts a
   base version that has not loaded as published, and a failed fetch never
   loads. On such a process, naming a new field "Amount" keeps the key
@@ -1857,30 +1827,21 @@ transliterate umlauts. It left sixteen points to later changes. The final
 review and the design audit raised SELECTS-7 to SELECTS-16. The SELECTS tag is
 local to this section.
 
-- **SELECTS-3: the Fields tab's data source select prints `ds.key ?? ds.id`.**
-  The select shows a key where the step selects show a label. Change 11 owns
-  the Sources view and can settle the wording.
 - **SELECTS-5: the migration plan form keeps its key and label choices.** No
   change is planned. A migration maps instance data by key, so its spec asks
   for both.
 - **SELECTS-6: a key derived before this change stops following its label.**
   A draft keyed `pr_fung` no longer counts as derived. A rename of "Prüfung"
   leaves that key alone. The change accepts this, since nothing is deployed.
-- **SELECTS-7: three more sites still fall back to a field key.** The
-  contract's input and output checkboxes print `f.key ?? f.id`
-  (`ContractPanel.tsx:67`, `:81`). The data source column map's target select
-  prints a key (`FieldCatalogPanel.tsx:1124`). The usage list reads a step key
-  (`draft/field-usage.ts:38`). Change 11 owns the Fields and Settings bodies.
 - **SELECTS-8: three letters still split a derived key.** The letters ı, đ and
   þ have no decomposition, so `transliterate` drops them. A later change extends
   the letter map.
 - **SELECTS-9: the time-limit and mapping rows keep unstyled literal classes.**
   The class names `timer-row` and `mapping-row` have no rule. Their captions
-  stand beside the controls. Change 11 (`studio-field-card`) owns them, since
-  change 10 left the section bodies as they were.
+  stand beside the controls. This needs its own change.
 - **SELECTS-10: CEL inputs stand beside the field-map selects.** They sit
-  outside a Developer view. These are stage 27's low-code sites. Change 11
-  (`studio-field-card`) settles them.
+  outside a Developer view. These are stage 27's low-code sites. This needs
+  its own change.
 - **SELECTS-11: the field border contrast already has an entry.** The audit
   measured 1.33:1 again. The 2026-09-11 design audits section holds the entry,
   "A field's border reads 1.32:1 in light and 1.64:1 in dark".
@@ -1971,33 +1932,14 @@ raised the last four.
   the "Read by" zone, in the other half of the editor. Risk (Low): an author
   must search for what moved.
 
-  Upgrade entry: name up to three places in the line, and tint the rewritten
-  rows in `panels/FieldCatalogPanel.tsx` with the usage tint.
-- **KEYFOLLOW-9: a "Read by" row offers no way to its condition.** The "Used
-  in" rows carry "Show on the map", and a "Read by" row has no control.
-  Risk (Low): an author opens the Steps tab and finds the way out by hand.
-
-  Upgrade entry: change 11 (`studio-field-card`) gives each row a control that
-  opens the section holding the condition.
+  Upgrade entry: name up to three places in the line, and mark the rewritten
+  rows in `panels/FieldCatalogPanel.tsx`.
 - **KEYFOLLOW-10: a condition on a field no step asks for can never match.** The
-  "Read by" zone lists it like any other. Nothing says the field stays empty.
+  "Read by" section lists it like any other. Nothing says the field stays empty.
   Risk (Medium): a way out that waits on such a field never opens.
 
   Upgrade entry: compare `panels/readByRows.ts`'s rows with the "Used in"
   rows and add a sentence when no step asks for the field.
-- **KEYFOLLOW-11: at 1024px the field editor scrolls in a short band.** Below
-  64rem the entity rail stacks above the editor. Measured on 2026-11-01 at
-  1024x800, the editor scrolls inside a 225px box. The label and the "Read by"
-  zone then stand about 1,060px apart. Risk (Low): the rewrite line and the
-  conditions it counts never stand on screen together.
-
-  Upgrade entry: changes 10 and 11 own the stacked layout, as `RAIL-7` records
-  for the Steps tab.
-
-  Resolved for the Steps tab by `studio-step-accordion`: below 64rem the step
-  page scrolls with the tab body. The entry RAIL-7 now stands in
-  `docs/decisions-archive.md`. The Fields tab half stays with change 11
-  (`studio-field-card`).
 
 ## Open from studio-step-accordion (needs its own OpenSpec change)
 
@@ -2030,9 +1972,9 @@ tag is local to this section.
   edge.
 - **ACCORDION-8: the Who acts body is the inline form of
   `PluginEnvelopeEditor`.** It prints schema-key labels, "Edit as JSON" and a
-  "Settings (JSON)" box outside a Developer view. Change 11 or a follow-up of
-  its own takes it. Risk (Medium): an author meets machine words where the
-  guided vocabulary promises plain ones.
+  "Settings (JSON)" box outside a Developer view. This needs its own change.
+  Risk (Medium): an author meets machine words where the guided vocabulary
+  promises plain ones.
 - **ACCORDION-9: a step-level check prints the validator's own text under a
   "ZOD" label.** A just-added step's name check lands on the masthead rather
   than under Name. Focus stays in the steps rail after "Add a step". Change 12
@@ -2106,9 +2048,6 @@ MAPLABELS tag is local to this section.
   stamp.** Each stamp takes half the width. "End: escalated_to_management"
   then wraps over four lines and stands 58 units tall. Risk (Low): the
   stamp can cover a step drawn close above.
-- **MAPLABELS-10: the field matrix's row headers print keys alone.** The
-  Catalog view prints labels beside them. This half of the archived "Show on
-  the canvas" entry stays open. Change 11 owns the matrix's words.
 - **MAPLABELS-11: in a 60-unit gap a sentence can cover an arrowhead or a
   handle.** Arrange leaves 60 units between columns. A straight way out across
   that gap leaves no box that clears both the source's handle and the
@@ -2196,6 +2135,202 @@ HEADER tag is local to this section.
   Upgrade entry: hold the session's last publish above the process surface, so
   a remount still reads it. The Developer view is in
   `panels/ProcessSettingsPanel.tsx`.
+
+## Open from studio-field-card (needs its own OpenSpec change)
+
+The change drew the selected field as one card in sections. It left thirty
+points to later changes. The FIELDCARD tag is local to this section.
+
+On 2026-11-01 the critique scored the card 25/40 (Acceptable) and the audit
+15/20 (Good). The CSP blocked the overlay again. FIELDCARD-13 to FIELDCARD-27
+come from those two reports.
+
+- **FIELDCARD-1: a choice rename moves no guard literal that compares the old
+  value.** The stored value follows the name until the first publish. The
+  rewrite covers the field's own `default` and nothing else. A guard such as
+  `data.status == "open"` keeps the old literal. Risk (Medium): a rename
+  before the first publish leaves a guard that never matches.
+
+  Upgrade entry: rewrite the literals too, through the traversal that
+  `removeFieldAndReferences` uses.
+- **FIELDCARD-2: a Read by "Open" on a form-flag condition stops one press
+  short.** It lands on the form editor. The flag's CEL stands in the strip's
+  Developer view, one press further. Risk (Low): an author opens the field's
+  Developer view by hand.
+
+  Upgrade entry: pass the entry's id with the target and open the strip's
+  Developer view on arrival.
+- **FIELDCARD-3: the form editor has no `fields` origin.** After a Read by
+  "Open" on a form flag, leaving the editor returns to Steps. Risk (Low): the
+  author walks back to the Fields tab.
+
+  Upgrade entry: add `fields` to the form editor's origin tabs, as NAMES-7
+  asks.
+- **FIELDCARD-4: after a Read by "Open" on another field's rule, More opens
+  and nothing scrolls it into view.** Risk (Low): the opened fold can stand
+  below the visible band.
+
+  Upgrade entry: scroll the More summary into view in the effect that opens
+  it.
+- **FIELDCARD-5: "+ Add field" stands after the card, outside it.** Risk
+  (Low): the control belongs to no card section.
+
+  Upgrade entry: move the control into the card or into the entity rail.
+- **FIELDCARD-6: the Fields view body is one padded scroll box around all
+  three views.** Risk (Low): a view no longer owns the scroll box around its
+  own content.
+
+  Upgrade entry: give each view its own scroll box in `FieldsTabViews.tsx`.
+- **FIELDCARD-7: More's summary holds an `h4`.** A screen reader may announce
+  the heading and the disclosure as two things. The phrasing is unverified.
+  Risk (Low): an unclear name for the fold.
+
+  Upgrade entry: run a screen reader pass, and drop the heading if it reads
+  twice.
+- **FIELDCARD-8: the card's tests pin several behaviours by source text.**
+  They match strings in `FieldCatalogPanel.tsx` instead of driving the
+  rendered card. The matrix badge test reads a slice of the grid's source too.
+  The `openPlace` dispatch in `EditScreen.tsx` had no test at all. The pure
+  `placeAction` now covers its three outside kinds. The `field` kind stays an
+  effect the tests pin at the source. Risk (Medium): a rename or a refactor
+  breaks them with no behaviour change.
+
+  Upgrade entry: render the card in a test and assert on the output.
+- **FIELDCARD-9: `FieldCatalogPanel.tsx` is about 1,520 lines.** The card,
+  its sections and the rail logic share one file. Risk (Low): every card
+  change reviews against the whole file.
+
+  Upgrade entry: split the sections into `panels/fieldCard/`, one file per
+  card section.
+- **FIELDCARD-10: a hand-set choice value under an empty name follows the next
+  name.** An empty value counts as derived. Risk (Low): an author who types a
+  value first, then a name, loses the typed value.
+
+  Upgrade entry: mark a hand-set value apart from an empty one.
+- **FIELDCARD-11: the badge grid no longer shares a pixel edge with the
+  checkbox columns.** The word badges are wider and size to their words. Only the slot order aligns.
+  Risk (Low): a badge stands off the checkbox column it toggles.
+
+  Upgrade entry: size the matrix columns to the widest badge.
+- **FIELDCARD-12: `DefaultValueEditor`'s forced-open details can drift from
+  its state.** The details element opens while the default is an expression.
+  Its own state catches up at the next prop change. Risk (Low): the fold shows
+  open or closed against what the author last chose.
+
+  Upgrade entry: hold the open state in the editor and derive the forced case.
+- **FIELDCARD-13: the envelope editor on Where values come from renders
+  unstyled.** The class `.plugin-envelope` of `PluginEnvelopeEditor` has no
+  rule. Its labels sit inline, and its JSON area stands 66px tall in the body
+  face. The audit rated it P1, and it predates this change. Risk (Medium): an
+  author meets a raw form inside the guided view.
+
+  Upgrade entry: give `panels/shared/PluginEnvelopeEditor.tsx` compiled
+  styles, with the label above the control.
+- **FIELDCARD-14: the authoring commands and a choice's Remove stand 33px
+  tall.** The 44px target size is out of reach. WCAG 2.5.8 passes, and the
+  studio is a desktop tool. Risk (Low): a touch press misses the command.
+
+  Upgrade entry: raise the block padding of the card's `command` style.
+- **FIELDCARD-15: the matrix checkboxes are 13px.** Risk (Low): a pointer
+  press misses the box.
+
+  Upgrade entry: size the cell checkbox in `panels/FieldMatrixGrid.tsx` to
+  1rem, inside its 1.75rem track.
+- **FIELDCARD-16: a mixed badge differs from an off badge by color alone.**
+  The "Already on" count stands only in the accessible name. Risk (Medium): an
+  author who cannot tell the colors apart reads a mixed column as off.
+
+  Upgrade entry: print a mark or the count on the mixed badge in
+  `panels/FieldMatrixGrid.tsx`.
+- **FIELDCARD-17: repeated commands lack row context in their names.**
+  "Open the form", "Show on the map" and "Open" repeat on every row. A matrix
+  column header's accessible name runs to about 250 characters. Risk (Medium):
+  a screen reader lists identical commands, and a long name per header.
+
+  Upgrade entry: add the row's step or place to each command's `aria-label`.
+  Move the header's bulk sentences into `aria-describedby`.
+- **FIELDCARD-18: a blank matrix cell has no accessible name.** Its dash is
+  `aria-hidden`. Risk (Low): a screen reader announces an empty cell.
+
+  Upgrade entry: name the cell with a catalog sentence that says the form
+  lacks the field.
+- **FIELDCARD-19: at 420x800 the view body gets 394px.** The header bar, the
+  tab row and the sub-row take the rest. Risk (Low): a narrow window shows a
+  small part of the card at once.
+
+  Upgrade entry: let the sub-row scroll with the view body below 30rem.
+- **FIELDCARD-20: no `h2` stands between the header bar's `h1` and the card's
+  `h3`.** Risk (Low): a screen reader's heading list skips a level.
+
+  Upgrade entry: give each tab body an `h2`, visually hidden where the tab row
+  already names it.
+- **FIELDCARD-21: the sub-row scrolls sideways at 420px with no edge fade.**
+  Each of its tabs takes `tabIndex` 0, with no roving tabindex. Risk (Low): an
+  author misses a view past the edge, and Tab stops on every view.
+
+  Upgrade entry: reuse the tab row's edge fade and roving tabindex in
+  `panels/SubRow.tsx`.
+- **FIELDCARD-22: the Kind picker lists 17 flat options.** It mixes value and
+  control in one list. The entry "custom (plugin)" stands outside a Developer
+  view. Risk (Medium): an author scans a long list of near twins.
+
+  Upgrade entry: group the options by value with `<optgroup>`, and move the
+  custom entry into a Developer view.
+- **FIELDCARD-23: the Validation editor inside More prints raw keys.** It
+  reads min, max, rule and a "(2)" summary. The Default value input carries
+  the caption "value". `studio-field-validation-form` and the default editor
+  keep their own words for now. Risk (Medium): machine words stand inside the
+  guided card.
+
+  Upgrade entry: a later change rewords
+  `panels/shared/FieldValidationEditor.tsx` and the default editor's caption.
+- **FIELDCARD-24: the "base locale" chip beside Name is a machine chip.** It
+  shows on a process with one locale too. Risk (Low): an author reads a
+  machine word that says nothing.
+
+  Upgrade entry: hide the chip while the process has one locale.
+- **FIELDCARD-25: the Remove field dialog prints counts, not names.** It says
+  "CEL expressions reading it". Change 13 owns the dialogs. Risk (Medium): an
+  author removes a field without seeing what reads it.
+
+  Upgrade entry: change 13's dialog work.
+- **FIELDCARD-26: a Read by row prints "A hand-written rule." for a guard the
+  builder cannot read.** An example is
+  `data.quantity * data.unit_price >= 10000.0`. Risk (Low): the row names its
+  place and says nothing about the rule.
+
+  Upgrade entry: change 16's expansion of the sentence reader.
+- **FIELDCARD-27: both entity rails carry the accessible name "Editors".** The
+  Catalog view's rail and the Where values come from view's rail share it.
+  Risk (Low): a screen reader user cannot tell the two apart.
+
+  Upgrade entry: name each rail after its view in `panels/EntityTabs.tsx`.
+- **FIELDCARD-28: removing a choice leaves a default naming its value.** A
+  hand edit of a stored value and a name-driven move carry the default along.
+  The removal in `removeChoice` leaves it. Risk (Low): the default names a
+  choice the field no longer offers.
+
+  Upgrade entry: clear the matching default in `FieldCatalogPanel.tsx`'s
+  `removeChoice`, in the same mutation.
+- **FIELDCARD-29: two seams lack a test of their own.** The provider path of
+  `usePublishedOptionValues` for a version mismatch has no test. The export
+  `DataSourceRow` exists for its test alone. Risk (Low): a regression in the
+  mismatch path stays unseen.
+
+  Upgrade entry: test the mismatch in `draft/publishedFields.tsx`, and test
+  `DataSourceRow` through `DataSourcesPanel`.
+- **FIELDCARD-30: More's heading takes the refusal tone for three checks
+  only.** A default, validation or mapping check turns it. A key or technical
+  check prints outside More, per D5. Risk (Low): an open More reads clean while
+  its key input holds a check.
+
+  Upgrade entry: decide in a later change whether those two checks turn the
+  heading too.
+- **The live specs still say "definition half".** Untouched `studio-app`
+  requirements, such as the removal dialog's and the move requirement's
+  scenarios, name the retired halves of the field editor. The sync of
+  `studio-field-card` rewrites only the requirements its delta names. A spec
+  sweep wants its own OpenSpec change.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

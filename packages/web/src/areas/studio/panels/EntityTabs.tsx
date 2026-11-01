@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import type { DataSourceDef } from "workflow-engine/schema";
@@ -29,6 +29,7 @@ import { flattenRailFields, issueCountForEntityId } from "../draft/panel-rail";
 import { moveFieldAndSyncViews } from "../draft/view-group-sync";
 import { fieldRemovalReach, hasReach, removeFieldAndReferences, type FieldRemovalReach } from "../draft/field-removal";
 import { FieldCatalogPanel } from "./FieldCatalogPanel";
+import type { OutsidePlace, ReadByTarget } from "./readByRows";
 import {
   dataSourceRemovalReach,
   hasDataSourceReach,
@@ -49,29 +50,35 @@ import {
 type DraftDataSource = DraftOf<DataSourceDef>;
 
 /** Below this width the rail and the open editor no longer fit beside one
- * another. The rail holds its 20rem, and `FieldCatalogPanel` stacks its own
- * two halves at the same width, so the whole tab turns at once. */
+ * another. The rail holds its 20rem cap above the editor, and the view body
+ * scrolls both (design.md D13), as the step page's tab body does. */
 const NARROW = "@media (max-width: 64rem)";
 
 const styles = stylex.create({
   // Below the breakpoint the rail and the editor fall under one another, in
-  // source order: list, then the editor.
+  // source order: list, then the editor. The grid then neither grows nor
+  // shrinks: a zero flex basis would pin it to the view's height, so it
+  // takes its content's height instead, as the Steps tab's grid does
+  // (`EditScreen.tsx`'s `stepsTab`). The view body around it scrolls, so the
+  // tab holds two scroll boxes, the rail and the view body, and no third.
   layout: {
     display: "grid",
-    flex: "1 1 0",
+    flex: { default: "1 1 0", [NARROW]: "0 0 auto" },
     gridTemplateColumns: { default: "20rem minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
-    gridTemplateRows: { default: "none", [NARROW]: "auto minmax(0, 1fr)" },
+    gridTemplateRows: { default: "none", [NARROW]: "auto auto" },
     gap: space.s3,
     alignItems: "stretch",
     minHeight: 0,
-    height: "100%",
-    overflow: "hidden",
+    height: { default: "100%", [NARROW]: "auto" },
+    overflow: { default: "hidden", [NARROW]: "visible" },
   },
   layoutChild: {
     minHeight: 0,
   },
+  // Below the breakpoint the editor has no scroll box of its own; the view
+  // body scrolls it. Its padding stays, so a ring keeps its room.
   editor: {
-    overflowY: "auto",
+    overflowY: { default: "auto", [NARROW]: "visible" },
     overscrollBehavior: "contain",
     minWidth: 0,
     // Room for the focus ring: a scroll box clips at its padding edge
@@ -252,7 +259,7 @@ interface PanelsRailFieldRowProps {
 /**
  * A Fields rail row: the kind icon, the resolved label, and the issue mark,
  * in one button. The row prints no `key` and no visible kind word; the key
- * stays in the definition half once an author selects that field. The kind
+ * stays in the card's Developer view once an author selects that field. The kind
  * name is the icon's tooltip, and it stays in the button's accessible name
  * as hidden text (design.md, decision: "The kind name stays inside the
  * button, visually hidden"). A nested entry's button also names the group
@@ -355,6 +362,7 @@ export function FieldsTab({
   visible,
   onShowStep,
   onOpenForm,
+  onOpenPlace,
 }: {
   token: string;
   /** False while the Fields tab hides. Every tab body stays mounted and five
@@ -362,9 +370,12 @@ export function FieldsTab({
    * open. A hide declines that removal. */
   visible: boolean;
   onShowStep: (stepId: string) => void;
-  /** Opens the form editor for one step: the field catalog's empty-state
-   * route. */
+  /** Opens the form editor for one step: an Asked on row's "Open the form"
+   * and the empty state's route. */
   onOpenForm: (stepId: string) => void;
+  /** A Read by row's "Open" for a place outside this tab: a way out, a step
+   * or a form (design.md D4). The tab handles a field's own place itself. */
+  onOpenPlace: (target: OutsidePlace) => void;
 }) {
   const { draft, mutate, validation, contentLocale } = useDraft();
 
@@ -373,6 +384,22 @@ export function FieldsTab({
   const baseLocale = draft.baseLocale ?? "en";
 
   const [selectedFieldIdState, setSelectedFieldId] = useState<string | undefined>(undefined);
+  // The field whose card opens More by itself: a Read by row named that
+  // field's rule or default. The card clears it once More stands open, so a
+  // later manual close holds.
+  const [openMoreFor, setOpenMoreFor] = useState<string | undefined>(undefined);
+  const clearOpenMore = useCallback(() => setOpenMoreFor(undefined), []);
+
+  /** A Read by row's "Open". A field's rule or default selects that field and
+   * opens its More; every other place leaves the tab. */
+  const openPlace = (target: ReadByTarget) => {
+    if (target.kind === "field") {
+      setSelectedFieldId(target.fieldId);
+      setOpenMoreFor(target.fieldId);
+      return;
+    }
+    onOpenPlace(target);
+  };
 
   // `dragFieldId` is the row a pointer picked up. `announcement` is what the
   // live region below reads out after a move or a removal. `refocusId` names
@@ -603,8 +630,8 @@ export function FieldsTab({
             const rowIssues = issueCountForEntityId(validation.issues, row.id);
             const field = fieldsById.get(row.id);
             const label = field ? resolveDraftLocalizedText(field.label, contentLocale, baseLocale) : undefined;
-            // The kind, not the base type: the same word the definition half's
-            // kind picker shows for this field.
+            // The kind, not the base type: the same word the card's kind
+            // picker shows for this field.
             const typeLabel = field ? fieldKindWord(field) : undefined;
             const kindIcon = field ? fieldKindIcon(field) : undefined;
             // The field that holds this one, at any depth. A field past the
@@ -654,7 +681,10 @@ export function FieldsTab({
           onRemove={requestRemove}
           onShowStep={onShowStep}
           onOpenForm={onOpenForm}
+          onOpenPlace={openPlace}
           onMoveField={moveField}
+          openMoreFor={openMoreFor}
+          onMoreOpened={clearOpenMore}
         />
       </div>
       {/* Outside the keyed `FieldEditor`, which a confirm remounts. A modal
@@ -692,7 +722,7 @@ interface DataSourceRemoval {
 }
 
 /**
- * The Settings tab's Where values come from view: the declared sources' own entity rail beside the open
+ * The Fields tab's Where values come from view: the declared sources' own entity rail beside the open
  * source's editor. A data source nests under nothing, so no entry carries a
  * move control.
  */
@@ -701,7 +731,7 @@ export function DataSourcesTab({
   visible,
 }: {
   token: string;
-  /** False while the Settings tab's Where values come from view hides. Every
+  /** False while the Fields tab's Where values come from view hides. Every
    * tab body and view stays mounted, so a browser Back can hide this view
    * while its removal dialog stands open. A hide declines that removal, the
    * way `FieldsTab` does. */

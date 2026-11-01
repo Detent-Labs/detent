@@ -593,3 +593,18 @@ export function removalAnnouncement(label: string, fieldsInside: number): string
     .replace("{count}", () => String(fieldsInside))
     .replace("{field}", () => label);
 }
+
+/** The controls that offer a participant a list to pick from. */
+const PICKER_CONTROLS: ReadonlySet<string> = new Set(["select", "radio", "checkboxes"]);
+
+/**
+ * Whether the field card draws its Choices section (design.md D1). It does
+ * for a picker control, for a `string` or `list` field with no `format`, and
+ * for any field already carrying `options` or a `dataSource`. A date, an
+ * email or a person field with neither draws none, and neither does a group.
+ */
+export function showsChoices(field: Pick<DraftField, "type" | "format" | "control" | "options" | "dataSource">): boolean {
+  if (field.control !== undefined && PICKER_CONTROLS.has(field.control)) return true;
+  if ((field.options?.length ?? 0) > 0 || field.dataSource !== undefined) return true;
+  return (field.type === "string" || field.type === "list") && field.format === undefined;
+}

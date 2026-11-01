@@ -15,12 +15,14 @@ one therefore stay one artifact.
 
 ## Requirements
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: the heading repeats the live spec's wording, which a MODIFIED block must match. -->
 ### Requirement: The builder is the default surface at every condition site
 
 The studio SHALL offer a row builder as the default editor for a path guard.
 It SHALL offer the same builder for `visible`, `required` and `readonly`,
-wherever the studio edits one. That includes the field catalog's
-"Only ask this when" row, which sits in the Fields view's effect half. That
+wherever the studio edits one. That includes the field card's
+"Only ask this when" row, which sits in its Asked on section. That
 row edits a field's `visible` override across every step view that references
 the field.
 
@@ -49,8 +51,8 @@ A timer deadline is not a condition and keeps its text input.
 
 #### Scenario: The field catalog's condition row opens on the builder
 
-- **WHEN** a developer opens "Only ask this when" in the field catalog's
-  effect half
+- **WHEN** a developer opens "Only ask this when" in the field card's
+  Asked on section
 - **THEN** the same row builder appears, editing the `visible` override the
   row writes to every referencing step view
 
@@ -710,6 +712,43 @@ override. It SHALL show the CEL text input with no second disclosure.
   picks CEL
 - **THEN** the builder, the sentence and the CEL text input appear, with no
   second "Developer view" disclosure
+
+### Requirement: A default value's expression stands in a Developer view
+
+A field's Default value SHALL hold its CEL input in a closed "Developer
+view" disclosure under the literal input. No "Edit as CEL" control SHALL
+print. While the default is an expression, the note "A rule computes this
+default." SHALL replace the literal input. The disclosure SHALL stand open
+then. Clearing the CEL text SHALL drop the `default` key and bring
+the literal input back.
+
+#### Scenario: A literal default keeps the disclosure closed
+
+- **WHEN** a `number` field carries `default: 100`
+- **THEN** the value input reads 100 and a closed Developer view stands
+  under it
+
+#### Scenario: An expression default opens the disclosure
+
+- **WHEN** a field carries `default: { lang: "cel", src: "data.a * 2.0" }`
+- **THEN** the note "A rule computes this default." stands where the value
+  input would
+- **AND** the Developer view stands open with that source
+
+#### Scenario: The value picker prints choice names
+
+- **WHEN** a field carries the choices `open` and `closed`, named Open and
+  Closed, and one choice with no name
+- **THEN** the Default value picker offers "Open", "Closed" and "(unnamed
+  choice)"
+- **AND** no option prints `open` or `closed` as its text
+
+#### Scenario: Clearing the expression restores the value input
+
+- **WHEN** an author empties the Developer view's CEL input
+- **THEN** the draft's field has no `default` key
+- **AND** the value input returns
+
 
 ### Requirement: A field rename rewrites CEL source through the parsed tree
 
