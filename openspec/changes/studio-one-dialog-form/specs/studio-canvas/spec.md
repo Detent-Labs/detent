@@ -13,7 +13,7 @@ The canvas bar's Remove step and Remove steps SHALL open the studio's dialog for
 - **WHEN** an author presses Remove step in the canvas bar with one step selected
 - **THEN** a dialog reads "Remove “Review”?" and the draft still holds the step
 
-#### Scenario: Several selected steps are named
+#### Scenario: The dialog names several selected steps
 
 - **WHEN** an author presses Remove steps with three steps selected
 - **THEN** a dialog reads "Remove 3 steps?" and names each one

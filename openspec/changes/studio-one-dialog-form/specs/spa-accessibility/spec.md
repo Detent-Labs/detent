@@ -6,6 +6,8 @@
 
 Tab and Shift+Tab SHALL move the focus among a modal dialog's own controls and wrap at both ends. The focus SHALL NOT reach the document body or the page behind. A click on the dialog's text can leave the focus outside its controls. The next Tab SHALL then land on one of them. A control inside a closed Developer view SHALL NOT be a tab position.
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: Cancel is a control's label; a tab stop is a focus position. -->
 #### Scenario: Tab from Cancel wraps
 
 - **WHEN** a dialog opens with Cancel focused, as its last control, and the author presses Tab

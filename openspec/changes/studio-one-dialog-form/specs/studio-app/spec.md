@@ -72,9 +72,9 @@ A dialog SHALL close with its confirming control, where it has one, and then Can
 
 ### Requirement: A long dialog keeps its controls in view
 
-A dialog SHALL stay inside the viewport with a gutter at every width. A body longer than the dialog SHALL scroll inside it, and the controls SHALL stay in view from the moment it opens. The heading SHALL stand in view when the dialog opens, by keyboard or by pointer. A refusal SHALL scroll into view when it appears.
+A dialog SHALL stay inside the viewport with a gutter at every width. A body longer than the dialog SHALL scroll inside it. The controls SHALL stay in view from the moment it opens. The heading SHALL stand in view when the dialog opens, by keyboard or by pointer. A refusal SHALL scroll into view when it appears.
 
-A list of more than eight names SHALL print its first five and fold the rest behind a disclosure that says how many it holds.
+A list of more than eight names SHALL print its first five. A disclosure SHALL fold the rest and say how many it holds.
 
 #### Scenario: A narrow viewport keeps a gutter
 
@@ -113,6 +113,8 @@ A confirmation's heading SHALL name the act, and its confirming control SHALL na
 - **WHEN** an author with unsaved changes chooses "Restore unsaved changes"
 - **THEN** a dialog reads "Replace your current changes?" with the control "Replace them"
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: an option is a field's choice; a setting here is a dialog's own word for what a kind or the Technical marker clears. -->
 #### Scenario: A kind change that drops a setting
 
 - **WHEN** an author changes the field "Due date" from the kind Date to the kind Number
@@ -140,7 +142,7 @@ A confirmation's heading SHALL name the act, and its confirming control SHALL na
 
 ### Requirement: Discarding from the process list takes the discard dialog
 
-A row's Discard draft SHALL open the same dialog as the header bar's entry. A refused discard SHALL render its reason inside the open dialog. A declined dialog SHALL return the focus to the row's control. After a confirmed discard, the focus SHALL stand on the row's name link, or on Import when the row has left.
+A row's Discard draft SHALL open the same dialog as the header bar's entry. A refused discard SHALL render its reason inside the open dialog. A declined dialog SHALL return the focus to the row's control. After a confirmed discard, the focus SHALL stand on the row's name link. It SHALL stand on Import when the row has left.
 
 #### Scenario: A refused discard stays in the dialog
 
@@ -157,7 +159,7 @@ A row's Discard draft SHALL open the same dialog as the header bar's entry. A re
 
 The heading SHALL name the removed field by its label, and say so for a group. The facts SHALL name, in the author's words, each place the removal reaches, one row per kind. A kind it does not carry SHALL print no row. No key, id or CEL source SHALL print, except a data source's name in the settings row, its only name.
 
-The kinds are the fields inside it, the steps asking for it, what writes it, the process's inputs and outputs, the fields filling it in, what reads it and the settings naming it.
+The first kinds are the fields inside it, the steps asking for it and what writes it. The process's inputs and outputs follow. The last kinds are the fields filling it in, what reads it and the settings naming it.
 
 #### Scenario: A group names the fields inside it and its steps
 
@@ -177,7 +179,7 @@ The kinds are the fields inside it, the steps asking for it, what writes it, the
 - **THEN** the "Read by" row prints "On Review: way out Approve → Book"
 - **AND** the dialog prints no CEL
 
-#### Scenario: A kept reference is said to stay
+#### Scenario: A note says a kept reference stays
 
 - **WHEN** something the removal keeps reads the field or names it in a setting
 - **THEN** a note says it stays as written and asks the author to check it before publishing

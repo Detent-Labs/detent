@@ -2378,12 +2378,13 @@ path joins, and an arrange moves both.
 
 ### Requirement: Arrange confirms before discarding a hand-placed layout
 
-Arrange SHALL ask the author to confirm before it runs. This holds
+Arrange SHALL ask the author to confirm before it runs, in the studio's
+dialog form. This holds
 whenever the draft carries at least one step with an explicit stored
 position, or at least one waypoint. A draft with neither SHALL arrange
-with no confirmation, since nothing hand-placed is at risk. Whenever
-the draft carries at least one waypoint, the confirmation text SHALL
-name waypoints among what the arrange will clear.
+with no confirmation, since nothing hand-placed is at risk. The
+confirmation text SHALL say that each path loses the bends placed on it, the
+author's word for a waypoint.
 
 #### Scenario: A brand-new canvas arranges without a confirmation
 
@@ -2416,8 +2417,22 @@ name waypoints among what the arrange will clear.
 
 - **WHEN** the draft carries at least one waypoint and an author
   activates Arrange
-- **THEN** the confirmation text names waypoints among what the arrange
-  will clear
+- **THEN** the confirmation text says each path loses the bends placed on it
+
+### Requirement: Removing steps from the canvas confirms first
+
+The canvas bar's Remove step and Remove steps SHALL open the studio's dialog form before the removal. One selected step SHALL take the dialog the step page's Remove this step opens. Several SHALL take a dialog that names each step. A decline SHALL leave the draft untouched and return the focus to the pressed control.
+
+#### Scenario: One selected step asks first
+
+- **WHEN** an author presses Remove step in the canvas bar with one step selected
+- **THEN** a dialog reads "Remove “Review”?" and the draft still holds the step
+
+#### Scenario: The dialog names several selected steps
+
+- **WHEN** an author presses Remove steps with three steps selected
+- **THEN** a dialog reads "Remove 3 steps?" and names each one
+- **AND** declining leaves all three in the draft
 
 ### Requirement: The canvas holds a set of selected steps
 

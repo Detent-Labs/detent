@@ -89,16 +89,8 @@ When the draft carries no unsaved change, a control SHALL navigate exactly
 as it does today, with no prompt.
 
 When the draft carries an unsaved change, a control SHALL ask for
-confirmation before navigating. This uses the browser's own `confirm()`
-prompt with a `t()` string.
-
-<!-- antislop: allow synonym-rotation -->
-<!-- Discard names the toolbar control; remove names a field removal. -->
-The header bar's Publish and Discard draft controls no longer share that pattern.
-Each confirms in a dialog of the application's own instead. Each commits an
-act the developer cannot undo. See `studio-publish` for the publish dialog,
-and the requirement below for the other one. A navigation prompt guards no
-commit, so it keeps the native prompt.
+confirmation before navigating. The question stands in the studio's dialog
+form.
 
 Confirming SHALL proceed with the navigation; the navigation drops the
 unsaved edits, exactly as an explicit Discard already drops them. Canceling
@@ -106,7 +98,7 @@ SHALL leave the developer on the edit screen with the draft untouched.
 
 While the draft has an unsaved change, closing the tab or reloading SHALL raise
 the browser's own leave prompt. A `401` answer is not a navigation control. It
-SHALL end the session with no `confirm()` and no leave prompt.
+SHALL end the session with no dialog and no leave prompt.
 
 This requirement covers the in-app controls named above, tab close and reload.
 A Back or Forward step between entries of this page is out of scope.
@@ -202,7 +194,7 @@ SHALL NOT count as different.
 
 - **WHEN** the developer moves a step, chooses Discard draft and confirms the
   dialog
-- **THEN** the screen navigates to the process list with no native prompt
+- **THEN** the screen navigates to the process list and no leave dialog opens
 
 ### Requirement: A save keeps a layout change made while it runs
 
@@ -243,6 +235,8 @@ session requirement states, even when the write fails.
 - **WHEN** a request from a draft with no unsaved change answers 401
 - **THEN** the studio writes nothing to storage
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: stop is a verb here; Cancel elsewhere in this file names a control. -->
 #### Scenario: A failed write does not stop the logout
 
 - **WHEN** the unsaved draft is too large for the storage quota and a save
@@ -335,10 +329,10 @@ Here the confirming control destroys the draft, and the studio carries no undo.
 So the declining control SHALL hold the initial focus, and the destructive one
 SHALL NOT. Document order alone puts the destructive control first.
 
-The dialog SHALL state the process and the draft revision it will drop. It
-SHALL state that the published versions stay. It SHALL state that only the
-unpublished draft goes. That last sentence is the one fact a developer
-needs. The native prompt could not carry it beside the facts above.
+The dialog SHALL state the process it will drop the draft of. It SHALL print
+no revision. It SHALL state that the published versions stay. It SHALL state
+that only the unpublished draft goes. That last sentence is the one fact a
+developer needs.
 
 <!-- antislop: allow synonym-rotation -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
@@ -349,7 +343,7 @@ The publish dialog reports a refusal the same way.
 #### Scenario: Discarding confirms with the facts first
 
 - **WHEN** the developer chooses Discard on an open draft
-- **THEN** a modal dialog opens naming the process and the draft revision
+- **THEN** a modal dialog opens naming the process, with no revision
 - **AND** it states that the published versions stay
 <!-- antislop: allow passive-voice -->
 <!-- Fixed Gherkin THEN/AND grammar; the clause is structurally passive. -->
@@ -384,6 +378,157 @@ The publish dialog reports a refusal the same way.
 - **WHEN** the developer closes the discard dialog by any route that keeps the draft
 - **THEN** focus stands on the `⋮` trigger
 - **AND** focus does not drop to the document body
+
+### Requirement: One dialog form serves every studio confirmation
+
+Every question the studio asks before an act SHALL stand in its one dialog form. No module of the studio area SHALL call the browser's `confirm()` prompt. Only the browser's own leave prompt on a tab close or a reload stays native. Every `dialog` element in the studio area SHALL render through that one form.
+
+The control `Remove this way out` stays dialog-free.
+
+#### Scenario: No native prompt remains in the studio
+
+- **WHEN** a test scans every source file of the studio area, comments aside
+- **THEN** no file calls `confirm(`
+- **AND** only the one dialog component writes a `dialog` element or calls `showModal`
+
+#### Scenario: A former prompt takes the dialog form
+
+- **WHEN** an author presses Arrange on a draft with a hand-placed step
+- **THEN** a modal dialog of the studio's own opens
+- **AND** no browser prompt appears
+
+#### Scenario: Removing a way out asks nothing
+
+- **WHEN** an author presses Remove this way out
+- **THEN** the way out leaves the draft
+- **AND** no dialog opens
+
+### Requirement: A dialog reads as one form
+
+A dialog SHALL read top to bottom: a heading, its facts, its notes, then its controls. The heading SHALL print an author's label in the capitals the author typed. A confirmation's heading SHALL be a question.
+
+A fact SHALL pair a term and a value on one baseline. A count SHALL print in mono. A value SHALL print no key, id or hash outside a closed Developer view. A data source's name and a template with no label print their key, since each has no other name.
+
+#### Scenario: A heading keeps the author's capitals
+
+- **WHEN** the removal dialog opens for the step "Prüfung by Finance"
+- **THEN** the heading reads "Remove “Prüfung by Finance”?" in those capitals
+
+#### Scenario: A count prints in mono
+
+- **WHEN** the removal dialog for a step counts two ways out leading here
+- **THEN** the figure 2 prints in the mono face
+- **AND** its term and the figure share a baseline
+
+#### Scenario: A choice is the one heading that is no question
+
+- **WHEN** the start picker opens
+- **THEN** its heading reads "Start a new process"
+
+### Requirement: A dialog's controls keep one order and one look
+
+A dialog SHALL close with its confirming control, where it has one, and then Cancel. Cancel SHALL take the secondary button, in ink. A destructive confirm SHALL stay outlined in the accent. Publish and an import's Publish here SHALL stay the one filled primary action. Cancel SHALL hold the opening focus unless the dialog commits nothing, as the start picker does.
+
+#### Scenario: Cancel takes no accent
+
+- **WHEN** the removal dialog opens
+- **THEN** Cancel prints in ink inside a divider border
+- **AND** the confirming control stands before it, outlined in the accent
+
+#### Scenario: Enter on an opening dialog declines
+
+- **WHEN** any dialog that commits an act opens and the author presses Enter
+- **THEN** the dialog closes and the act does not run
+
+#### Scenario: The start picker opens on its first choice
+
+- **WHEN** the start picker opens
+- **THEN** "Empty process" holds the focus
+
+### Requirement: A long dialog keeps its controls in view
+
+A dialog SHALL stay inside the viewport with a gutter at every width. A body longer than the dialog SHALL scroll inside it. The controls SHALL stay in view from the moment it opens. The heading SHALL stand in view when the dialog opens, by keyboard or by pointer. A refusal SHALL scroll into view when it appears.
+
+A list of more than eight names SHALL print its first five. A disclosure SHALL fold the rest and say how many it holds.
+
+#### Scenario: A narrow viewport keeps a gutter
+
+- **WHEN** a dialog opens at 420px wide
+- **THEN** at least 16px of the page shows on each side of it
+
+#### Scenario: A long list leaves the heading and Cancel on screen
+
+- **WHEN** a dialog whose body is longer than the dialog opens by keyboard at a short viewport
+- **THEN** the heading and Cancel both stand in view on open
+- **AND** the arrow keys scroll the body with Cancel focused
+
+#### Scenario: A long list folds
+
+- **WHEN** the removal dialog for a group names 18 fields inside it
+- **THEN** five names print, with a closed disclosure reading "and 13 more"
+- **AND** opening it prints the other 13
+
+### Requirement: Each confirmation names its act
+
+A confirmation's heading SHALL name the act, and its confirming control SHALL name the same act. Neither SHALL read "OK" or "Continue". A confirmation SHALL use no contract word its author would not meet elsewhere.
+
+#### Scenario: Leaving a draft
+
+- **WHEN** an author with unsaved changes presses the back control
+- **THEN** a dialog reads "Leave this draft?" with the control "Leave without saving"
+- **AND** declining returns the focus to the back control and keeps the changes
+
+#### Scenario: Arrange
+
+- **WHEN** an author presses Arrange on a hand-placed draft
+- **THEN** a dialog reads "Arrange every step?" with the control "Arrange"
+
+#### Scenario: Restoring over newer changes
+
+- **WHEN** an author with unsaved changes chooses "Restore unsaved changes"
+- **THEN** a dialog reads "Replace your current changes?" with the control "Replace them"
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: an option is a field's choice; a setting here is a dialog's own word for what a kind or the Technical marker clears. -->
+#### Scenario: A kind change that drops a setting
+
+- **WHEN** an author changes the field "Due date" from the kind Date to the kind Number
+- **THEN** a dialog reads "Change “Due date” from Date to Number?" with the control "Change kind"
+- **AND** it says the new kind cannot keep how this field checks its value
+- **AND** declining leaves the field and the select on the old kind
+
+#### Scenario: Checking Technical
+
+- **WHEN** an author checks Technical on a field whose entries carry three required or read-only settings
+- **THEN** a dialog reads "Mark “Reference” as technical?" with the control "Mark as technical"
+- **AND** it counts 3 settings it clears
+- **AND** declining leaves the checkbox clear and the draft unchanged
+
+#### Scenario: Deleting a template
+
+- **WHEN** a curator presses Delete on the template "Approval"
+- **THEN** a dialog reads "Delete “Approval”?" with the control "Delete template"
+- **AND** no request goes out until the curator confirms
+
+#### Scenario: Replacing a template
+
+- **WHEN** a curator creates a template over the existing key of "Approval"
+- **THEN** a dialog reads "Replace “Approval”?" with the control "Replace template"
+
+### Requirement: Discarding from the process list takes the discard dialog
+
+A row's Discard draft SHALL open the same dialog as the header bar's entry. A refused discard SHALL render its reason inside the open dialog. A declined dialog SHALL return the focus to the row's control. After a confirmed discard, the focus SHALL stand on the row's name link. It SHALL stand on Import when the row has left.
+
+#### Scenario: A refused discard stays in the dialog
+
+- **WHEN** an author confirms a row's discard and the engine refuses it
+- **THEN** the dialog stays open and prints the reason inside itself
+
+#### Scenario: The focus survives a discard
+
+- **WHEN** an author confirms the discard of a process with a published version
+- **THEN** the row's name link holds the focus
+- **AND** the focus does not stand on the document body
 <!-- antislop: allow sentence-length run-ons passive-voice -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
 
@@ -617,8 +762,8 @@ The native file input SHALL stay hidden.
 #### Scenario: The discard confirmation names the process
 
 - **WHEN** an author discards the draft of the process named "Laptop Pool"
-- **THEN** the confirmation reads "Discard the draft of “Laptop Pool”? You
-  lose its unpublished edits."
+- **THEN** a dialog reads "Discard this draft?" and its Process fact reads
+  "Laptop Pool"
 
 ### Requirement: A new process mints a prefixed id client-side in one write
 
@@ -3379,17 +3524,16 @@ declares no rule for it either.
 dialog and its start-picker dialog), `screens/TemplatesScreen.tsx`, and
 `screens/VersionsScreen.tsx` SHALL render from compiled component
 styles. The rendered result SHALL match the previous stylesheet
-declaration for declaration. The process list's own toolbar and rows are the
-one exception. They follow "The process list shows draft and published state
-per process".
+declaration for declaration. Two exceptions stand. The process list's own
+toolbar and rows follow "The process list shows draft and published state per
+process". Both dialogs follow "A dialog reads as one form".
 
 #### Scenario: The process list and its dialogs keep their look
 
 - **WHEN** a browser renders the process list, then opens its
   promotion-preview dialog and its start-picker dialog
-- **THEN** each one's computed layout, spacing, color and border equal
-  the values the deleted stylesheet declared, including the dialogs'
-  `::backdrop`
+- **THEN** each dialog's layout, spacing, color and border follow "A dialog
+  reads as one form", including its `::backdrop`
 - **AND** the toolbar and the rows follow the process list's own
   requirement instead
 
@@ -3400,19 +3544,15 @@ per process".
 - **THEN** each one's computed layout, spacing, color and border equal
   the values the deleted stylesheet declared
 
-### Requirement: Discarding a draft's confirmation dialog renders from compiled styles
+### Requirement: The dialog form renders from compiled styles
 
-`panels/ProcessHeaderBar.tsx` renders the discard-confirmation dialog,
-per this capability's own "Discarding a draft confirms in a modal
-dialog" requirement. The dialog SHALL render from compiled component
-styles. The header bar around it is a different capability's own
-concern. Only the dialog itself is this requirement's scope.
+The one dialog component SHALL render from compiled component styles. `::backdrop` SHALL stay its one literal rule, matched by the `studio-dialog` class. No dialog SHALL keep its own copy of those styles.
 
-#### Scenario: The discard dialog keeps its look
+#### Scenario: A dialog's backdrop stays literal
 
-- **WHEN** a browser opens the discard-confirmation dialog
-- **THEN** its computed layout, spacing, color and border equal the
-  values the deleted stylesheet declared, including its `::backdrop`
+- **WHEN** a browser opens any studio dialog
+- **THEN** a backdrop of black at 45% stands behind it
+- **AND** the dialog carries the `studio-dialog` class
 
 ### Requirement: The content-locale switcher renders from compiled styles
 
@@ -5212,41 +5352,34 @@ field.
 - **THEN** the draft stays unchanged
 - **AND** Remove field holds the focus again
 
-### Requirement: The removal dialog counts each kind of reach
+### Requirement: The removal dialog names each kind of reach
 
-The dialog's heading SHALL name the removed field by its label. Its facts SHALL
-name the field's key beside the label, when the field carries a key. For a
-group, the heading SHALL say that the removal takes a group.
+The heading SHALL name the removed field by its label, and say so for a group. The facts SHALL name, in the author's words, each place the removal reaches, one row per kind. A kind it does not carry SHALL print no row. No key, id or CEL source SHALL print, except a data source's name in the settings row, its only name.
 
-The facts SHALL state one count per kind of reach the removal carries. The
-kinds are these:
+The first kinds are the fields inside it, the steps asking for it and what writes it. The process's inputs and outputs follow. The last kinds are the fields filling it in, what reads it and the settings naming it.
 
-- the fields inside a removed group, at every depth
-- the steps whose view carries an entry naming a removed field
-- the action outputs and subprocess output mappings that write a removed field
-- the contract list entries naming a removed field
-- the column mapping entries that target a removed field
-- the CEL expressions the removal keeps that read a removed field's key
-- the plugin config values that name a removed field's id
+#### Scenario: A group names the fields inside it and its steps
 
-The facts SHALL state no row for a kind the removal does not carry. The dialog
-SHALL name no step, no expression and no config by itself. The Asked on
-section already lists the steps.
-
-#### Scenario: A group states the fields inside it and its steps
-
-- **WHEN** the author presses Remove field on the group "Processing (Fabrikam)" in
-  the IT Offboarding draft
+- **WHEN** the author presses Remove field on the group "Processing (Fabrikam)" in the IT Offboarding draft
 - **THEN** the dialog's heading says the removal takes a group
-- **AND** its facts state 18 fields inside and 10 steps
+- **AND** its facts hold the 18 fields inside and the 10 steps, by name
 
 #### Scenario: Only the kinds a removal carries appear
 
-- **WHEN** the author presses Remove field on "Booking Status" in the Expense
-  Approval draft
-- **THEN** the facts state 2 steps, 1 writing action output, 1 contract list
-  entry and 2 CEL expressions
-- **AND** the facts lack a column mapping row and a plugin config row
+- **WHEN** the author presses Remove field on "Booking Status" in the Expense Approval draft
+- **THEN** the facts name 2 steps, what writes it, one input or output list and the 2 places reading it
+- **AND** the facts lack a "Filled in from" row and a settings row
+
+#### Scenario: A place that reads the field names its place
+
+- **WHEN** a way out named "Approve" on the step "Review" leads to "Book" and reads the field
+- **THEN** the "Read by" row prints "On Review: way out Approve → Book"
+- **AND** the dialog prints no CEL
+
+#### Scenario: A note says a kept reference stays
+
+- **WHEN** something the removal keeps reads the field or names it in a setting
+- **THEN** a note says it stays as written and asks the author to check it before publishing
 
 ### Requirement: Removing a field clears its view, output, contract and mapping references in one draft change
 
@@ -5471,7 +5604,7 @@ A data source is in use when at least one field names its id in `dataSource`. Re
 
 ### Requirement: The data source removal dialog counts what it clears
 
-The dialog SHALL name the data source by its key. Its facts SHALL state the count of fields that name the source, at every depth. They SHALL state the count of column mapping entries those fields carry. They SHALL print no row for a count of zero. The dialog SHALL name no field.
+The heading SHALL name the data source by its name. Its facts SHALL state the count of fields that name the source, at every depth. They SHALL state the count of column mapping entries those fields carry. They SHALL print no row for a count of zero. The dialog SHALL name no field.
 
 #### Scenario: The facts count fields and mappings
 
