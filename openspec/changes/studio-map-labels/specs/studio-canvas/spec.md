@@ -74,7 +74,8 @@ does.
 A sentence SHALL NOT cover a node, a stamp or another sentence where it can
 avoid them. A narrower width or a place further along its route avoids
 them. The sentence SHALL first narrow and take more lines, then slide along
-its route.
+its route or across it, while its line stays inside its block. Where nothing
+avoids them, it SHALL take the place that covers least.
 
 #### Scenario: A sentence clears the nodes in a tight column gap
 
