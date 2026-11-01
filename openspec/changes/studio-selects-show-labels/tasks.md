@@ -50,15 +50,15 @@
 
 ## 5. Fix wave from the final review and the audit
 
-- [ ] 5.1 Add `stepTextMap` and the two catalog keys to `optionText.ts`, per design D7, with tests.
-- [ ] 5.2 Make `PathsPanel.tsx` and `TimersPanel.tsx` read `stepTextMap`, and drop both map builders.
-- [ ] 5.3 Make `wayOutHeading` print the label alone when it already ends with the target, per D8, with a test.
-- [ ] 5.4 Move the studio select into `panels/shared/StudioSelect.tsx`, and render it in both panels, per D9.
-- [ ] 5.5 Give each field-map row's select, value input and delete control a name, per D10, with a test.
-- [ ] 5.6 Rewrite the "Review (2)" step expectations in the panel tests to the rail-number form.
-- [ ] 5.7 In `docs/decisions.md`, add the final review's and the audit's open points to this change's section.
-- [ ] 5.8 In `docs/browser-checks.md`, change this change's walk to the rail-number form and the named rows.
-- [ ] 5.9 Run typecheck, then the full suite, both in the foreground. Name any failing test.
+- [x] 5.1 Add `stepTextMap` and the two catalog keys to `optionText.ts`, per design D7, with tests.
+- [x] 5.2 Make `PathsPanel.tsx` and `TimersPanel.tsx` read `stepTextMap`, and drop both map builders.
+- [x] 5.3 Make `wayOutHeading` print the label alone when it already ends with the target, per D8, with a test.
+- [x] 5.4 Move the studio select into `panels/shared/StudioSelect.tsx`, and render it in both panels, per D9.
+- [x] 5.5 Give each field-map row's select, value input and delete control a name, per D10, with a test.
+- [x] 5.6 Rewrite the "Review (2)" step expectations in the panel tests to the rail-number form.
+- [x] 5.7 In `docs/decisions.md`, add the final review's and the audit's open points to this change's section.
+- [x] 5.8 In `docs/browser-checks.md`, change this change's walk to the rail-number form and the named rows.
+- [x] 5.9 Run typecheck, then the full suite, both in the foreground. Name any failing test.
 
 ## 6. Verification
 

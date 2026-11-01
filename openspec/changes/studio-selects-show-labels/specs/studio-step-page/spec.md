@@ -136,8 +136,8 @@ step whose label no other step shares SHALL read its label alone.
 ### Requirement: A way-out heading names its target once
 
 A way-out heading SHALL name its target by the step select's text. A
-way-out label can already end with an arrow and that text. The heading SHALL
-then print the label alone. The time limit's select SHALL take the studio
+way-out label can already end with an arrow and the target's label, plain
+or numbered. The heading SHALL then print the label alone. The time limit's select SHALL take the studio
 select's form and span its column.
 
 #### Scenario: A default way-out label does not repeat its target
