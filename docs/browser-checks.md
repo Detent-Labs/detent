@@ -6736,30 +6736,34 @@ Open "Where the new way out leads". Pass: its options read the same labels.
 step's label, such as "Review". Open "Leads to". Pass: the options read
 "Review" and "Review (2)", in the order of the steps rail.
 
-Read the way out's heading for each step. Pass: the heading that names the
-second step reads "Review (2)".
+Read the heading of the way out that leads to the second step. Pass: it ends
+in "→ Review (2)".
 
 **3. A step with no label reads as unnamed.** Drop a new step on the canvas
 and clear its label. Open "Leads to" on another step. Pass: the new step's
 option reads "(unnamed step)".
 
-**4. The time limit lists way-out headings.** Open the Time limit section of a
-step that has a way out. Open its way-out select. Pass: each option reads a
-heading such as "Approve → Done". No option shows a key.
+**4. The time limit lists way-out headings.** Name a way out "Approve". Point
+it at a step named "Done". Open the Time limit section of the step that holds
+the way out, then its way-out select. Pass: an option reads "Approve → Done". No
+option shows a key.
 
-**5. An action's output mapping lists field labels.** Open an action on a
-step and its output mapping. Open a target select. Pass: the options read
-field labels. A group does not appear.
+**5. An action lists field labels.** Open an action under "What happens when
+entered". Open a target select in "Values it writes back". Pass: the options
+read field labels. A group does not appear.
 
-**6. A call's input mapping lists field labels.** Open a step that calls a
-process and read its input mapping. Open a target select. Pass: the options
-read the child process's field labels, and none shows a key.
+**6. A call lists field labels in both mappings.** Open a step that calls a
+process. Open a target select in "Values passed to the child". Pass: the
+options read the child process's field labels, and none shows a key.
+
+Open a target select in "Values copied back from the child". Pass: the
+options read this process's field labels.
 
 **7. A derived key transliterates.** Add a step and name it "Prüfung". Open
 the step's Developer view. Pass: the key reads `pruefung`.
 
-Add a way out named "Abschluss" from that step to another step. Open its
-Developer view. Pass: the key reads `pruefung-abschluss`.
+Add a step named "Abschluss". Add a way out from "Prüfung" to "Abschluss".
+Open that way out's Developer view. Pass: the key reads `pruefung-abschluss`.
 
 Discard the draft from the process list and accept the browser's confirm.
 Under `playwright-cli`, `dialog-accept` answers it.
