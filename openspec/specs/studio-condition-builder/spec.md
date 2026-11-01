@@ -438,7 +438,8 @@ behavior. A raw row SHALL print a sentence in place of its fragment's text.
 That sentence SHALL point to the Developer view. The row SHALL keep the
 fragment unchanged in the written expression, and its remove control SHALL
 stay. In the condition's sentence, a raw row SHALL read "a hand-written
-rule". The canvas edge label keeps the fragment's text.
+rule". The canvas way out's sentence and the form preview's note read a raw
+row the same way, per `studio-canvas`.
 
 #### Scenario: The joiner reads a word
 
@@ -609,46 +610,32 @@ same rule.
 - **WHEN** a field's `validation.rule` reads `data.prioritaet > -3`
 - **THEN** the rule builder shows one comparison row
 
-### Requirement: A path's guard shows a plain-English summary on its canvas edge
+### Requirement: A path's guard reads as a sentence on its canvas way out
 
-The canvas SHALL show a plain-English summary of a path's guard as a label on
-that path's edge. That holds for an automatic path and for a manual path.
-A new pure function, `summarizeCondition`, SHALL build that summary from the
-same `Condition`/`Row` model the builder already computes for that guard.
+The canvas SHALL read a path's guard in the builder's clause words, on the
+way out's line. That holds for an automatic path and for a manual path. The
+words SHALL come from the same `Condition`/`Row` model the builder computes.
+A condition with no readable row SHALL read "a hand-written rule holds". The
+line SHALL NOT print CEL source. `studio-canvas` states the sentence around
+the condition.
 
-<!-- antislop: allow synonym-rotation trailing-negation -->
-<!-- Why: copied byte for byte from the removed requirement. -->
-It SHALL NOT read `celReadout`, the builder's raw-CEL preview text, to
-produce this summary. That text is CEL syntax, not a sentence.
+#### Scenario: A single-row guard reads in words
 
-A guard the builder cannot represent as rows SHALL show its raw CEL text
-as the edge label instead. See "A fragment the builder cannot represent
-survives as a raw row" above.
+- **WHEN** an automatic path's guard reads `data.status == "approved"`, and
+  the builder shows it as one row
+- **THEN** the path's line carries the row's clause in words
 
-The priority badge and the "else" marker stay with automatic paths. A manual
-path draws its guard label and no badge.
+#### Scenario: An unbuildable guard reads as a hand-written rule
 
-#### Scenario: A single-row guard shows its plain-English form
+- **WHEN** a path's guard reads `size(data.amount) > 3`
+- **THEN** the path's line reads "Only if a hand-written rule holds"
+- **AND** the guard's source text appears nowhere on the canvas
 
-- **WHEN** an automatic path's guard reads `data.status == "approved"`,
-  and the builder shows it as one row
-<!-- antislop: allow trailing-negation -->
-<!-- Why: copied byte for byte from the removed scenario. -->
-- **THEN** the path's canvas edge shows a label built from that row, not
-  the raw CEL
-
-#### Scenario: An unbuildable guard shows raw CEL on the edge
-
-- **WHEN** an automatic path's guard holds a fragment the builder keeps
-  as a raw row
-- **THEN** the path's canvas edge shows that fragment's CEL text as the
-  label
-
-#### Scenario: A manual path's guard shows on its edge
+#### Scenario: A manual path's guard draws its sentence and no number
 
 - **WHEN** a manual path's guard reads `data.amount > 1000.0`
-- **THEN** the path's canvas edge shows a label built from that row
-- **AND** the edge shows no priority badge
+- **THEN** the path's line reads "Only if Amount is greater than 1,000"
+- **AND** no number draws on the line
 
 ### Requirement: A way out's row shows a "How it is taken" control
 

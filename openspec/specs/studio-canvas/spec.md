@@ -353,12 +353,14 @@ The signal then does not rest on color alone.
 A drag carrying an `end` step SHALL draw the state on no path. Such a step
 never lands inside one, so nothing may suggest that it does.
 
-The state SHALL NOT move the priority badge or the guard label. It SHALL NOT
+The state SHALL NOT move the way out's sentence. It SHALL NOT
 add a second control at the route midpoint. A selected path already carries a
 waypoint handle there.
 
 #### Scenario: The path under the pointer marks itself
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: the line repeats the live spec's wording verbatim; this change edits another sentence of the block. -->
 - **WHEN** the developer holds a Step from the edit rail over a path
 - **THEN** that path renders in the drop-target state
 - **AND** every other path renders unchanged
@@ -437,12 +439,26 @@ moment of creation.
 ### Requirement: Path lines visually encode trigger type, automatic-path priority, and terminal outcomes
 
 An automatic path SHALL render as a solid line and a manual path as a dashed
-line. Among a step's automatic paths, each guarded path SHALL show its
-`priority` as a badge and the guardless default path (if present) SHALL show
-an "else" marker instead of a number. A terminal step (no outgoing paths)
-bound to a contract `outcome` SHALL render a distinct marker carrying that
-outcome's key; a terminal step with no bound outcome SHALL render as terminal
-without an outcome key.
+line.
+
+A path SHALL carry one sentence on its line, in the author's words. A guarded
+path reads "Only if" and its condition. A step can have two or more automatic
+paths. A guarded one there leads with its place in the order, as in "First,
+only if". The guardless default there reads "Otherwise". A guardless manual path, and a lone guardless automatic
+path, have no sentence.
+
+The place SHALL count the step's automatic paths by `priority`, lowest first.
+A guarded path with no `priority` SHALL read "Only if" alone. No path SHALL
+draw a number badge or an "else" marker.
+
+The condition SHALL read in the condition builder's clause words. A
+condition with no readable row, and source that does not parse, SHALL read "a
+hand-written rule holds". A raw row beside readable rows reads "a hand-written
+rule", as the builder's sentence does. The sentence SHALL NOT carry CEL
+source.
+
+A terminal step SHALL carry an end stamp. A terminal step bound to a
+contract `outcome` SHALL carry that outcome's whole name on the stamp.
 
 #### Scenario: Automatic and manual paths are visually distinct
 
@@ -453,14 +469,210 @@ without an outcome key.
 
 #### Scenario: Automatic path priority is visible
 
-- **WHEN** a step has two guarded automatic paths and one guardless default
-- **THEN** the guarded paths each show their `priority` and the default
-  shows "else" instead of a number
+- **WHEN** a step has two guarded automatic paths at priorities 10 and 20,
+  and one guardless default
+- **THEN** the first reads "First, only if" and its condition, and the second
+  reads "Second, only if" and its condition
+- **AND** the default reads "Otherwise"
+- **AND** no number and no "else" draws on any of the three lines
 
 #### Scenario: A terminal step shows its bound outcome
 
 - **WHEN** a terminal step is bound to an `outcome` in a contracted process
-- **THEN** the step renders the terminal marker carrying that outcome's key
+- **THEN** the step's end stamp carries that outcome's whole name
+
+#### Scenario: A manual path's guard reads as a sentence
+
+- **WHEN** a manual path carries the guard `data.amount > 1000.0` over a field
+  labelled "Amount"
+- **THEN** its line reads "Only if Amount is greater than 1,000"
+
+#### Scenario: An unreadable guard prints no CEL
+
+- **WHEN** a path's guard reads `size(data.amount) > 3`, which no row of the
+  builder reads
+- **THEN** its line reads "Only if a hand-written rule holds"
+- **AND** the guard's source text appears nowhere on the canvas
+
+### Requirement: A canvas stamp names its fact in words
+
+The start stamp SHALL read "Start". An end stamp SHALL read "End", or "End:"
+and the whole outcome name. A stamp SHALL never cut a word or print a lone
+symbol.
+
+A stamp SHALL be a straight rectangle across the node's top edge. It SHALL
+read in the uppercase mono stamp face, at 11px or above. A long stamp SHALL wrap to a
+second line rather than clip. The stamp SHALL leave the accessibility tree;
+the node's accessible name carries its words.
+
+#### Scenario: The start stamp reads its word
+
+- **WHEN** the canvas renders the draft's initial step
+- **THEN** that node's stamp reads "Start"
+
+#### Scenario: An end stamp carries the whole outcome
+
+- **WHEN** the canvas renders an end step bound to the outcome `rejected`
+- **THEN** its stamp reads "End: rejected", in the stamp's uppercase face
+- **AND** no stamp on the canvas reads "REJE" or "•"
+
+#### Scenario: An end with no outcome reads End
+
+- **WHEN** the canvas renders an end step bound to no outcome
+- **THEN** its stamp reads "End"
+
+#### Scenario: A long outcome wraps
+
+- **WHEN** an end step binds an outcome name wider than its corner of the
+  node
+- **THEN** the stamp takes a second line, and every letter of the name shows
+
+#### Scenario: A stamp stays out of the accessibility tree
+
+- **WHEN** the canvas renders a stamp
+- **THEN** the stamp carries `aria-hidden`
+- **AND** the node's accessible name carries the stamp's words
+
+### Requirement: A way out's sentence wraps on its line
+
+A way out's sentence SHALL wrap over up to six lines. It SHALL sit on its
+way out's route, as near the route's midpoint as the room allows. Its width
+SHALL stay within a fixed floor and cap.
+
+A sentence longer than six lines SHALL end in an ellipsis. It SHALL carry
+the full sentence as its hover title, and only where the lines cut it.
+
+A press on the sentence SHALL select its way out, as a press on the line
+does.
+
+#### Scenario: A long condition wraps rather than cuts
+
+- **WHEN** a way out's sentence reads "Only if Amount is greater than 1,000
+  and Cost centre is “Finance”"
+- **THEN** the sentence shows whole over two or more lines
+- **AND** it has no hover title
+
+#### Scenario: A sentence past six lines keeps its full text
+
+- **WHEN** a way out's sentence needs more than six lines at its width
+- **THEN** the sixth line ends in an ellipsis
+- **AND** the hover title carries the sentence untruncated
+
+#### Scenario: The sentence centres on the route where it has room
+
+- **WHEN** a way out's route crosses open canvas at its midpoint
+- **THEN** the sentence's block centres on that midpoint
+
+### Requirement: A way out's sentence clears the nodes, the stamps and the other sentences
+
+A sentence SHALL NOT cover a node, a stamp or another sentence where it can
+avoid them. A narrower width or a place further along its route avoids
+them. The sentence SHALL first slide along its route or across it at its widest
+width. Only then SHALL it narrow and take more lines. Its line SHALL stay
+inside its block. Where
+nothing avoids them, the sentence SHALL take the place that covers least.
+
+#### Scenario: A sentence clears the nodes in a tight column gap
+
+- **WHEN** two steps stand side by side with the 60-unit gap Arrange leaves
+- **AND** the way out between them carries a 39-character sentence
+- **THEN** the sentence stands inside the gap, over more lines
+- **AND** it covers neither step's label nor any stamp
+
+#### Scenario: Two sentences in one gap stand apart
+
+- **WHEN** two ways out run through the same column gap, one above the other
+- **THEN** their sentences slide apart along their routes, and neither covers
+  the other
+
+### Requirement: The connect handle explains its gesture
+
+The connect handle SHALL carry a hover tooltip that says what a drag from it
+does. It reads: "Drag to a step to add a way out, or to empty space to add a
+new step." An end step's handle SHALL read: "An end has no way out."
+
+The handle's pointer target SHALL measure at least 24px across at a canvas
+scale of 1. Its drawn dot stays the size it is. Its cursor SHALL read as a
+crosshair, and as not-allowed on an end step.
+
+#### Scenario: Hovering the handle names the gesture
+
+- **WHEN** the author rests the pointer on a task step's connect handle
+- **THEN** the tooltip names both drags: to a step, and to empty space
+- **AND** the cursor is a crosshair
+
+#### Scenario: An end step's handle says why it does nothing
+
+- **WHEN** the author rests the pointer on an end step's connect handle
+- **THEN** a tooltip reads "An end has no way out."
+- **AND** the cursor reads not-allowed
+
+#### Scenario: The handle is easy to hit
+
+- **WHEN** the author presses 10px right of the handle's centre, at a canvas
+  scale of 1
+- **THEN** the press starts a connect drag
+
+### Requirement: The connect handle draws above the way-out sentences
+
+The connect handle SHALL draw above every way-out sentence, so a sentence
+never takes its press.
+
+#### Scenario: A sentence beside a handle leaves the drag alone
+
+- **WHEN** a sentence in a 60-unit column gap reaches the source step's
+  connect handle
+- **AND** the author presses the handle and drags to another step
+- **THEN** the drag adds a way out, as it does from a clear handle
+
+### Requirement: A double-click opens the step on the Steps tab
+
+A double-click on a step node SHALL select that step. It SHALL open the Steps
+tab on it, as Enter on a focused node does. A double-click on a way out's
+line or sentence SHALL open its source step's Ways out. That way out SHALL be
+the selected one, as after Enter on a focused path.
+
+A single click SHALL still select alone and leave the author on the canvas.
+A double-click on a waypoint handle SHALL still delete that waypoint, and
+SHALL open nothing.
+
+#### Scenario: A double-click on a node opens its step
+
+- **WHEN** the author double-clicks the node of the step "Review"
+- **THEN** the Steps tab opens with "Review" as the current step
+
+#### Scenario: A double-click on a way out opens Ways out
+
+- **WHEN** the author double-clicks the line of the way out "Approve" from
+  "Review"
+- **THEN** the Steps tab opens on "Review", with Ways out open and "Approve"
+  selected
+
+#### Scenario: Ways out reopens for the way out already selected
+
+- **WHEN** the author selected the way out "Approve", then folded Ways out
+  on the step page
+- **AND** the author double-clicks "Approve" on the Map tab
+- **THEN** the step page opens with Ways out open again
+
+#### Scenario: A double-click on a waypoint opens nothing
+
+- **WHEN** the author double-clicks a waypoint handle on the selected way out
+- **THEN** the waypoint goes, and the Map tab stays open
+
+### Requirement: The midpoint handle opens its way out on a double-click
+
+The selected way out's midpoint handle can stand over its sentence. A
+double-click on that handle SHALL open the way out, as a double-click on its
+line does. It SHALL NOT add a waypoint.
+
+#### Scenario: The midpoint handle passes a double-click on
+
+- **WHEN** the author selected a way out whose sentence sits at its
+  midpoint, under the midpoint handle
+- **AND** the author double-clicks that handle
+- **THEN** the step page opens on the way out's source step, with Ways out
+  open
 
 ### Requirement: The canvas supports pan and zoom over the process graph
 
@@ -647,9 +859,7 @@ focus on the entry point the rule below defines. A roving `tabindex` SHALL
 move focus inside it, so no node takes a stop of its own.
 
 Each step node SHALL carry `role="button"`, an `aria-label` and that roving
-`tabindex`. A node SHALL drop all three while its inline rename is open. That
-rename field is focusable, and ARIA forbids a focusable element inside a
-`role="button"`. The `<svg>` SHALL carry `role="application"`, an `aria-label`
+`tabindex`. The `<svg>` SHALL carry `role="application"`, an `aria-label`
 naming the graph, and a `tabindex` of its own. The role is load-bearing: a
 screen reader's browse mode otherwise consumes an arrow key before the
 element's handler sees it.
@@ -660,7 +870,8 @@ order, the order `workflow.steps` holds. Enter SHALL select the focused step
 and open the Steps tab on it.
 
 A pointer press SHALL select alone and leave the author on the canvas. A
-shift-click builds a set there, and the delete control acts on one.
+shift-click builds a set there, and the delete control acts on one. A
+double-click is the pointer's route to the Steps tab.
 
 Escape SHALL move focus to the `<svg>`, which carries the `tabindex` that call
 needs. Escape SHALL also move the roving stop itself. The `<svg>` takes
@@ -676,10 +887,10 @@ Without that move an arrow key walks from whatever the keyboard last touched.
 Enter binds for a step focus and a path focus alone. A disclosure press
 therefore leaves no stop a following Enter also answers.
 
-A key press originating inside the inline rename field SHALL NOT reach the
-canvas handler. The exclusion SHALL read the event's target. A target inside a
-text-entry field stops the handler. A disclosure button the canvas draws is
-not such a field. An arrow key and Escape SHALL reach the handler from one.
+A key press originating inside a text-entry field SHALL NOT reach the canvas
+handler. The exclusion SHALL read the event's target. A disclosure button the
+canvas draws is not such a field. An arrow key and Escape SHALL reach the
+handler from one.
 
 Focus SHALL alternate between a step and a path. Right from a step SHALL move
 to that step's first outgoing path, and Right again to that path's target
@@ -693,11 +904,11 @@ and Left on the initial step SHALL move nothing. Down on the last step in the
 draft order and Up on the first SHALL move nothing. The same holds at either
 end of a fan.
 
-The step's `aria-label` SHALL name, in order, its resolved label, its key, its
-kind, its stamps and its outgoing-path count. That count SHALL cover the
-reachable paths alone. The kind SHALL read the three plain phrases the palette
-uses. The phrase carrying that count SHALL agree with it in number. A step
-carrying one path SHALL NOT announce a plural.
+The step's `aria-label` SHALL name four things in order. They are the text its
+node prints, its kind, its count of ways out and its stamps' words. It SHALL NOT name the step's
+key. The kind SHALL read the phrase the step page's kind control prints. The
+count SHALL cover the reachable paths alone, and SHALL read "way out" or
+"ways out" in agreement with it.
 
 #### Scenario: Tab reaches the canvas and lands on the initial step
 
@@ -768,13 +979,14 @@ carrying one path SHALL NOT announce a plural.
 
 - **WHEN** focus reaches an end step labelled "Approved", keyed `approved`,
   carrying outcome `approved` and no outgoing path
-- **THEN** its accessible name carries the label, the key, the kind phrase,
-  the outcome and a zero path count
+- **THEN** its accessible name reads "Approved, An end, 0 ways out, End:
+  approved"
+- **AND** the key `approved` stands in it only as the outcome's name
 
 #### Scenario: A step carrying one path announces the singular
 
 - **WHEN** focus reaches a step carrying exactly one outgoing path
-- **THEN** its accessible name reads one outgoing path, never the plural
+- **THEN** its accessible name reads "1 way out", never the plural
 <!-- "function" here is the mathematical sense; "method" elsewhere names a TypeScript method. -->
 <!-- antislop: allow synonym-rotation -->
 
@@ -891,8 +1103,8 @@ element inside the canvas SHALL always carry the tab stop.
 
 Each path SHALL be a focusable control with `role="button"`, a roving
 `tabindex` and an `aria-label`. Activating a path SHALL resolve to that path's
-source step. The step page then holds that source step, with its Path to
-section in view.
+source step. The step page then holds that source step, with Ways out open on
+that way out.
 
 The guard label's own `<div>` SHALL leave the accessibility tree. A pointer
 already reaches the path anywhere along its route. The edge group's own
@@ -900,13 +1112,11 @@ handler and its full-route hit area do that today. What the canvas lacks is a
 tab stop, a role and a name. The path itself now carries all three.
 
 The path's `aria-label` SHALL name its label, its source step, its target
-step, its trigger and its guard. An automatic path SHALL add its `priority`. A
-path carrying no guard SHALL say so.
-
-The guard slot SHALL take the readable condition the canvas draws on the edge,
-never the CEL source. That readable form already exists on the canvas, under
-`aria-hidden`. Where nothing resolves it, the slot SHALL take the source
-itself.
+step, its trigger and its sentence. The trigger reads "a person chooses" or
+"happens by itself". The sentence slot SHALL take the sentence
+the line draws, its place in the order included. A path with no sentence
+SHALL say "no condition". The name SHALL NOT carry the trigger's enum value,
+a `priority` number or CEL source.
 
 While focus sits on a path, Up and Down SHALL walk the fan the author arrived
 through. A path entered from its source SHALL walk that source's outgoing
@@ -918,30 +1128,41 @@ set. A path entered from its target SHALL walk that target's incoming set.
 - **THEN** the step page opens on that path's source step, and the author can
   change the guard it carries
 
+<!-- The scenario name repeats the live spec's; a MODIFIED block cannot rename a scenario. -->
 #### Scenario: An automatic path announces its priority
 
-- **WHEN** focus reaches an automatic path carrying `priority: 10` and a guard
-- **THEN** its accessible name carries the label, both step names, the
-  trigger word and the guard
-- **AND** the priority reads last, after the guard
+- **WHEN** focus reaches the first of two automatic paths, carrying
+  `priority: 10` and a guard
+- **THEN** its accessible name carries the label, both step names, "happens
+  by itself" and "First, only if" with the condition
+- **AND** the number 10 stands nowhere in it
 
+<!-- antislop: allow negation-habit -->
+<!-- Why: the scenario name repeats the live spec's; a MODIFIED block cannot rename a scenario. -->
 #### Scenario: A guardless default says it carries no guard
 
 - **WHEN** focus reaches the guardless automatic path at a step's highest
-  priority
-- **THEN** its accessible name states that it carries no guard
+  priority, beside a guarded one
+- **THEN** its accessible name ends in "Otherwise"
 
 #### Scenario: A guard announces as the phrase the canvas draws
 
 - **WHEN** focus reaches a path guarded by a condition the edge label
   summarizes in words
-- **THEN** its accessible name carries that summary, not the CEL source
+- **THEN** its accessible name carries that summary, and no CEL source
 
 #### Scenario: The guard label leaves the accessibility tree
 
 - **WHEN** the canvas renders a path carrying a guard
 - **THEN** the path itself is focusable and named, and the guard label's
   `<div>` carries `aria-hidden`
+
+#### Scenario: A manual path names its trigger in words
+
+- **WHEN** focus reaches a guardless manual path "Send" from "Capture" to
+  "Review"
+- **THEN** its accessible name reads "Send, from Capture to Review, a person
+  chooses, no condition"
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
@@ -1143,7 +1364,7 @@ Every canvas gesture the other requirements of this capability state SHALL
 stay live. Those gestures cover the drag, the connect and the drop on a path.
 They cover the pan, the zoom, the keyboard traversal and the focus ring. They
 also cover auto layout, Arrange, the grid snap, groups, waypoints and the
-inline rename.
+double-click.
 
 The canvas and the step page SHALL share one selected step. Pressing a node
 SHALL make that step the one the step page holds. Pressing a rail row SHALL
@@ -1710,9 +1931,11 @@ throughout. Nothing about it SHALL become read-only or disabled otherwise.
 ### Requirement: A step node prints the step's label, centred and resolved for the content locale
 
 A step node SHALL print the step's `label`, resolved against the studio's
-content locale with fallback to the draft's `baseLocale`. It SHALL fall back
-to the step's `key` only when that resolution yields nothing. It SHALL fall
-back to the unnamed-step string only when the step has no key either.
+content locale with fallback to the draft's `baseLocale`. It SHALL print the
+step text the step page's selects print. An unnamed step reads the
+unnamed-step string, numbered when two or more steps lack one. A label two
+steps share adds the rail number. The node SHALL NOT fall back to the step's
+`key`.
 
 That resolved text is the only text the node body draws. The node SHALL NOT
 draw the step's key on a line of its own. The terminal and initial stamps are
@@ -1734,8 +1957,9 @@ The node's own size SHALL NOT change with the label's length. The label block
 SHALL sit centred between the node's top and bottom edges. That holds at one
 line and at two, so every node reads from its own middle.
 
-The key stays legible elsewhere. The step's accessible name names it, and the
-inspector and the JSON view both carry it.
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: "JSON surface" is the glossary's name for that view. -->
+The key stays in the step page's Developer view and in the JSON surface.
 
 Changing the content locale SHALL change what every node prints, for a step
 carrying a translation in the chosen locale.
@@ -1793,79 +2017,38 @@ carrying a translation in the chosen locale.
   switches the content locale to `de`
 - **THEN** the node prints "Prüfen"
 
+<!-- The scenario name repeats the live spec's; a MODIFIED block cannot rename a scenario. -->
 #### Scenario: A step with no resolvable label falls back to its key
 
 - **WHEN** a step carries key `capture` and a `label` with no entry for the
   content locale and none for the base locale
-- **THEN** the node prints `capture`
+- **THEN** the node prints "(unnamed step)"
+- **AND** `capture` is nowhere in the node body
 
-### Requirement: A step node on the canvas offers an inline rename
+#### Scenario: Two unnamed steps read apart
 
-The canvas SHALL let an author rename a step's label directly on its node.
-Renaming SHALL NOT need the step page's name line. Committing the rename SHALL
-write `step.label` through the same Draft mutation that name line calls.
-
-The field SHALL open seeded with the step's label resolved for the content
-locale, and with nothing else. It SHALL NOT seed from the step's `key`, and it
-SHALL NOT seed from the unnamed-step string. A step carrying no entry for the
-chosen locale therefore opens an empty field. The author then writes a
-translation, rather than committing a copy of the key as a label.
-
-#### Scenario: Double-clicking a node's label opens an inline text field
-
-- **WHEN** an author double-clicks a step node's label on the canvas
-- **THEN** a text field opens on the node, seeded with the step's current
-  label
-
-#### Scenario: Committing the inline rename updates the step's label
-
-- **WHEN** an author writes a node's inline text field and commits it
-- **THEN** the step's `label` changes through the same Draft mutation the step
-  page's name line calls
-
-#### Scenario: A step with no translation opens an empty field
-
-- **WHEN** the content locale is `de`, a step's `label` carries only its
-  base-locale entry, and the author opens the inline rename
-- **THEN** the field opens empty, carrying neither the base-locale text nor
-  the step's key
-
-#### Scenario: Enter inside the rename field opens no inspector
-
-- **WHEN** the inline rename stands open and the author presses Enter
-- **THEN** the rename commits, and the canvas handler neither selects the step
-  nor opens the step page on it
+- **WHEN** the draft's third and fifth steps have no label
+- **THEN** their nodes print "(unnamed step 3)" and "(unnamed step 5)", as the
+  steps rail does
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
 <!-- antislop: allow synonym-rotation -->
 
-### Requirement: The masthead's step key auto-derives from the step label
+### Requirement: A step's key auto-derives from its label on the step page
 
-The step page's key field SHALL auto-fill from the step's label as an author
-types. This holds for a step whose key is empty. It also holds for a step
-whose key still matches the derivation from the label's prior value.
-Derivation SHALL follow the same rule the header bar's process key uses.
-
-This auto-fill and lock behavior SHALL apply through both label-writing
-routes. Those routes are the step page's own name line, and the canvas node's
-inline rename. The two routes count as one for this purpose. A rename through
-either route SHALL keep the step's key in agreement with the other. A key
-locked by a hand-written value through either route SHALL stay locked through
-the other.
-
-The step page SHALL append `_2` when the derived key collides with another
-step's key in the draft's workflow. If that also collides, the page SHALL
-append `_3`. It SHALL keep incrementing the suffix until the candidate is
-unique among the draft's steps.
-
-The first value typed directly into the key field SHALL disable this auto-fill
-for that step. That holds for the rest of the draft's lifetime in the browser.
+The step page's key field SHALL fill from the step's label as the author
+types. That holds while the key is empty or matches the label's prior
+derivation. It
+SHALL follow the process key's rule. A colliding key SHALL take the next free
+suffix: `_2`, then `_3`. The first value typed into the key field SHALL stop
+the fill for that step. The step page's name line is the one route that
+writes a step's label.
 
 #### Scenario: A new step's key follows its label as the developer types
 
 - **WHEN** the developer, while the studio's content locale is the draft's
-  base locale, creates a step from the palette
+  base locale, creates a step from the canvas bar
 - **AND** the developer types "Manager review" into its label, having never
   touched its key field
 - **THEN** the step's key reads `manager_review`
@@ -1874,7 +2057,7 @@ for that step. That holds for the rest of the draft's lifetime in the browser.
 
 - **WHEN** the developer has switched the studio's content locale away from
   the draft's base locale
-- **AND** the developer creates a step from the palette and types a label
+- **AND** the developer creates a step from the canvas bar and types a label
   into it
 - **AND** the developer never touches its key field
 - **THEN** the step's key stays empty. A newly created step's label seeds
@@ -1894,22 +2077,12 @@ for that step. That holds for the rest of the draft's lifetime in the browser.
   step's label further
 - **THEN** that step's key stays what the developer typed
 
-#### Scenario: A step renamed via the canvas node's inline rename derives its key the same way
-
-- **WHEN** the developer double-clicks a new step's canvas node
-- **AND** the developer types "Manager review" via the inline rename, having
-  never touched its key field
-- **THEN** the step's key reads `manager_review`. Typing the same label into
-  the step page's name line reads the same
-
 #### Scenario: Editing a non-base-locale translation leaves an already-derived step key untouched
 
 - **WHEN** the developer types a base-locale step label, deriving a key, then
   switches the studio's content locale
 - **AND** the developer types a translation into the step label's
-  non-base-locale entry
-- **AND** the developer does this via either the step page's name line or the
-  canvas node's inline rename
+  non-base-locale entry on the step page's name line
 - **THEN** the step's key stays unchanged
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
@@ -1948,7 +2121,12 @@ The word `terminal` SHALL NOT stand on it.
 The canvas SHALL draw a stamp on the node of the draft's
 `workflow.initialStep`, distinct from a terminal step's outcome stamp. This
 lets an author identify the process's entry point from the canvas alone. An
+<!-- antislop: allow negation-habit -->
+<!-- Why: the sentence repeats the live spec's wording verbatim. -->
 author needs no JSON inspection and no per-step identity check.
+
+The stamp SHALL read "Start". It sits in the node's top-left corner, and an
+end stamp sits in the top-right corner.
 
 #### Scenario: The initial step shows its stamp
 
@@ -2478,6 +2656,8 @@ source anchor to the first waypoint. It SHALL run from each waypoint to the
 next, and from the last waypoint to the target anchor. Every waypoint SHALL
 lie on the drawn route.
 
+<!-- antislop: allow negation-habit -->
+<!-- Why: the line repeats the live spec's wording verbatim; this change edits another sentence of the block. -->
 A leg between two points SHALL draw as one straight segment, or as two when
 the points share no axis. It SHALL carry no gutter. The gutter clears the node
 an anchor sits on, and a waypoint has no box to clear.
@@ -2522,7 +2702,8 @@ The route SHALL carry the pointer over its whole length. The area a developer
 clicks SHALL follow the route. It SHALL NOT follow a straight line between the
 anchors.
 
-A guard label and a priority badge SHALL sit at the route's own midpoint.
+A way out's sentence SHALL sit on its own route, by the placement rule this
+capability states for it.
 
 The connect handle SHALL stay at the source node's right-middle, whatever
 anchor a path leaving that node takes. The handle is a control an author
@@ -2536,8 +2717,8 @@ A selected path SHALL draw one handle at each of its waypoints, and one at the
 route's midpoint. An unselected path SHALL draw none. The canvas holds at most
 one selected path, so at most one path shows handles.
 
-A handle SHALL draw after the guard label and the priority badge, which read
-the same midpoint. A handle stays grabbable that way. It may cover part of a
+A handle SHALL draw after the way out's sentence, which reads the same
+midpoint. A handle stays grabbable that way. It may cover part of a
 label, and an author reading a guard deselects the path to clear the handles.
 
 A waypoint handle SHALL draw after the midpoint handle and take the pointer
@@ -2602,6 +2783,8 @@ reset, and nothing stores what the route was before.
 - **THEN** the path renders as five axis-aligned segments
 - **AND** it enters the target from outside the target's entry edge
 
+<!-- antislop: allow negation-habit -->
+<!-- Why: the scenario name repeats the live spec's, so the delta can match it. -->
 #### Scenario: A straight route carries no arc under either style
 
 - **WHEN** a same-row path renders under `smoothstep`
@@ -2619,10 +2802,12 @@ reset, and nothing stores what the route was before.
 - **THEN** the arc clamps to half that segment, and the route stays within its
   own corner points
 
+<!-- The scenario name repeats the live spec's; a MODIFIED block cannot rename a scenario. -->
 #### Scenario: A guard label follows the route
 
-- **WHEN** a guarded automatic path renders under either style
-- **THEN** its guard label sits at the midpoint of the route
+- **WHEN** a way out with a sentence renders under either style, over open
+  canvas
+- **THEN** its sentence centres on the midpoint of the route
 - **AND** it does not sit at the midpoint of a straight line between the
   anchors
 
@@ -3165,10 +3350,11 @@ directly, outside the compiled-style system.
 
 #### Scenario: Panzoom still excludes every node and edge group from panning
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: the line repeats the live spec's wording verbatim; this change edits another sentence of the block. -->
 - **WHEN** a developer starts a pointer drag on one of the canvas's
   excluded elements
-- **AND** the element is a step node, an edge group, a waypoint handle,
-  or the inline rename field
+- **AND** the element is a step node, an edge group or a waypoint handle
 - **THEN** the press reaches the canvas's own handlers and does not pan
   the canvas
 - **AND** each of those elements still carries the literal
