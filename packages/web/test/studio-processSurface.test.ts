@@ -217,8 +217,8 @@ describe("the Fix control's landing", () => {
     const request = fix.indexOf("setFixRequest(");
 
     expect(request).toBeGreaterThan(-1);
-    expect(fix.slice(request)).toContain("return;");
-    expect(fix.slice(request).indexOf("return;")).toBeLessThan(fix.indexOf("setPendingFocus("));
+    expect(fix.indexOf("return;", request)).toBeGreaterThan(-1);
+    expect(fix.indexOf("return;", request)).toBeLessThan(fix.indexOf("setPendingFocus("));
   });
 
   it("keys the focus effect on the tab and the request, acts on its own tab alone, and clears", () => {

@@ -34,6 +34,7 @@ import { sectionHeaderId, STEP_PAGE_NAME_ID } from "../draft/process-tabs.js";
 import {
   defaultOpenSection,
   nextOpenSection,
+  fixOpensDeveloperView,
   openSectionFor,
   sectionForRequest,
   sectionSummary,
@@ -626,6 +627,7 @@ export function StepPage({
   const removeTriggerRef = useRef<HTMLButtonElement | null>(null);
   // The author's own toggle of More's Developer view. A key check opens it too.
   const [developerOpen, setDeveloperOpen] = useState(false);
+  const developerRef = useRef<HTMLDetailsElement | null>(null);
 
   const index = steps.findIndex((s) => s.id === step?.id);
 
@@ -661,14 +663,19 @@ export function StepPage({
   useEffect(() => {
     if (selectedPathId !== undefined && holdsPaths) setOpenSection("paths");
   }, [selectedPathId, holdsPaths, waysOutRequest]);
+  const keyChecked = validation.issues.some((i) => i.entityId === step?.id && namesStepKey(i.loc));
   // A Fix opens its section on the page already mounted too. Taking the request
-  // clears it, and a request for another step waits untouched.
+  // clears it, and a request for another step waits untouched. The Developer
+  // view's `open` prop stays true under a key check, so React writes nothing
+  // after a hand close, and the Fix writes the element itself. Its `toggle`
+  // syncs `developerOpen`.
   const requestHere = sectionRequest !== undefined && sectionRequest.stepId === step?.id;
   useEffect(() => {
     if (!requestHere) return;
     if (requestedSection !== undefined) setOpenSection(requestedSection);
+    if (fixOpensDeveloperView(requestedSection, keyChecked) && developerRef.current !== null) developerRef.current.open = true;
     onSectionOpened();
-  }, [requestHere, requestedSection, sectionRequest, onSectionOpened]);
+  }, [requestHere, requestedSection, keyChecked, sectionRequest, onSectionOpened]);
 
   // The page remounts for the step it opens, which drops the focus the pressed
   // walk button held. One animation frame later the new page's control in the
@@ -725,7 +732,6 @@ export function StepPage({
   // issue prints at exactly one place below, so the page never says one sentence
   // twice.
   const masthead = mastheadIssues(step, validation.issues, sections);
-  const keyChecked = validation.issues.some((i) => i.entityId === step.id && namesStepKey(i.loc));
   const isInitialStep = draft.workflow?.initialStep === step.id;
   // A step with no assignment still works: the assignment-less floor in
   // `submitAndTransition` is starter-or-`system:admin`. That is not thereby an
@@ -937,8 +943,9 @@ export function StepPage({
             for hand-authoring a definition (`studio-step-page`). The disclosure
             stands closed until an author opens it or a check names the key. Its
             summary stays a native toggle: a press closes it under the check, and
-            the `open` prop holds still until the check clears. */}
+            the `open` prop holds still until the check clears or a Fix reopens it. */}
         <details
+          ref={developerRef}
           {...stylex.props(styles.developer)}
           open={developerOpen || keyChecked}
           onToggle={(e) => setDeveloperOpen(e.currentTarget.open)}

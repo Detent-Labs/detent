@@ -1,7 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { checkTarget, formEditorReturnTab, placeAction, processTabCounts, sectionHeaderId, surfaceTab } from "../src/areas/studio/draft/process-tabs.js";
 import * as processTabs from "../src/areas/studio/draft/process-tabs.js";
+import { checkAnswer } from "../src/areas/studio/draft/checkSentence.js";
 import { checksDotState, groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
+import { runValidation } from "../src/areas/studio/draft/validation.js";
 import type { EditorIssue, EntityType } from "../src/areas/studio/draft/issues.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
@@ -209,17 +211,27 @@ describe("checkTarget", () => {
       expect(at("process", "process", "label", MISSING)).toEqual({ tab: "checks", focusId: "process-header-name" });
     });
 
-    it("opens the Process view for the process's key and base language, whichever tier answers", () => {
-      const process = { tab: "settings", view: "process" } as const;
+    it("opens the Process view for the process's key and base language, on the messages validation raises", () => {
+      const body = {
+        label: { en: "P" },
+        baseLocale: "NOT A LOCALE",
+        fields: [],
+        workflow: { initialStep: "step_a", steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true }] },
+      } as unknown as Draft;
+      const issues = runValidation(body, undefined, {}, {}).issues;
+      const issueAt = (loc: string) => issues.find((i) => i.loc === loc)!;
 
-      expect(at("process", "process", "key", BUILT_IN)).toEqual(process);
-      expect(at("process", "process", "baseLocale", BUILT_IN)).toEqual(process);
-      expect(at("process", "process", "key", UNKNOWN)).toEqual(process);
-      expect(at("process", "process", "baseLocale", UNKNOWN)).toEqual(process);
+      expect(issueAt("key").message).toBe("Invalid input: expected string, received undefined");
+      expect(issueAt("baseLocale").message).toStartWith("Invalid string: must match pattern");
+      expect(checkAnswer(body, issueAt("key"))).toMatchObject({ tier: 3, place: "settings" });
+      expect(checkAnswer(body, issueAt("baseLocale"))).toMatchObject({ tier: 3, place: "settings" });
+      expect(checkTarget(issueAt("key"), body)).toEqual({ tab: "settings", view: "process" });
+      expect(checkTarget(issueAt("baseLocale"), body)).toEqual({ tab: "settings", view: "process" });
     });
 
     it("stays on Checks for a process check with no place, whose sentence sends the author there", () => {
       expect(at("process", "process", "somewhere", UNKNOWN)).toEqual({ tab: "checks" });
+      expect(at("process", "process", "key", UNKNOWN)).toEqual({ tab: "checks" });
     });
 
     it("opens the JSON surface for a check whose sentence names it", () => {

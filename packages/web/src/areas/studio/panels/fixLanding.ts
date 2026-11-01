@@ -43,21 +43,22 @@ export function fixLandsNow(visible: boolean, requested: string | undefined, sel
 
 /** What `focusCheckAnchor` reads of an element. */
 interface AnchorElement {
-  closest: (selector: "details") => { open: boolean; parentElement: AnchorElement | null } | null;
+  closest: (selector: "details") => { open: boolean } | null;
   focus: () => void;
 }
 
 /**
  * Focuses the first id that stands in the page. A closed `<details>` keeps its
  * content out of focus, and a hand-closed More under a standing check stays
- * closed whatever its `open` prop says, so each one around the element opens
- * here first.
+ * closed whatever its `open` prop says, so the one around the element opens here
+ * first. No anchor stands in two.
  */
 export function focusCheckAnchor(ids: readonly string[], find: (id: string) => AnchorElement | null = (id) => document.getElementById(id)): void {
   for (const id of ids) {
     const element = find(id);
     if (element === null) continue;
-    for (let fold = element.closest("details"); fold !== null; fold = fold.parentElement?.closest("details") ?? null) fold.open = true;
+    const fold = element.closest("details");
+    if (fold !== null) fold.open = true;
     element.focus();
     return;
   }

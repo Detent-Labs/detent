@@ -1,6 +1,6 @@
 import type { DraftField } from "./fields";
 import type { DraftViewEntry } from "./view-layout";
-import { tokenize, type EditorIssue } from "./issues";
+import type { EditorIssue } from "./issues";
 import { flattenRailFields } from "./panel-rail";
 import type { Draft } from "./types";
 import { checkPlace, checkStep, type CheckSite } from "./checkSentence";
@@ -91,8 +91,8 @@ function onStepPage(issue: CheckSite, body: Draft, place: SectionName | "page"):
  * `fields` and `sources` serve a field's or a source's own rule and the
  * process's duplicate-key rules alike, so the entity tells them apart: only an
  * entity the rail lists gets selected. Only a process-wide fallback and a
- * subject the draft no longer holds answer no place. The process's `key` and
- * `baseLocale` then read from the location.
+ * subject the draft no longer holds answer no place. The fallback's sentence
+ * sends the author to the Checks tab, so it stays there.
  */
 export function checkTarget(issue: CheckSite, body: Draft): CheckTarget {
   const place = checkPlace(body, issue);
@@ -117,11 +117,8 @@ export function checkTarget(issue: CheckSite, body: Draft): CheckTarget {
       if (issue.entityType !== "dataSource" || !body.dataSources?.some((source) => source.id === issue.entityId)) return target;
       return { ...target, dataSourceId: issue.entityId };
     }
-    case undefined: {
-      if (issue.entityType !== "process") return { tab: "steps" };
-      const first = tokenize(issue.loc)[0]?.key;
-      return first === "key" || first === "baseLocale" ? { tab: "settings", view: "process" } : { tab: "checks" };
-    }
+    case undefined:
+      return issue.entityType === "process" ? { tab: "checks" } : { tab: "steps" };
     default:
       return onStepPage(issue, body, place);
   }

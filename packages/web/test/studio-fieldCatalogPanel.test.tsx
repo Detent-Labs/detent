@@ -605,7 +605,7 @@ describe("More", () => {
   });
 
   it("opens itself on a check naming the field's data source, where the select stands", () => {
-    const check: EditorIssue = { entityType: "field", entityId: "field_a", message: "gone", source: "zod", loc: "fields[0].dataSource" };
+    const check: EditorIssue = { entityType: "field", entityId: "field_a", message: "field dataSource does not resolve: ds_x", source: "zod", loc: "fields.field_a.dataSource" };
     const html = renderPanel(draftOf([fld("field_a", "a")]), "field_a", { issues: [check] });
 
     expect(moreDetails(html)).toContain(" open");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { fieldCheckZone, namesFieldKey, namesFieldTechnical } from "../src/areas/studio/panels/fieldCheckZone.js";
+import { fieldCheckZone, namesFieldKey, namesFieldSource, namesFieldTechnical } from "../src/areas/studio/panels/fieldCheckZone.js";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
@@ -121,6 +121,51 @@ describe("the two checks that open More", () => {
     expect(namesFieldTechnical("fields[2].technical")).toBe(true);
     expect(namesFieldTechnical("fields[0].fields[1].technical")).toBe(true);
     expect(fieldCheckZone("fields[2].technical")).toBe("kind");
+  });
+
+  it("names the Technical marker on the location the studio's own finding carries", () => {
+    const draft = {
+      key: "p",
+      label: { en: "P" },
+      baseLocale: "en",
+      fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "number", technical: true }],
+      workflow: { initialStep: "step_a", steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true }] },
+    } as unknown as Draft;
+    const issue = runValidation(draft, undefined, {}, {}).issues.find((i) => i.source === "view");
+
+    expect(issue!.loc).toBe("fields.field_amount.technical");
+    expect(namesFieldTechnical(issue!.loc)).toBe(true);
+    expect(namesFieldKey(issue!.loc)).toBe(false);
+  });
+
+  it("names the data source on the location a removed source's check carries", () => {
+    const draft = {
+      key: "p",
+      label: { en: "P" },
+      baseLocale: "en",
+      fields: [{ id: "field_amount", key: "amount", label: { en: "Amount" }, type: "string", dataSource: "ds_gone" }],
+      workflow: { initialStep: "step_a", steps: [{ id: "step_a", key: "a", label: { en: "A" }, type: "task", terminal: true }] },
+    } as unknown as Draft;
+    const issue = runValidation(draft, undefined, {}, {}).issues.find((i) => i.message === "field dataSource does not resolve: ds_gone");
+
+    expect(issue!.loc).toBe("fields.field_amount.dataSource");
+    expect(namesFieldSource(issue!.loc)).toBe(true);
+    expect(fieldCheckZone(issue!.loc)).toBe("values");
+  });
+
+  it("reads the id form and the index form alike, a nested id form included", () => {
+    expect(namesFieldSource("fields.field_x.dataSource")).toBe(true);
+    expect(namesFieldSource("fields[0].dataSource")).toBe(true);
+    expect(namesFieldTechnical("fields.field_x.technical")).toBe(true);
+    expect(namesFieldKey("fields.field_x.key")).toBe(true);
+    expect(namesFieldSource("fields[0].fields.field_x.dataSource")).toBe(true);
+  });
+
+  it("does not read a field's id as one of its keys", () => {
+    expect(namesFieldKey("fields.key.label")).toBe(false);
+    expect(namesFieldSource("fields.dataSource.label")).toBe(false);
+    expect(namesFieldTechnical("fields.technical")).toBe(false);
+    expect(fieldCheckZone("fields.key")).toBeUndefined();
   });
 
   it("names neither for an option's label or another key", () => {

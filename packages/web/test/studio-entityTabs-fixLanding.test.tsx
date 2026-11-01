@@ -90,7 +90,7 @@ describe("focusCheckAnchor", () => {
 
   it("opens a closed disclosure around the element before it takes focus", () => {
     const log: string[] = [];
-    const fold = { open: false, parentElement: null };
+    const fold = { open: false };
     const anchor = {
       closest: () => fold,
       focus: () => log.push(fold.open ? "open" : "closed"),
@@ -103,13 +103,12 @@ describe("focusCheckAnchor", () => {
 });
 
 describe("namesFieldSource", () => {
-  it("answers true for a data source segment right after the fields anchor", () => {
-    expect(namesFieldSource("fields[0].dataSource")).toBe(true);
-    expect(namesFieldSource("fields[1].fields[0].dataSource")).toBe(true);
+  it("answers true on the location a removed source's check carries", () => {
+    expect(namesFieldSource("fields.field_x.dataSource")).toBe(true);
   });
 
   it("answers false elsewhere", () => {
-    expect(namesFieldSource("fields[0].options[0].dataSource")).toBe(false);
+    expect(namesFieldSource("fields.field_x.options[0].dataSource")).toBe(false);
     expect(namesFieldSource("dataSources[0].key")).toBe(false);
     expect(namesFieldSource("fields[0].label")).toBe(false);
   });
@@ -194,7 +193,10 @@ describe("the two passes on the Fields tab", () => {
   });
 
   it("runs the second pass after the scroll reset, so the reset cannot undo the focus's scroll", () => {
-    expect(fieldsTab.indexOf('scrollTo({ top: 0, behavior: "instant" })')).toBeLessThan(fieldsTab.indexOf("if (!fixLandsNow("));
+    const reset = fieldsTab.indexOf('scrollTo({ top: 0, behavior: "instant" })');
+
+    expect(reset).toBeGreaterThan(-1);
+    expect(reset).toBeLessThan(fieldsTab.indexOf("if (!fixLandsNow("));
   });
 
   it("selects a source in one pass, and focuses and clears in the next", () => {

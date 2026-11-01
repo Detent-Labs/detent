@@ -79,14 +79,15 @@ export function namesFieldSource(loc: string): boolean {
   return segmentsAfterAnchor(loc)[0] === "dataSource";
 }
 
-/** The `loc` segments after its last `fields` token, index suffixes dropped,
- * or none for a `loc` with no such token. */
+/** The `loc` segments after the field its last `fields` token names, index
+ * suffixes dropped, or none for a `loc` with no such token. A bare `fields`
+ * token names its field by the id after it, as in `fields.field_x.dataSource`,
+ * and `fields[0].dataSource` carries the field in its own index. */
 function segmentsAfterAnchor(loc: string): string[] {
-  const segments = loc
-    .split(".")
-    .map((s) => s.replace(/\[\d+\]$/, ""))
-    .filter((s) => s.length > 0);
+  const raw = loc.split(".").filter((s) => s.length > 0);
+  const segments = raw.map((s) => s.replace(/\[\d+\]$/, ""));
 
   const anchor = segments.lastIndexOf("fields");
-  return anchor === -1 ? [] : segments.slice(anchor + 1);
+  if (anchor === -1) return [];
+  return segments.slice(raw[anchor] === "fields" ? anchor + 2 : anchor + 1);
 }
