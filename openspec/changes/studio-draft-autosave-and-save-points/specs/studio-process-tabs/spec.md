@@ -28,6 +28,11 @@ moved elsewhere in the meantime SHALL stay there.
 - **WHEN** a keyboard user presses Try again and the save fails
 - **THEN** focus stands on Try again
 
+#### Scenario: A retry answered 409 moves the focus from Try again
+
+- **WHEN** a keyboard user presses Try again and the save answers 409
+- **THEN** focus stands on the state line
+
 #### Scenario: An automatic retry that heals moves the focus from Try again
 
 - **WHEN** focus stands on Try again and a timed retry succeeds
@@ -116,7 +121,7 @@ holds.
 The header bar's `⋮` menu SHALL carry two groups, "Views" and "Draft". The Views
 group SHALL hold the JSON surface, Versions and Player. The Draft group SHALL
 hold Save points and Discard draft. Save points SHALL open the Settings tab's Save
-points view with the focus on its name input. No process setting SHALL stand in the menu. The Settings tab holds those. The tab row SHALL have no
+points view. The focus SHALL land on its name input, or at the bound on its sentence. No process setting SHALL stand in the menu. The Settings tab holds those. The tab row SHALL have no
 trailing control of its own. Its trailing edge is the last tab.
 
 The open panel SHALL stand above every tab body, so a press on an entry reaches
@@ -154,6 +159,11 @@ the entry opens the JSON surface or leaves it.
 
 - **WHEN** an author chooses Save points in the `⋮` menu
 - **THEN** the Save points view is open and its name input holds the focus
+
+#### Scenario: The menu at the bound lands on the sentence
+
+- **WHEN** an author chooses Save points on a draft at the bound
+- **THEN** the bound's sentence holds the focus once the list answers
 
 #### Scenario: The menu leaves the JSON surface for Save points
 

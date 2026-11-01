@@ -100,9 +100,11 @@ for them. A re-render during typing clears the timer, and that is the debounce.
 `autosaveWait` is pure and lives in `screens/draftAutosaveLogic.ts`, so `bun:test`
 can pin it. Its inputs mean:
 
-- `dirtyFor` counts from the first change after the last request left. A
-  `dirtySince` ref restarts when `doSave` sends. Measured from the rise of the dirty
-  state, it would stay above the maximum and drop the debounce for good.
+- `dirtyFor` counts from the first change after the last request left. `dirtySince`
+  clears when `doSave` sends and when the draft is clean. The effect sets it on the
+  first commit whose draft or layout is not identical to the last sent pair. A pure
+  `nextDirtySince` holds that step. Measured any other way, a pause or the saving
+  commit itself would drop the debounce.
 - `held` is true in four cases: the restore notice stands, the discard dialog is
   open, the leave dialog stands (`holdSaves` from `root.tsx`), or a save point
   request runs.
@@ -112,7 +114,18 @@ can pin it. Its inputs mean:
 | `AUTOSAVE_DEBOUNCE_MS` | 1200 | a typing pause, short enough for the next press |
 | `AUTOSAVE_MAX_WAIT_MS` | 10000 | a long typing run still lands |
 | `AUTOSAVE_RETRY_MS` | 5000, 15000, 30000, then 60000 | backoff after an answer that may heal |
-| `SAVE_TIMEOUT_MS` | 30000 | a hung request reads as a network failure |
+| `SAVE_TIMEOUT_MS` | 30000 | a hung request reads as a network failure. `api/client.ts` exports this one, since the API layer imports nothing from `screens/` |
+
+`autosaveWait` answers in this order:
+
+1. Not dirty, saving or a conflict: `undefined`.
+2. A failure with no later change: `undefined` when held or refused, else the backoff.
+3. `flushAsked`: 0.
+4. Held: `undefined`.
+5. Otherwise, the debounce capped by the maximum.
+
+A failure outranks `flushAsked`. A flush clears the failure first, so any failure it
+sees answers its own try.
 
 Two alternatives lost. A debounce library adds a dependency for four lines. A
 `useRef` timer in each writer misses the layout writers.
@@ -122,10 +135,20 @@ while it stands, so its confirm cannot reach a running save. A `PUT` at revision
 landing after a delete would otherwise create the draft again.
 
 An unmount that bypasses `askLeave` (the browser's Back or Forward) would drop a
-waiting change with the timer. So one unmount effect sends a last `saveDraft` from
-refs while the draft is dirty. It sends nothing where a `dropped` ref is set or where
-a failure, a conflict or the notice stands. A discard and a 401 set that ref. A
-confirmed leave dialog needs no ref, since a failure or a conflict stands there.
+waiting change with the timer. So one unmount effect acts from refs, unless a `dropped`
+ref is set:
+
+- Dirty with nothing standing: one last `saveDraft`, its rejection caught.
+- A request running: it chains on a `running` promise ref. It sends only if the latest
+  draft differs from what that request sent, at the answer's revision.
+- A failure or a conflict standing, or that last save failing: it writes the stash
+  when none stands, through a `keepCopy` callback.
+- The notice standing: the store's one slot holds the copy, and D7's accepted loss
+  applies.
+
+A discard, a 401 (through `stashOnUnauthorized`) and a confirmed leave dialog set
+`dropped`. `onFlushChange` therefore reports `{ flush, drop }`, and the dialog's
+`onConfirm` calls `drop()` before it runs the exit.
 
 ### D2. What a failure does
 
@@ -143,7 +166,8 @@ A later change takes the ordinary debounce again. The hook sees it by comparing
 identity with `sentDraft` and `sentLayout`.
 
 `retry` keeps `failure` and sends at once. `saving` paints the control, and the
-answer replaces or clears `failure`. So Try again stays mounted during its run.
+answer replaces or clears `failure`. So Try again stays mounted during its run. Try
+again leaves when `failure` leaves, on a dirty draft too.
 
 A clean draft clears the failure, by the render-time adjustment `justPublishedAfter`
 uses. An author may take a change back by hand, and `reload` clears it too.
@@ -155,11 +179,17 @@ Detent keeps trying.
 A successful save clears only the failure's own banner. A plain `clearError()` there
 would wipe an Arrange banner the author is still reading.
 
-A network failure can hide a save that committed. Its retry then carries a passed
-revision and answers 409, with this tab as the only other writer. So a 409 while
-`failure` stands reads the stored draft first. Where its body and layout equal
-`failure.sentDraft` and `sentLayout` under `canonicalize`, the save counts as landed
-at the stored revision. A change made since then stays dirty and saves next.
+A network failure can hide a save that committed. The next send then carries a passed
+revision and answers 409, with this tab as the only other writer. So a ref `unconfirmed`
+lists each pair a send sent and lost on the network (`status === undefined`). A success
+or a real conflict empties it, and a flush leaves it alone.
+
+A 409 while `unconfirmed` holds an entry reads the stored draft first. Where its body and
+layout equal an entry under `canonicalize`, that entry landed at the stored revision.
+`savedBody` takes the entry's draft and not the record's body, since `isDirty` compares
+with `JSON.stringify` and `jsonb` reorders keys. A change made since then stays dirty and
+saves next. A 409 that matches no entry clears `failure` and raises the conflict. At most
+one send at a revision can commit, so a match is unambiguous.
 
 `saveDraft` passes `signal: AbortSignal.timeout(SAVE_TIMEOUT_MS)`. `request` maps a
 thrown fetch to the `network` error, so a hung request takes the retry path.
@@ -206,8 +236,10 @@ void flushRef.current?.().then((r) => {
 ```
 
 `dirtyRef` stays first, because `onDiscarded` lowers it before it navigates. A flush
-there would write to a draft the author just deleted. The one slot stops two presses
-from running two exits. `EditScreen` reports `flush` upward through a new
+there would write to a draft the author just deleted. `EditScreen` reports `dirtyNow ||
+actions.saving` into it, so an exit during a request waits for the answer even after the
+author took the text back by hand. The one slot stops two presses
+from running two exits. `EditScreen` reports `{ flush, drop }` upward through a new
 `onFlushChange` prop, and it takes a new `holdSaves` prop, true while `leaving`
 stands. A healed retry cannot then land what the dialog says it will drop. A
 `localPath` change clears `pendingLeave`, as it clears `leaving`.
@@ -246,7 +278,7 @@ tone, and the other four print muted.
 
 | Condition | State | Words |
 |---|---|---|
-| failure, conflict, or a dirty draft under the restore notice | `unsaved` | Unsaved changes |
+| failure, a conflict over a dirty draft, or a dirty draft under the restore notice | `unsaved` | Unsaved changes |
 | dirty otherwise | `saving` | Saving… |
 | saved in this session, under a minute ago | `savedJustNow` | Saved just now |
 | saved in this session, a minute ago or more | `savedAt` | Saved at 12:02 PM |
@@ -263,10 +295,15 @@ three moments, and otherwise stays empty:
 - "Saved" on leaving it.
 - The published version sentence after a publish.
 
-The line keeps `tabIndex={-1}`. `saveFocusTarget` swaps its `pressed` argument for
-`heldControl`, read from a ref that Try again's `onFocus` sets and its `onBlur`
-clears. A timed retry can heal under a resting keyboard user, and a press never ran
-there. `focusOnBody` still guards focus the author moved.
+A save point act can raise a 409 on a clean draft. That draft keeps the banner and reads
+the saved state, since nothing unsaved stands, and an exit leaves with no question.
+
+The line keeps `tabIndex={-1}`. `saveFocusTarget` takes `{ heldControl, controlGone,
+focusOnBody }`. `heldControl` reads a ref that Try again's `onFocus` sets and its `onBlur`
+clears. A timed retry can heal under a resting keyboard user, and a press never ran there.
+`controlGone` means `failure === undefined`, because a retry answered 409 or a retry with
+a newer change removes the control on a dirty draft. The effect's dependencies add
+`failure`. `focusOnBody` still guards focus the author moved.
 
 ### D7. The stash
 
@@ -277,13 +314,15 @@ stored draft. Four rules follow.
   line reads "Unsaved changes".
 - `onSaved` stops deleting the stash. The copy goes when the author answers the notice
   or discards the draft.
-- A flush may still save over the stored draft (an exit, Publish or a save point act).
+- A flush may still save over the stored draft (an exit, Publish, naming or restoring a
+  save point).
   Each such save, and each save point restore, rewrites the copy's revision to the
   answer's, in state and in storage. A 409 on a restored copy then means somebody else
   moved the draft. `askRestore` also asks first when this tab saved since the notice
   appeared, since the restore replaces that saved change.
 - While a copy stands, a 401 keeps that copy. `stashOnUnauthorized` checks `stash ===
-  undefined`, because the store has one slot. The change made under the notice goes.
+  undefined`, because the store has one slot. The change made under the notice goes, and
+so does one a browser Back drops there.
 
 The last rule is an accepted loss. A second slot would need a second notice for a rare
 case, and the kept copy is the larger piece of work.
@@ -375,6 +414,10 @@ It is the fourth Settings view, at the address `/edit/settings/points`.
 Settings view stays mounted, and an unopened view should cost nothing. A refetch keeps
 the old rows until its answer, so Restore keeps its focus.
 
+The form renders from the first commit, and a waiting line stands only where the rows
+will. When an answer reaches the bound while the input holds the focus, the focus moves to
+the bound's sentence.
+
 The `⋮` Draft group gains "Save points". A new `openSavePoints` in `EditScreen` calls
 `setJsonOpen(false)`, `setJsonNote(undefined)` and the plain `navigate` to this view.
 It then sets a pending focus on the name input. `openSettings` is no model here: it
@@ -386,7 +429,8 @@ Copy (catalog, English only):
 - Help: "A save point keeps the draft as it stands now, so you can come back to it."
 - Empty: "No save points yet."
 - Row: the name, then "Saved by Roman, 3 minutes ago" through the process list's
-  `relativeAgo`, with Restore and Remove.
+  `relativeAgo`, with Restore and Remove. With no display name it reads "Saved 3 minutes
+  ago", as `processList.savedAnonymous` does.
 - At the bound: "This draft holds {limit} save points. Remove one to name another or
   to restore one."
 - An empty name: "Give this save point a name." at the input, with no request.
@@ -400,9 +444,11 @@ restoring “{name}”". It clips the embedded name to 120 characters with "…"
 therefore never exceeds 139, however many rounds nest, and the engine's bound of 200
 holds.
 
-Each act calls `flush()` first, so a copy holds what the author sees. The hook owns the
-acts (`createSavePoint`, `restoreSavePoint`, `removeSavePoint`), so the panel keeps no
-command logic. Each outcome has one home:
+Naming and restoring call `flush()` first, so a copy holds what the author sees. Remove
+sends its request at once, since it copies nothing and carries no revision. The hook owns
+the acts (`createSavePoint`, `restoreSavePoint`, `removeSavePoint`), so the panel keeps no
+command logic. All three write calls pass the `AbortSignal.timeout`, since `held` waits on
+them. Each outcome has one home:
 
 | Outcome | Where it lands |
 |---|---|
@@ -416,7 +462,9 @@ command logic. Each outcome has one home:
 calls, and it leaves the draft clean and starts no save. `reload` adds its own
 `onCanPublishChange`. The restore answer carries no `canPublish`, so reusing `reload`
 whole would wipe a re-read permission. A restore adds `setJustPublished(false)` through
-a new callback, since the draft changed.
+a new callback, since the draft changed. That callback also filters `selectedStepIds` to
+the answer's steps and clears `selectedPathId`, or the canvas bar would count a step that
+went.
 
 Restore asks "Restore “{name}”?" and names who saved the point and when. Its note reads
 "Your work as it stands now becomes a save point, so you can come back to it." Its

@@ -39,7 +39,7 @@ The state SHALL read "Saving…" from a change until its save answers. It SHALL 
 "Saved at" and a time. It SHALL read "Saved" where no save has run in this session.
 
 It SHALL read "Unsaved changes", in the refusal tone, in three cases. A save has
-failed, a conflict stands, or a restore notice holds a change back. Where a published version exists, the state SHALL add
+failed, a conflict stands over a dirty draft, or a restore notice holds a change back. Where a published version exists, the state SHALL add
 that version and the word "published". The version SHALL print in the mono face.
 
 The visible state SHALL be no live region, so a save stays quiet for an author typing.

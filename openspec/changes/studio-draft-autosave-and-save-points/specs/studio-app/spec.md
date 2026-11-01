@@ -142,8 +142,15 @@ the draft with every change kept. No automatic save SHALL run while the dialog s
 
 #### Scenario: A conflict asks first
 
-- **WHEN** a conflict stands and an author presses the back control
+- **WHEN** a conflict stands over a change that has not landed, and an author presses
+  the back control
 - **THEN** the dialog opens and no save request leaves
+
+#### Scenario: A conflict on a clean draft leaves with no question
+
+- **WHEN** a save point act answered 409 on a clean draft, and an author presses the
+  back control
+- **THEN** the process list opens with no dialog
 
 #### Scenario: Confirming the dialog drops the change
 
@@ -159,8 +166,9 @@ the draft with every change kept. No automatic save SHALL run while the dialog s
 
 While a change has not landed, closing the tab or reloading SHALL raise the browser's
 own leave prompt. A `401` answer SHALL end the session with no dialog and no leave
-prompt. A Back or Forward step between entries of this page SHALL raise no prompt, and
-it SHALL send a waiting change once.
+prompt. A Back or Forward step between entries of this page SHALL raise no prompt. It
+SHALL send a waiting change once where no failure, conflict or notice stands, and
+otherwise keep it as a copy where none stands.
 
 #### Scenario: Closing the tab while a change waits prompts
 
@@ -176,6 +184,12 @@ it SHALL send a waiting change once.
 
 - **WHEN** an author changes a label and presses the browser's Back within the pause
 - **THEN** one `PUT /drafts/:processId` carries the change
+
+#### Scenario: Browser Back during a backoff keeps a copy
+
+- **WHEN** a save failed on the network and an author presses the browser's Back
+- **THEN** the tab's copy holds the change
+- **AND** a later visit to that draft shows the notice
 
 #### Scenario: Browser Back after a discard sends nothing
 
@@ -252,8 +266,8 @@ delete the copy.
 ### Requirement: A standing notice holds the automatic saves
 
 While the notice stands, no automatic save SHALL run. A change made then SHALL stay in
-the tab, and the state line SHALL read "Unsaved changes". An exit, a Publish or a save
-point act still saves that change. The copy SHALL then stay, and its revision SHALL
+the tab, and the state line SHALL read "Unsaved changes". An exit, a Publish, or naming
+or restoring a save point still saves that change. The copy SHALL then stay, and its revision SHALL
 follow that save, so a later restore can still land. Answering the notice SHALL let
 the saves run. A 401 SHALL keep that copy and drop the change made under the notice.
 
@@ -451,6 +465,32 @@ save SHALL carry it. A save that answers 409 SHALL leave the current layout as i
 - **THEN** the step stays at its new position
 - **AND** the conflict message appears
 
+### Requirement: A session that ends with unsaved changes keeps the draft
+
+When a request answers 401 and no copy stands for that actor and process, the
+studio SHALL store an unsaved draft in the tab's `sessionStorage`. The copy holds the body, layout and revision. Its key
+holds the actor id and the process id. The session SHALL still end as the
+session requirement states, even when the write fails.
+
+#### Scenario: A 401 on save keeps the work
+
+- **WHEN** the developer has an unsaved change and a save answers 401
+- **THEN** the login screen appears
+- **AND** the copy exists for that actor and process
+
+#### Scenario: A clean draft stores nothing
+
+- **WHEN** a request from a draft with no unsaved change answers 401
+- **THEN** the studio writes nothing to storage
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: stop is a verb here; Cancel elsewhere in this file names a control. -->
+#### Scenario: A failed write does not stop the logout
+
+- **WHEN** the unsaved draft is too large for the storage quota and a save
+  answers 401
+- **THEN** the login screen appears
+
 ### Requirement: A save conflict is surfaced and resolved by reloading, never merged
 
 <!-- antislop: allow sentence-length run-ons passive-voice em-dash -->
@@ -460,9 +500,9 @@ the draft was changed elsewhere and SHALL offer reloading the stored draft. It
 SHALL NOT merge, SHALL NOT silently retry with the newer revision, and SHALL
 NOT discard the conflict. No automatic save SHALL run while a conflict stands.
 
-One 409 is no conflict. A retry after a lost answer SHALL read the stored draft. Where
-its body and layout equal what the failed request sent, that save SHALL count as
-landed at the stored revision. Equal content means this tab made the only write.
+One 409 is no conflict. A send after a lost answer SHALL read the stored draft. Where
+its body and layout equal what a failed request sent, that save SHALL count as landed
+at the stored revision. Equal content means this tab made the only write.
 
 <!-- antislop: allow sentence-length run-ons passive-voice em-dash -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
