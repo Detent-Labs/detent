@@ -1,13 +1,14 @@
 import { useState } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, space } from "form-ui/tokens.stylex";
+import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { DraftField } from "../../draft/fields";
+import { useDraft } from "../../draft/store";
+import { resolveDraftLocalizedText } from "../../draft/localized-text";
 import { t } from "../../catalog.js";
 import { asExpression, defaultValueDisabledReason, literalControlKind, parseCelDefault, toggleMultiselectValue } from "./defaultValueLogic";
 
 type DraftDefault = DraftField["default"];
 
-/** Every class this file's own markup renders, from `app.css`. */
 const styles = stylex.create({
   defaultValueZone: {
     display: "flex",
@@ -23,8 +24,7 @@ const styles = stylex.create({
     marginBlockStart: 0,
     marginInline: 0,
   },
-  // `.default-value-disabled .studio-note { margin: 0 }`: the disabled
-  // note's own zero-margin override.
+  // The disabled note's own zero-margin override.
   studioNoteInDisabledZone: {
     margin: 0,
   },
@@ -32,10 +32,6 @@ const styles = stylex.create({
     margin: 0,
     color: colors.refusal,
     fontSize: "0.85rem",
-  },
-  defaultValueFooter: {
-    display: "flex",
-    gap: space.s3,
   },
   conditionMode: {
     backgroundColor: "transparent",
@@ -59,6 +55,40 @@ const styles = stylex.create({
     alignItems: "center",
     gap: space.s1,
   },
+  // The condition input's Developer view (`ConditionInput.tsx`), duplicated:
+  // an area's component never reads another component's style object.
+  developer: {
+    width: "100%",
+    paddingBlock: space.s2,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
+  },
+  developerSummary: {
+    cursor: "pointer",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
+  },
+  celField: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    marginBlockStart: space.s2,
+    minWidth: 0,
+  },
+  celCaption: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
+  },
+  // CEL is a machine value, so it takes the mono face.
+  celInput: {
+    fontFamily: fonts.mono,
+    width: "100%",
+  },
 });
 
 interface Props {
@@ -67,19 +97,29 @@ interface Props {
 }
 
 /**
- * `FieldDef.default`'s editor: a literal input matching the field's own
- * type, or — behind a link-styled toggle — a raw CEL expression. Deliberately
- * not `ConditionInput` itself: a default is a value of the field's own type,
- * not a boolean (design.md Decision 3).
+ * `FieldDef.default`'s editor (design.md D9): the literal input matching the
+ * field's own type first, then a "Developer view" disclosure holding the CEL
+ * input. Deliberately not `ConditionInput`: a default is a value of the
+ * field's own type, not a boolean.
+ *
+ * While the default is an expression, a note that a rule computes it stands
+ * in place of the literal input, and the disclosure stands open. Clearing the
+ * CEL text drops the `default` key, and the literal input returns. Text that
+ * does not parse stays in the input and writes nothing.
  */
 export function DefaultValueEditor({ field, onChange }: Props) {
+  const { contentLocale, draft } = useDraft();
   const current = field.default;
   const currentExpr = asExpression(current);
   const disabledReason = defaultValueDisabledReason(field.type);
 
-  const [celMode, setCelMode] = useState(currentExpr !== undefined);
-  const [celText, setCelText] = useState(currentExpr?.src ?? "");
-  const [celInvalid, setCelInvalid] = useState(false);
+  // The typed CEL text while it does not parse; otherwise the input reads the
+  // draft's own source, so a JSON-surface edit shows here too.
+  const [unparsed, setUnparsed] = useState<string | undefined>(undefined);
+  // The author's own toggle. An expression default opens the disclosure by
+  // itself; a typed edit opens it for good, so clearing the text never closes
+  // the input under the cursor.
+  const [developerOpen, setDeveloperOpen] = useState(false);
 
   if (disabledReason) {
     return (
@@ -92,60 +132,85 @@ export function DefaultValueEditor({ field, onChange }: Props) {
   }
 
   const commitCel = (text: string) => {
-    setCelText(text);
+    setDeveloperOpen(true);
     const result = parseCelDefault(text);
-    if (result.ok) {
-      setCelInvalid(false);
-      onChange(result.value as DraftDefault);
-    } else {
-      setCelInvalid(true);
+    if (!result.ok) {
+      setUnparsed(text);
+      return;
     }
-  };
-
-  const switchToCel = () => {
-    setCelText(currentExpr?.src ?? "");
-    setCelInvalid(false);
-    setCelMode(true);
+    setUnparsed(undefined);
+    // An emptied input over a literal default leaves that literal alone.
+    if (result.value === undefined && currentExpr === undefined) return;
+    onChange(result.value as DraftDefault);
   };
 
   const clear = () => {
-    setCelText("");
-    setCelInvalid(false);
+    setUnparsed(undefined);
     onChange(undefined);
   };
 
+  const celText = unparsed ?? currentExpr?.src ?? "";
+
   return (
     <div {...stylex.props(styles.defaultValueZone)}>
-      {celMode ? (
-        <>
-          <label>
-            {t("defaultValue.celLabel")}
-            <textarea rows={2} className="cel-input" value={celText} onChange={(e) => commitCel(e.target.value)} />
-          </label>
-          {celInvalid && (
-            <p {...stylex.props(styles.conditionParseError)} role="status">
-              {t("defaultValue.unparseable")}
-            </p>
-          )}
-        </>
+      {currentExpr !== undefined ? (
+        <p {...stylex.props(styles.studioNote)}>{t("defaultValue.computedNote")}</p>
       ) : (
-        <LiteralDefaultInput field={field} value={current} onChange={onChange} />
+        <LiteralDefaultInput
+          field={field}
+          value={current}
+          onChange={onChange}
+          contentLocale={contentLocale}
+          baseLocale={draft.baseLocale ?? contentLocale}
+        />
       )}
-      <div {...stylex.props(styles.defaultValueFooter)}>
-        <button type="button" {...stylex.props(styles.conditionMode)} onClick={celMode ? () => setCelMode(false) : switchToCel}>
-          {celMode ? t("defaultValue.useValue") : t("defaultValue.editAsCel")}
+      {current !== undefined && (
+        <button type="button" {...stylex.props(styles.conditionMode)} onClick={clear}>
+          {t("defaultValue.clear")}
         </button>
-        {current !== undefined && (
-          <button type="button" {...stylex.props(styles.conditionMode)} onClick={clear}>
-            {t("defaultValue.clear")}
-          </button>
+      )}
+      <details
+        {...stylex.props(styles.developer)}
+        open={developerOpen || currentExpr !== undefined || unparsed !== undefined}
+        onToggle={(e) => setDeveloperOpen(e.currentTarget.open)}
+      >
+        <summary {...stylex.props(styles.developerSummary)}>{t("defaultValue.developerView")}</summary>
+        <label {...stylex.props(styles.celField)}>
+          <span {...stylex.props(styles.celCaption)}>{t("defaultValue.celLabel")}</span>
+          <textarea
+            rows={2}
+            spellCheck={false}
+            translate="no"
+            {...stylex.props(styles.celInput)}
+            value={celText}
+            onChange={(e) => commitCel(e.target.value)}
+          />
+        </label>
+        {unparsed !== undefined && (
+          <p {...stylex.props(styles.conditionParseError)} role="status">
+            {t("defaultValue.unparseable")}
+          </p>
         )}
-      </div>
+      </details>
     </div>
   );
 }
 
-function LiteralDefaultInput({ field, value, onChange }: { field: DraftField; value: DraftDefault; onChange: (next: DraftDefault) => void }) {
+/** A choice's name at the content locale, else the base locale, else the
+ * unnamed-choice placeholder. The value stays the option's own `value`. */
+function choiceName(label: NonNullable<DraftField["options"]>[number]["label"], contentLocale: string, baseLocale: string): string {
+  return resolveDraftLocalizedText(label, contentLocale, baseLocale) || t("fieldCard.unnamedChoice");
+}
+
+interface LiteralProps {
+  field: DraftField;
+  value: DraftDefault;
+  onChange: (next: DraftDefault) => void;
+  contentLocale: string;
+  baseLocale: string;
+}
+
+function LiteralDefaultInput({ field, value, onChange, contentLocale, baseLocale }: LiteralProps) {
   const kind = literalControlKind(field);
 
   if (kind === "boolean") {
@@ -198,7 +263,7 @@ function LiteralDefaultInput({ field, value, onChange }: { field: DraftField; va
           <option value="">{t("fieldCatalog.noneOption")}</option>
           {(field.options ?? []).map((opt, i) => (
             <option key={i} value={opt.value ?? ""}>
-              {opt.value ?? ""}
+              {choiceName(opt.label, contentLocale, baseLocale)}
             </option>
           ))}
         </select>
@@ -217,7 +282,7 @@ function LiteralDefaultInput({ field, value, onChange }: { field: DraftField; va
               checked={selected.includes(opt.value ?? "")}
               onChange={(e) => onChange(toggleMultiselectValue(value, opt.value ?? "", e.target.checked) as DraftDefault)}
             />
-            {opt.value ?? ""}
+            {choiceName(opt.label, contentLocale, baseLocale)}
           </label>
         ))}
       </fieldset>
