@@ -137,6 +137,54 @@ describe("applyChoiceName", () => {
   });
 });
 
+describe("a name that derives nothing", () => {
+  const open = () => field([{ value: "open", label: "Open" }], { default: "open" });
+
+  it("keeps the value and the default when the name is cleared", () => {
+    const f = open();
+    applyChoiceName(f, 0, { en: "" }, "en", false);
+    expect(f.options![0]).toEqual({ value: "open", label: { en: "" } });
+    expect(f.default).toBe("open");
+  });
+
+  it("moves the value and the default once the cleared name is retyped", () => {
+    const f = open();
+    applyChoiceName(f, 0, { en: "" }, "en", false);
+    applyChoiceName(f, 0, { en: "C" }, "en", false);
+    applyChoiceName(f, 0, { en: "Closed" }, "en", false);
+    expect(f.options![0]!.value).toBe("closed");
+    expect(f.default).toBe("closed");
+  });
+
+  it("treats a name such as '!' like a cleared name", () => {
+    const f = open();
+    applyChoiceName(f, 0, { en: "!" }, "en", false);
+    expect(f.options![0]).toEqual({ value: "open", label: { en: "!" } });
+    expect(f.default).toBe("open");
+    applyChoiceName(f, 0, { en: "Closed" }, "en", false);
+    expect(f.options![0]!.value).toBe("closed");
+    expect(f.default).toBe("closed");
+  });
+
+  it("follows the next name for a value under a name that derives nothing", () => {
+    expect(nextChoiceValue("open", { en: "" }, { en: "Closed" }, "en", none)).toBe("closed");
+    expect(nextChoiceValue("open", { en: "!" }, { en: "Closed" }, "en", none)).toBe("closed");
+  });
+
+  it("never moves the value to an empty derivation", () => {
+    expect(nextChoiceValue("open", { en: "Open" }, { en: "" }, "en", none)).toBeUndefined();
+    expect(nextChoiceValue("", { en: "" }, { en: "!" }, "en", none)).toBeUndefined();
+  });
+
+  it("holds a locked value through clearing and retyping", () => {
+    const f = open();
+    applyChoiceName(f, 0, { en: "" }, "en", true);
+    applyChoiceName(f, 0, { en: "Closed" }, "en", true);
+    expect(f.options![0]!.value).toBe("open");
+    expect(f.default).toBe("open");
+  });
+});
+
 describe("collectOptionValues", () => {
   it("maps each field id to its choice values, groups' nested fields included", () => {
     const map = collectOptionValues({

@@ -8,7 +8,9 @@ import { resolveDraftLocalizedText, type DraftLocalizedText } from "./localized-
  * the base-locale name through `deriveKey` and steps past `taken`, the
  * sibling choices' values. A value the prior name derived follows the new
  * name, plain or with the `_<n>` suffix a dedupe adds. So does an empty
- * value. A hand-set value stays.
+ * value, and so does a value under a name that derives nothing. A name that
+ * derives nothing (cleared, or only punctuation) never moves the value. A
+ * hand-set value under a name that derives something stays.
  *
  * `locked` is the caller's verdict that a published version holds this
  * choice's value. It stops the follow for a non-empty value. An empty value
@@ -27,7 +29,13 @@ export function nextChoiceValue(
   if (locked && currentValue !== "") return undefined;
   const priorBase = deriveKey(resolveDraftLocalizedText(priorName, baseLocale, baseLocale) ?? "");
   const newDerived = deriveKey(resolveDraftLocalizedText(newName, baseLocale, baseLocale) ?? "");
-  const priorSuffixed = priorBase !== "" && new RegExp(`^${priorBase}_[0-9]+$`).test(currentValue);
+  // A name that derives nothing never moves the value, so clearing a name
+  // keeps the value and the default that names it.
+  if (newDerived === "") return undefined;
+  // A value under a name that derives nothing counts as derived: the next
+  // name that derives something sets it.
+  if (priorBase === "") return dedupeKey(newDerived, taken);
+  const priorSuffixed = new RegExp(`^${priorBase}_[0-9]+$`).test(currentValue);
   if (!shouldAutoDeriveKey(currentValue, dedupeKey(priorBase, taken)) && !priorSuffixed) return undefined;
   return dedupeKey(newDerived, taken);
 }
