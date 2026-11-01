@@ -721,6 +721,7 @@ export function FieldsTab({
           onMoveField={moveField}
           openMoreFor={openMoreFor}
           onMoreOpened={clearOpenMore}
+          visible={visible}
         />
       </div>
       {/* Outside the keyed `FieldEditor`, which a confirm remounts. A modal

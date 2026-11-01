@@ -21,6 +21,7 @@ import { useDataLists } from "./shared/useDataLists.js";
 import { columnMappingRows, declaredColumns, mappableTargets, showsColumnMapping } from "./columnMappingLogic.js";
 import type { StudioDataList } from "../api/types.js";
 import { IssueItems } from "./shared/IssueList";
+import { KindDropDialog, TechnicalClearDialog } from "./confirmations.js";
 import { LocalizedTextInput } from "./shared/LocalizedTextInput";
 import { FieldValidationEditor } from "./shared/FieldValidationEditor";
 import { DefaultValueEditor } from "./shared/DefaultValueEditor";
@@ -611,7 +612,7 @@ function FieldKeyInput({ field, notice, onCommitted }: FieldKeyInputProps) {
 
 /**
  * Applies a kind switch, dropping the `format` or `control` the new kind does
- * not name and saying so before it happens.
+ * not name.
  *
  * A kind names one `{type, format, control}` triple, so the switch writes all
  * three at once. A key the entry omits is written as `undefined`, which
@@ -620,29 +621,21 @@ function FieldKeyInput({ field, notice, onCommitted }: FieldKeyInputProps) {
  * `checkFieldFormatControl` rejects, and the picker would offer nothing that
  * says why.
  */
-function changeKind(field: DraftField, raw: string, onChange: (patch: Partial<DraftField>) => void): void {
+function changeKind(raw: string, onChange: (patch: Partial<DraftField>) => void): void {
   if (raw === CUSTOM_KIND) {
-    if (!confirmDrops(droppedByKindChange(field, undefined))) return;
     onChange({ type: { type: "", config: {} }, format: undefined, control: undefined });
     return;
   }
   const entry = FIELD_KINDS[raw as FieldKindName];
   if (entry === undefined) return;
-  if (!confirmDrops(droppedByKindChange(field, entry))) return;
   onChange({ type: entry.type, format: entry.format, control: entry.control });
 }
 
-/** One key per whole sentence: a translator reads the sentence, never two
- * halves glued around a key name. */
-function confirmDrops(dropped: ("format" | "control")[]): boolean {
-  if (dropped.length === 0) return true;
-  const message =
-    dropped.length === 2
-      ? t("fieldCatalog.typeDropsBothConfirm")
-      : dropped[0] === "format"
-        ? t("fieldCatalog.typeDropsFormatConfirm")
-        : t("fieldCatalog.typeDropsControlConfirm");
-  return confirm(message);
+/** What a pick from the kind select would drop from `field`. */
+function droppedByKindPick(field: DraftField, raw: string): ("format" | "control")[] {
+  if (raw === CUSTOM_KIND) return droppedByKindChange(field, undefined);
+  const entry = FIELD_KINDS[raw as FieldKindName];
+  return entry === undefined ? [] : droppedByKindChange(field, entry);
 }
 
 /**
@@ -656,7 +649,30 @@ function confirmDrops(dropped: ("format" | "control")[]): boolean {
  * value, so no catalog key translates it. Picking any other entry replaces
  * the triple; the JSON view stays the route back to an unnamed one.
  */
-function KindPicker({ field, onChange }: { field: DraftField; onChange: (patch: Partial<DraftField>) => void }) {
+function KindPicker({
+  field,
+  label,
+  visible,
+  onChange,
+}: {
+  field: DraftField;
+  /** The field's resolved label, for the dialog's heading. */
+  label: string;
+  /** Whether the tab holding this card shows. */
+  visible: boolean;
+  onChange: (patch: Partial<DraftField>) => void;
+}) {
+  // The pick `KindDropDialog` asks about. The select stays controlled, so while
+  // it waits, and after a decline, the select reads the old kind.
+  const [pendingKind, setPendingKind] = useState<{ raw: string; dropped: ("format" | "control")[] } | undefined>(undefined);
+  const kindSelect = useRef<HTMLSelectElement>(null);
+  // A hide declines: a hidden tab body must not hold a modal.
+  if (!visible && pendingKind !== undefined) setPendingKind(undefined);
+  const askKind = (raw: string) => {
+    const dropped = droppedByKindPick(field, raw);
+    if (dropped.length === 0) changeKind(raw, onChange);
+    else setPendingKind({ raw, dropped });
+  };
   const custom = isCustomType(field.type);
   const kind = custom ? undefined : fieldKindOf(field);
   const unnamed = !custom && kind === undefined;
@@ -672,7 +688,7 @@ function KindPicker({ field, onChange }: { field: DraftField; onChange: (patch: 
         {/* The written face, not mono: a kind name is a word an author reads,
             not a value the engine matches. The one exception is the raw
             triple below, which is exactly such a value. */}
-        <select value={custom ? CUSTOM_KIND : (kind ?? "")} onChange={(e) => changeKind(field, e.target.value, onChange)}>
+        <select ref={kindSelect} value={custom ? CUSTOM_KIND : (kind ?? "")} onChange={(e) => askKind(e.target.value)}>
           {unnamed && (
             <option {...stylex.props(styles.studioMono)} value="">
               {rawTriple}
@@ -687,6 +703,18 @@ function KindPicker({ field, onChange }: { field: DraftField; onChange: (patch: 
         </select>
       </label>
       {kind !== undefined && <p {...stylex.props(styles.studioNote)}>{kindNote}</p>}
+      {visible && pendingKind !== undefined && (
+        <KindDropDialog
+          label={label}
+          dropped={pendingKind.dropped}
+          triggerRef={kindSelect}
+          onCancel={() => setPendingKind(undefined)}
+          onConfirm={() => {
+            setPendingKind(undefined);
+            changeKind(pendingKind.raw, onChange);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -839,6 +867,8 @@ interface FieldEditorProps {
   /** True while `FieldsTab` asks this card to open More: a Read by row of
    * another field, or of this one, named this field's rule or default. */
   openMore: boolean;
+  /** Whether the tab holding this card shows. A hide clears a waiting dialog. */
+  visible: boolean;
   /** Tells `FieldsTab` the card opened More, so it clears the request and a
    * later manual close holds. */
   onMoreOpened: () => void;
@@ -870,6 +900,7 @@ function FieldEditor({
   onAdd,
   openMore,
   onMoreOpened,
+  visible,
 }: FieldEditorProps) {
   const { draft, mutate, contentLocale, validation } = useDraft();
   const published = usePublishedFieldIds();
@@ -997,11 +1028,17 @@ function FieldEditor({
   };
 
   const technicalChecked = field.technical === true;
+  // The count `TechnicalClearDialog` states, while it asks. The checkbox stays
+  // controlled, so while it waits, and after a decline, the box stays clear.
+  const [pendingTechnical, setPendingTechnical] = useState<number | undefined>(undefined);
+  const technicalBox = useRef<HTMLInputElement>(null);
+  // A hide declines: a hidden tab body must not hold a modal.
+  if (!visible && pendingTechnical !== undefined) setPendingTechnical(undefined);
   const toggleTechnical = (next: boolean) => {
     if (fieldId === undefined) return;
     const clearCount = countTechnicalClearKeys(draft, fieldId);
-    if (needsTechnicalToggleConfirm(next, clearCount) && !confirm(t("fieldCatalog.technicalClearConfirm").replace("{count}", String(clearCount)))) return;
-    mutate((d) => applyTechnicalMarker(d, fieldId, next));
+    if (needsTechnicalToggleConfirm(next, clearCount)) setPendingTechnical(clearCount);
+    else mutate((d) => applyTechnicalMarker(d, fieldId, next));
   };
 
   const writeRequired = (next: boolean) => {
@@ -1099,7 +1136,7 @@ function FieldEditor({
       )}
 
       <CardSection heading={t("fieldCard.kindHeading")} issues={zoned("kind")} anchorId={fieldCheckAnchorId("kind")} ruled={false}>
-        <KindPicker field={field} onChange={onChange} />
+        <KindPicker field={field} label={label} visible={visible} onChange={onChange} />
       </CardSection>
 
       {choicesShown && (
@@ -1387,7 +1424,7 @@ function FieldEditor({
           </MorePart>
 
           <label {...stylex.props(styles.fieldRowLabel, styles.checkboxLabel)}>
-            <input type="checkbox" checked={technicalChecked} disabled={isGroup} onChange={(e) => toggleTechnical(e.target.checked)} />
+            <input ref={technicalBox} type="checkbox" checked={technicalChecked} disabled={isGroup} onChange={(e) => toggleTechnical(e.target.checked)} />
             {t("fieldCard.technicalLabel")}
           </label>
 
@@ -1438,6 +1475,19 @@ function FieldEditor({
           {t("fieldCatalog.removeField")}
         </button>
       </div>
+      {/* Outside the checkbox's label, where a press in the dialog would toggle the box. */}
+      {visible && pendingTechnical !== undefined && (
+        <TechnicalClearDialog
+          label={label}
+          count={pendingTechnical}
+          triggerRef={technicalBox}
+          onCancel={() => setPendingTechnical(undefined)}
+          onConfirm={() => {
+            setPendingTechnical(undefined);
+            if (fieldId !== undefined) mutate((d) => applyTechnicalMarker(d, fieldId, true));
+          }}
+        />
+      )}
     </article>
   );
 }
@@ -1465,6 +1515,8 @@ interface Props {
   openMoreFor?: string;
   /** Called once the card opened More for `openMoreFor`. */
   onMoreOpened?: () => void;
+  /** Whether the tab holding this panel shows. A hide clears a waiting dialog. */
+  visible?: boolean;
 }
 
 const NOOP = () => {};
@@ -1480,6 +1532,7 @@ export function FieldCatalogPanel({
   onMoveField,
   openMoreFor,
   onMoreOpened = NOOP,
+  visible = true,
 }: Props) {
   const { draft, mutate } = useDraft();
   const fields = draft.fields ?? [];
@@ -1541,6 +1594,7 @@ export function FieldCatalogPanel({
         onAdd={onAdd}
         openMore={openMoreFor !== undefined && openMoreFor === field.id}
         onMoreOpened={onMoreOpened}
+        visible={visible}
       />
       <button type="button" className="btn btn-secondary" onClick={() => onAdd()}>
         {t("fieldCatalog.addField")}

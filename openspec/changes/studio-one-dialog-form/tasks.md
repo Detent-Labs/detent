@@ -40,16 +40,16 @@
 
 ## 4. The prompts convert (studio-app, studio-canvas)
 
-- [ ] 4.1 Add `panels/confirmations.tsx` with the seven components of D6 and the sentences of D7. Remove each prompt's old catalog key. Add `studio-confirmations.test.tsx` with each heading, body and confirm label.
-- [ ] 4.2 Convert `root.tsx` per D5. Update `studio-leave-guard.test.ts`: pin `askLeave`'s dirty read, and each wrapper's callee inside its `proceed`, with its mutation cases.
-- [ ] 4.3 Convert `EditScreen.tsx`'s Arrange and restore per D6, with the openers and landings of D4.
-- [ ] 4.3a Update `studio-stash-wiring.test.ts` to `askRestore`, keeping its `requestRunning` pin and its mutation. Drop the removed key from `studio-restoreNotice.test.tsx`.
-- [ ] 4.4 Convert `FieldCatalogPanel.tsx`'s `changeKind` and `toggleTechnical` per D6, with `visible` passed down. A hide clears each pending state. `FieldCatalogPanel` writes `visible = true`, so its static test still types. Rewrite the comment in `field-usage.ts`.
-- [ ] 4.5 Convert `ProcessesScreen.tsx`'s discard onto `DiscardDraftDialog`, with the refusal inside it and the focus landing of D4. Add a name link id on the row.
-- [ ] 4.5a Hold a `discarding` state beside `importing`, and pass it as `busy`. The dialog closes only after the `DELETE` answers. The row landing runs after `load()`.
-- [ ] 4.6 Convert `TemplatesScreen.tsx`'s delete and replace per D6, naming a template by `templateDisplayName`, with the landings of D4.
-- [ ] 4.7 Rewrite `studio-no-confirm.test.ts` to walk `src/areas/studio`, per D11. It fails on a planted `confirm(` in a fixture string and on a second `<dialog` site.
-- [ ] 4.8 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
+- [x] 4.1 Add `panels/confirmations.tsx` with the seven components of D6 and the sentences of D7. Remove each prompt's old catalog key. Add `studio-confirmations.test.tsx` with each heading, body and confirm label.
+- [x] 4.2 Convert `root.tsx` per D5. Update `studio-leave-guard.test.ts`: pin `askLeave`'s dirty read, and each wrapper's callee inside its `proceed`, with its mutation cases.
+- [x] 4.3 Convert `EditScreen.tsx`'s Arrange and restore per D6, with the openers and landings of D4.
+- [x] 4.3a Update `studio-stash-wiring.test.ts` to `askRestore`, keeping its `requestRunning` pin and its mutation. Drop the removed key from `studio-restoreNotice.test.tsx`.
+- [x] 4.4 Convert `FieldCatalogPanel.tsx`'s `changeKind` and `toggleTechnical` per D6, with `visible` passed down. A hide clears each pending state. `FieldCatalogPanel` writes `visible = true`, so its static test still types. Rewrite the comment in `field-usage.ts`.
+- [x] 4.5 Convert `ProcessesScreen.tsx`'s discard onto `DiscardDraftDialog`, with the refusal inside it and the focus landing of D4. Add a name link id on the row.
+- [x] 4.5a Hold a `discarding` state beside `importing`, and pass it as `busy`. The dialog closes only after the `DELETE` answers. The row landing runs after `load()`.
+- [x] 4.6 Convert `TemplatesScreen.tsx`'s delete and replace per D6, naming a template by `templateDisplayName`, with the landings of D4.
+- [x] 4.7 Rewrite `studio-no-confirm.test.ts` to walk `src/areas/studio`, per D11. It fails on a planted `confirm(` in a fixture string and on a second `<dialog` site.
+- [x] 4.8 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
 
 ## 5. A real browser, and the docs (spa-accessibility)
 

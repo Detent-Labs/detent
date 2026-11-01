@@ -48,7 +48,7 @@ describe("DiscardDraftDialog", () => {
     expect(renderDialog()).not.toContain("Last saved");
 
     const row = /<dt[^>]*>Last saved<\/dt><dd[^>]*>([^<]*)<\/dd>/.exec(renderDialog({ lastSavedAt: new Date(2026, 9, 31, 14, 5) }));
-    expect(row![1]).toContain("2026");
+    expect(row![1]).toContain("Oct 31, 2026");
     expect(row![1]).toMatch(/\d{1,2}:05/);
   });
 

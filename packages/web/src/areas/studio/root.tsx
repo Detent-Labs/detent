@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { Workflow, LayoutTemplate } from "lucide-react";
 import { matchRoute, routePath, ROUTE_ROLE, type Route } from "./routing.js";
@@ -13,6 +13,8 @@ import { VersionsScreen } from "./screens/VersionsScreen.js";
 import { MigrationPlanScreen } from "./screens/MigrationPlanScreen.js";
 import { ToolsScreen } from "./screens/ToolsScreen.js";
 import { TemplatesScreen } from "./screens/TemplatesScreen.js";
+import { LeaveDraftDialog } from "./panels/confirmations.js";
+import { activeControl } from "./panels/shared/dialogFocus.js";
 import type { AreaRootProps } from "../../shell/App.js";
 
 // The only role this file names on its own. Every other per-screen role comes
@@ -90,25 +92,39 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
     if (route.name !== "edit") dirtyRef.current = false;
   }, [route.name]);
 
-  // The one prompt for leaving an open, unsaved draft. A clean draft, or any
-  // screen but the edit screen, leaves `dirtyRef` false and asks nothing.
-  const confirmLeave = () => !dirtyRef.current || confirm(t("app.leaveDraftConfirm"));
+  // The exit `LeaveDraftDialog` asks about, while the dialog stays open, and the
+  // control that held the focus when the exit was asked for.
+  const [leaving, setLeaving] = useState<(() => void) | undefined>(undefined);
+  const leaveTrigger = useRef<HTMLElement | null>(null);
+  // A browser Back or Forward under the open dialog settles the question.
+  useEffect(() => {
+    setLeaving(undefined);
+  }, [localPath]);
 
-  // Each exit from the draft goes through `confirmLeave`: in-area navigation,
-  // an href leaving the area, and the account menu's logout. `dest`, not
-  // `route`, so the parameter does not shadow the outer `route` above.
-  // `onUnauthorized` stays raw: a dead session asks nothing.
+  // The one question before leaving an open, unsaved draft. A clean draft, or
+  // any screen but the edit screen, leaves `dirtyRef` false and asks nothing.
+  const askLeave = (proceed: () => void) => {
+    if (!dirtyRef.current) {
+      proceed();
+      return;
+    }
+    leaveTrigger.current = activeControl();
+    setLeaving(() => proceed);
+  };
+
+  // Each exit from the draft goes through `askLeave`: in-area navigation, an
+  // href leaving the area, and the account menu's logout. `dest`, not `route`,
+  // so the parameter does not shadow the outer `route` above. `onUnauthorized`
+  // stays raw: a dead session asks nothing.
   const guardedNavigate = (dest: Route, opts?: NavigateOptions) => {
-    if (dest.name !== "edit" && !confirmLeave()) return;
-    navigate(dest, opts);
+    if (dest.name === "edit") navigate(dest, opts);
+    else askLeave(() => navigate(dest, opts));
   };
   const guardedGo = (href: string, opts?: NavigateOptions) => {
-    if (!confirmLeave()) return;
-    go(href, opts);
+    askLeave(() => go(href, opts));
   };
   const guardedLogout = () => {
-    if (!confirmLeave()) return;
-    onLogout();
+    askLeave(() => onLogout());
   };
 
   // The browser words this prompt. Modern browsers need `preventDefault()` to
@@ -189,6 +205,19 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
       onGoToProfile={() => guardedGo(PROFILE_PATH)}
       nav={nav}
     >
+      {/* Wrapped: `.shell > *` sets every direct child's width, a dialog's too. */}
+      {leaving !== undefined && (
+        <div>
+          <LeaveDraftDialog
+            triggerRef={leaveTrigger}
+            onCancel={() => setLeaving(undefined)}
+            onConfirm={() => {
+              setLeaving(undefined);
+              leaving();
+            }}
+          />
+        </div>
+      )}
       {!may(required) && <MissingRole roles={required} />}
       {may(required) && (
         <>

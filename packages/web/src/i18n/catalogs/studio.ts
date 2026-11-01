@@ -18,13 +18,38 @@
 export const en = {
   "app.title": "Process Studio",
   "app.draftIncomplete": "Some checks cannot run yet. Open Checks and fix what it lists.",
-  "app.leaveDraftConfirm": "Leave this draft? Unsaved edits will be lost.",
   "app.screenLoading": "Loading the screen…",
   "app.processLegend": "Process",
 
   // The one dialog form's own words (`panels/shared/StudioDialog.tsx`).
   "dialog.cancel": "Cancel",
   "dialog.noUndo": "The studio has no undo.",
+
+  // The confirmations that stand in `panels/confirmations.tsx`.
+  "leaveDialog.heading": "Leave this draft?",
+  "leaveDialog.body": "Your unsaved changes go with it. The saved draft stays.",
+  "leaveDialog.confirm": "Leave without saving",
+  "arrangeDialog.heading": "Arrange every step?",
+  "arrangeDialog.body": "Every step moves to a new place, and each path loses the bends placed on it.",
+  "arrangeDialog.confirm": "Arrange",
+  "restoreDialog.heading": "Replace your current changes?",
+  "restoreDialog.body": "The restored copy takes their place.",
+  "restoreDialog.confirm": "Replace them",
+  "kindDropDialog.heading": "Change the kind of “{field}”?",
+  "kindDropDialog.bodyFormat": "The new kind cannot keep this field's format.",
+  "kindDropDialog.bodyControl": "The new kind cannot keep how this field asks for its value.",
+  "kindDropDialog.bodyBoth": "The new kind keeps neither this field's format nor how it asks for its value.",
+  "kindDropDialog.confirm": "Change kind",
+  "technicalDialog.heading": "Mark “{field}” as technical?",
+  "technicalDialog.clearsTerm": "Required and read-only settings it clears",
+  "technicalDialog.body": "The process fills this field in by itself, so no step can require it or make it read-only.",
+  "technicalDialog.confirm": "Mark as technical",
+  "templateDeleteDialog.heading": "Delete “{name}”?",
+  "templateDeleteDialog.body": "Processes already created from it stay as they are.",
+  "templateDeleteDialog.confirm": "Delete template",
+  "templateReplaceDialog.heading": "Replace “{name}”?",
+  "templateReplaceDialog.body": "A template keeps no earlier version, so the old one goes. Processes already created from it stay as they are.",
+  "templateReplaceDialog.confirm": "Replace template",
 
   "draftToolbar.save": "Save",
   "draftToolbar.saving": "Saving…",
@@ -72,7 +97,6 @@ export const en = {
   "restoreNotice.message": "Your session ended while this draft had unsaved changes. Detent kept them in this browser tab.",
   "restoreNotice.restore": "Restore unsaved changes",
   "restoreNotice.discard": "Discard them",
-  "restoreNotice.replaceConfirm": "Replace your current changes with the restored ones?",
 
   "fieldCatalog.heading": "Field catalog",
   "fieldCatalog.addField": "+ Add field",
@@ -104,9 +128,6 @@ export const en = {
   "fieldCatalog.removeDialogConfirmField": "Remove field",
   "fieldCatalog.removeDialogConfirmGroup": "Remove group",
   "fieldCatalog.customTypeOption": "custom (plugin)",
-  "fieldCatalog.typeDropsFormatConfirm": "The new type doesn't allow this field's format. Switch anyway and drop it?",
-  "fieldCatalog.typeDropsControlConfirm": "The new type doesn't allow this field's control. Switch anyway and drop it?",
-  "fieldCatalog.typeDropsBothConfirm": "The new type allows neither this field's format nor its control. Switch anyway and drop both?",
   "fieldCatalog.noneOption": "(none)",
   "fieldCatalog.addSubField": "+ Add field to this group",
   "fieldCatalog.customTypeLabel": "custom type",
@@ -115,8 +136,6 @@ export const en = {
   "fieldCatalog.baseLocaleMark": "base locale",
   "fieldCatalog.translationComplete": "translated",
   "fieldCatalog.translationGap": "{count} missing",
-  "fieldCatalog.technicalClearConfirm":
-    "Checking Technical will clear {count} required/readonly key(s) across this draft's steps. Continue?",
   "fieldCatalog.previewHeading": "How it will look",
   "fieldCatalog.previewResolvesAtRuntime":
     "This field's choices come from a data source. They resolve when a participant reaches this step, not here.",
@@ -1052,8 +1071,6 @@ export const en = {
 
   "canvas.fitToView": "Fit to view",
   "canvas.arrange": "Arrange",
-  "canvas.arrangeConfirm":
-    "Arrange every step from the workflow graph? This overwrites every saved position and clears any waypoint a path carries.",
   "canvas.edgeStyleToggle": "Rounded corners",
   "canvas.selectionHeading": "Steps selected",
   "canvas.selectionRemoveOne": "Remove step",
@@ -1355,7 +1372,6 @@ export const en = {
   "processList.createDraft": "Create draft",
   "processList.versions": "Versions",
   "processList.discard": "Discard draft",
-  "processList.discardConfirm": "Discard the draft of “{name}”? You lose its unpublished edits.",
 
   // The start picker and the import preview (`screens/ProcessesScreen.tsx`).
   "processList.startHeading": "Start a new process",

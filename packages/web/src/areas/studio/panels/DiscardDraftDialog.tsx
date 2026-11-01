@@ -2,10 +2,9 @@ import type { RefObject } from "react";
 import { t } from "../catalog.js";
 import { DestructiveConfirm, DialogFact, DialogFacts, DialogNote, DialogRefusal, StudioDialog } from "./shared/StudioDialog.js";
 
-/** The date and time of the last save, in the browser's locale. */
-function formatSavedAt(at: Date): string {
-  return at.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
+/** A date and time for the studio's English sentences, so a German browser never
+ * prints a German month inside one. */
+export const ABSOLUTE_TIME = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
 
 interface Props {
   /** The process's resolved name, with the untitled fallback already applied. */
@@ -40,7 +39,7 @@ export function DiscardDraftDialog({ processLabel, lastSavedAt, refusal, busy, t
     >
       <DialogFacts>
         <DialogFact term={t("draftToolbar.dialogProcess")}>{processLabel}</DialogFact>
-        {lastSavedAt && <DialogFact term={t("draftToolbar.discardDialogLastSaved")}>{formatSavedAt(lastSavedAt)}</DialogFact>}
+        {lastSavedAt && <DialogFact term={t("draftToolbar.discardDialogLastSaved")}>{ABSOLUTE_TIME.format(lastSavedAt)}</DialogFact>}
       </DialogFacts>
       <DialogNote>{t("draftToolbar.discardDialogKeepsPublished")}</DialogNote>
     </StudioDialog>

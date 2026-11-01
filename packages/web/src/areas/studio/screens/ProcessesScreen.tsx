@@ -46,6 +46,8 @@ import {
   PrimaryConfirm,
   StudioDialog,
 } from "../panels/shared/StudioDialog.js";
+import { activeControl } from "../panels/shared/dialogFocus.js";
+import { ABSOLUTE_TIME, DiscardDraftDialog } from "../panels/DiscardDraftDialog.js";
 
 /** Every class this file's own markup renders. The two dialogs stand on
  * `panels/shared/StudioDialog.tsx`. */
@@ -321,9 +323,6 @@ export function StartPickerDialog({ templates, triggerRef, onCancel, onPick }: S
   );
 }
 
-/** The absolute date and time a `<time>` shows on hover. */
-const ABSOLUTE_TIME = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
-
 /** A relative time, with the absolute date and time on hover. `now` is the one `Date.now()` the list's pass read. */
 function RelativeTime({ iso, now }: { iso: string; now: number }) {
   const absolute = ABSOLUTE_TIME.format(new Date(iso));
@@ -361,6 +360,9 @@ function DeveloperEntry({ term, value }: { term: string; value: string }) {
   );
 }
 
+/** The row's name link, where the focus lands after a discard from that row. */
+const nameLinkId = (processId: string): string => `process-name-${processId}`;
+
 export interface ProcessListRowProps {
   view: ProcessRowView;
   /** Epoch milliseconds, read once per pass of the list. */
@@ -385,6 +387,7 @@ export function ProcessListRow({ view, now, creating, onNavigate, onCreateDraft,
       <td {...stylex.props(styles.tableCell)}>
         <a
           href={areaHref("studio", routePath(view.open))}
+          id={nameLinkId(view.processId)}
           {...stylex.props(styles.nameLink, view.name === "" && styles.quiet)}
           onClick={(e) => {
             if (!isPlainLeftClick(e)) return;
@@ -489,6 +492,14 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | undefined>(undefined);
   const [importResult, setImportResult] = useState<string | undefined>(undefined);
+  // The row `DiscardDraftDialog` asks about, its request, and its refusal.
+  const [pendingDiscard, setPendingDiscard] = useState<ProcessRowView | undefined>(undefined);
+  const [discarding, setDiscarding] = useState(false);
+  const [discardError, setDiscardError] = useState<string | undefined>(undefined);
+  // The row's Discard draft, for the focus return on a decline.
+  const discardTrigger = useRef<HTMLElement | null>(null);
+  // The process whose discard just ended, for the focus landing below.
+  const [discardLanding, setDiscardLanding] = useState<string | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
   // The controls that open the two dialogs, for their focus return.
   const newProcessButton = useRef<HTMLButtonElement>(null);
@@ -499,6 +510,7 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err)));
   const failImport = useFail(onUnauthorized, (err) => setImportError(describeCaughtError(err)));
+  const failDiscard = useFail(onUnauthorized, (err) => setDiscardError(describeCaughtError(err)));
   // The set of processIds with a "Create draft" write in flight, mirrored
   // from `runCreateDraft`'s own held set so the row's button can read it.
   // `runCreateDraft` is created once, lazily: a `useRef` argument would
@@ -651,17 +663,43 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
     setImportResult(undefined);
   };
 
-  const discard = async (view: ProcessRowView) => {
-    const name = view.name || t("processList.untitled");
-    // A function fills the slot, so a `$` pattern in a name prints as written.
-    if (!confirm(t("processList.discardConfirm").replace("{name}", () => name))) return;
+  const askDiscard = (view: ProcessRowView) => {
+    discardTrigger.current = activeControl();
+    setDiscardError(undefined);
+    setPendingDiscard(view);
+  };
+
+  /**
+   * The dialog stays open, its controls disabled, until the `DELETE` answers. A
+   * refusal prints inside it. A discard removes the row when the process has no
+   * published version, so the focus does not return to the row's control: it
+   * lands once the list has reloaded.
+   */
+  const confirmDiscard = async () => {
+    if (!pendingDiscard) return;
+    const { processId } = pendingDiscard;
+    setDiscarding(true);
+    setDiscardError(undefined);
     try {
-      await deleteDraft(view.processId, token);
+      await deleteDraft(processId, token);
+      discardTrigger.current = null;
+      setPendingDiscard(undefined);
       await load();
+      setDiscardLanding(processId);
     } catch (err) {
-      fail(err);
+      failDiscard(err);
+    } finally {
+      setDiscarding(false);
     }
   };
+
+  // The name link of a row that stayed, else Import. An effect, so it runs after
+  // the commit that unmounted the dialog: the page stands inert until then.
+  useEffect(() => {
+    if (discardLanding === undefined) return;
+    (document.getElementById(nameLinkId(discardLanding)) ?? importButton.current)?.focus();
+    setDiscardLanding(undefined);
+  }, [discardLanding]);
 
   // One clock read per pass: a list left open does not tick, and its times move on the next load.
   const now = Date.now();
@@ -720,6 +758,19 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
           onConfirm={() => void confirmImport()}
         />
       )}
+      {pendingDiscard !== undefined && (
+        <DiscardDraftDialog
+          processLabel={pendingDiscard.name || t("processList.untitled")}
+          refusal={discardError === undefined ? null : { message: discardError, detail: null }}
+          busy={discarding}
+          triggerRef={discardTrigger}
+          onCancel={() => {
+            setPendingDiscard(undefined);
+            setDiscardError(undefined);
+          }}
+          onConfirm={() => void confirmDiscard()}
+        />
+      )}
       {error && (
         <div {...stylex.props(styles.errorBanner)} role="alert">
           <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
@@ -743,7 +794,7 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
               creating={creating.has(view.processId)}
               onNavigate={navigate}
               onCreateDraft={(v) => void createDraft(v.processId, v.seedVersion)}
-              onDiscard={(v) => void discard(v)}
+              onDiscard={askDiscard}
             />
           ))}
         </ProcessListTable>

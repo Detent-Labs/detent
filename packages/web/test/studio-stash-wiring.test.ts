@@ -19,8 +19,10 @@ import { describe, expect, it } from "bun:test";
  * unmounts the screen. `RestoreNotice` renders while a stash exists, the form
  * editor's address included: the editor stands under the tab row, so either
  * button's focus move to the open tab finds one. A gate on `formStepId` would
- * hide the notice over the editor. Its two buttons call the restore and
- * discard handlers. Both buttons wait while a save or publish runs (`requestRunning`),
+ * hide the notice over the editor. Its two buttons call `askRestore` and
+ * `discardStash`. `askRestore` asks first over unsaved work and runs
+ * `runRestore`, whose focus move waits for the commit that unmounts the dialog.
+ * Both buttons wait while a save or publish runs (`requestRunning`),
  * because a restore during a save would let the save's answer overwrite the
  * stored revision. The outer
  * `EditScreen` loads the draft before any draft exists, so it keeps the raw
@@ -118,7 +120,7 @@ function scan(source: string): string[] {
     const gate = /\{([^{}]*)$/.exec(code.slice(0, notice.start))?.[1] ?? "";
     if (!/\bstash\s*&&\s*$/.test(gate)) violations.push("RestoreNotice is not gated on stash");
     if (/\bformStepId\b/.test(gate)) violations.push("RestoreNotice is gated on formStepId");
-    if (propValue(notice.tag, "onRestore") !== "restoreStash") violations.push("RestoreNotice onRestore is not restoreStash");
+    if (propValue(notice.tag, "onRestore") !== "askRestore") violations.push("RestoreNotice onRestore is not askRestore");
     if (propValue(notice.tag, "onDiscard") !== "discardStash") violations.push("RestoreNotice onDiscard is not discardStash");
     if (propValue(notice.tag, "disabled") !== "requestRunning") violations.push("RestoreNotice disabled is not requestRunning");
   }
@@ -128,12 +130,30 @@ function scan(source: string): string[] {
   if (!/\bconst\s+requestRunning\s*=\s*actions\.saving\s*\|\|\s*actions\.publishing\s*;/.test(code)) {
     violations.push("requestRunning is not actions.saving || actions.publishing");
   }
-  for (const name of ["restoreStash", "discardStash"]) {
+  for (const name of ["askRestore", "discardStash"]) {
     const handler = new RegExp(`\\bconst\\s+${name}\\s*=\\s*\\(\\)\\s*=>\\s*\\{`).exec(code);
     const handlerBody = handler ? braced(code, handler.index + handler[0].length - 1) : undefined;
     if (handlerBody === undefined || !/\brequestRunning\b/.test(handlerBody)) {
       violations.push(`${name} does not return early while a request runs`);
     }
+  }
+
+  // A restore asks only over unsaved work, and a clean draft restores at once.
+  const ask = /\bconst\s+askRestore\s*=\s*\(\)\s*=>\s*\{/.exec(code);
+  const askBody = ask ? braced(code, ask.index + ask[0].length - 1)?.replace(/\s+/g, " ") : undefined;
+  if (askBody === undefined || !/\bif \(dirtyNow\) \{ restoreTrigger\.current = activeControl\(\); setRestoreAsked\(true\); \} else \{ runRestore\(\); \}/.test(askBody)) {
+    violations.push("askRestore does not ask only while dirtyNow");
+  }
+  // The page behind an open dialog stands inert until the commit that unmounts
+  // it, so the landing is a pending focus. A confirm clears the ref the frame
+  // would otherwise focus.
+  const run = /\bconst\s+runRestore\s*=\s*\(\)\s*=>\s*\{/.exec(code);
+  const runBody = run ? braced(code, run.index + run[0].length - 1) : undefined;
+  if (runBody === undefined || !/\bsetPendingFocus\(\{ tab: openTab \}\)/.test(runBody)) violations.push("runRestore does not land through setPendingFocus");
+  const dialog = openingTag(code, "RestoreOverChangesDialog");
+  if (dialog === undefined) violations.push("RestoreOverChangesDialog is not rendered");
+  else if (!/\brestoreTrigger\.current = null;[\s\S]*\brunRestore\(\)/.test(propValue(dialog.tag, "onConfirm") ?? "")) {
+    violations.push("the restore confirm does not clear its trigger and run the restore");
   }
 
   // A clean draft has no work to keep, so the 401 stores nothing for it.
@@ -225,9 +245,9 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
   });
 
   it("a RestoreNotice whose buttons call the wrong handlers is flagged", () => {
-    const restore = mutate(real, /onRestore=\{restoreStash\}/, "onRestore={discardStash}");
-    expect(scan(restore)).toEqual(["RestoreNotice onRestore is not restoreStash"]);
-    const discard = mutate(real, /onDiscard=\{discardStash\}/, "onDiscard={restoreStash}");
+    const restore = mutate(real, /onRestore=\{askRestore\}/, "onRestore={discardStash}");
+    expect(scan(restore)).toEqual(["RestoreNotice onRestore is not askRestore"]);
+    const discard = mutate(real, /onDiscard=\{discardStash\}/, "onDiscard={askRestore}");
     expect(scan(discard)).toEqual(["RestoreNotice onDiscard is not discardStash"]);
   });
 
@@ -245,9 +265,26 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
 
   it("a restore or discard that runs during a save is flagged", () => {
     const restore = mutate(real, /stash === undefined \|\| requestRunning/, "stash === undefined");
-    expect(scan(restore)).toEqual(["restoreStash does not return early while a request runs"]);
+    expect(scan(restore)).toEqual(["askRestore does not return early while a request runs"]);
     const discard = mutate(real, /(\bconst discardStash = \(\) => \{\s*)if \(requestRunning\) return;\s*/, "$1");
     expect(scan(discard)).toEqual(["discardStash does not return early while a request runs"]);
+  });
+
+  it("a restore that asks with no unsaved work, or never asks, is flagged", () => {
+    const inverted = mutate(real, /\bif \(dirtyNow\) (\{\s*restoreTrigger)/, "if (!dirtyNow) $1");
+    expect(scan(inverted)).toEqual(["askRestore does not ask only while dirtyNow"]);
+    const never = mutate(real, /setRestoreAsked\(true\);/, "runRestore();");
+    expect(scan(never)).toEqual(["askRestore does not ask only while dirtyNow"]);
+  });
+
+  it("a restore that moves the focus behind the open dialog is flagged", () => {
+    const direct = mutate(real, /setPendingFocus\(\{ tab: openTab \}\);/, "focusTabButton(openTab);");
+    expect(scan(direct)).toEqual(["runRestore does not land through setPendingFocus"]);
+  });
+
+  it("a restore confirm that keeps its trigger ref is flagged", () => {
+    const kept = mutate(real, /\s*restoreTrigger\.current = null;/, "");
+    expect(scan(kept)).toEqual(["the restore confirm does not clear its trigger and run the restore"]);
   });
 
   it("a 401 that stashes a clean draft is flagged", () => {
@@ -280,7 +317,7 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
     const gone = mutate(
       real,
       /\{stash && <RestoreNotice[^>]*\/>\}/,
-      "{/* {stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} />} */}",
+      "{/* {stash && <RestoreNotice onRestore={askRestore} onDiscard={discardStash} />} */}",
     );
     expect(scan(gone)).toEqual(["RestoreNotice is not rendered"]);
   });
