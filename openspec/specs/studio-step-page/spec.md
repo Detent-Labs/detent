@@ -11,17 +11,28 @@ author walks the process from its first step to its last without a diagram.
 ### Requirement: The Steps tab lays out a rail beside one page
 
 The Steps tab SHALL carry a steps rail on its leading edge and one step page
-beside it. The rail SHALL keep a fixed width and scroll on its own. The page
-SHALL hold the one selected step.
+beside it. The rail SHALL keep a fixed width of 22rem and scroll on its own.
+The page SHALL hold the one selected step.
 
 Selecting a step in the rail SHALL open that step on the page. The rail SHALL
 mark which step the page holds.
+
+Below 64rem the rail SHALL stand above the page, capped at 20rem, and scroll
+inside that cap. The page SHALL then scroll with the tab body rather than on
+its own. The tab body then holds two scroll boxes.
 
 #### Scenario: Picking a step in the rail opens it
 
 - **WHEN** an author presses the third row of the steps rail
 - **THEN** the step page holds that step
 - **AND** the rail marks that row as the current one
+
+#### Scenario: The page scrolls with the tab body below 64rem
+
+- **WHEN** the window stands 420px wide and the open step's body outgrows the
+  viewport
+- **THEN** the tab body scrolls the rail and the page as one
+- **AND** the page has no scroll box of its own
 
 ### Requirement: The steps rail lists each step in the draft's own order
 
@@ -36,6 +47,9 @@ Each row SHALL carry a number and the step's label. A row SHALL have no summary
 line under the label. That holds for every step kind: a task step, a call to
 another process, and an end step. The step page names who works a step, the
 fields its form carries, the process it calls and its outcome.
+
+A step with no label SHALL read "(unnamed step)" in its row. The row SHALL
+print no key.
 
 #### Scenario: The rail numbers steps in the draft's own order
 
@@ -73,6 +87,12 @@ fields its form carries, the process it calls and its outcome.
 
 - **WHEN** an end step declares the outcome `approved`
 - **THEN** its rail row has no line naming that outcome
+
+#### Scenario: An unnamed step's row reads the placeholder
+
+- **WHEN** a step has an empty label and the key `review`
+- **THEN** its rail row reads "(unnamed step)"
+- **AND** the row does not contain `review`
 
 ### Requirement: A rail row carries its own open issue count
 
@@ -122,7 +142,8 @@ key input.
 
 The step's key input SHALL stand inside the Developer view under "Key",
 and typing there SHALL write the key. The page SHALL mark the first step
-and carry one control that removes the step.
+and carry one control that removes the step. That control SHALL open the
+confirmation dialog this capability requires.
 
 #### Scenario: Renaming the step on the page
 
@@ -329,56 +350,225 @@ numbers each step.
 - **THEN** the operand picker offers "Name" and "Name (2)"
 - **AND** an output-mapping select offers "Name" and "Name (2)"
 
-### Requirement: The step page stands its sections open in two columns
+### Requirement: The step page folds its sections into one accordion
 
-The step page SHALL lay its sections in two columns. No section SHALL
-collapse. The leading column SHALL carry Ways out, Who acts, Cancellable,
-Which process it calls, and How the case ends. The trailing column SHALL
-carry When entered, When left, Time limit, Form, and Collaboration.
+The step page SHALL lay its sections in one column, under the masthead. Each
+section SHALL hold a header and a body. The header SHALL be a button that
+opens and closes the body. The body of a closed section SHALL stay out of
+view. No section SHALL stand beside another.
 
-A section SHALL stand only where the step's kind declares it. A task step
-carries Who acts. A subprocess step carries Which process it calls. An end
-step carries How the case ends. It has no way out, so it carries
-neither When left nor Time limit.
+#### Scenario: A task step's sections stand in one column
 
-A task step and a subprocess step both carry Cancellable. An end step has no
-Cancellable section. An instance resting on a terminal step has already left
-the running state the field governs. So the setting has nothing left to
-apply to.
+- **WHEN** the step page holds a task step
+- **THEN** its sections stand one under the other
+- **AND** each section's header is a button
 
-A subprocess step also drops the Collaboration section. It is an automatic
-wait-state with no participant-facing task screen for the setting to govern.
+#### Scenario: A closed body stays out of view
 
-This replaces the runtime-order register of collapsible sections. An author
-reads every setting of one step without opening anything.
+- **WHEN** a section stands closed
+- **THEN** none of its controls is visible
+- **AND** its header stays visible
 
-#### Scenario: A task step carries the task sections
+### Requirement: A step's kind decides its sections
+
+A task step SHALL carry six sections. They read Who acts, Form, Ways out,
+Time limit, When entered or left and More, in that order. A subprocess step
+SHALL swap Who acts and Form for Which process it calls, standing first. An
+end step SHALL swap Ways out for How the case ends and have no Time limit.
+Its fifth section SHALL read When entered.
+
+More SHALL hold the Developer view. It SHALL hold Cancellable and the
+Collaboration controls where the kind carries them.
+
+#### Scenario: A task step carries six sections
 
 - **WHEN** the step page holds a task step that is not an end
-- **THEN** the page carries Ways out, Who acts, Cancellable, When entered,
-  When left, Time limit, Form and Collaboration
-- **AND** the page has no Which process it calls section
+- **THEN** the headers read Who acts, Form, Ways out, Time limit, When entered
+  or left and More, in that order
+- **AND** no header reads Which process it calls or How the case ends
 
-<!-- Why: this heading is what a future MODIFIED delta against this
-     requirement will need to match, byte for byte. -->
-<!-- antislop: allow negation-habit -->
-#### Scenario: An end step carries no outgoing path
-
-- **WHEN** the step page holds an end step
-- **THEN** the page carries How the case ends
-- **AND** the page has no Ways out section, no When left section, no Time
-  limit section and no Cancellable section
-
-#### Scenario: Every section stands open
-
-- **WHEN** an author opens any step on the step page
-- **THEN** every section of that step is readable without a press
-
-#### Scenario: A subprocess step has no Collaboration section
+#### Scenario: A subprocess step calls a process first
 
 - **WHEN** the step page holds a subprocess step
-- **THEN** the page carries Which process it calls
-- **AND** the page has no Collaboration section
+- **THEN** the headers read Which process it calls, Ways out, Time limit, When
+  entered or left and More
+- **AND** that is their order
+- **AND** no header reads Who acts or Form
+
+#### Scenario: An end step says how the case ends
+
+- **WHEN** the step page holds an end step
+- **THEN** the headers read Who acts, Form, How the case ends, When entered
+  and More, in that order
+- **AND** no header reads Ways out or Time limit
+
+#### Scenario: More gathers the step's settings
+
+- **WHEN** an author opens More on a task step
+- **THEN** the body holds the cancelling control, the Comment and Attachments
+  controls and the Developer view
+
+### Requirement: A section header carries a summary and its state
+
+Each header SHALL carry the section's name, a one-line summary of what it
+holds, and a state. The summary SHALL use the author's words. A machine value
+in it SHALL print in the mono face.
+
+A done section SHALL carry a check mark named "Done". A section with an open
+check SHALL carry the count instead, in the steps rail's badge. A section
+still to do SHALL carry the word "To do". A section with nothing set and
+nothing needed SHALL have no mark, and its summary SHALL say what is missing.
+
+#### Scenario: Who acts names the assignment
+
+- **WHEN** a task step assigns a group's members
+- **THEN** the Who acts header's summary names that strategy in words
+- **AND** the header carries the Done mark
+
+#### Scenario: Ways out lists the ways out
+
+- **WHEN** a step carries a way out "Approve → Done" and one "Reject →
+  Rework"
+- **THEN** the Ways out header's summary reads both headings
+- **AND** the header carries the Done mark
+
+#### Scenario: An empty section says what is missing
+
+- **WHEN** a task step has no way out, and no check names its paths
+- **THEN** the Ways out header's summary reads "No way out yet"
+- **AND** the header reads "To do" and has no Done mark
+
+#### Scenario: A section with a check carries the count
+
+- **WHEN** a structural check names a step's assignment
+- **THEN** the Who acts header carries a badge reading 1
+- **AND** the header has no Done mark
+
+#### Scenario: The open header carries the current mark
+
+- **WHEN** Form stands open
+- **THEN** the Form header carries the current mark on its leading edge
+- **AND** its name prints in ink while the other five print in slate
+
+#### Scenario: More summarizes the overrides
+
+- **WHEN** a step overrides nothing of cancelling, comments or attachments
+- **THEN** the More header's summary reads "Follows the process settings"
+
+#### Scenario: How the case ends prints the outcome in mono
+
+- **WHEN** an end step declares the outcome `approved`
+- **THEN** the How the case ends header's summary reads `approved` in the
+  mono face
+
+### Requirement: One section stands open at a time
+
+At most one section SHALL stand open. Opening a section SHALL close the open
+one. Pressing the open section's header SHALL close it. A selected way out
+SHALL open Ways out.
+
+#### Scenario: Opening one closes the other
+
+- **WHEN** Who acts stands open and the author presses the Form header
+- **THEN** Form stands open
+- **AND** Who acts stands closed
+
+#### Scenario: The open header closes its section
+
+- **WHEN** Form stands open and the author presses the Form header
+- **THEN** no section stands open
+
+#### Scenario: A selected way out opens Ways out
+
+- **WHEN** a press on a canvas path selects a way out of this step
+- **THEN** Ways out stands open
+- **AND** that way out's row carries the current mark
+
+### Requirement: The page opens on the section that needs the author
+
+On open, the page SHALL open the first section carrying an open check. It
+SHALL open the first section still to do when no section carries a check. It
+SHALL open the first section when none is to do.
+
+A section is to do where it is empty and the step needs it. Those are Ways
+out and Which process it calls. Who acts counts on a task step with a manual
+way out or none. How the case ends counts where the process declares
+outcomes.
+
+#### Scenario: A check decides which section opens first
+
+- **WHEN** a step opens with a check on a time limit and none elsewhere
+- **THEN** Time limit stands open
+
+#### Scenario: An unassigned task step opens on Who acts
+
+- **WHEN** a task step opens with no assignment and no open check
+- **THEN** Who acts stands open
+
+#### Scenario: A complete step opens on its first section
+
+- **WHEN** a task step opens with an assignment, a way out and no open check
+- **THEN** Who acts stands open
+
+#### Scenario: An automatic step does not open on Who acts
+
+- **WHEN** a task step with no assignment has two automatic ways out and no
+  open check
+- **THEN** Who acts has no To do word
+- **AND** the page opens on Who acts only because it is the first section
+
+### Requirement: Removing a step confirms first
+
+Remove this step SHALL open a modal dialog before the removal. The dialog
+SHALL name the step. It SHALL state that the studio has no undo.
+
+Cancel SHALL hold the initial focus. The confirming control SHALL stay outlined. A decline
+SHALL leave the step as it was. The control that opens the dialog SHALL take
+the destructive outline.
+
+#### Scenario: Pressing Remove this step opens the dialog
+
+- **WHEN** an author presses Remove this step
+- **THEN** a dialog opens naming the step
+- **AND** the step stays until the author confirms
+
+#### Scenario: Confirming removes the step
+
+- **WHEN** the author confirms that dialog
+- **THEN** the draft no longer holds the step
+- **AND** the ways out that led to it stay, and the Checks tab reports them
+- **AND** focus lands on the steps rail's current row
+
+#### Scenario: Cancel holds the focus
+
+- **WHEN** the dialog opens
+- **THEN** keyboard focus stands on Cancel
+- **AND** Enter on the open dialog declines
+
+### Requirement: The removal dialog counts what the removal reaches
+
+The dialog SHALL count the ways out of other steps that lead to the step. It
+SHALL count the fields on its form too. Each count SHALL stand in one fact
+row, where it is above zero. Where other steps lead to the step, the dialog
+SHALL say that those ways out stay. It SHALL say the checks report them. Where the step
+is the first step, the dialog SHALL say that the first remaining step takes
+its place.
+
+#### Scenario: Removing a step the others lead to
+
+- **WHEN** an author presses Remove this step on a step two ways out lead to
+- **THEN** the dialog counts two ways out leading here
+- **AND** it says those ways out stay and the checks report them
+
+#### Scenario: Removing a step nothing leads to
+
+- **WHEN** an author presses Remove this step on a step no way out leads to
+- **THEN** the dialog shows no fact row for ways out leading here
+
+#### Scenario: Removing the first step
+
+- **WHEN** an author presses Remove this step on the process's first step
+- **THEN** the dialog says the first remaining step takes its place
 
 ### Requirement: The Form section states the form's size in words
 
@@ -442,39 +632,41 @@ yet", and "Open the form" otherwise. Those are the Forms card's own words.
 
 ### Requirement: The Cancellable section sets a step's participant-cancel override
 
-The Cancellable section SHALL let an author set that step's `cancellable`
+<!-- antislop: allow sentence-length -->
+<!-- Why: this paragraph is the live spec's own text, copied so the archive keeps it; only its first words changed. -->
+The More section SHALL let an author set that step's `cancellable`
 field to one of three states. Those are unset (inherit the process's own
 default), explicitly cancellable, or explicitly not cancellable. Setting it SHALL write
 `Step.cancellable` in the draft; choosing the inherit state SHALL remove the
 key from the step rather than writing a redundant explicit value equal to the
 process's current default.
 
-The section SHALL name the effective outcome in the inherit state: whether a
+The control SHALL name the effective outcome in the inherit state: whether a
 running instance would resolve as cancellable there. That way, an author
 need not open the process-wide setting separately to know what "inherit"
-currently means.
+currently means. An end step SHALL have no cancelling control.
 
 #### Scenario: Setting a step to explicitly not cancellable
 
-- **WHEN** an author sets a task step's Cancellable section to "not
+- **WHEN** an author sets a task step's cancelling control to "not
   cancellable"
 - **THEN** the draft's step carries `cancellable: false`
 
 #### Scenario: Returning a step to the inherited default
 
-- **WHEN** an author returns a step's Cancellable section from an explicit
+- **WHEN** an author returns a step's cancelling control from an explicit
   state to "inherit"
 - **THEN** the draft's step has no `cancellable` key
 
 #### Scenario: The inherit state names the process's current default
 
-- **WHEN** a step's Cancellable section stands in the inherit state and the
+- **WHEN** a step's cancelling control stands in the inherit state and the
   process itself declares `cancellable: false`
-- **THEN** the section names the effective outcome as not cancellable
+- **THEN** the control names the effective outcome as not cancellable
 
 ### Requirement: The Collaboration section offers a three-state control per field
 
-The Collaboration section SHALL carry a three-state control each for
+The More section SHALL carry a three-state control each for
 Comment and Attachments, offering three states: Default, On, and Off.
 Selecting Default SHALL clear the step's own override for
 that key, so the step reads as `undefined` for it. It then inherits the
@@ -483,6 +675,8 @@ or Off SHALL set the step's own override to `true` or `false`. While
 Default is the selected state, the control SHALL visibly name the
 process-wide default's current resolved value for that key. That value
 might read as "Currently: on", for example.
+
+A subprocess step SHALL carry neither control.
 
 #### Scenario: Selecting Default clears the step's own override
 
@@ -500,10 +694,11 @@ might read as "Currently: on", for example.
 
 ### Requirement: A section prints its own open issues beside its heading
 
-Each section SHALL print the open issues that belong to it, beside its own
-heading. An issue about the assignment SHALL stand at Who acts. An issue
-about a way out SHALL stand at Ways out. An issue about the form SHALL
-stand at Form.
+Each section SHALL print the open issues that belong to it inside its body,
+above its controls, as sentences. The header SHALL count them. An issue about
+the assignment SHALL stand at Who acts. An issue about a way out SHALL stand
+at Ways out, in that way out's row. An issue about the form SHALL stand at
+Form.
 
 An issue SHALL stand at exactly one section. The Checks tab SHALL keep listing
 every issue, including those a section already prints.
@@ -511,18 +706,25 @@ every issue, including those a section already prints.
 #### Scenario: An unassigned step prints its issue at Assignment
 
 - **WHEN** a task step declares no assignment
-- **THEN** the Who acts section prints that issue beside its heading
+- **THEN** the Who acts section prints that issue inside its body
 
 #### Scenario: The Checks tab keeps the same issue
 
 - **WHEN** the Who acts section prints an issue
 - **THEN** the Checks tab still lists that issue
 
+#### Scenario: A way out's issue stays at its row
+
+- **WHEN** a check names a way out's guard
+- **THEN** the sentence stands at that way out's row inside Ways out
+- **AND** the Ways out header counts it once
+
 ### Requirement: The step page walks to the previous and the next step
 
 The step page's foot SHALL carry one control that opens the previous step and
 one that opens the next step. The order SHALL be the rail's order. Each
-control SHALL name the step it opens.
+control SHALL name the step it opens. A neighbour with no label SHALL read
+"(unnamed step)" there, and the control SHALL print no key.
 
 The control SHALL refuse the press at the end of the walk it belongs to.
 
@@ -536,11 +738,18 @@ The control SHALL refuse the press at the end of the walk it belongs to.
 - **WHEN** the step page holds the last step in the rail's order
 - **THEN** the next control refuses the press
 
+#### Scenario: An unnamed neighbour reads the placeholder
+
+- **WHEN** the next step in the rail has an empty label and the key `review`
+- **THEN** the next control reads "Next: (unnamed step)"
+- **AND** it does not contain `review`
+
 ### Requirement: The step page carries a Developer view of the step
 
-The step page SHALL carry a Developer view disclosure at its foot. The
-disclosure SHALL stand closed until an author opens it. An open disclosure
-SHALL carry the step's key input, the step's `id` and the step's own JSON.
+The step page SHALL carry a Developer view disclosure inside the More
+section, after the cancelling and collaboration controls. The disclosure
+SHALL stand closed until an author opens it. An open disclosure SHALL carry
+the step's key input, the step's `id` and the step's own JSON.
 
 <!-- antislop: allow synonym-rotation -->
 <!-- Why: "JSON surface" is this codebase's fixed UI-glossary term for the raw definition-editing screen (.claude/rules/ui-glossary.md), not a rotated synonym for a display/show/carry verb used elsewhere in this file. -->
@@ -558,6 +767,11 @@ the disclosure.
 
 - **WHEN** an author types into the Developer view's JSON
 - **THEN** the draft does not change
+
+#### Scenario: The Developer view stands inside More
+
+- **WHEN** an author opens More
+- **THEN** the Developer view disclosure stands last in its body, closed
 
 ### Requirement: The first process choice on a subprocess step writes a whole spec
 

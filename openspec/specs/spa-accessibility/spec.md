@@ -59,6 +59,8 @@ This currently blocks:
 
 ### Requirement: A disclosure is a button that carries its expanded state
 
+<!-- antislop: allow sentence-length -->
+<!-- Why: this paragraph is the live spec's own text, copied so the archive keeps it; the code spans merge its count. -->
 An element that expands or collapses adjacent content SHALL be a
 `<button type="button">` carrying `aria-expanded` reflecting its current
 state and `aria-controls` naming the element it discloses.
@@ -69,12 +71,16 @@ rows are buttons that open a step page, and the current row carries
 `aria-current`. A grip at each row's trailing edge drags the step, and
 answers `Alt+ArrowUp`/`Alt+ArrowDown`. No row in the rail expands.
 
-The step page stands every section open, so no section heading discloses
-anything. Two disclosures remain on the step page, and both read "Developer
-view". The step's own read-only JSON stands behind a native `<details>` pair.
-The browser supplies its button role, its keyboard operation and its state
-announcement. This requirement governs a disclosure a package builds itself. A
-native pair stays outside it.
+The step page folds its sections into an accordion. Each section header is a
+disclosure the studio builds itself, so this requirement governs it. It
+carries `aria-expanded`, true on the one open section, and `aria-controls`
+naming the section's body.
+
+Two further disclosures stand on the step page, and both read "Developer
+view". The step's own read-only JSON stands behind a native `<details>` pair,
+inside the More section. The browser supplies its button role, its keyboard
+operation and its state announcement. A native pair stays outside this
+requirement.
 
 A path's guard editor carries the second, one toggle per automatic path. The
 studio builds that button itself, so this requirement governs it. It carries
@@ -105,6 +111,13 @@ while every row stands open, and `aria-controls` naming the list.
 - **WHEN** a change list stands with every row folded
 - **THEN** its Expand all command carries `aria-expanded="false"`
 - **AND** its `aria-controls` names the element holding the rows
+
+#### Scenario: A step page section header carries its expanded state
+
+- **WHEN** a task step's page opens with Who acts open
+- **THEN** the Who acts header button carries `aria-expanded="true"` and the
+  other five carry `aria-expanded="false"`
+- **AND** each header's `aria-controls` names its own section's body
 
 ### Requirement: A graphical surface's own nodes are focusable, named and visibly focused
 
