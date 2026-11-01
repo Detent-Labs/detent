@@ -1111,9 +1111,10 @@ filled shape there means the hit area lost its `fill: none`.
 Save the draft and open it again. Pass: the style you chose is the style you
 get, and every step kept its position.
 
-A way out's sentence on a routed path centres on the middle of the route. On a
-route that turns, that puts it on a vertical run. Pass: it is legible and clear of every
-step. It is not expected to sit between the two steps.
+A way out's sentence on a routed path stands on the route, as near its middle
+as the room allows. On a route that turns, that can put it on a vertical run.
+Pass: it is legible and clear of every step. It is not expected to sit between
+the two steps.
 
 An edge crosses a step that lies in its path. Pass: it does. Nothing routes
 around an obstacle, by decision, and stage 33's control points are the answer.
@@ -1219,8 +1220,8 @@ waypoints, and every step kept its position.
 Double-click a filled square. Pass: that waypoint goes. Delete the last one.
 Pass: the path draws the straight route it drew at the start.
 
-Find a guarded automatic path and select it. Pass: the midpoint square sits
-over its sentence and stays grabbable. Deselect. Pass: the sentence reads
+Find a guarded automatic path and select it. Pass: the midpoint square stays
+grabbable, over its sentence or beside it. Deselect. Pass: the sentence reads
 whole again.
 
 ### Canvas step groups (`canvas-step-groups`)
@@ -6969,8 +6970,9 @@ ways out of "Book". Pass: they read "First, only if" and "Second, only if",
 each with its condition in words.
 
 Pass, on both maps: no CEL, no bare number and no "else" shows on the canvas.
-Each sentence centres on its route and wraps over three lines at most. It
-stays clear of every node. A sentence the clamp cut ends in an ellipsis, and
+Each sentence stands on its route, as near its middle as the room allows. It
+wraps over six lines at most. It stays clear of every node label, every stamp
+and every other sentence. A sentence the clamp cut ends in an ellipsis, and
 pointing at it shows the whole sentence.
 
 **6. The sentences at 1024.** Resize the window to 1024x800. Press Fit to view
@@ -6997,6 +6999,10 @@ Double-click the line of "Needs finance approval". Pass: the Steps tab opens on
 current mark. Back on Map, double-click the same way out's sentence. Pass: the
 same happens.
 
+Select "Needs finance approval", then double-click its midpoint square. Pass:
+the Steps tab opens on "Route by Amount", with Ways out open. Back on Map, the
+way out has no new waypoint.
+
 Select a way out and drag its midpoint square aside to add a waypoint.
 Double-click the filled square. Pass: the waypoint goes, and the tab stays
 Map. The Steps tab opening here is the defect.
@@ -7007,12 +7013,12 @@ Double-click it again. Pass: Ways out opens, and the row carries the current
 mark.
 
 **10. Two gestures the reviews named.** Double-click the connect handle of
-"Manager Approval". Pass: the tab stays Map. If the Steps tab opens, record
-the result under MAPLABELS-6 in `docs/decisions.md`.
+"Manager Approval". Pass: the Steps tab opens on "Manager Approval". The
+handle belongs to the node, so its double-click opens the step.
 
 Press the sentence of "Under threshold", then press Enter. Pass: the Steps tab
-opens on "Route by Amount". If it opens another step, record the result under
-MAPLABELS-7.
+opens on "Route by Amount". The press moved the keyboard's stop to that way
+out, as a press on its line does.
 
 Discard both drafts from the process list and accept the browser's confirm.
 Under `playwright-cli`, `dialog-accept` answers it.

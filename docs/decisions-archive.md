@@ -1032,3 +1032,23 @@ system that resulted; this file explains why it took that shape.
   Resolved by `studio-map-labels`: a double-click on a way out bumps
   `waysOutRequest`, and the step page's effect keys on it too. Ways out then
   reopens for the way out already selected.
+- **MAPLABELS-6: a double-click on the connect handle opens the step.** The
+  hit circle sits inside the node's group, so its double-click bubbles to the
+  node's handler. Each press on the handle also runs a connect gesture first.
+  Risk (Low): an author who presses the handle twice lands on the Steps tab.
+
+  Upgrade entry: stop the double-click's propagation on the hit circle in
+  `canvas/CanvasView.tsx`, if the browser check shows the step page opening.
+
+  Ruled by `studio-map-labels`, with no code change: the handle belongs to
+  the node. Its double-click opens the step, as the node's own does.
+- **MAPLABELS-7: a press on a way out's sentence leaves the roving stop
+  behind.** A press on the line moves it, and a press on the sentence only
+  selects. Enter after a sentence press then acts on the older stop. Risk
+  (Low): the keyboard and the pointer disagree on the current way out.
+
+  Upgrade entry: give the sentence's text block an `onPointerDown` that moves
+  the stop to that path, as the line's handler does.
+
+  Resolved by `studio-map-labels`: the text block's `onPointerDown` moves the
+  stop to its way out, as the line's handler does.

@@ -2130,20 +2130,6 @@ MAPLABELS tag is local to this section.
   reads "Only if", and so does the vocabulary table's row for a guard. The
   heading is `condition.onlyWhenHeading`. Risk (Low): one rule reads two ways
   on two tabs.
-- **MAPLABELS-6: a double-click on the connect handle opens the step.** The
-  hit circle sits inside the node's group, so its double-click bubbles to the
-  node's handler. Each press on the handle also runs a connect gesture first.
-  Risk (Low): an author who presses the handle twice lands on the Steps tab.
-
-  Upgrade entry: stop the double-click's propagation on the hit circle in
-  `canvas/CanvasView.tsx`, if the browser check shows the step page opening.
-- **MAPLABELS-7: a press on a way out's sentence leaves the roving stop
-  behind.** A press on the line moves it, and a press on the sentence only
-  selects. Enter after a sentence press then acts on the older stop. Risk
-  (Low): the keyboard and the pointer disagree on the current way out.
-
-  Upgrade entry: give the sentence's text block an `onPointerDown` that moves
-  the stop to that path, as the line's handler does.
 - **MAPLABELS-8: the stamp's compiled style repeats four sizes as literals.**
   StyleX cannot read a constant imported from `canvas/mapWords.ts` at build
   time. The `stamp` style in `CanvasView.tsx` writes the rule, both paddings
