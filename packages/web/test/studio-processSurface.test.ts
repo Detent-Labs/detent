@@ -113,16 +113,52 @@ describe("what the surface no longer carries", () => {
 describe("the canvas opens the Steps tab, and keeps its own selection behavior", () => {
   const CANVAS = "src/areas/studio/canvas/CanvasView.tsx";
 
-  it("opens the Steps tab from the Enter binding alone", () => {
+  /** The `onDoubleClick` handler's body after `anchor`, up to its closing `}}`. */
+  const doubleClickAfter = (code: string, anchor: string): string => {
+    const from = code.indexOf(anchor);
+    expect(from).toBeGreaterThan(-1);
+    const at = code.indexOf("onDoubleClick={(e) => {", from);
+    expect(at).toBeGreaterThan(-1);
+    return code.slice(at, code.indexOf("}}", at));
+  };
+
+  it("opens the Steps tab from Enter, and Enter on a path passes its id", () => {
     const code = stripComments(read(CANVAS));
     const enterAt = code.indexOf('if (e.key === "Enter")');
     const binding = code.slice(enterAt, code.indexOf("const arrow", enterAt));
 
     expect(enterAt).toBeGreaterThan(-1);
-    expect(binding).toContain("onOpenStepPage");
-    // Exactly the two calls that binding makes: a step focus and a path
-    // focus. A third would mean a pointer handler reached it too.
-    expect(code.match(/onOpenStepPage\?\.\(/g)).toHaveLength(2);
+    expect(binding).toContain("onOpenStepPage?.(focus.stepId)");
+    expect(binding).toContain("onOpenStepPage?.(owner.id, focus.pathId)");
+    // Two from Enter, and one from each of the three double-click routes: the
+    // node, the edge group and the sentence. A sixth would mean a single
+    // press reached it too.
+    expect(code.match(/onOpenStepPage\?\.\(/g)).toHaveLength(5);
+  });
+
+  it("opens the step from a double-click on its node", () => {
+    const handler = doubleClickAfter(stripComments(read(CANVAS)), "const renderNode");
+
+    expect(handler).toContain("onSelectStep(step.id as string)");
+    expect(handler).toContain("onOpenStepPage?.(step.id as string)");
+  });
+
+  it("opens the source step's Ways out from a double-click on the edge group", () => {
+    const handler = doubleClickAfter(stripComments(read(CANVAS)), 'tabIndex={focus.kind === "path"');
+
+    expect(handler).toContain("onSelectStep(step.id, path.id)");
+    expect(handler).toContain("onOpenStepPage?.(step.id as string, path.id)");
+  });
+
+  it("opens the source step's Ways out from a double-click on the sentence", () => {
+    const code = stripComments(read(CANVAS));
+    const handler = doubleClickAfter(code, "function EdgeLabel");
+    const at = code.indexOf("<EdgeLabel");
+    const opener = code.slice(code.indexOf("onOpen={", at), code.indexOf("/>", at));
+
+    expect(handler).toContain("onOpen()");
+    expect(opener).toContain("onSelectStep(label.stepId, label.pathId)");
+    expect(opener).toContain("onOpenStepPage?.(label.stepId, label.pathId)");
   });
 
   it("leaves a pointer press on the canvas, so a set can still be built", () => {
@@ -134,17 +170,22 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     expect(handler).not.toContain("onOpenStepPage");
   });
 
-  it("keeps the inline rename on a node's double-click", () => {
+  it("has no inline rename left on a node's double-click", () => {
     const code = stripComments(read(CANVAS));
-    const at = code.indexOf("onDoubleClick={(e) => {");
-    const handler = code.slice(at, code.indexOf("}}", at));
 
-    expect(handler).toContain("startRename(");
-    expect(handler).not.toContain("onOpenStepPage");
+    expect(doubleClickAfter(code, "const renderNode")).not.toContain("startRename");
+    expect(code).not.toContain("renaming");
+    expect(code).not.toContain("inlineRename");
   });
 
-  it("wires the surface's own opener to the Steps tab", () => {
-    expect(stripComments(read(SURFACE))).toContain('onOpenStepPage={() => goToTab("steps")}');
+  it("wires the surface's own opener to the Steps tab, bumping waysOutRequest for a way out", () => {
+    const code = stripComments(read(SURFACE));
+    const at = code.indexOf("onOpenStepPage={");
+    const opener = code.slice(at, code.indexOf("}}", at));
+
+    expect(opener).toContain("setWaysOutRequest(");
+    expect(opener).toContain('goToTab("steps")');
+    expect(code).toContain("waysOutRequest={waysOutRequest}");
   });
 });
 

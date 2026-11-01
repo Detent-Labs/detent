@@ -1,9 +1,20 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import type { DraftStep } from "../src/areas/studio/draft/createStep.js";
 import { buildOperands } from "../src/areas/studio/panels/shared/conditionLogic.js";
 import { stepTextMap } from "../src/areas/studio/panels/shared/optionText.js";
-import { nodeName, pathName, stampLines, stampWords, wayOutSentence } from "../src/areas/studio/canvas/mapWords.js";
+import {
+  nodeName,
+  pathName,
+  stampLines,
+  stampWords,
+  wayOutSentence,
+  STAMP_CHROME_HEIGHT,
+  STAMP_LINE_HEIGHT,
+  STAMP_PADDING_X,
+  STAMP_RULE,
+} from "../src/areas/studio/canvas/mapWords.js";
 
 /**
  * `studio-canvas`: every word the canvas prints or announces, read off the
@@ -178,6 +189,19 @@ describe("stampLines", () => {
   it("counts the uppercase form, where ß prints as SS", () => {
     expect(stampLines("End: ßßßßßßßßßß", ALONE)).toBe(stampLines("End: SSSSSSSSSSSSSSSSSSSS", ALONE));
   });
+
+  // StyleX cannot read an imported constant at build time, so the canvas's
+  // compiled `stamp` style repeats the four metrics as literals. A drift
+  // between them would make the estimate frame a stamp it does not draw.
+  it("measures the stamp the canvas's compiled style draws", () => {
+    const source = readFileSync(new URL("../src/areas/studio/canvas/CanvasView.tsx", import.meta.url), "utf8");
+    const stamp = /\n {2}stamp: \{([\s\S]*?)\n {2}\},/.exec(source)?.[1] ?? "";
+
+    expect(stamp).toContain(`borderWidth: ${STAMP_RULE},`);
+    expect(stamp).toContain(`paddingInline: ${STAMP_PADDING_X},`);
+    expect(stamp).toContain(`lineHeight: "${STAMP_LINE_HEIGHT}px",`);
+    expect(stamp).toContain(`paddingBlock: ${(STAMP_CHROME_HEIGHT - 2 * STAMP_RULE) / 2},`);
+  });
 });
 
 describe("nodeName", () => {
@@ -248,6 +272,14 @@ describe("pathName", () => {
     const path = { id: "path_a", label: "Send", to: "step_x" } as never;
 
     expect(pathName(path, "Capture", "Review", undefined)).toBe("Send, from Capture to Review, not set yet, no condition");
+  });
+
+  it("names a path with an empty label as an unnamed way out", () => {
+    const blank = { id: "path_a", label: "", to: "step_x", trigger: "manual" } as never;
+    const spaces = { id: "path_b", label: "   ", to: "step_x", trigger: "manual" } as never;
+
+    expect(pathName(blank, "Capture", "Review", undefined)).toBe("(unnamed way out), from Capture to Review, a person chooses, no condition");
+    expect(pathName(spaces, "Capture", "Review", undefined)).toBe("(unnamed way out), from Capture to Review, a person chooses, no condition");
   });
 });
 

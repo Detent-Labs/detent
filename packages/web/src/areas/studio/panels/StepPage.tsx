@@ -564,6 +564,9 @@ interface Props {
   /** The path a canvas edge click selected: resolves to this step (its
    * source) and highlights that row in the Ways out section. */
   selectedPathId?: string;
+  /** Bumps on every canvas request to open a way out. A new value reopens Ways
+   * out, even for the way out already selected. */
+  waysOutRequest?: number;
   /** Opens the form editor for a step: the Form section's control. */
   navigate: (stepId: string) => void;
   /** The processes a subprocess step may call. Empty until the fetch
@@ -592,6 +595,7 @@ export function StepPage({
   onSelectStep,
   onRemoveStep,
   selectedPathId,
+  waysOutRequest,
   navigate,
   processes,
 }: Props) {
@@ -636,11 +640,11 @@ export function StepPage({
   // the new kind's list. The page's opening section then stands open instead.
   const shownOpen = openSectionFor(openSection, sections, opening());
   // A way out selected on the canvas opens Ways out, where its row carries
-  // the current mark.
+  // the current mark. A repeated request for the same way out reopens it.
   const holdsPaths = sections.includes("paths");
   useEffect(() => {
     if (selectedPathId !== undefined && holdsPaths) setOpenSection("paths");
-  }, [selectedPathId, holdsPaths]);
+  }, [selectedPathId, holdsPaths, waysOutRequest]);
 
   // The page remounts for the step it opens, which drops the focus the pressed
   // walk button held. One animation frame later the new page's control in the

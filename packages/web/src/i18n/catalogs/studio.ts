@@ -730,7 +730,6 @@ export const en = {
   "stepSections.outcomePlaceholder": "choose how it ended…",
   "stepSections.isInitialStep": "This is the process's first step.",
   "stepSections.noSelection": "Select a step or a way out to edit it.",
-  "stepSections.renameLabel": "Step name",
   "stepSections.keyField": "Key",
   "stepSections.labelField": "Name",
   "stepSections.idField": "Id",
@@ -832,8 +831,9 @@ export const en = {
   // (`studio-guided-vocabulary`). Keyed by `draft/performedBy.ts`'s own three
   // values, so the closed key union stays exhaustive against the model the
   // sections read. A canvas node's accessible name reads the same phrase. A
-  // stamp naming an existing step's kind keeps the short `stepRole.*` word
-  // instead: a phrase does not fit a stamp.
+  // form card's kicker and the step page's initial mark keep the short
+  // `stepRole.*` word instead: a phrase does not fit there. The canvas stamps
+  // read `canvas.startStamp` and `canvas.endStamp*`.
   "stepKind.legend": "What this step is",
   "stepKind.participant": "A step someone works",
   "stepKind.subprocess": "A call to another process",
@@ -933,8 +933,6 @@ export const en = {
   "canvas.arrange": "Arrange",
   "canvas.arrangeConfirm":
     "Arrange every step from the workflow graph? This overwrites every saved position and clears any waypoint a path carries.",
-  "canvas.elseMarker": "else",
-  "canvas.initialStamp": "start",
   "canvas.edgeStyleToggle": "Rounded corners",
   "canvas.selectionHeading": "Steps selected",
   "canvas.selectionRemoveOne": "Remove step",

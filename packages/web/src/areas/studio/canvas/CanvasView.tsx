@@ -7,7 +7,7 @@ import { useDraft } from "../draft/store";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import { newStep } from "../draft/createStep";
 import { newPath, triggerForNewPath } from "../draft/createPath";
-import { seedLocalizedText, resolveDraftLocalizedText } from "../draft/localized-text";
+import { seedLocalizedText } from "../draft/localized-text";
 import { t } from "../catalog.js";
 import { drawnPositions, type LayoutStep } from "./layout";
 import {
@@ -31,14 +31,37 @@ import { toggleSelection, normalizeRect, nodesInRect } from "./selection";
 import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups";
 import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER, type Fit } from "./fit";
 import { resolveDropGesture } from "./dropGesture";
-import { inlineRenamePatch } from "./inlineRename";
-import { nodeName, pathName, stampWords, wayOutSentence } from "./mapWords";
+import {
+  nodeName,
+  pathName,
+  stampLines,
+  stampWords,
+  wayOutSentence,
+  STAMP_CHROME_HEIGHT,
+  STAMP_LINE_HEIGHT,
+} from "./mapWords";
 import { nextFocus, entryFocus, type ArrowKey, type Focus } from "./traversal";
-import { nextStepKey } from "../panels/stepsPanelLogic.js";
 import { stepTextMap } from "../panels/shared/optionText";
-import { buildOperands, edgeGuardLabel } from "../panels/shared/conditionLogic";
+import { buildOperands } from "../panels/shared/conditionLogic";
 
 const HANDLE_RADIUS = 7;
+/** The connect handle's pointer target: 24 units across at a scale of 1,
+ * over the 7-unit dot it stands for (design.md D6). */
+const HANDLE_HIT_RADIUS = 12;
+/** How far a stamp stands in from the node's left or right edge, and how far
+ * below the top edge its host ends (design.md D4). */
+const STAMP_INSET = 8;
+/** The room between two stamps on one node. */
+const STAMP_GAP = 4;
+/** A stamp's width cap: the node less an inset on each side. A node carrying
+ * both stamps splits it, less the gap between them. */
+const STAMP_CAP = NODE_WIDTH - 2 * STAMP_INSET;
+const STAMP_CAP_SHARED = (STAMP_CAP - STAMP_GAP) / 2;
+/** A way out's sentence host: three 16-unit lines plus padding (design.md D5). */
+const SENTENCE_HOST_HEIGHT = 52;
+/** The sentence's width floor and cap, in user units. */
+const SENTENCE_MIN_WIDTH = 120;
+const SENTENCE_MAX_WIDTH = 200;
 /** The waypoint handle's side. A square, not a circle: the canvas already has
  * one control shape, and the connect handle owns it (design.md). */
 const WAYPOINT_HANDLE = 10;
@@ -230,9 +253,18 @@ const styles = stylex.create({
     color: { default: colors.textMuted, ":hover": colors.text },
     pointerEvents: "auto",
   },
+  // The drawn dot. The hit circle over it takes every press.
   connectHandle: {
     fill: colors.accent,
+    pointerEvents: "none",
+  },
+  // Transparent counts as painted, so the circle takes the press.
+  connectHandleHit: {
+    fill: "transparent",
     cursor: "crosshair",
+  },
+  connectHandleHitTerminal: {
+    cursor: "not-allowed",
   },
   waypointHandle: {
     fill: colors.accent,
@@ -245,7 +277,6 @@ const styles = stylex.create({
   },
   connectHandleTerminal: {
     fill: colors.textMuted,
-    cursor: "not-allowed",
   },
   initialArrow: {
     stroke: colors.textMuted,
@@ -287,32 +318,54 @@ const styles = stylex.create({
     strokeWidth: 12,
     cursor: "pointer",
   },
-  edgeBadge: {
-    fontFamily: fonts.mono,
-    fontSize: 10,
-    fill: colors.accent,
-    textAnchor: "middle",
-  },
   arrowhead: {
     fill: colors.textMuted,
   },
-  // Stands in for both the terminal stamp and the initial stamp: app.css
-  // declared `.canvas-terminal-stamp circle`/`.canvas-initial-stamp circle`
-  // identically, so one style covers both, the same de-duplication phase 2
-  // applied to `.app-stamp-mine`/`.app-stamp-open`.
-  stampCircle: {
-    fill: "none",
-    stroke: colors.neutral900,
-    strokeWidth: 1.5,
+  // A stamp's host. `overflow: visible`, so a short line estimate never
+  // clips a letter; no pointer events, so the node under it keeps the press.
+  stampHost: {
+    overflow: "visible",
+    pointerEvents: "none",
   },
-  // Stands in for both stamps' `text`, identically declared for the same
-  // reason `stampCircle` does.
-  stampText: {
+  // A flex column with the stamp at its foot, so a second line grows upward
+  // from the node's top edge.
+  stampColumn: {
+    height: "100%",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "flex-end",
+  },
+  stampColumnStart: {
+    alignItems: "flex-start",
+  },
+  stampColumnEnd: {
+    alignItems: "flex-end",
+  },
+  // The register's stamp at canvas scale (design-language.md). Four values
+  // repeat `mapWords.ts`'s stamp constants, which `stampLines` estimates
+  // from: the 2px rule (`STAMP_RULE`), the 4px inline padding
+  // (`STAMP_PADDING_X`), the 13px line (`STAMP_LINE_HEIGHT`), and the 1px
+  // block padding `STAMP_CHROME_HEIGHT` leaves after both rules. StyleX
+  // evaluates a value at build time and cannot follow an import from a
+  // plain module, so they stand as literals here; a test pins each to its
+  // constant.
+  stamp: {
+    boxSizing: "border-box",
+    maxWidth: "100%",
     fontFamily: fonts.mono,
-    fontSize: 9,
+    fontSize: 11,
+    fontWeight: 600,
+    lineHeight: "13px",
     textTransform: "uppercase",
-    textAnchor: "middle",
-    fill: colors.neutral900,
+    letterSpacing: "0.08em",
+    overflowWrap: "anywhere",
+    color: colors.text,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: colors.text,
+    paddingBlock: 1,
+    paddingInline: 4,
   },
   marquee: {
     position: "absolute",
@@ -337,33 +390,35 @@ const styles = stylex.create({
     pointerEvents: "none",
     maxWidth: "16rem",
   },
-  edgeGuardLabel: {
-    width: "100%",
-    height: 16,
+  // A way out's sentence host. It takes no press, so its empty corners never
+  // swallow one meant for a node; the text block below takes them instead.
+  edgeLabelHost: {
+    pointerEvents: "none",
+  },
+  // Centres the text block, so one line and three share the route's midpoint.
+  edgeLabelBox: {
+    height: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Three lines, then an ellipsis: the clamp needs all four of its
+  // declarations, as `nodeLabel`'s does.
+  edgeLabel: {
+    fontFamily: fonts.body,
+    fontSize: 12,
     lineHeight: "16px",
     textAlign: "center",
-    fontFamily: fonts.body,
-    fontSize: 10,
     color: colors.textMuted,
     backgroundColor: colors.surface,
-    padding: "0 3px",
-    whiteSpace: "nowrap",
+    paddingInline: space.s1,
+    display: "-webkit-box",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: 3,
     overflow: "hidden",
-    textOverflow: "ellipsis",
+    overflowWrap: "anywhere",
+    pointerEvents: "auto",
     cursor: "pointer",
-  },
-  renameInput: {
-    width: "100%",
-    height: "100%",
-    boxSizing: "border-box",
-    font: "inherit",
-    fontSize: 13,
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: colors.accent,
-    padding: `0 ${space.s1}`,
-    backgroundColor: colors.surface,
-    color: colors.text,
   },
 });
 
@@ -392,11 +447,13 @@ interface Props {
   /** The whole set at once: a shift-click's toggle and a marquee's release. */
   onSelectSteps: (stepIds: string[]) => void;
   /** Opens the Steps tab on one step, after the selection is written. Enter
-   * calls it; a pointer press never does. A click has to leave the author on
-   * the canvas: shift-click builds a set and the delete control acts on one,
-   * and neither survives a press that switches tabs (`studio-canvas`'s "Every
-   * canvas gesture ... SHALL stay live"). */
-  onOpenStepPage?: (stepId: string) => void;
+   * and a double-click call it; a single press never does. A click has to
+   * leave the author on the canvas: shift-click builds a set and the delete
+   * control acts on one, and neither survives a press that switches tabs
+   * (`studio-canvas`'s "Every canvas gesture ... SHALL stay live"). A
+   * `pathId` asks for that way out's Ways out section, open again even where
+   * the same way out stays selected (design.md D7). */
+  onOpenStepPage?: (stepId: string, pathId?: string) => void;
   /** Canvas-wide, never per path (design.md). `EditScreen` resolves an absent
    * or unknown stored value to the default before it reaches here. */
   edgeStyle: EdgeStyle;
@@ -416,7 +473,7 @@ interface Props {
   /** The path under the pointer during an edit-rail drag (design.md: "The
    * rail reports its moving position"), or `undefined` outside a drag or
    * over an `end` step. Drawn as the drop-target state on the matching edge
-   * group and its guard label; adds no permanent control. */
+   * group; adds no permanent control. */
   insertTargetPathId?: string;
   /** False while the Map tab hides. Every tab body stays mounted and five
    * hide, so this canvas can mount inside a `hidden` subtree, where the SVG
@@ -439,27 +496,26 @@ function trackPointer<T extends object>(drag: T | null, setDrag: (next: T) => vo
 }
 
 /**
- * A step node's label, over one or two lines, with the full text on hover
- * where the clamp cut it.
+ * Whether the clamp on `ref`'s element cut `text`. A label carries its full
+ * text as a hover title only where this reads true.
  *
  * The `title` is the only reveal a sighted pointer user has, so it carries a
- * meaning worth keeping: a tooltip on every node, cut or not, stops saying
+ * meaning worth keeping: a tooltip on every label, cut or not, stops saying
  * "there is more text here". It therefore rides the measurement rather than
- * the label.
+ * the text.
  *
  * The state opens `true` so the server-rendered markup and the first paint
- * both carry it, and the effect clears it on a label that fits. The reverse
- * default would flash a node with no tooltip and render SSR markup that
+ * both carry it, and the effect clears it on a text that fits. The reverse
+ * default would flash a label with no tooltip and render SSR markup that
  * contradicts the client.
  */
-function NodeLabel({ label }: { label: string }): React.JSX.Element {
-  const line = useRef<HTMLDivElement | null>(null);
+function useClipped(ref: React.RefObject<HTMLElement | null>, text: string): boolean {
   const [clipped, setClipped] = useState(true);
   useLayoutEffect(() => {
-    const el = line.current;
+    const el = ref.current;
     if (!el) return;
     // A `ResizeObserver` and not a one-shot measurement, because the box
-    // changes without the label changing. Every tab body stays mounted and
+    // changes without the text changing. Every tab body stays mounted and
     // `EditScreen`'s `tabBodyHidden` is `display: none`, so a label edited on
     // the Steps tab re-renders while the canvas lays out at zero. Measured on
     // a one-shot: the node came back to a visible canvas clamped and with no
@@ -473,13 +529,105 @@ function NodeLabel({ label }: { label: string }): React.JSX.Element {
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [label]);
+  }, [ref, text]);
+  return clipped;
+}
+
+/** A step node's label, over one or two lines, with the full text on hover
+ * where the clamp cut it. */
+function NodeLabel({ label }: { label: string }): React.JSX.Element {
+  const line = useRef<HTMLDivElement | null>(null);
+  const clipped = useClipped(line, label);
   return (
     <div {...stylex.props(styles.nodeLabelBox)} aria-hidden="true" title={clipped ? label : undefined}>
       <div ref={line} {...stylex.props(styles.nodeLabel)}>
         {label}
       </div>
     </div>
+  );
+}
+
+/**
+ * One stamp across a node's top edge, in node coordinates (design.md D4). The
+ * host ends `STAMP_INSET` below the top edge and grows upward one line at a
+ * time, by `stampLines`' estimate, so `getBBox()` frames the stamp's real
+ * extent. Its words stand in the node's accessible name, so the stamp leaves
+ * the accessibility tree.
+ */
+function NodeStamp({ text, corner, width }: { text: string; corner: "start" | "end"; width: number }): React.JSX.Element {
+  const height = stampLines(text, width) * STAMP_LINE_HEIGHT + STAMP_CHROME_HEIGHT;
+  return (
+    <foreignObject
+      x={corner === "start" ? STAMP_INSET : NODE_WIDTH - STAMP_INSET - width}
+      y={STAMP_INSET - height}
+      width={width}
+      height={height}
+      {...stylex.props(styles.stampHost)}
+    >
+      <div {...stylex.props(styles.stampColumn, corner === "start" ? styles.stampColumnStart : styles.stampColumnEnd)}>
+        <div {...stylex.props(styles.stamp)} aria-hidden="true">
+          {text}
+        </div>
+      </div>
+    </foreignObject>
+  );
+}
+
+/**
+ * A way out's sentence, centred on its route's midpoint over up to three
+ * lines (design.md D5). The path's own name carries the sentence, so the text
+ * block leaves the accessibility tree. It takes the press its host does not.
+ */
+function EdgeLabel({
+  x,
+  y,
+  width,
+  text,
+  stepId,
+  pathId,
+  onSelect,
+  onOpen,
+}: {
+  x: number;
+  y: number;
+  width: number;
+  text: string;
+  stepId: string;
+  pathId: string | undefined;
+  onSelect: () => void;
+  onOpen: () => void;
+}): React.JSX.Element {
+  const block = useRef<HTMLDivElement | null>(null);
+  const clipped = useClipped(block, text);
+  return (
+    <foreignObject
+      x={x - width / 2}
+      y={y - SENTENCE_HOST_HEIGHT / 2}
+      width={width}
+      height={SENTENCE_HOST_HEIGHT}
+      className={`panzoom-exclude ${stylex.props(styles.edgeLabelHost).className}`}
+      data-path-id={pathId}
+      data-step-id={pathId !== undefined ? stepId : undefined}
+    >
+      <div {...stylex.props(styles.edgeLabelBox)}>
+        <div
+          ref={block}
+          {...stylex.props(styles.edgeLabel)}
+          aria-hidden="true"
+          title={clipped ? text : undefined}
+          onPointerUp={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+          }}
+        >
+          {text}
+        </div>
+      </div>
+    </foreignObject>
   );
 }
 
@@ -731,9 +879,6 @@ export function CanvasView({
   // never transforms, so one reading holds for the whole gesture.
   const [marquee, setMarquee] = useState<{ origin: Point; startClient: Point; currentClient: Point; startSvg: Point } | null>(null);
   const [rejectMessage, setRejectMessage] = useState<{ text: string; x: number; y: number } | null>(null);
-  // The step node whose label is being renamed inline (task 3.8), and the
-  // text field's live value. Neither writes the draft until commit.
-  const [renaming, setRenaming] = useState<{ stepId: string; value: string } | null>(null);
   // Where the keyboard sits. One element inside the `<svg>` carries the roving
   // `tabindex="0"`, and this names it. The traversal module decides every move;
   // this component only holds the result and points the browser at it.
@@ -768,27 +913,10 @@ export function CanvasView({
   // re-enter it.
   useLayoutEffect(() => {
     const svg = svgRef.current;
-    // An open rename takes the node's own `tabindex` away (ARIA forbids a
-    // focusable field inside a `role="button"`), and its input is the stop
-    // meanwhile.
-    if (!svg || renaming) return;
+    if (!svg) return;
     if (svg.tabIndex === 0 || svg.querySelector('[tabindex="0"]')) return;
     setFocus(entryFocus(steps, groups, initialStepId));
-  }, [steps, groups, hidden, renaming]);
-
-  // The rename's `<foreignObject>` unmounts on commit and on cancel, and focus
-  // would drop to `<body>`. The node takes it back, now that its own
-  // `tabindex` is on the element again.
-  const renamedStepId = useRef<string | null>(null);
-  useLayoutEffect(() => {
-    if (renaming) {
-      renamedStepId.current = renaming.stepId;
-      return;
-    }
-    const stepId = renamedStepId.current;
-    renamedStepId.current = null;
-    if (stepId) elementFor({ kind: "step", stepId })?.focus();
-  }, [renaming]);
+  }, [steps, groups, hidden]);
 
   const toSvgPoint = (e: { clientX: number; clientY: number }): Point => {
     const svg = svgRef.current;
@@ -1006,29 +1134,6 @@ export function CanvasView({
     releasePan();
   };
 
-  const startRename = (stepId: string, currentLabel: string) => {
-    setRenaming({ stepId, value: currentLabel });
-    // The roving stop follows, so the arrow keys resume from the node the
-    // rename closes back onto.
-    setFocus({ kind: "step", stepId });
-  };
-
-  const commitRename = () => {
-    if (!renaming) return;
-    const index = steps.findIndex((s) => s.id === renaming.stepId);
-    const step = steps[index];
-    if (step) {
-      const patch = inlineRenamePatch(step.label, contentLocale, renaming.value);
-      if (patch) {
-        const siblingKeys = new Set(steps.filter((s) => s.id !== step.id).map((s) => s.key ?? ""));
-        const derivedKey = nextStepKey(step.key ?? "", step.label, patch, baseLocale, siblingKeys);
-        const stepPatch: Partial<(typeof steps)[number]> = derivedKey === undefined ? { label: patch } : { label: patch, key: derivedKey };
-        updateInDraftArray(mutate, (d) => d.workflow?.steps?.[index], stepPatch);
-      }
-    }
-    setRenaming(null);
-  };
-
   const onHandlePointerDown = (e: React.PointerEvent, stepId: string) => {
     e.stopPropagation();
     capturePointer(e);
@@ -1105,11 +1210,9 @@ export function CanvasView({
     if (e.target === svgRef.current) onSelectStep(undefined);
   };
 
-  const stepLabel = (s: (typeof steps)[number] | undefined) =>
-    resolveDraftLocalizedText(s?.label, contentLocale, baseLocale) || s?.key || t("steps.unnamedStep");
-
-  /** The step text both accessible names read: the step page's selects' own
-   * text, which never falls back to a key and numbers repeats. */
+  /** The step text the node body and both accessible names read: the step
+   * page's selects' own text, which never falls back to a key and numbers
+   * repeats (design.md D11). */
   const stepTexts = useMemo(() => stepTextMap(steps, contentLocale, baseLocale), [steps, contentLocale, baseLocale]);
   const nameText = (id: string | undefined) => (id !== undefined ? stepTexts.get(id) : undefined) ?? t("steps.unnamedStep");
 
@@ -1118,9 +1221,10 @@ export function CanvasView({
    * `.canvas-wrap`, which would also catch the toolbar's buttons.
    */
   const onCanvasKeyDown = (e: React.KeyboardEvent<SVGSVGElement>) => {
-    // The inline rename owns Enter, Escape and its own caret movement. A
-    // disclosure button is no text field, so an arrow key and Escape still
-    // reach this handler from one.
+    // A text field owns Enter, Escape and its own caret movement. The canvas
+    // draws none today; the guard keeps the rule general. A disclosure button
+    // is no text field, so an arrow key and Escape still reach this handler
+    // from one.
     if ((e.target as Element).closest("input, textarea, [contenteditable]")) return;
     if (e.key === "Escape") {
       // The stop moves with the focus. Without that move Tab walks straight
@@ -1138,7 +1242,7 @@ export function CanvasView({
         const owner = steps.find((s) => s.paths?.some((p) => p.id === focus.pathId));
         if (owner?.id) {
           onSelectStep(owner.id, focus.pathId);
-          onOpenStepPage?.(owner.id);
+          onOpenStepPage?.(owner.id, focus.pathId);
         }
       }
       return;
@@ -1154,22 +1258,23 @@ export function CanvasView({
     onGroupsChange(groups.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g)));
   };
 
-  // Guard labels render in their own pass, after every node (below), instead
-  // of inline in the edge that computes them: `.canvas-node-rect` is opaque,
-  // and nodes draw after edges, so a label inline in the edge group could
-  // sit partly behind a nearby node's fill and read as a clipped fragment.
-  // Collected here during the edge pass, rendered after the node pass.
-  const guardLabels: Array<{ key: string; x: number; y: number; maxWidth: number; text: string; stepId: string; pathId: string | undefined }> =
+  // Way-out sentences render in their own pass, after every node (below),
+  // instead of inline in the edge that computes them: `.canvas-node-rect` is
+  // opaque, and nodes draw after edges, so a sentence inline in the edge group
+  // could sit partly behind a nearby node's fill and read as a clipped
+  // fragment. Collected here during the edge pass, rendered after the node
+  // pass.
+  const edgeLabels: Array<{ key: string; x: number; y: number; width: number; text: string; stepId: string; pathId: string | undefined }> =
     [];
 
   // Waypoint handles ride that same late pass, and for the same reason: a
   // handle inside the edge group sits behind a nearby node's opaque fill.
-  // Drawing after the guard labels also keeps a handle grabbable where the
-  // two share the route's midpoint.
+  // Drawing after the sentences also keeps a handle grabbable where the two
+  // share the route's midpoint.
   const waypointHandles: Array<{ key: string; x: number; y: number; pathId: string; index?: number; insertAt?: number }> = [];
 
   // The disclosure buttons ride the same late pass, and they need it most: a
-  // guard label is a 220-wide `<foreignObject>` carrying its own pointer
+  // sentence's text block is up to 200 wide and carries its own pointer
   // handler, and it lands wherever a route midpoint lands, so it can cover a
   // box corner. Collected in the group pass, drawn after every other one.
   const disclosures: Array<{ group: StepGroup; x: number; y: number }> = [];
@@ -1202,8 +1307,8 @@ export function CanvasView({
     const isSelected = selectedStepIds.includes(step.id);
     const isInitial = initialStepId === step.id;
     const isTerminal = step.terminal === true;
-    const isRenaming = renaming?.stepId === step.id;
-    const label = stepLabel(step);
+    const stamps = stampWords(step, initialStepId);
+    const stampWidth = stamps.start !== undefined && stamps.end !== undefined ? STAMP_CAP_SHARED : STAMP_CAP;
 
     return (
       <g
@@ -1211,25 +1316,20 @@ export function CanvasView({
         data-step-id={step.id}
         transform={`translate(${x}, ${y})`}
         className={`canvas-node panzoom-exclude ${stylex.props(styles.node, stylex.defaultMarker()).className}`}
-        // All three drop while the rename is open: ARIA forbids a focusable
-        // field inside a `role="button"`, and the field is that node's own.
-        role={isRenaming ? undefined : "button"}
-        tabIndex={isRenaming ? undefined : focus.kind === "step" && focus.stepId === step.id ? 0 : -1}
+        role="button"
+        tabIndex={focus.kind === "step" && focus.stepId === step.id ? 0 : -1}
         // `outgoing` counts the paths the traversal reaches, the set the edge
         // pass drew.
-        aria-label={
-          isRenaming
-            ? undefined
-            : nodeName(step, nameText(step.id), outgoingCount.get(step.id) ?? 0, stampWords(step, initialStepId))
-        }
+        aria-label={nodeName(step, nameText(step.id), outgoingCount.get(step.id) ?? 0, stamps)}
         onPointerDown={(e) => onNodePointerDown(e, step.id as string)}
         onPointerUp={(e) => onNodePointerUp(e, step.id as string)}
+        // The pointer's route to the Steps tab, the pair Enter calls. The
+        // first click of the two already selected; this repeats it so the
+        // end state matches Enter's.
         onDoubleClick={(e) => {
           e.stopPropagation();
-          // The resolved label alone, with no fallback: a step carrying no
-          // entry for the chosen locale opens an empty field, so the author
-          // writes a translation rather than committing a copy of the key.
-          startRename(step.id as string, resolveDraftLocalizedText(step.label, contentLocale, baseLocale) ?? "");
+          onSelectStep(step.id as string);
+          onOpenStepPage?.(step.id as string);
         }}
       >
         {isInitial && <line x1={-24} y1={NODE_HEIGHT / 2} x2={0} y2={NODE_HEIGHT / 2} {...stylex.props(styles.initialArrow)} markerEnd="url(#canvas-arrow)" />}
@@ -1240,62 +1340,29 @@ export function CanvasView({
           // own circle covers the 3px it overlaps on the right.
           <rect x={4} y={4} width={NODE_WIDTH - 8} height={NODE_HEIGHT - 8} rx={0} {...stylex.props(styles.nodeSubprocess)} />
         )}
-        {isRenaming ? (
-          <foreignObject x={6} y={19} width={NODE_WIDTH - 12} height={22} className="panzoom-exclude">
-            <input
-              autoFocus
-              aria-label={t("stepSections.renameLabel")}
-              {...stylex.props(styles.renameInput)}
-              value={renaming.value}
-              onChange={(e) => setRenaming({ stepId: step.id as string, value: e.target.value })}
-              onBlur={commitRename}
-              onPointerDown={(e) => e.stopPropagation()}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") commitRename();
-                else if (e.key === "Escape") setRenaming(null);
-              }}
-            />
-          </foreignObject>
-        ) : (
-          // The node's body, over one or two lines. All four attributes are
-          // load-bearing: a `<foreignObject>` with no `height` draws nothing,
-          // and the outer `<div>` resolves its own `height: 100%` against this
-          // rect. The 26 units on the right clear the connect handle, whose
-          // circle reaches 7 units inward from `NODE_WIDTH`.
-          <foreignObject
-            x={10}
-            y={0}
-            width={NODE_WIDTH - 36}
-            height={NODE_HEIGHT}
-            className="panzoom-exclude"
-          >
-            <NodeLabel label={label} />
-          </foreignObject>
-        )}
-        {isTerminal && (
-          <g transform={`translate(${NODE_WIDTH - 22}, -12) rotate(-8)`}>
-            <circle r={16} {...stylex.props(styles.stampCircle)} />
-            <text y={4} {...stylex.props(styles.stampText)}>
-              {(step.outcome ?? "").slice(0, 4) || "•"}
-            </text>
-          </g>
-        )}
-        {isInitial && (
-          <g transform="translate(22, -12)">
-            <circle r={16} {...stylex.props(styles.stampCircle)} />
-            <text y={4} {...stylex.props(styles.stampText)}>
-              {t("canvas.initialStamp")}
-            </text>
-          </g>
-        )}
+        {/* The node's body, over one or two lines. All four attributes are
+            load-bearing: a `<foreignObject>` with no `height` draws nothing,
+            and the outer `<div>` resolves its own `height: 100%` against this
+            rect. The 26 units on the right clear the connect handle's hit
+            circle, which reaches 12 units inward from `NODE_WIDTH`. */}
+        <foreignObject x={10} y={0} width={NODE_WIDTH - 36} height={NODE_HEIGHT} className="panzoom-exclude">
+          <NodeLabel label={nameText(step.id)} />
+        </foreignObject>
+        {stamps.start !== undefined && <NodeStamp text={stamps.start} corner="start" width={stampWidth} />}
+        {stamps.end !== undefined && <NodeStamp text={stamps.end} corner="end" width={stampWidth} />}
+        <circle cx={NODE_WIDTH} cy={NODE_HEIGHT / 2} r={HANDLE_RADIUS} {...stylex.props(styles.connectHandle, isTerminal && styles.connectHandleTerminal)} />
+        {/* The handle's pointer target, over the dot. It carries the press,
+            the cursor and the tooltip naming the gesture. */}
         <circle
           cx={NODE_WIDTH}
           cy={NODE_HEIGHT / 2}
-          r={HANDLE_RADIUS}
-          {...stylex.props(styles.connectHandle, isTerminal && styles.connectHandleTerminal)}
+          r={HANDLE_HIT_RADIUS}
+          {...stylex.props(styles.connectHandleHit, isTerminal && styles.connectHandleHitTerminal)}
           onPointerDown={(e) => onHandlePointerDown(e, step.id as string)}
           onPointerUp={onHandlePointerUp}
-        />
+        >
+          <title>{t(isTerminal ? "canvas.connectHandleEnd" : "canvas.connectHandle")}</title>
+        </circle>
         {/* Last, so nothing the node draws paints over it. A CSS outline does
             not follow an SVG shape, so the ring is an element; the stroke keeps
             its 2px under the canvas zoom, while the offset scales with the
@@ -1452,38 +1519,32 @@ export function CanvasView({
             );
             const route = routed.points;
             const d = routePath(route, edgeStyle);
-            // The badge and the guard label follow the route, not a straight
-            // line between the anchors. On a five-segment route those two
-            // points are nowhere near each other.
+            // The sentence follows the route, not a straight line between the
+            // anchors. On a five-segment route those two points are nowhere
+            // near each other.
             const mid = midpointOfRoute(route);
             const midX = mid.point.x;
             const midY = mid.point.y;
-            const automaticGuarded = path.trigger === "automatic" && path.guard !== undefined;
-            const automaticDefault = path.trigger === "automatic" && path.guard === undefined;
             const isSelected = path.id !== undefined && path.id === selectedPathId;
-            // The readable guard serves both the drawn label and the path's
-            // accessible name, so it resolves once for either. Any guarded
-            // path draws it; the badge and the "else" marker below stay
-            // automatic-only.
-            const guardText = edgeGuardLabel(path, operands);
-            if (guardText) {
-              // Cap the label to the free space on the segment its midpoint
-              // actually falls on, so it never needs to spill onto a
-              // neighboring node in the first place; the post-node paint
-              // order (below) is the fallback for when that gap is too
-              // narrow for even the ellipsis to clear it.
+            // The sentence the line draws is also the sentence the path's
+            // accessible name reads, so the guard parses once for both.
+            const sentence = wayOutSentence(path, step, operands);
+            if (sentence !== undefined) {
+              // Width follows the free space on the segment the midpoint
+              // actually falls on, so the sentence rarely spills onto a
+              // neighboring node; the post-node paint order (below) is the
+              // fallback where that gap is narrower than the floor.
               //
               // The segment, not the anchor gap: a five-segment route puts
               // its midpoint on a vertical run, where the distance between
               // the two anchors says nothing about the room available.
               const gap = segmentLength(route, mid.segment);
-              const maxWidth = Math.min(220, Math.max(60, gap - 24));
-              guardLabels.push({
-                key: path.id ?? `${step.id}-${pathIndex}-guard`,
+              edgeLabels.push({
+                key: path.id ?? `${step.id}-${pathIndex}-sentence`,
                 x: midX,
-                y: midY + 4,
-                maxWidth,
-                text: guardText,
+                y: midY,
+                width: Math.min(SENTENCE_MAX_WIDTH, Math.max(SENTENCE_MIN_WIDTH, gap - 24)),
+                text: sentence,
                 stepId: step.id as string,
                 pathId: path.id,
               });
@@ -1520,7 +1581,7 @@ export function CanvasView({
                 data-step-id={path.id !== undefined ? step.id : undefined}
                 role="button"
                 tabIndex={focus.kind === "path" && focus.pathId === path.id ? 0 : -1}
-                aria-label={pathName(path, nameText(step.id), nameText(path.to), wayOutSentence(path, step, operands))}
+                aria-label={pathName(path, nameText(step.id), nameText(path.to), sentence)}
                 // The press takes the roving stop, entered through the source,
                 // which is the end Up and Down walk from. A path with no id
                 // takes none: nothing can name it.
@@ -1530,6 +1591,14 @@ export function CanvasView({
                 onPointerUp={(e) => {
                   e.stopPropagation();
                   onSelectStep(step.id, path.id);
+                }}
+                // Opens the source step's Ways out on this way out, the pair
+                // Enter on a focused path calls. A waypoint handle draws
+                // outside this group, so its own double-click never lands here.
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  onSelectStep(step.id, path.id);
+                  onOpenStepPage?.(step.id as string, path.id);
                 }}
               >
                 {/* The halo, not a ring: a stroke holds no offset, so a line's
@@ -1554,16 +1623,6 @@ export function CanvasView({
                     `<line>` cannot fill, a `<path>` can, and a five-segment
                     route encloses area SVG would otherwise paint black. */}
                 <path d={d} {...stylex.props(styles.edgeHitarea)} />
-                {automaticGuarded && (
-                  <text x={midX} y={midY - 6} {...stylex.props(styles.edgeBadge)}>
-                    {path.priority ?? "?"}
-                  </text>
-                )}
-                {automaticDefault && (
-                  <text x={midX} y={midY - 6} {...stylex.props(styles.edgeBadge)}>
-                    {t("canvas.elseMarker")}
-                  </text>
-                )}
               </g>
             );
           });
@@ -1604,32 +1663,21 @@ export function CanvasView({
           });
         })()}
 
-        {guardLabels.map((label) => (
-          <foreignObject
+        {edgeLabels.map((label) => (
+          <EdgeLabel
             key={label.key}
-            x={label.x - label.maxWidth / 2}
+            x={label.x}
             y={label.y}
-            width={label.maxWidth}
-            height={16}
-            className="panzoom-exclude"
-            data-path-id={label.pathId}
-            data-step-id={label.pathId !== undefined ? label.stepId : undefined}
-          >
-            <div
-              {...stylex.props(styles.edgeGuardLabel)}
-              // Out of the accessibility tree: the path itself now carries the
-              // role, the name and the tab stop, and this only duplicates a
-              // pointer route the edge group already offers.
-              aria-hidden="true"
-              title={label.text}
-              onPointerUp={(e) => {
-                e.stopPropagation();
-                onSelectStep(label.stepId, label.pathId);
-              }}
-            >
-              {label.text}
-            </div>
-          </foreignObject>
+            width={label.width}
+            text={label.text}
+            stepId={label.stepId}
+            pathId={label.pathId}
+            onSelect={() => onSelectStep(label.stepId, label.pathId)}
+            onOpen={() => {
+              onSelectStep(label.stepId, label.pathId);
+              onOpenStepPage?.(label.stepId, label.pathId);
+            }}
+          />
         ))}
 
         {waypointHandles.map((h) => {
@@ -1662,10 +1710,10 @@ export function CanvasView({
           );
         })}
 
-        {/* Last of all, so no route, node, guard label or waypoint handle can
-            take a press meant for a disclosure. A guard label is a 220-wide
-            `<foreignObject>` carrying its own pointer handler, and it lands
-            wherever a route midpoint lands. Each button is a sibling of its box
+        {/* Last of all, so no route, node, sentence or waypoint handle can
+            take a press meant for a disclosure. A sentence's text block is up
+            to 200 wide, carries its own pointer handler, and lands wherever a
+            route midpoint lands. Each button is a sibling of its box
             `<g>`, so the group's drag handlers never see the press either. */}
         {disclosures.map(({ group, x, y }) => (
           <foreignObject
@@ -1689,7 +1737,7 @@ export function CanvasView({
               aria-controls={groupMembersDomId(group.id)}
               aria-label={t("canvas.groupDisclosure").replace("{group}", group.name)}
               // The press stops here rather than reaching the `<svg>`'s own
-              // handlers, the rule the rename input already follows.
+              // handlers.
               // `panzoom-exclude` above is what keeps Panzoom's native
               // down-handler and the marquee's capture handler off it.
               //

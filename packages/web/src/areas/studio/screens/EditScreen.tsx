@@ -395,6 +395,10 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // it, so the canvas bar carries that set's own count and controls.
   const [selectedStepIds, setSelectedStepIds] = useState<string[]>([]);
   const [selectedPathId, setSelectedPathId] = useState<string | undefined>(undefined);
+  // Bumps on every canvas request to open a way out (design.md D7). The step
+  // page keys its Ways out effect on it too, so the section reopens even where
+  // the same way out stays selected.
+  const [waysOutRequest, setWaysOutRequest] = useState(0);
   // The path an edit-rail drag currently sits over, resolved the same way the
   // drop itself resolves one (design.md: "The rail reports its moving
   // position"). Drives the drop-target render in `CanvasView`; not the
@@ -1133,7 +1137,10 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                   selectedStepIds={selectedStepIds}
                   onSelectStep={onSelectStep}
                   onSelectSteps={onSelectSteps}
-                  onOpenStepPage={() => goToTab("steps")}
+                  onOpenStepPage={(_stepId, pathId) => {
+                    if (pathId !== undefined) setWaysOutRequest((n) => n + 1);
+                    goToTab("steps");
+                  }}
                   selectedPathId={selectedPathId}
                   edgeStyle={edgeStyle}
                   onEdgeStyleChange={onEdgeStyleChange}
@@ -1170,6 +1177,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                 onSelectStep={(target) => onSelectStep(target)}
                 onRemoveStep={onRemoveStep}
                 selectedPathId={selectedPathId}
+                waysOutRequest={waysOutRequest}
                 navigate={(target) => openFormEditor(target, "steps")}
                 processes={processes ?? []}
               />

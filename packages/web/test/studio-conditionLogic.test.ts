@@ -555,14 +555,13 @@ describe("summarizeCondition", () => {
     expect(summarizeCondition(condition, operands)).toBe("amount is greater than 1,000 or flagged is yes");
   });
 
-  it("prints a raw row's own CEL text by default, or the catalog's phrase on request", () => {
+  it("reads a raw row as the catalog's phrase, never its CEL text", () => {
     const operands = catalog([field("amount", "number")]);
     const src = "data.amount * 2.0 > 1000.0";
     const condition = fromCel(src, operands)!;
     expect(condition.rows[0].kind).toBe("raw");
-    expect(summarizeCondition(condition, operands)).toBe(src);
-    expect(summarizeCondition(condition, operands, "source")).toBe(src);
-    expect(summarizeCondition(condition, operands, "phrase")).toBe("a hand-written rule");
+    expect(summarizeCondition(condition, operands)).toBe("a hand-written rule");
+    expect(summarizeCondition(condition, operands)).not.toContain("data.amount");
   });
 
   it("fills a value holding a placeholder or a $ pattern as written", () => {
