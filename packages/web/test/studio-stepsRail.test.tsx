@@ -185,11 +185,6 @@ describe("The steps rail's order and numbering", () => {
   });
 });
 
-/**
- * `spa-accessibility`: "A disclosure is a button that carries its expanded
- * state". A rail row is not a disclosure. It opens the step page, so it takes
- * `aria-current` and never `aria-expanded`.
- */
 describe("An unnamed step's row", () => {
   const UNNAMED_DRAFT = {
     baseLocale: "en",
@@ -207,7 +202,11 @@ describe("An unnamed step's row", () => {
   });
 
   it("names the grip after the placeholder", () => {
-    expect(render({ draft: UNNAMED_DRAFT })).not.toMatch(/aria-label="[^"]*review[^"]*"/);
+    const html = render({ draft: UNNAMED_DRAFT });
+    const grip = buttonTags(html).find((b) => b.includes('aria-label="Reorder '));
+
+    expect(grip).toContain('aria-label="Reorder (unnamed step). Alt+Up or Alt+Down moves it."');
+    expect(html).not.toMatch(/aria-label="[^"]*review[^"]*"/);
   });
 });
 
@@ -225,6 +224,11 @@ describe("stepText, the one label the rail and the walk read", () => {
   });
 });
 
+/**
+ * `spa-accessibility`: "A disclosure is a button that carries its expanded
+ * state". A rail row is not a disclosure. It opens the step page, so it takes
+ * `aria-current` and never `aria-expanded`.
+ */
 describe("A steps rail row selects rather than discloses", () => {
   it("gives each row a button that carries `aria-current` and no `aria-expanded`", () => {
     // The row's own button is the one carrying neither a move control's

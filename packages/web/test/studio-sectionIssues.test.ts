@@ -56,6 +56,17 @@ describe("sectionOfIssue routes by the entity an issue resolved to", () => {
   it("names no section for an issue belonging to another step", () => {
     expect(sectionOfIssue(step, issue("path", "path_elsewhere"), PARTICIPANT)).toBeUndefined();
   });
+
+  it("lands an onExit or onCancel action issue on an end step at no section", () => {
+    // An end step's When entered section draws the entry list alone, so a
+    // left list's action row prints nowhere there.
+    const ends = ds({ id: "step_a", terminal: true, onEntry: [{ id: "act_entry" }], onExit: [{ id: "act_exit" }], onCancel: [{ id: "act_cancel" }] });
+    const terminal = sectionsFor("terminal");
+
+    expect(sectionOfIssue(ends, issue("action", "act_exit"), terminal)).toBeUndefined();
+    expect(sectionOfIssue(ends, issue("action", "act_cancel"), terminal)).toBeUndefined();
+    expect(sectionOfIssue(ends, issue("action", "act_entry"), terminal)).toBe("lifecycle");
+  });
 });
 
 describe("sectionOfIssue routes a step-level issue by its loc", () => {

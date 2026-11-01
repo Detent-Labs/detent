@@ -271,10 +271,13 @@ const styles = stylex.create({
   // rail gives up its column and stands above the page. Both rows size to
   // their content, so the page takes its content's height and the tab body
   // scrolls the two as one. The tab then holds two scroll boxes, the body and
-  // the capped rail, and not three.
+  // the capped rail, and not three. Below the breakpoint the grid also stops
+  // shrinking, so it takes its content's height inside the tab body; a
+  // shrunk grid cell would let that content spill past it.
   stepsTab: {
     display: "grid",
     flex: "1 1 auto",
+    flexShrink: { default: 1, [NARROW]: 0 },
     gridTemplateColumns: { default: "22rem minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
     gridTemplateRows: { default: "none", [NARROW]: "auto auto" },
     gap: space.s3,

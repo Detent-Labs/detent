@@ -47,7 +47,7 @@
 - [ ] 4.7 On the production bundle, open a `purchase_requisition` draft's Steps tab at 1440px. A task step shows six headers in D1's order, one open, each a button with `aria-expanded`.
 - [ ] 4.7a Press a closed header. It opens and the open one closes. Press it again. None stands open. Tab order runs masthead, headers, open body, walk.
 - [ ] 4.7b Open a subprocess step and an end step. The headers read per D1. Open More: the Developer view stands last, closed, and prints the key only once opened.
-- [ ] 4.8 Add a task step from the rail's foot. Who acts stands open with "Nobody in particular" in slate and no Done mark. Ways out shows "No way out yet" and a badge reading 1.
+- [ ] 4.8 Add a task step from the rail's foot. Ways out stands open with a badge reading 1. Who acts reads "Nobody in particular" in slate, carries the word To do and no Done mark.
 - [ ] 4.8a Set an assignment. The Who acts header shows the Done mark and the strategy's name in ink.
 - [ ] 4.9 Press Remove this step on a step two ways out lead to. The dialog names the step, counts two ways out leading here, and Cancel holds the focus. Escape returns focus to the control. Confirm removes the step and focus lands on the rail's current row.
 - [ ] 4.10 At 420px, the rail stands above the page capped at 20rem. The page has no scroll box of its own: `getComputedStyle` reads `overflow-y: visible` on it. At 1024px the condition builder's row wraps inside the page column, and no control clips or runs under the rail.

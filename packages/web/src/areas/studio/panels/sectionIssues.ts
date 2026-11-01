@@ -47,8 +47,12 @@ function sectionByEntityId(step: DraftStep): Map<string, SectionName> {
   };
 
   claimActions(step.onEntry, "lifecycle");
-  claimActions(step.onExit, "lifecycle");
-  claimActions(step.onCancel, "lifecycle");
+  // An end step's section draws the entry list alone, so a left list's
+  // action has no row to print at there.
+  if (step.terminal !== true) {
+    claimActions(step.onExit, "lifecycle");
+    claimActions(step.onCancel, "lifecycle");
+  }
   for (const path of step.paths ?? []) {
     claim(path.id, "paths");
     claimActions(path.onPath, "paths");

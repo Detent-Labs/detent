@@ -165,7 +165,7 @@ takes the body text, in ink on a done section and in slate otherwise. A mono
 value inside it takes `fonts.mono` at the size around it. The summary wraps
 after one line; nothing clips.
 
-The mark is one of three. A section with open checks draws the check badge.
+The mark is one of four. A section with open checks draws the check badge.
 That is `fonts.mono`, 11px, weight 600, a 2px `currentcolor` box. It prints
 in refusal where any counted issue blocks a publish and in slate otherwise.
 Its `aria-label` reads the count and `stepsRail.issueMark` or `issueMarkOne`.
@@ -173,7 +173,19 @@ Its `aria-label` reads the count and `stepsRail.issueMark` or `issueMarkOne`.
 A done section without a check draws Lucide `Check` at 18px in slate. A
 visually hidden "Done" (`stepPage.sectionDone`) stands beside the icon. That
 word is also its `title`. The icon therefore stands in for a secondary word
-beside the label. A section with nothing set draws no mark.
+beside the label. A section still to do draws the word To do
+(`stepPage.sectionTodo`) in the Legend style. A section with nothing set and
+nothing needed draws no mark.
+
+The open header takes the current mark, a 3px accent rule on its leading
+edge. It copies the steps rail's `rowMainCurrent` shadow. Code picks it from
+the same flag that sets `aria-expanded`. The open section's name prints in
+ink, and the closed names stay in slate. The ledger hover wash stays on every
+header.
+
+Below 64rem the header stacks. The name stands above the summary in one
+column, and the mark keeps the trailing edge across both rows. A long Ways
+out summary then takes the full width under the name.
 
 The button's accessible name is its text: the name, the summary and the
 mark's word or count. That is what the owner's principle 6 asks the header to
@@ -198,11 +210,11 @@ A new pure module, `panels/stepSummaries.ts`, exports:
 
 The summary and the state per section:
 
-<!-- antislop: allow passive-voice -->
-<!-- Why: the table's "Done when" column states a draft condition, and the draft has no actor. -->
+<!-- antislop: allow passive-voice sentence-length -->
+<!-- Why: the table's "Done when" column states a draft condition, and the draft has no actor. A table row is no sentence, and its cells read one by one. -->
 | Section | Text | Done when | Else |
 |---|---|---|---|
-| assignment | the `assignmentWord` text, mono as it says | the step holds a strategy | todo on a task step, else optional |
+| assignment | the `assignmentWord` text, mono as it says | the step holds a strategy | todo on a task step with a manual way out or none, else optional |
 | form | `formSizeText(...)` or `formsTab.miniatureEmpty` | a field entry counts | optional |
 | subprocess | `processLabel` of the called process, else its id in mono, else `stepSummary.processNone` | the spec holds a `processId` | todo |
 | paths | every `wayOutHeading` joined with ", ", else `stepSummary.pathsNone` | one path or more | todo |
@@ -267,6 +279,10 @@ the `onExit` and `onCancel` editors follow. The `form` body keeps the open
 control alone, since the header already states the size. The other bodies
 are today's section bodies, unchanged.
 
+The Who acts body keeps the strategy's note alone above the envelope editor.
+The header's summary already names the strategy. Every open body pads 12px at
+its top, so its first control stands clear of the header.
+
 The terminal note `stepSections.terminalNoPathsOrTimers` stays under the
 sections, and the walk follows it. The Developer view loses its own 2px top
 rule and foot padding. More's section rule and the page's own padding frame
@@ -290,6 +306,11 @@ comment names the walk's padding instead.
 height, and the tab body scrolls. Below 64rem the rail keeps its 20rem cap.
 It keeps its own scroll too. `studio-guidedSurfaceStyle.test.ts` gains an assertion on the
 page's `overflowY` pair, beside the rail's cap assertion.
+
+Under `NARROW` the grid also stops shrinking: its `flexShrink` reads 1 by
+default and 0 there. A shrunk grid holds a 278px cell inside the tab body,
+and its content spills past that cell. Without the shrink, the grid takes its
+content's height.
 
 RAIL-6 resolves with the rail's width at 22rem. The 60-character label from
 the browser check wraps to two lines. The page column still clears 52rem
@@ -356,6 +377,7 @@ the owner's D7 asks one dialog form for every destructive action.
 | `stepSummary.attachmentsOn` | Attachments on |
 | `stepSummary.attachmentsOff` | Attachments off |
 | `stepPage.sectionDone` | Done |
+| `stepPage.sectionTodo` | To do |
 | `removeStep.heading` | Remove “{step}”? |
 | `removeStep.stepTerm` | Step |
 | `removeStep.incomingTerm` | Ways out leading here |
@@ -379,16 +401,19 @@ numerals, so "2 when entered, 0 when left" is a full sentence from one key.
   `sectionLabel`'s two lifecycle keys and the fresh-array case. The
   `sectionColumns` block goes.
 - `studio-sectionIssues.test.ts`: an `onEntry`, `onExit` and `onCancel`
-  action land at `lifecycle`; a `cancellable` loc lands at `more`.
+  action land at `lifecycle`; a `cancellable` loc lands at `more`. On an end
+  step, an `onExit` or `onCancel` action lands at no section.
 - `studio-vocabulary.test.ts`: the `stepSections.entry` and
   `stepSections.exit` rows give way to `["stepSections.lifecycle", "When
   entered or left"]`, `["stepSections.lifecycleEntryOnly", "When entered"]`
   and `["stepSections.more", "More"]`.
 - `studio-stepsRail.test.tsx`: a step with an empty label and the key
-  `review` renders a row reading "(unnamed step)" and not `review`.
+  `review` renders a row reading "(unnamed step)" and not `review`. Its
+  grip's label names "(unnamed step)" too.
 - New `studio-stepSummaries.test.ts`: every row of D3's table, the mono
   flag, the three states, `defaultOpenSection`'s four answers and
-  `nextOpenSection`'s two.
+  `nextOpenSection`'s two. An unassigned task step reads optional at Who acts
+  where every way out happens by itself. One manual way out makes it todo.
 - New `studio-stepRemoval.test.ts`: `stepRemovalReach` counts two incoming
   paths from two steps and ignores the step's own paths. It counts form
   fields as `formCounts` does, and reads `isInitial`.
@@ -402,9 +427,13 @@ numerals, so "2 when entered, 0 when left" is a full sentence from one key.
   control carries `btn-destructive`. A step-level issue prints once, inside
   its body. The Form-section cases read the size sentence from the header
   and the control from the body. The two-column block goes.
+- `studio-stepPage.test.tsx`, last: the open header carries the current-mark
+  style, and the closed ones lack it. A to-do header reads "To do". The Who
+  acts body keeps the note and repeats no strategy name. The kicker is an
+  `<h2>`. A `$&` in a neighbour's label prints as written.
 - `studio-guidedSurfaceStyle.test.ts`: the page's `overflowY` reads `auto`
   by default and `visible` under `NARROW`; the `stepsTab` grid reads 22rem
-  and `auto auto` rows.
+  and `auto auto` rows, with the `flexShrink` pair of 1 and 0.
 - `studio-panels-literal-text.test.ts` stays green: every string is a key.
 
 ### D10. Docs, glossary and roadmap

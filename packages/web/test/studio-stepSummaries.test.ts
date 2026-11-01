@@ -62,6 +62,23 @@ describe("sectionSummary: Who acts", () => {
   it("reads optional on an unassigned end step", () => {
     expect(sectionSummary("assignment", input(end())).state).toBe("optional");
   });
+
+  it("reads optional on an unassigned task step whose ways out all happen by themselves", () => {
+    const step = task({
+      paths: [
+        { id: "path_1", label: "Approve", to: "step_b", trigger: "automatic", priority: 1, guard: { lang: "cel", src: "data.ok" } },
+        { id: "path_2", label: "Reject", to: "step_c", trigger: "automatic", priority: 2 },
+      ],
+    });
+
+    expect(sectionSummary("assignment", input(step)).state).toBe("optional");
+  });
+
+  it("reads to do on an unassigned task step with a manual way out", () => {
+    const step = task({ paths: [{ id: "path_1", label: "Approve", to: "step_b", trigger: "manual" }] });
+
+    expect(sectionSummary("assignment", input(step)).state).toBe("todo");
+  });
 });
 
 describe("sectionSummary: Form", () => {

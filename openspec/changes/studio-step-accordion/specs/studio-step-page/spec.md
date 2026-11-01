@@ -76,12 +76,14 @@ Collaboration controls where the kind carries them.
 
 ### Requirement: A section header carries a summary and its state
 
-Each header SHALL carry the section's name, a one-line summary of what the
-section holds, and a state. The summary SHALL use the author's words. A
-machine value in it SHALL print in the mono face. A done section SHALL carry a
-check mark named "Done". A section with an open check SHALL carry the count
-instead, in the badge the steps rail uses. A section with
-nothing set SHALL have neither, and its summary SHALL say what is missing.
+Each header SHALL carry the section's name, a one-line summary of what it
+holds, and a state. The summary SHALL use the author's words. A machine value
+in it SHALL print in the mono face.
+
+A done section SHALL carry a check mark named "Done". A section with an open
+check SHALL carry the count instead, in the steps rail's badge. A section
+still to do SHALL carry the word "To do". A section with nothing set and
+nothing needed SHALL have no mark, and its summary SHALL say what is missing.
 
 #### Scenario: Who acts names the assignment
 
@@ -100,13 +102,19 @@ nothing set SHALL have neither, and its summary SHALL say what is missing.
 
 - **WHEN** a task step has no way out, and no check names its paths
 - **THEN** the Ways out header's summary reads "No way out yet"
-- **AND** the header has no Done mark
+- **AND** the header reads "To do" and has no Done mark
 
 #### Scenario: A section with a check carries the count
 
 - **WHEN** a structural check names a step's assignment
 - **THEN** the Who acts header carries a badge reading 1
 - **AND** the header has no Done mark
+
+#### Scenario: The open header carries the current mark
+
+- **WHEN** Form stands open
+- **THEN** the Form header carries the current mark on its leading edge
+- **AND** its name prints in ink while the other five print in slate
 
 #### Scenario: More summarizes the overrides
 
@@ -146,9 +154,11 @@ SHALL open Ways out.
 
 On open, the page SHALL open the first section carrying an open check. It
 SHALL open the first section still to do when no section carries a check. It
-SHALL open the first section when none is to do. A section is to do where it is empty
-and the step needs it. Those are Who acts on a task step, Ways out and Which
-process it calls. How the case ends counts where the process declares
+SHALL open the first section when none is to do.
+
+A section is to do where it is empty and the step needs it. Those are Ways
+out and Which process it calls. Who acts counts on a task step with a manual
+way out or none. How the case ends counts where the process declares
 outcomes.
 
 #### Scenario: A check decides which section opens first
@@ -165,6 +175,13 @@ outcomes.
 
 - **WHEN** a task step opens with an assignment, a way out and no open check
 - **THEN** Who acts stands open
+
+#### Scenario: An automatic step does not open on Who acts
+
+- **WHEN** a task step with no assignment has two automatic ways out and no
+  open check
+- **THEN** Who acts has no To do word
+- **AND** the page opens on Who acts only because it is the first section
 
 ### Requirement: Removing a step confirms first
 

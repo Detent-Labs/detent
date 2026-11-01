@@ -810,6 +810,8 @@ export const en = {
   // The visually hidden word beside a done section's check mark, and its
   // tooltip.
   "stepPage.sectionDone": "Done",
+  // The mark a section header carries while the step still needs it.
+  "stepPage.sectionTodo": "To do",
   "stepPage.developerView": "Developer view",
   "stepPage.developerViewNote":
     "The JSON is read-only here. The JSON surface stays the one place for hand-authoring a definition.",

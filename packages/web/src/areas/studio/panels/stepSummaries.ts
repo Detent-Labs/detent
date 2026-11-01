@@ -75,7 +75,12 @@ export function sectionSummary(section: SectionName, input: SummaryInput): Secti
       const word = assignmentWord(step.assignment?.strategy);
       const type = step.assignment?.strategy?.type;
       const held = typeof type === "string" && type !== "";
-      return { text: word.text, mono: word.mono, state: held ? "done" : performedBy === "participant" ? "todo" : "optional" };
+      // A task step whose ways out all happen by themselves never waits on a
+      // person, so it works without anyone named.
+      const paths = step.paths ?? [];
+      const waitsOnPerson = paths.length === 0 || paths.some((p) => p.trigger !== "automatic");
+      const needed = performedBy === "participant" && waitsOnPerson;
+      return { text: word.text, mono: word.mono, state: held ? "done" : needed ? "todo" : "optional" };
     }
     case "form": {
       const { fieldCount, requiredCount } = formCounts(step, fields);

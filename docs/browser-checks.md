@@ -6874,8 +6874,8 @@ Developer view, and no Comment or Attachments control.
 
 **4. A fresh task step.** Press "Add a step" at the foot of the steps rail.
 Pass: Ways out stands open. Its header reads "No way out yet" and carries a
-check badge reading 1. Who acts reads "Nobody in particular" in slate and
-has no Done mark.
+check badge reading 1. Who acts reads "Nobody in particular" in slate,
+carries the word To do and has no Done mark.
 
 Open Who acts and pick a strategy. Pass: the header shows the Done mark, a check
 icon named "Done". Pass: the summary reads the strategy's name in ink.
@@ -6908,6 +6908,18 @@ tab body are the two scroll boxes. Under `playwright-cli`, read the style with
 "Route by Amount" and open Ways out. Read the condition of "Needs finance
 approval". Pass: the condition builder's row wraps inside the page column.
 Pass: no control clips.
+
+**8. An unnamed neighbour.** Resize the window back to 1440x900. Choose
+"Manager Approval" and note the step after it in the steps rail. Open that
+step and clear its name line. Choose "Manager Approval" again. Pass: its Next
+control reads "Next: (unnamed step)", and no key shows.
+
+**9. A way out picked on the Map.** Choose "Manager Approval". Close Ways out
+where it stands open. Open the Map tab. Press one of that step's paths on the
+canvas.
+
+Pass: the Steps tab opens, and Ways out stands open. Pass: that path's row
+carries the current mark.
 
 Discard the draft from the process list and accept the browser's confirm.
 Under `playwright-cli`, `dialog-accept` answers it.

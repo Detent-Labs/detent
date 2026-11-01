@@ -92,6 +92,9 @@ describe("the Steps tab holds two scroll boxes below the breakpoint", () => {
 
     expect(block).toContain('"22rem minmax(0, 1fr)"');
     expect(block).toMatch(/\[NARROW\]: "auto auto"/);
+    // Below the breakpoint the grid takes its content's height instead of a
+    // shrunk cell its content spills out of.
+    expect(block).toMatch(/flexShrink: \{ default: 1, \[NARROW\]: 0 \}/);
   });
 });
 

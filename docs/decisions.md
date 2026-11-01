@@ -2039,9 +2039,10 @@ raised the last four.
 
 ## Open from studio-step-accordion (needs its own OpenSpec change)
 
-The change folded the step page's sections into one accordion. Its final
-review left five points to later changes. The browser check of this change
-may append further entries. The ACCORDION tag is local to this section.
+The change folded the step page's sections into one accordion. Its task
+reviews, its browser check, its design critique and its technical audit left
+the points below. Each one falls outside the change's scope. The ACCORDION
+tag is local to this section.
 
 - **ACCORDION-1: choosing the selected way out again on the canvas leaves
   Ways out closed.** The effect keys on `selectedPathId`, which does not move. Risk
@@ -2060,6 +2061,55 @@ may append further entries. The ACCORDION tag is local to this section.
 - **ACCORDION-5: a kind switch can bring back a hidden open section.** The page
   stores the open section across the switch. Risk (Low): the section shows
   again when the author switches back.
+- **ACCORDION-6: a way out whose target step is gone heads its row "(no step
+  yet)".** Its Leads to select still displays the first step, and picking
+  that step writes nothing. The code lives in `panels/PathsPanel.tsx` and is
+  older than this change. Risk (Medium): the select shows a target the draft
+  lacks.
+- **ACCORDION-7: the header's hover wash runs flush to the text.** The header
+  sets `paddingInline: 0`. Risk (Low): the wash reads as clipped at the text's
+  edge.
+- **ACCORDION-8: the Who acts body is the inline form of
+  `PluginEnvelopeEditor`.** It prints schema-key labels, "Edit as JSON" and a
+  "Settings (JSON)" box outside a Developer view. Change 11 or a follow-up of
+  its own takes it. Risk (Medium): an author meets machine words where the
+  guided vocabulary promises plain ones.
+- **ACCORDION-9: a step-level check prints the validator's own text under a
+  "ZOD" label.** A just-added step's name check lands on the masthead rather
+  than under Name. Focus stays in the steps rail after "Add a step". Change 12
+  owns the sentences. Risk (Medium): the first check a new step meets reads as
+  machine output.
+- **ACCORDION-10: the masthead stands about 300px tall before the first
+  header at 1440x900.** "Set as the process's first step" shows on every step
+  but the first, end steps included. Change 14 owns the header rows. Risk
+  (Low): the sections start a third of the way down the window.
+- **ACCORDION-11: below 64rem the capped steps rail never scrolls to the
+  current row.** Its `overscroll-behavior: contain` also keeps a wheel over it
+  from reaching the page at its end. The rule comes from `DESIGN.md`. Risk
+  (Medium): the current row can sit out of view, and the page stops scrolling
+  under the pointer.
+- **ACCORDION-12: the no-assignment warning draws a 2px rule in the refusal
+  role.** The warning callout in `DESIGN.md` names a 3px rule in Advisory. The
+  site is the `warning` style in `StepPage.tsx`, older than this change. Risk
+  (Low): the warning reads as a refusal.
+- **ACCORDION-13: Ways out opens every way out at once.** Whether its rows fold
+  one at a time is an owner question. Risk (Low): a step with many ways out
+  stands long when open.
+- **ACCORDION-14: two unnamed steps both read "(unnamed step)".** That holds in
+  the steps rail, the walk and the removal dialog, while the selects number
+  them. Risk (Low): an author cannot tell the two apart there.
+- **ACCORDION-15: the steps rail reorders only by drag or Alt+Arrow.** No
+  press-to-move control stands in for the drag (WCAG 2.5.7), and the grip
+  measures 26px. Both are older than this change. Risk (Medium): a pointer
+  user who cannot drag has no way to reorder.
+- **ACCORDION-16: at 1366x768 and 1100x800 the Steps tab nests three scroll
+  boxes.** The cause is the `minHeight: 36rem` that `stepsTab` keeps, older
+  than this change. Risk (Low): a wheel scrolls the wrong box first.
+- **ACCORDION-17: the removal dialog's heading uppercases the step's name.**
+  The global `h2` style does it. Its counts print outside mono, and labels and
+  values share no baseline. The two dialogs it copies share all three. Change
+  13 owns the one dialog. Risk (Low): the dialog reads unlike the register it
+  confirms.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

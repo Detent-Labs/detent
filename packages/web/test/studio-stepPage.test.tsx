@@ -158,6 +158,16 @@ describe("The step page's masthead", () => {
     expect(html).toContain("A step someone works");
   });
 
+  it("makes the kicker the page's h2, so the section headings nest under the step", () => {
+    const html = render({ stepNumber: 3 });
+    const kicker = /<h2 class="kicker">([\s\S]*?)<\/h2>/.exec(html);
+
+    expect(kicker).not.toBeNull();
+    expect(kicker![1]).toContain("Step 3");
+    expect(kicker![1]).toContain("A step someone works");
+    expect(html.indexOf("<h2")).toBeLessThan(html.indexOf("<h3"));
+  });
+
   it("carries the step's label as a writable line, and keeps its key in the Developer view", () => {
     const html = render();
     // The step's own disclosure stands last in More, after the way-out rows'
@@ -283,6 +293,41 @@ describe("The step page opens on the section that needs the author", () => {
   it("opens Ways out where a way out is selected", () => {
     expect(openNames(render({ selectedPathId: "path_1" }))).toEqual(["Ways out"]);
   });
+
+  it("opens an unassigned step whose ways out all happen by themselves on Who acts only as the first section", () => {
+    const automatic = {
+      ...TASK_STEP,
+      paths: [
+        { id: "path_1", to: "step_b", trigger: "automatic", priority: 1, guard: { lang: "cel", src: "data.ok" } },
+        { id: "path_2", to: "step_b", trigger: "automatic", priority: 2 },
+      ],
+    } as unknown as DraftStep;
+    const html = render({ step: automatic });
+
+    expect(section(html, "Who acts").header).not.toContain("To do");
+    expect(openNames(html)).toEqual(["Who acts"]);
+  });
+});
+
+describe("The open section header", () => {
+  it("carries the current mark and prints its name in ink, and no closed header does", () => {
+    const all = sections(render());
+
+    for (const { name, button, header } of all) {
+      const open = button.includes('aria-expanded="true"');
+
+      expect(`${name}: ${button.includes("sectionHeaderOpen")}`).toBe(`${name}: ${open}`);
+      expect(`${name}: ${header.includes("sectionNameOpen")}`).toBe(`${name}: ${open}`);
+    }
+    expect(all.filter((s) => s.button.includes("sectionHeaderOpen"))).toHaveLength(1);
+  });
+
+  it("draws the current mark as the steps rail's 3px accent rule", () => {
+    const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
+
+    expect(source).toMatch(/sectionHeaderOpen: \{\s*boxShadow: `inset 3px 0 0 \$\{colors\.accent\}`,\s*\}/);
+    expect(source).toMatch(/sectionNameOpen: \{\s*color: colors\.text,\s*\}/);
+  });
 });
 
 describe("A section header's summary and mark", () => {
@@ -316,10 +361,23 @@ describe("A section header's summary and mark", () => {
     expect(header).toContain('title="Done"');
   });
 
-  it("says what is missing and carries no mark on an empty section", () => {
+  it("says what is missing and reads To do on an empty section the step needs", () => {
     const { header } = section(render({ step: { ...TASK_STEP, paths: undefined } as unknown as DraftStep }), "Ways out");
 
     expect(header).toContain("No way out yet");
+    expect(header).toContain('class="todoMark markPlace">To do</span>');
+    expect(header).not.toContain('title="Done"');
+    expect(header).not.toContain("open issue");
+  });
+
+  it("reads To do on Who acts on an unassigned task step with a manual way out", () => {
+    expect(section(render(), "Who acts").header).toContain(">To do</span>");
+  });
+
+  it("carries no mark on an empty section the step works without", () => {
+    const { header } = section(render(), "Time limit");
+
+    expect(header).not.toContain("To do");
     expect(header).not.toContain('title="Done"');
     expect(header).not.toContain("open issue");
   });
@@ -342,6 +400,20 @@ describe("A section header's summary and mark", () => {
     const ends = { ...TASK_STEP, terminal: true, paths: undefined, outcome: "approved" } as unknown as DraftStep;
 
     expect(section(render({ step: ends }), "How the case ends").header).toContain(">approved</span>");
+  });
+});
+
+describe("The step page's Who acts section", () => {
+  it("leads its body with the strategy's note, and leaves the name to the header", () => {
+    const { header, body } = section(render({ step: ASSIGNED }), "Who acts");
+    const note = "Whoever is in the group when an instance enters the step can act on it.";
+
+    expect(header).toContain("Everyone in a group");
+    expect(body).toContain(note);
+    // The type picker still offers the name as an option; no paragraph
+    // repeats it.
+    expect(body).not.toMatch(/<p[^>]*>Everyone in a group<\/p>/);
+    expect(body.indexOf(note)).toBeLessThan(body.indexOf("Who can act on this step"));
   });
 });
 
@@ -489,7 +561,7 @@ describe("A step page section's own open issues", () => {
     expect(html.match(/no such group/g)).toHaveLength(1);
     expect(body).toContain("no such group");
     // Above the section's own controls.
-    expect(body.indexOf("no such group")).toBeLessThan(body.indexOf("Nobody in particular"));
+    expect(body.indexOf("no such group")).toBeLessThan(body.indexOf("Who can act on this step"));
   });
 
   it("prints an issue about the form once, inside the Form body", () => {
@@ -517,8 +589,8 @@ describe("A step page section's own open issues", () => {
     const badge = (issues: EditorIssue[]) => /<span class="([^"]+)" aria-label="1 open issue"/.exec(section(render({ issues }), "Form").header)![1];
     const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
 
-    expect(badge([view])).toBe("badge badgeAdvisory");
-    expect(badge([cel])).toBe("badge badgeBlocker");
+    expect(badge([view])).toBe("badge badgeAdvisory markPlace");
+    expect(badge([cel])).toBe("badge badgeBlocker markPlace");
     expect(source).toMatch(/badgeBlocker: \{\s*color: colors\.refusal,\s*\}/);
     expect(source).toMatch(/badgeAdvisory: \{\s*color: colors\.textMuted,\s*\}/);
   });
@@ -552,6 +624,13 @@ describe("The step page's walk", () => {
 
     expect(html).toContain("Previous: Intake");
     expect(html).toContain("Next: Credit check");
+  });
+
+  it("fills a $ pattern in a neighbour's label as written", () => {
+    const html = render({ previous: { id: "step_z", label: "Pay $& now" }, next: { id: "step_b", label: "Owe $1" } });
+
+    expect(html).toContain("Previous: Pay $&amp; now");
+    expect(html).toContain("Next: Owe $1");
   });
 
   it("reads the placeholder for an unnamed neighbour", () => {

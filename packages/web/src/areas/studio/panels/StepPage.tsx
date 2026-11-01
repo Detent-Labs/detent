@@ -39,7 +39,7 @@ import {
   type SectionSummary,
 } from "./stepSummaries.js";
 import { stepRemovalReach } from "../draft/stepRemoval.js";
-import { stepText } from "./shared/optionText.js";
+import { fill, stepText } from "./shared/optionText.js";
 import type { EditorIssue } from "../draft/issues.js";
 
 type DraftStep = DraftOf<Step>;
@@ -109,14 +109,21 @@ const styles = stylex.create({
     flexWrap: "wrap",
   },
   // The kicker: the step's place in the walk and its kind, over the name
-  // line. The number aligns with the rail's own, so it takes mono.
+  // line. The number aligns with the rail's own, so it takes mono. It is the
+  // page's `h2`, so the section headings nest under the step. `shell/global.css`
+  // gives every `h2` the heading face, a size, a weight and margins; the
+  // first four declarations reset them, and the compiled class outranks that
+  // element selector.
   kicker: {
+    margin: 0,
+    fontFamily: fonts.body,
+    fontSize: 11,
+    fontWeight: 400,
     display: "flex",
     alignItems: "baseline",
     gap: space.s2,
     flex: "1 1 auto",
     minWidth: 0,
-    fontSize: 11,
     textTransform: "uppercase",
     letterSpacing: "0.1em",
     color: colors.textMuted,
@@ -255,10 +262,11 @@ const styles = stylex.create({
   // The header: one button filling the row, flush left. The name, the
   // summary and the mark stand in three columns, so every summary down the
   // page starts at one edge, as a register's column does. A name too long
-  // for its column wraps inside it.
+  // for its column wraps inside it. Below the breakpoint the name stands
+  // above the summary, and the mark keeps the trailing edge of both rows.
   sectionHeader: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 11rem) minmax(0, 1fr) auto",
+    gridTemplateColumns: { default: "minmax(0, 11rem) minmax(0, 1fr) auto", [NARROW]: "minmax(0, 1fr) auto" },
     alignItems: "baseline",
     columnGap: space.s3,
     width: "100%",
@@ -276,6 +284,12 @@ const styles = stylex.create({
     textAlign: "start",
     cursor: "pointer",
   },
+  // The open header takes the current mark the steps rail's current row
+  // draws (`DESIGN.md`'s Shapes). Picked in code from the same flag that
+  // sets `aria-expanded`.
+  sectionHeaderOpen: {
+    boxShadow: `inset 3px 0 0 ${colors.accent}`,
+  },
   // The Legend style (`DESIGN.md`'s Typography).
   sectionName: {
     fontFamily: fonts.body,
@@ -286,8 +300,15 @@ const styles = stylex.create({
     color: colors.textMuted,
     overflowWrap: "anywhere",
   },
+  // The open section's name prints in ink; the closed ones stay in slate.
+  sectionNameOpen: {
+    color: colors.text,
+  },
   // The summary takes the body text, and wraps after one line; nothing clips.
+  // Below the breakpoint it takes the first column's second row, under the
+  // name.
   sectionSummary: {
+    gridColumn: { default: "auto", [NARROW]: "1" },
     minWidth: 0,
     overflowWrap: "anywhere",
     color: colors.textMuted,
@@ -323,6 +344,21 @@ const styles = stylex.create({
     display: "inline-flex",
     color: colors.textMuted,
   },
+  // A section still to do says so in the Legend style.
+  todoMark: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    fontWeight: 400,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+  },
+  // Below the breakpoint the mark stands in the second column across both
+  // rows, beside the name and the summary under it.
+  markPlace: {
+    gridColumn: { default: "auto", [NARROW]: "2" },
+    gridRow: { default: "auto", [NARROW]: "1 / span 2" },
+  },
   // Off screen, never `display: none`, so the word stays in the header's
   // accessible name.
   visuallyHidden: {
@@ -336,7 +372,10 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     borderWidth: 0,
   },
+  // The open body stands clear of its header at the top. The hidden style
+  // below still wins while the section is closed.
   sectionBody: {
+    paddingBlockStart: space.s3,
     paddingBlockEnd: space.s3,
   },
   // `hidden` alone would lose against a compiled `display`, so the closed
@@ -347,16 +386,6 @@ const styles = stylex.create({
   bodyIssues: {
     marginBlockStart: 0,
     marginBlockEnd: space.s2,
-  },
-  // The one word the Who acts section leads with. Mono only where it falls
-  // back to a registry type, which is a value the engine matches.
-  plainWord: {
-    marginBlock: 0,
-  },
-  monoWord: {
-    fontFamily: fonts.mono,
-    fontSize: "0.8rem",
-    marginBlock: 0,
   },
   errorText: {
     color: colors.refusal,
@@ -477,25 +506,27 @@ function CollaborationControl({
 }
 
 /** A header's closing mark. The check badge where the section counts open
- * issues; else the check mark where it is done; else nothing. The badge
- * prints in refusal where any counted issue blocks a publish. */
+ * issues; else the check mark where it is done; else the word To do where
+ * the step still needs it; else nothing. The badge prints in refusal where
+ * any counted issue blocks a publish. */
 function SectionMark({ issues, state }: { issues: readonly EditorIssue[]; state: SectionState }) {
   if (issues.length > 0) {
     const blocker = issues.some((i) => i.source !== "view");
     return (
       <span
-        {...stylex.props(styles.badge, blocker ? styles.badgeBlocker : styles.badgeAdvisory)}
+        {...stylex.props(styles.badge, blocker ? styles.badgeBlocker : styles.badgeAdvisory, styles.markPlace)}
         aria-label={`${issues.length} ${t(issues.length === 1 ? "stepsRail.issueMarkOne" : "stepsRail.issueMark")}`}
       >
         {issues.length}
       </span>
     );
   }
+  if (state === "todo") return <span {...stylex.props(styles.todoMark, styles.markPlace)}>{t("stepPage.sectionTodo")}</span>;
   if (state !== "done") return null;
   // The icon stands in for the word beside the name: the word stays its
   // tooltip and part of the header's accessible name.
   return (
-    <span {...stylex.props(styles.doneMark)} title={t("stepPage.sectionDone")}>
+    <span {...stylex.props(styles.doneMark, styles.markPlace)} title={t("stepPage.sectionDone")}>
       <Check size={18} strokeWidth={1.75} aria-hidden="true" />
       <span {...stylex.props(styles.visuallyHidden)}>{t("stepPage.sectionDone")}</span>
     </span>
@@ -665,6 +696,7 @@ export function StepPage({
   const showAssignmentWarning = step.terminal !== true && step.assignment === undefined;
   // One word for the step's assignment, read by both the section and the rail
   // row, so the two cannot name it differently (`studio-guided-vocabulary`).
+  // The body reads its note alone; the header's summary names it.
   const assignment = assignmentWord(step.assignment?.strategy);
 
   const actionList = (label: CatalogKey, list: "onEntry" | "onExit" | "onCancel") => (
@@ -696,13 +728,11 @@ export function StepPage({
           </>
         );
       case "assignment":
-        // The plain name and its note stand above the envelope editor, so the
-        // section says who ends up able to act on the step before it says how
-        // (`studio-guided-vocabulary`). A registered type the curated table
-        // misses reads as its registry type, in mono.
+        // The header's summary names the strategy, and its note leads the
+        // body above the envelope editor, so the section says who ends up able
+        // to act on the step before it says how (`studio-guided-vocabulary`).
         return (
           <>
-            <p {...stylex.props(assignment.mono ? styles.monoWord : styles.plainWord)}>{assignment.text}</p>
             {assignment.note !== undefined && <p {...stylex.props(styles.hint)}>{assignment.note}</p>}
             <PluginEnvelopeEditor
               label={t("steps.assignmentLabel")}
@@ -907,10 +937,10 @@ export function StepPage({
             id={headerId}
             aria-expanded={open}
             aria-controls={bodyId}
-            {...stylex.props(styles.sectionHeader)}
+            {...stylex.props(styles.sectionHeader, open && styles.sectionHeaderOpen)}
             onClick={() => setOpenSection(nextOpenSection(shownOpen, section))}
           >
-            <span {...stylex.props(styles.sectionName)}>{t(sectionLabel(section, performedBy))}</span>
+            <span {...stylex.props(styles.sectionName, open && styles.sectionNameOpen)}>{t(sectionLabel(section, performedBy))}</span>
             <span
               {...stylex.props(
                 styles.sectionSummary,
@@ -944,12 +974,12 @@ export function StepPage({
       <div {...stylex.props(styles.column)}>
         <div {...stylex.props(styles.masthead)}>
           <div {...stylex.props(styles.mastheadTop)}>
-            <span {...stylex.props(styles.kicker)}>
+            <h2 {...stylex.props(styles.kicker)}>
               <span {...stylex.props(styles.kickerNumber)}>
                 {t("stepPage.stepNumber").replace("{number}", String(stepNumber))}
               </span>
               <span>{stepKindPhrase(performedBy)}</span>
-            </span>
+            </h2>
             {isInitialStep && <span {...stylex.props(styles.firstStep)}>{t("stepRole.initial")}</span>}
             <button
               ref={removeTriggerRef}
@@ -1074,7 +1104,7 @@ export function StepPage({
             disabled={previous === undefined}
             onClick={() => previous !== undefined && walkTo(previous.id, "previous")}
           >
-            {previous === undefined ? t("stepPage.previousNone") : t("stepPage.previous").replace("{step}", previous.label)}
+            {previous === undefined ? t("stepPage.previousNone") : fill(t("stepPage.previous"), { step: previous.label })}
           </button>
           <button
             type="button"
@@ -1083,7 +1113,7 @@ export function StepPage({
             disabled={next === undefined}
             onClick={() => next !== undefined && walkTo(next.id, "next")}
           >
-            {next === undefined ? t("stepPage.nextNone") : t("stepPage.next").replace("{step}", next.label)}
+            {next === undefined ? t("stepPage.nextNone") : fill(t("stepPage.next"), { step: next.label })}
           </button>
         </nav>
       </div>
