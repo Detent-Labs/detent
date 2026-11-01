@@ -6714,3 +6714,52 @@ Discard the draft from the process list, on the "IT Offboarding" row, and
 accept the browser's confirm. Under `playwright-cli`, `dialog-accept` answers
 it. The header bar's own "Discard draft" does not work, per DRAFT-1 in
 `docs/decisions.md`.
+
+### Studio: selects list labels (`studio-selects-show-labels`)
+
+Source: `studio-selects-show-labels` task 5.6. The bun tests pin the option
+text, the numbering of repeats and the key derivation. A select's open list
+and the Developer view need a real page.
+
+Use the production build, as "Before you start" describes. Seed the database
+and sign in as `demo-superuser@example.test`, password `seed-demo-password`.
+Create a draft of a process with at least three steps. Under `playwright-cli`,
+pass `-s=selects-show-labels` on every call.
+
+**1. A way out's step selects list labels.** Open the Steps tab and select a
+step with a way out. Open the way out's "Leads to" select. Pass: each option
+reads a step's label. No option shows a key or an id.
+
+Open "Where the new way out leads". Pass: its options read the same labels.
+
+**2. Two steps named alike take a count.** Rename a second step to the first
+step's label, such as "Review". Open "Leads to". Pass: the options read
+"Review" and "Review (2)", in the order of the steps rail.
+
+Read the way out's heading for each step. Pass: the heading that names the
+second step reads "Review (2)".
+
+**3. A step with no label reads as unnamed.** Drop a new step on the canvas
+and clear its label. Open "Leads to" on another step. Pass: the new step's
+option reads "(unnamed step)".
+
+**4. The time limit lists way-out headings.** Open the Time limit section of a
+step that has a way out. Open its way-out select. Pass: each option reads a
+heading such as "Approve → Done". No option shows a key.
+
+**5. An action's output mapping lists field labels.** Open an action on a
+step and its output mapping. Open a target select. Pass: the options read
+field labels. A group does not appear.
+
+**6. A call's input mapping lists field labels.** Open a step that calls a
+process and read its input mapping. Open a target select. Pass: the options
+read the child process's field labels, and none shows a key.
+
+**7. A derived key transliterates.** Add a step and name it "Prüfung". Open
+the step's Developer view. Pass: the key reads `pruefung`.
+
+Add a way out named "Abschluss" from that step to another step. Open its
+Developer view. Pass: the key reads `pruefung-abschluss`.
+
+Discard the draft from the process list and accept the browser's confirm.
+Under `playwright-cli`, `dialog-accept` answers it.

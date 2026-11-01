@@ -1907,6 +1907,32 @@ this section.
   none, so the focus falls to the page body. The archived NAMES-3 fix covers
   only the first two exits.
 
+## Open from studio-selects-show-labels (needs its own OpenSpec change)
+
+The change made the step page's selects print labels and made derived keys
+transliterate umlauts. It left six points to later changes. The SELECTS tag is
+local to this section.
+
+- **SELECTS-1: the steps rail still falls back to a step key.** An unnamed
+  step reads its key in the rail. The step selects read "(unnamed step)".
+  Change 10 (`studio-step-accordion`) owns the rail.
+- **SELECTS-2: the Previous and Next labels still fall back to a step key.**
+  The step page foot prints the key of an unnamed neighbor. The Checks
+  narrowing label does the same. Both live in `EditScreen.tsx`. Change 10 owns
+  the page foot. Change 12 (`studio-checks-by-subject`) owns the Checks label.
+- **SELECTS-3: the Fields tab's data source select prints `ds.key ?? ds.id`.**
+  The select shows a key where the step selects show a label. Change 11 owns
+  the Sources view and can settle the wording.
+- **SELECTS-4: the canvas node's accessible name carries the step key.** A
+  screen reader hears the key and not the label. Change 5 owns the canvas
+  words.
+- **SELECTS-5: the migration plan form keeps its key and label choices.** No
+  change is planned. A migration maps instance data by key, so its spec asks
+  for both.
+- **SELECTS-6: a key derived before this change stops following its label.**
+  A draft keyed `pr_fung` no longer counts as derived. A rename of "Prüfung"
+  leaves that key alone. The change accepts this, since nothing is deployed.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
