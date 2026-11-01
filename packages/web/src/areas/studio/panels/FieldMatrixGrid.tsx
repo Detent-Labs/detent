@@ -6,10 +6,11 @@ import type { Draft } from "../draft/types";
 import { t } from "../catalog.js";
 import { resolveDraftLocalizedText } from "../draft/localized-text";
 import { effectiveFlag, isFlagGated, setFlag, writtenFieldCounts, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
-import { technicalFieldIds } from "../draft/fields";
+import { flattenDraftFields, technicalFieldIds } from "../draft/fields";
 import { isDraftViewField, type DraftViewField } from "../draft/view-layout";
 import type { BoolOrExpr } from "./shared/overrideMode";
 import { isExpression } from "./shared/overrideMode";
+import { stepText } from "./shared/optionText";
 import {
   matrixRows,
   cellState,
@@ -104,13 +105,6 @@ const styles = stylex.create({
     letterSpacing: "0.06em",
     color: colors.textMuted,
   },
-  matrixColKey: {
-    display: "block",
-    fontFamily: fonts.mono,
-    fontSize: "0.8rem",
-    color: colors.text,
-    overflowWrap: "anywhere",
-  },
   matrixColNote: {
     display: "block",
     fontFamily: fonts.mono,
@@ -145,19 +139,19 @@ const styles = stylex.create({
     color: colors.text,
     fontWeight: 600,
   },
-  matrixFieldKey: {
+  matrixFieldLabel: {
     display: "block",
-    fontFamily: fonts.mono,
     fontSize: "0.85rem",
     overflowWrap: "anywhere",
   },
-  matrixFieldType: {
+  matrixFieldKind: {
     display: "block",
-    fontFamily: fonts.mono,
     fontSize: "11px",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
     color: colors.textMuted,
+  },
+  // A kind no picker entry names prints as the raw triple, a machine value.
+  matrixFieldKindRaw: {
+    fontFamily: fonts.mono,
   },
   matrixCell: {
     borderBottomWidth: 1,
@@ -261,18 +255,15 @@ const styles = stylex.create({
   },
   matrixFlags: {
     display: "grid",
-    gridTemplateColumns: "repeat(3, 1.75rem)",
+    gridTemplateColumns: "repeat(3, 1fr)",
     columnGap: 0,
-    justifyItems: "center",
+    justifyItems: "stretch",
     marginTop: space.s2,
   },
   matrixFlagBadge: {
-    fontFamily: fonts.mono,
     fontSize: "11px",
     lineHeight: 1.6,
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    width: "1.75rem",
+    width: "100%",
     textAlign: "center",
     color: colors.textMuted,
     backgroundColor: "transparent",
@@ -291,7 +282,7 @@ const styles = stylex.create({
   // `aria-pressed` the button already carries.
   //
   // The fill is the flag's own color, never the accent. Three reasons, in
-  // order. The legend twelve pixels away names these three colors, so a REQ
+  // order. The legend twelve pixels away names these three colors, so a Required
   // badge that filled with the accent would contradict the key beside it.
   // The accent marks state and the one primary action per screen
   // (`design-language.md`), and Publish already holds it. And the accent
@@ -351,7 +342,6 @@ const MATRIX_FLAG_ACCENT_STYLE: Record<FlagKey, stylex.StyleXStyles> = {
 };
 
 export const FLAG_KEYS: FlagKey[] = ["visible", "required", "readonly"];
-const FLAG_LETTER: Record<FlagKey, string> = { visible: "VIS", required: "REQ", readonly: "RO" };
 
 /** The pressed fill, per flag. Mirrors `FLAG_SWATCH_STYLE` in the panel's
  * legend, so the badge and the key it explains read one color each. */
@@ -397,7 +387,7 @@ function cellKey(row: number, col: number): string {
 function CelStamp({ label, src }: { label: string; src: string }) {
   return (
     <span {...stylex.props(styles.matrixCel)} title={`${label}: ${src}`}>
-      <span {...stylex.props(styles.matrixCelStamp)}>{t("formEditor.markCel")}</span>
+      <span {...stylex.props(styles.matrixCelStamp)}>{t("fieldMatrix.markCondition")}</span>
       <span {...stylex.props(styles.matrixCelSrc)}>{src}</span>
     </span>
   );
@@ -469,7 +459,7 @@ function BulkBadges({
             title={name}
             onClick={() => onToggle(key)}
           >
-            {FLAG_LETTER[key]}
+            {t(FLAG_LABEL_KEY[key])}
           </button>
         );
       })}
@@ -527,6 +517,16 @@ export const FieldMatrixGrid = memo(function FieldMatrixGrid({
   const rows = useMemo(() => matrixRows(draft.fields), [draft.fields]);
   const allSteps = draft.workflow?.steps ?? [];
   const drawnSteps = filterInertSteps(allSteps, hideInert);
+  const fieldNames = useMemo(
+    () =>
+      new Map(
+        flattenDraftFields(draft.fields).map((f) => [
+          f.id as string,
+          resolveDraftLocalizedText(f.label, contentLocale, baseLocale)?.trim() ?? "",
+        ]),
+      ),
+    [draft.fields, contentLocale, baseLocale],
+  );
   const written = useMemo(() => writtenFieldCounts(draft), [draft]);
   const technicalIds = useMemo(() => technicalFieldIds(draft.fields), [draft.fields]);
 
@@ -699,6 +699,7 @@ export const FieldMatrixGrid = memo(function FieldMatrixGrid({
             {drawnSteps.map(({ step, index: stepIndex }, colIndex) => {
               const inert = step.view === undefined;
               const colTargets = showBulkBadges ? columnLiveTargets(rows, step, stepIndex) : [];
+              const colName = stepText(step, contentLocale, baseLocale);
               return (
                 <th
                   key={step.id ?? colIndex}
@@ -714,22 +715,13 @@ export const FieldMatrixGrid = memo(function FieldMatrixGrid({
                   onFocus={() => showBulkBadges && setFocus({ row: -1, col: colIndex })}
                   onBlur={activated && focus.row === -1 && focus.col === colIndex ? onCellBlur : undefined}
                 >
-                  <span {...stylex.props(styles.matrixColLabel)}>
-                    {resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep")}
-                  </span>
-                  <span {...stylex.props(styles.matrixColKey)}>{step.key}</span>
+                  <span {...stylex.props(styles.matrixColLabel)}>{colName}</span>
                   {inert && <span {...stylex.props(styles.matrixColNote)}>{t("fieldMatrix.columnInertNote")}</span>}
                   {showBulkBadges && colTargets.length > 0 && (
                     <BulkBadges
                       targets={colTargets}
                       active={activated && focus.row === -1 && focus.col === colIndex}
-                      scope={{
-                        kind: "column",
-                        name:
-                          resolveDraftLocalizedText(step.label, contentLocale, baseLocale) ||
-                          step.key ||
-                          t("steps.unnamedStep"),
-                      }}
+                      scope={{ kind: "column", name: colName }}
                       allSteps={allSteps}
                       written={written}
                       technicalFieldIds={technicalIds}
@@ -744,6 +736,7 @@ export const FieldMatrixGrid = memo(function FieldMatrixGrid({
         <tbody>
           {rows.map((row, rowIndex) => {
             const rowTargets = showBulkBadges ? rowLiveTargets(allSteps, row.id) : [];
+            const rowName = fieldNames.get(row.id) || t("panelsScreen.unnamedField");
             return (
               <tr key={row.id} data-group={row.isGroup || undefined}>
                 <th
@@ -764,8 +757,11 @@ export const FieldMatrixGrid = memo(function FieldMatrixGrid({
                   onFocus={() => showBulkBadges && setFocus({ row: rowIndex, col: -1 })}
                   onBlur={activated && focus.col === -1 && focus.row === rowIndex ? onCellBlur : undefined}
                 >
-                  <span {...stylex.props(styles.matrixFieldKey)}>{row.key === "" ? t("panelsScreen.unnamedField") : row.key}</span>
-                  <span {...stylex.props(styles.matrixFieldType)} aria-label={`${t("fieldMatrix.rowTypeLabel")}: ${row.kind}`}>
+                  <span {...stylex.props(styles.matrixFieldLabel)}>{rowName}</span>
+                  <span
+                    {...stylex.props(styles.matrixFieldKind, row.unmatched && styles.matrixFieldKindRaw)}
+                    aria-label={`${t("fieldMatrix.rowKindLabel")}: ${row.kind}`}
+                  >
                     {row.kind}
                   </span>
                   {technicalIds.has(row.id) && (
@@ -777,7 +773,7 @@ export const FieldMatrixGrid = memo(function FieldMatrixGrid({
                     <BulkBadges
                       targets={rowTargets}
                       active={activated && focus.col === -1 && focus.row === rowIndex}
-                      scope={{ kind: "row", name: row.key === "" ? t("panelsScreen.unnamedField") : row.key }}
+                      scope={{ kind: "row", name: rowName }}
                       allSteps={allSteps}
                       written={written}
                       technicalFieldIds={technicalIds}

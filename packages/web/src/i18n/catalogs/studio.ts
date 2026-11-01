@@ -382,7 +382,6 @@ export const en = {
   "formEditor.removeNote": "Remove: the note",
   "formEditor.markRequired": "Required",
   "formEditor.markReadonly": "Read-only",
-  "formEditor.markCel": "CEL",
   "formEditor.stripLabel": "Selected field",
   "formEditor.selectAField": "Choose a field on the canvas to edit how this step presents it.",
   "formEditor.visible": "Asked",
@@ -610,7 +609,6 @@ export const en = {
   "formsTab.legendField": "Field",
   "formsTab.legendRequired": "Required",
   "formsTab.legendConditional": "Required if a condition holds",
-  "formsTab.legendSection": "Section",
   "formsTab.legendHeight": "Taller asks for more",
 
   // The form editor's trailing pane: what a participant meets
@@ -660,7 +658,6 @@ export const en = {
   "fieldMatrix.legendTechnical": "Technical means the process fills the field in by itself.",
   "fieldMatrix.legendColors": "Each box's color names its mark:",
   "fieldMatrix.columnInertNote": "No form",
-  "fieldMatrix.rowTypeLabel": "Type",
   "fieldMatrix.flaggedCellMark": "Flagged in Checks",
   // The blast radius a bulk press carries. The studio has no undo for a bulk
   // write, so the badge states what a press touches before an author presses

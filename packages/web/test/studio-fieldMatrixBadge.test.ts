@@ -9,7 +9,7 @@
  *
  * Three rules say the accent is wrong here, and the last one is measurable:
  *
- * 1. The legend twelve pixels away names one color per flag. A REQ badge
+ * 1. The legend twelve pixels away names one color per flag. A Required badge
  *    filled with the accent contradicts the key that explains it.
  * 2. `design-language.md` rule 3: the accent marks state and the one primary
  *    action per screen. Publish already holds it.
@@ -159,5 +159,32 @@ describe("the pressed bulk badge", () => {
       const flagRatio = contrast(text, token(css, `color-flag-${flag}`, "light"));
       expect(flagRatio - accent, `${flag} margin over the accent`).toBeGreaterThan(1.9);
     }
+  });
+});
+
+describe("the bulk badge grid", () => {
+  const grid = read(GRID);
+  const block = (name: string) => {
+    const start = grid.indexOf(`${name}: {`);
+    expect(start).toBeGreaterThan(-1);
+    return grid.slice(start, grid.indexOf("\n  },", start));
+  };
+
+  it("shares the widest word's width across the three badges of one header", () => {
+    // Three `1fr` tracks of a shrink-to-fit header each take the widest
+    // track's max-content, so Asked, Required and Read-only line up.
+    const flags = block("matrixFlags");
+    expect(flags).toContain('gridTemplateColumns: "repeat(3, 1fr)"');
+    expect(flags).not.toContain("1.75rem");
+    expect(block("matrixFlagBadge")).toContain('width: "100%"');
+  });
+
+  it("keeps the cells' checkbox grid at three fixed 1.75rem tracks", () => {
+    expect(grid).toContain('gridTemplateColumns: "repeat(3, 1.75rem)"');
+  });
+
+  it("lets a long word wrap instead of clipping", () => {
+    expect(block("matrixFlagBadge")).not.toContain("nowrap");
+    expect(block("matrixFlagBadge")).not.toContain("overflow");
   });
 });

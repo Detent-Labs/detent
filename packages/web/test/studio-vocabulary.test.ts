@@ -135,7 +135,7 @@ describe("flag vocabulary", () => {
       ["formEditor.noteText", "Text"],
       ["formsTab.legendField", "Field"],
       ["formsTab.legendConditional", "Required if a condition holds"],
-      ["formsTab.legendSection", "Section"],
+      ["formsTab.legendGroup", "Group"],
       ["formsTab.legendHeight", "Taller asks for more"],
       ["fieldMatrix.legendFlagged", "A marked cell stands in Checks."],
       ["fieldCatalog.dataSourceLabel", "Values come from"],

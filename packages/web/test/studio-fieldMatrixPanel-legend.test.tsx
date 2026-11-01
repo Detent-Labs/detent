@@ -36,6 +36,27 @@ describe("FieldMatrixPanel's legend", () => {
     expect(html).toContain("Technical means the process fills the field in by itself.");
   });
 
+  it("prints the seven entries in order with the reworded sentences", () => {
+    const html = renderToStaticMarkup(
+      <DraftProvider initial={DRAFT} token="token">
+        <FieldMatrixPanel />
+      </DraftProvider>,
+    );
+    const legend = html.match(/<div class="matrixLegend">([\s\S]*?)<\/div>/)![1]!;
+    const entries = legend.split("<span data-legend-entry").slice(1);
+    const first = (e: string) => e.replace(/^[^>]*>/, "").replace(/<[^>]*>/g, "").replace(/&#x27;/g, "'");
+    expect(entries.map(first)).toEqual([
+      "A badge sets the whole column or row it sits on.",
+      "An unchecked box writes nothing.",
+      "Condition means a rule decides in place of a fixed yes or no.",
+      "A dash marks a field this step's form does not hold.",
+      "A marked cell stands in Checks.",
+      "Technical means the process fills the field in by itself.",
+      "Each box's color names its mark:AskedRequiredRead-only",
+    ]);
+    expect(html).not.toContain("CEL");
+  });
+
   it("renders the seventh entry's three swatches, each reading its own --color-flag-* token", () => {
     const html = renderToStaticMarkup(
       <DraftProvider initial={DRAFT} token="token">

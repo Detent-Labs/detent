@@ -61,7 +61,7 @@ export const FORMS_LEGEND: readonly { key: CatalogKey; samples: readonly Miniatu
     samples: [{ index: 0, groupBreak: false, height: 12, requirement: "conditional" }],
   },
   {
-    key: "formsTab.legendSection",
+    key: "formsTab.legendGroup",
     samples: [{ index: 0, groupBreak: true, height: GROUP_BREAK_HEIGHT, requirement: "optional" }],
   },
   {
