@@ -1,4 +1,5 @@
 import { canonicalize } from "workflow-engine/schema/canonical-json";
+import { resolveAddLocaleAttempt } from "../draft/localized-text.js";
 
 /**
  * Whether the currently-open draft differs from the last body successfully
@@ -99,4 +100,65 @@ export function publishAvailability(
  */
 export function nextVersionLabel(baseVersion: number | null | undefined): string {
   return `v${typeof baseVersion === "number" ? baseVersion + 1 : 1}`;
+}
+
+/** What the header bar's state line prints, as parts the caller turns into
+ * catalog sentences. `unsaved` carries no time. `savedAt` carries the formatted
+ * clock time of a save in this session. `saved` is a clean draft with no save
+ * yet. `version` is present where a published version exists. */
+export interface HeaderStateLine {
+  state: "unsaved" | "savedAt" | "saved";
+  time?: string;
+  version?: string;
+}
+
+/**
+ * The state line's parts (studio-canvas spec: "The header bar's state says
+ * what holds for the draft"). A dirty draft is `unsaved`, whatever happened
+ * before. A clean one is `savedAt` once `savedTime` exists, else `saved`.
+ * `baseVersion` is the version the draft stands on; null or undefined means
+ * nobody has published it, so the line carries no version.
+ */
+export function headerStateLine(
+  dirty: boolean,
+  savedTime: string | undefined,
+  baseVersion: number | null | undefined,
+): HeaderStateLine {
+  const version = typeof baseVersion === "number" ? { version: `v${baseVersion}` } : {};
+  if (dirty) return { state: "unsaved", ...version };
+  if (savedTime !== undefined) return { state: "savedAt", time: savedTime, ...version };
+  return { state: "saved", ...version };
+}
+
+/** The clock time of a save, hour and minute, in the browser's locale. */
+export function formatSavedTime(at: Date): string {
+  return at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/**
+ * The language name for the header bar's "Editing" note, or `undefined` when
+ * the bar prints none (studio-app spec: "The header bar says when an author
+ * edits another language"). The note stands only while the content locale
+ * differs from a well-formed base language and the JSON surface is shut. The
+ * JSON surface prints every language and reads no content locale.
+ *
+ * An absent base reads as "en", the fallback every other locale reader
+ * applies. A malformed base, such as a half-typed `d`, yields no note.
+ * `Intl.DisplayNames#of` throws on a malformed tag and echoes a well-formed
+ * code it cannot name, so a throw prints the code itself.
+ */
+export function editingLocaleNote(
+  contentLocale: string,
+  baseLocale: string | undefined,
+  jsonOpen: boolean,
+): string | undefined {
+  if (jsonOpen) return undefined;
+  const base = baseLocale ?? "en";
+  if (!resolveAddLocaleAttempt(base).ok) return undefined;
+  if (contentLocale === base) return undefined;
+  try {
+    return new Intl.DisplayNames(["en"], { type: "language" }).of(contentLocale) ?? contentLocale;
+  } catch {
+    return contentLocale;
+  }
 }

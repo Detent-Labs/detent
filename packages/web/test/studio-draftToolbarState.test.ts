@@ -1,5 +1,14 @@
 import { describe, expect, it } from "bun:test";
-import { isDirty, isLayoutDirty, isDraftDirty, publishAvailability, nextVersionLabel } from "../src/areas/studio/screens/draftToolbarState.js";
+import {
+  isDirty,
+  isLayoutDirty,
+  isDraftDirty,
+  publishAvailability,
+  nextVersionLabel,
+  headerStateLine,
+  formatSavedTime,
+  editingLocaleNote,
+} from "../src/areas/studio/screens/draftToolbarState.js";
 import { applyReload, applySaveResult, initialSaveState } from "../src/areas/studio/screens/draftSaveLogic.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
@@ -343,5 +352,65 @@ describe("nextVersionLabel (studio-publish: the dialog names a valid version lab
     for (const base of [null, undefined, 0, 1, 42]) {
       expect(nextVersionLabel(base)).toMatch(/^v[0-9]+$/);
     }
+  });
+});
+
+describe("headerStateLine", () => {
+  it("a dirty draft reads unsaved, with or without a version and a past save", () => {
+    expect(headerStateLine(true, undefined, null)).toEqual({ state: "unsaved" });
+    expect(headerStateLine(true, undefined, 1)).toEqual({ state: "unsaved", version: "v1" });
+    expect(headerStateLine(true, "10:32", 1)).toEqual({ state: "unsaved", version: "v1" });
+  });
+
+  it("a clean draft with no save in this session reads saved", () => {
+    expect(headerStateLine(false, undefined, null)).toEqual({ state: "saved" });
+    expect(headerStateLine(false, undefined, undefined)).toEqual({ state: "saved" });
+    expect(headerStateLine(false, undefined, 3)).toEqual({ state: "saved", version: "v3" });
+  });
+
+  it("a clean draft after a save reads saved at its time", () => {
+    expect(headerStateLine(false, "10:32", null)).toEqual({ state: "savedAt", time: "10:32" });
+    expect(headerStateLine(false, "10:32", 2)).toEqual({ state: "savedAt", time: "10:32", version: "v2" });
+  });
+});
+
+describe("formatSavedTime", () => {
+  it("prints hour and minute without seconds", () => {
+    const out = formatSavedTime(new Date(2026, 0, 5, 9, 7, 42));
+    expect(out).toMatch(/9.07/);
+    expect(out).not.toMatch(/42/);
+  });
+});
+
+describe("editingLocaleNote", () => {
+  it("names nothing in the base language", () => {
+    expect(editingLocaleNote("en", "en", false)).toBeUndefined();
+    expect(editingLocaleNote("de", "de", false)).toBeUndefined();
+  });
+
+  it("names the language of another content locale", () => {
+    expect(editingLocaleNote("de", "en", false)).toBe("German");
+    expect(editingLocaleNote("en", "de", false)).toBe("English");
+    expect(editingLocaleNote("pt-BR", "en", false)).toBe("Brazilian Portuguese");
+  });
+
+  it("reads an absent base as en", () => {
+    expect(editingLocaleNote("de", undefined, false)).toBe("German");
+    expect(editingLocaleNote("en", undefined, false)).toBeUndefined();
+  });
+
+  it("names nothing while the base language is part-typed or empty", () => {
+    expect(editingLocaleNote("de", "d", false)).toBeUndefined();
+    expect(editingLocaleNote("de", "", false)).toBeUndefined();
+    expect(editingLocaleNote("de", "EN", false)).toBeUndefined();
+  });
+
+  it("prints a code it cannot name as itself and never throws", () => {
+    expect(editingLocaleNote("zz", "en", false)).toBe("zz");
+    expect(editingLocaleNote("not a tag", "en", false)).toBe("not a tag");
+  });
+
+  it("names nothing while the JSON surface is open", () => {
+    expect(editingLocaleNote("de", "en", true)).toBeUndefined();
   });
 });
