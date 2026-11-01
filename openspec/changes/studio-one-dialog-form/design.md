@@ -88,7 +88,7 @@ From `vercel-composition-patterns`: explicit parts over boolean props, children 
 | `DialogFact` | One row, value in the written face. `PublishChanges.tsx` writes its row through it |
 | `DialogMonoFact` | One row, value in mono. It prints a zero, as Publish's open issue count needs |
 | `DialogCount` | One row, value in mono tabular figures. It renders nothing at zero |
-| `DialogNames` | One row, value a `ul` of names with no marker. It renders nothing for an empty list |
+| `DialogNames` | One row, value a `ul` of names with no marker. It renders nothing for an empty list. A list of more than eight prints five and folds the rest |
 | `DialogNote` | One slate paragraph at 0.9rem |
 | `DialogWarning` | The warning callout's form, for a blocked publish or a key collision |
 | `DialogRefusal` | The `role="alert"` paragraph. A closed Developer view follows it only for a non-null `detail` |
@@ -105,7 +105,7 @@ Alternative: a single `ConfirmDialog` with `facts` and `notes` arrays. It reads 
 ### D2. Layout, and the footer that stays
 
 ```text
-dialog: width min(34rem, 100vw - 32px); max-height 85vh; overflow-y auto;
+dialog: width min(34rem, 100% - 32px); max-height 85vh; overflow-y auto;
         padding max(16px, focus.reach) on three sides, 0 on the block end;
         scroll-padding-block-start focus.reach; scroll-padding-block-end 5rem
   h2           Headline style, margin 0 0 12px, overflow-wrap anywhere
@@ -221,15 +221,16 @@ Catalog keys are new unless a row says otherwise. `dialog.cancel` replaces `draf
 | Leave | Leave this draft? | Your unsaved changes go with it. The saved draft stays. | Leave without saving |
 | Arrange | Arrange every step? | Every step moves to a new place, and each path loses the bends placed on it. + no undo | Arrange |
 | Restore | Replace your current changes? | The restored copy takes their place. + no undo | Replace them |
-| Kind, format | Change the kind of “{field}”? | The new kind cannot keep this field's format. + no undo | Change kind |
+| Kind, format | Change “{field}” from {from} to {to}? | The new kind cannot keep how this field checks its value. + no undo | Change kind |
 | Kind, control | same | The new kind cannot keep how this field asks for its value. + no undo | same |
-| Kind, both | same | The new kind keeps neither this field's format nor how it asks for its value. + no undo | same |
+| Kind, both | same | The new kind keeps neither how this field checks its value nor how it asks for it. + no undo | same |
 | Technical | Mark “{field}” as technical? | Count "Required and read-only settings it clears". The process fills this field in by itself, so no step can require it or make it read-only. + no undo | Mark as technical |
 | Template delete | Delete “{name}”? | Processes already created from it stay as they are. + no undo | Delete template |
 | Template replace | Replace “{name}”? | A template keeps no earlier version, so the old one goes. Processes already created from it stay as they are. | Replace template |
+| Canvas, several | Remove {count} steps? | Names "Steps". The ways out leading to them stay, and the checks report them. + no undo | Remove the steps |
 | Discard (both) | Discard this draft? | Fact Process, fact Last saved (date and time) where known. The published versions stay. Only the unpublished draft goes. | Discard draft |
 | Publish | Publish this draft? | unchanged | Publish |
-| Import | Publish this version here? | Fact Process, mono fact Source version. The note stays. Developer view: Key, Process id, Source hash | Publish here |
+| Import | Publish this version here? | Fact Process, mono fact Source version. This environment assigns its own version number. A call from another process keeps working once that process is promoted too. Developer view: Key, Process id, Source hash | Publish here |
 | Start picker | Start a new process | the choices | none |
 
 The start picker's heading is a statement on purpose: it offers a choice and confirms nothing.
@@ -320,9 +321,9 @@ The existing tests that read markup or source follow the new names.
 ## Risks / Trade-offs
 
 - [`askLeave` could run `proceed` after the world moved] → the `localPath` effect clears `leaving`, and the modal blocks every other control.
+- [The fold hides a name] → the disclosure counts what it holds, and a keyboard reaches it.
 - [Keyboard wrap misses a Tab stop] → `dialogFocusables` reads the DOM at each Tab, so an opened Developer view counts. A missed stop still wraps correctly, since `wrapTarget` acts at the ends alone.
 - [A sticky footer covers the focused element] → `scroll-padding-block-end` at 5rem keeps a Tab stop clear. A footer that wraps at 420px stands taller, and the browser check measures it.
-- [A names list grows long] → it scrolls, and the footer stays. The group case in the spec prints 28 names.
 - [The owner chose counts on 2026-09-13] → the inherited points and the brief reverse that. The report states it.
 - [Tests that quote removed catalog keys] → the typecheck and the suite name them, and `CatalogKey` is a closed union.
 

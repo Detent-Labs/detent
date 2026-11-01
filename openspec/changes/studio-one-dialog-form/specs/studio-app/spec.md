@@ -72,7 +72,9 @@ A dialog SHALL close with its confirming control, where it has one, and then Can
 
 ### Requirement: A long dialog keeps its controls in view
 
-A dialog SHALL stay inside the viewport with a gutter at every width. A body longer than the dialog SHALL scroll inside it, and the controls SHALL stay in view from the moment it opens. The heading SHALL stand in view when the dialog opens. A refusal SHALL scroll into view when it appears.
+A dialog SHALL stay inside the viewport with a gutter at every width. A body longer than the dialog SHALL scroll inside it, and the controls SHALL stay in view from the moment it opens. The heading SHALL stand in view when the dialog opens, by keyboard or by pointer. A refusal SHALL scroll into view when it appears.
+
+A list of more than eight names SHALL print its first five and fold the rest behind a disclosure that says how many it holds.
 
 #### Scenario: A narrow viewport keeps a gutter
 
@@ -81,9 +83,15 @@ A dialog SHALL stay inside the viewport with a gutter at every width. A body lon
 
 #### Scenario: A long list leaves the heading and Cancel on screen
 
-- **WHEN** the removal dialog for a group lists 28 names at 1024 by 600 pixels
+- **WHEN** a dialog whose body is longer than the dialog opens by keyboard at a short viewport
 - **THEN** the heading and Cancel both stand in view on open
-- **AND** the arrow keys scroll the list with Cancel focused
+- **AND** the arrow keys scroll the body with Cancel focused
+
+#### Scenario: A long list folds
+
+- **WHEN** the removal dialog for a group names 18 fields inside it
+- **THEN** five names print, with a closed disclosure reading "and 13 more"
+- **AND** opening it prints the other 13
 
 ### Requirement: Each confirmation names its act
 
@@ -107,9 +115,9 @@ A confirmation's heading SHALL name the act, and its confirming control SHALL na
 
 #### Scenario: A kind change that drops a setting
 
-- **WHEN** an author changes a field with a date format to the kind Number
-- **THEN** a dialog reads "Change the kind of “Due date”?" with the control "Change kind"
-- **AND** it says the new kind cannot keep this field's format
+- **WHEN** an author changes the field "Due date" from the kind Date to the kind Number
+- **THEN** a dialog reads "Change “Due date” from Date to Number?" with the control "Change kind"
+- **AND** it says the new kind cannot keep how this field checks its value
 - **AND** declining leaves the field and the select on the old kind
 
 #### Scenario: Checking Technical
@@ -155,7 +163,7 @@ The kinds are the fields inside it, the steps asking for it, what writes it, the
 
 - **WHEN** the author presses Remove field on the group "Processing (Fabrikam)" in the IT Offboarding draft
 - **THEN** the dialog's heading says the removal takes a group
-- **AND** its facts name the 18 fields inside and the 10 steps
+- **AND** its facts hold the 18 fields inside and the 10 steps, by name
 
 #### Scenario: Only the kinds a removal carries appear
 

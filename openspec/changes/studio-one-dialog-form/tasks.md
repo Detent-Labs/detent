@@ -66,21 +66,44 @@
 - [x] 5.6 Rewrite the comments that name the old hook or the native prompt: `git grep -n -E "useConfirmDialog|native prompt|browser's own confirm|counts each kind of reach" -- packages/web/src packages/web/test` prints nothing that states a stale fact.
 - [x] 5.7 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
 
-## 6. Verification
+## 6. The review wave (studio-app, studio-canvas, spa-accessibility)
 
-- [ ] 6.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
-- [ ] 6.2 Run `bun run build` in the devcontainer. Expect exit code 0.
-- [ ] 6.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test` with `DATABASE_URL` set by the pod.
-- [ ] 6.4 Read the pass, skip and fail counts off that run. Name any failing test. Compare the pass count with `scripts/gates/pass-floor.txt`.
-- [ ] 6.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
-- [ ] 6.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
-- [ ] 6.7 On the production bundle, open each dialog of D7 once. Read the heading, the confirm label and the opening focus. Cancel it and read `document.activeElement`.
-- [ ] 6.7a Confirm Restore, a template delete and a list discard, and read `document.activeElement` each time. Hide the Fields tab with browser Back under the kind dialog, and no modal stays.
-- [ ] 6.8 Press Tab through the Publish dialog with its Developer view closed, then open. Read every stop. No stop is `body`.
-- [ ] 6.9 At 420px, measure the gutter on a dialog. Below 30rem, facts stack. At 1024 by 600, the IT Offboarding group's removal keeps its heading and Cancel on screen. ArrowDown with Cancel focused moves `scrollTop`. A refusal under a long list scrolls into view.
-- [ ] 6.10 Leave a dirty draft by five routes. They are the area nav, the back control, the `⋮` menu's Versions, the account menu's profile entry and logout. Decline each: the focus returns. Confirm one.
-- [ ] 6.11 Run `/impeccable critique` and `/impeccable audit` on the dialogs. Run `impeccable detect --json` on the changed files, since the app's CSP blocks the overlay.
-- [ ] 6.12 Read `git grep -n "confirm(" -- packages/web/src/areas/studio`. Only comments and `onConfirm(` remain. A `git grep` of each key D7 and D8 retire prints nothing.
+- [ ] 6.1 In the open hook of `StudioDialog.tsx`, set `scrollTop` to 0 after the focus call, since `scrollKeyboardFocusIntoView` runs on that focus.
+- [ ] 6.2 Replace `100vw - 32px` with `100% - 32px` in the frame's width. A classic scrollbar then keeps the gutter.
+- [ ] 6.3 Rewrite the comments that say React's `autoFocus` moves the focus before the effect. A focus inside a closed dialog does nothing. `autoFocus` serves the markup alone.
+- [ ] 6.4 Give `DialogNames` the fold of "A long dialog keeps its controls in view", with one catalog key `dialog.moreNames` ("and {count} more"). Test 8 names unfolded, and 9 as 5 plus "and 4 more".
+- [ ] 6.5 Print `aria-describedby` only where a `confirm` is present. Test the start picker carries none.
+- [ ] 6.6 Reword `KindDropDialog` per D7's table, with the old and new kind names passed from `KindPicker`. Fall back to the heading "Change the kind of “{field}”?" where the old kind has no name.
+- [ ] 6.7 Reword `processList.importNote` per D7. Rename `dialogError` in `ProcessesScreen.tsx` to what it styles.
+- [ ] 6.8 Call `clearError()` at the top of `runPublish` and `runDiscard`, so a repeated refusal scrolls and announces again. Pin it.
+- [ ] 6.9 Run `fieldsInside` and `columnMappings` through `numberRepeats` in `removalNames.ts`, so two fields sharing a label stay two lines. Test it.
+- [ ] 6.10 Guard `newProcess` in `ProcessesScreen.tsx`: no second dialog opens while one is pending. Pin it.
+- [ ] 6.11 Pass `visible` into `StepPage`, and clear `removing` and `pendingKind` during the render that hides it. Close DIALOG-1 in `docs/decisions.md`.
+- [ ] 6.12 Add `canvas.removeStepsHeading` and `RemoveStepsDialog` per the `studio-canvas` delta. Route the canvas bar's two controls through it and `RemoveStepDialog`, with the landing of D4. Test the words.
+- [ ] 6.13 Fix `studio-leave-guard.test.ts`'s two lint warnings with `startsWith` and `endsWith`. `bun run lint` exits 0.
+- [ ] 6.14 Delete the `refusalSlot` assertion, and narrow the comment in `studio-dialogFocus.test.ts` to what e2e covers.
+- [ ] 6.15 Fix the stale comment at `ProcessHeaderBar.tsx`'s dialog section.
+- [ ] 6.16 In `e2e/dialog.e2e.ts`, after the click on a fact's text, press Shift+Tab and expect Cancel to hold the focus. In `e2e/publish.e2e.ts`'s refused flow, delay the route. Press Escape three times while busy. The dialog stays, and the refusal arrives.
+- [ ] 6.17 In `DESIGN.md`, say Cancel takes the opening focus unless the dialog commits nothing, and add the fold. Restore the revision and the source hash in the glossary's Developer view row. Say in `docs/browser-checks.md`'s entry to open a long dialog with Enter and to run with scrollbars shown.
+- [ ] 6.18 Record six points in `docs/decisions.md`. A busy dialog announces nothing. Remove this step counts where Remove field names. No dialog carries `alertdialog`.
+- [ ] 6.18a Record too: an import's refusal keeps server text in the alert, Back under Arrange or Restore, and `activeControl()` on Safari.
+- [ ] 6.19 Run `bun run typecheck` and the e2e, then the full gated suite in the foreground. Read its verdict off the named tests.
+
+## 7. Verification
+
+- [ ] 7.1 Run `bun run typecheck` in the devcontainer. Expect exit code 0.
+- [ ] 7.2 Run `bun run build` in the devcontainer. Expect exit code 0.
+- [ ] 7.3 Run the full suite: `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test` with `DATABASE_URL` set by the pod.
+- [ ] 7.4 Read the pass, skip and fail counts off that run. Name any failing test. Compare the pass count with `scripts/gates/pass-floor.txt`.
+- [ ] 7.5 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host. Read its exit code.
+- [ ] 7.6 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/whitespace.sh` on the host. Read its exit code.
+- [ ] 7.7 On the production bundle, open each dialog of D7 once. Read the heading, the confirm label and the opening focus. Cancel it and read `document.activeElement`.
+- [ ] 7.7a Confirm Restore, a template delete and a list discard, and read `document.activeElement` each time. Hide the Fields tab with browser Back under the kind dialog, and no modal stays.
+- [ ] 7.8 Press Tab through the Publish dialog on a draft with changes since its base. Do it with the change list and Developer view closed, then open. Read every stop. No stop is `body`.
+- [ ] 7.9 At 420px, measure the gutter on a dialog. Below 30rem, facts stack. Open the IT Offboarding group's removal with Enter at 1024 by 600. Its heading and Cancel stand on screen. At a viewport short enough to overflow, ArrowDown with Cancel focused moves `scrollTop`. A refusal under a long list scrolls into view.
+- [ ] 7.10 Leave a dirty draft by five routes. They are the area nav, the back control, the `⋮` menu's Versions, the account menu's profile entry and logout. Decline each: the focus returns. Confirm one.
+- [ ] 7.11 Run `/impeccable critique` and `/impeccable audit` on the dialogs. Run `impeccable detect --json` on the changed files, since the app's CSP blocks the overlay.
+- [ ] 7.12 Read `git grep -n "confirm(" -- packages/web/src/areas/studio`. Only comments and `onConfirm(` remain. A `git grep` of each key D7 and D8 retire prints nothing.
 
 ## Workflow follow-up
 

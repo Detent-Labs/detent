@@ -24,6 +24,7 @@ Decision D7 of `docs/studio-ui-concept.md` chose one dialog form for every destr
 - The Remove field dialog names what the removal reaches, in the author's words. The field's key leaves it.
 - The discard dialog stops printing the draft revision. A process-list discard takes the same dialog. A refused discard reports inside it.
 - The import preview moves the key, the process id and the hash into a closed Developer view.
+- The canvas bar's Remove step and Remove steps confirm in the same form.
 - `DESIGN.md` gains the "Dialogs" entry that states this form.
 - The `.btn` join helper moves into one shared module. Tools, Player, Versions and the migration plan take it, so their back controls regain the `.btn` look.
 
@@ -41,7 +42,7 @@ None.
 
 - `studio-app`: the one dialog form and its heading rule. Each converted prompt, the leave prompt, the discard dialog, and the removal dialog's names.
 - `studio-publish`: the publish dialog takes the one form, and the backdrop route leaves its requirement.
-- `studio-canvas`: Arrange confirms in the dialog form.
+- `studio-canvas`: Arrange and the canvas bar's removal confirm in the dialog form.
 - `spa-accessibility`: a modal dialog holds the keyboard, returns the focus and states its name and description.
 - `environment-promotion`: the preview holds machine values in a closed Developer view.
 
@@ -52,7 +53,7 @@ Section 8 of the concept names `studio-form-editor` too. The form editor raises 
 - New in `packages/web/src/areas/studio`: `panels/shared/StudioDialog.tsx`, `panels/shared/dialogFocus.ts`, `panels/shared/btn.ts`, `panels/confirmations.tsx`, `panels/DiscardDraftDialog.tsx`, `panels/removalNames.ts`.
 - Gone: `panels/shared/confirmDialog.tsx`.
 - Moved onto the new component: the eight dialogs, `root.tsx`, `EditScreen.tsx`, `ProcessesScreen.tsx`, `TemplatesScreen.tsx`, `FieldCatalogPanel.tsx`.
-- Changed in support: `draft/field-removal.ts`, `draft/field-usage.ts`, `panels/readByRows.ts`, `panels/EntityTabs.tsx`, `panels/DraftToolbar.tsx`.
+- Changed in support: `draft/field-removal.ts`, `draft/field-usage.ts`, `panels/readByRows.ts`, `panels/EntityTabs.tsx`, `panels/DraftToolbar.tsx`, `panels/StepPage.tsx`, `canvas/CanvasBar.tsx`.
 - Changed too: `panels/PublishChanges.tsx`, `panels/ChangeList.tsx`, `panels/FormTabStrip.tsx`, `screens/FormEditorScreen.tsx` and the four screens of design D10.
 - `packages/web/src/i18n/catalogs/studio.ts`: the new sentences, and one `dialog.cancel` and one `dialog.noUndo`.
 - `packages/web/test`, with `e2e/dialog.e2e.ts` and `e2e/publish.e2e.ts` for what only a real browser shows.

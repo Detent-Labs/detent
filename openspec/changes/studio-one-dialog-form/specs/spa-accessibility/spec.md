@@ -53,7 +53,7 @@ Every close route that keeps the opener on the page SHALL return the focus to it
 
 ### Requirement: A modal dialog states its name and description
 
-A modal dialog SHALL name itself through `aria-labelledby` on its heading. Its `aria-describedby` SHALL point at its body. The body holds the facts and notes under the heading. A refusal SHALL stand outside that description and carry `role="alert"`.
+A modal dialog SHALL name itself through `aria-labelledby` on its heading. Its `aria-describedby` SHALL point at its body, which holds the facts and notes under the heading. A dialog with no confirming control has none, since its body holds its choices. A refusal SHALL stand outside that description and carry `role="alert"`.
 
 #### Scenario: A screen reader hears the facts
 

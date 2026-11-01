@@ -2,6 +2,23 @@
 <!-- Why: a MODIFIED block copies its base wording from the live spec, whose debt a new file counts as a rise. -->
 # Spec Delta
 
+## ADDED Requirements
+
+### Requirement: Removing steps from the canvas confirms first
+
+The canvas bar's Remove step and Remove steps SHALL open the studio's dialog form before the removal. One selected step SHALL take the dialog the step page's Remove this step opens. Several SHALL take a dialog that names each step. A decline SHALL leave the draft untouched and return the focus to the pressed control.
+
+#### Scenario: One selected step asks first
+
+- **WHEN** an author presses Remove step in the canvas bar with one step selected
+- **THEN** a dialog reads "Remove “Review”?" and the draft still holds the step
+
+#### Scenario: Several selected steps are named
+
+- **WHEN** an author presses Remove steps with three steps selected
+- **THEN** a dialog reads "Remove 3 steps?" and names each one
+- **AND** declining leaves all three in the draft
+
 ## MODIFIED Requirements
 
 ### Requirement: Arrange confirms before discarding a hand-placed layout
