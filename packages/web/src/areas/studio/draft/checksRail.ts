@@ -119,3 +119,64 @@ export function checksDotState(groups: readonly CheckGroup[], noStepYet = false)
   if (groups.some((g) => g.heldBack || (g.source !== "view" && g.issues.length > 0))) return "blocker";
   return groups.some((g) => g.issues.length > 0) ? "advisory" : "clear";
 }
+
+/** The Checks tab's three subjects, in display order. */
+export type CheckSubjectName = "steps" | "fields" | "publishing";
+
+export const CHECK_SUBJECTS: CheckSubjectName[] = ["steps", "fields", "publishing"];
+
+export interface CheckSubject {
+  subject: CheckSubjectName;
+  issues: EditorIssue[];
+}
+
+/** The subject a process-level issue joins by the first segment of its `loc`:
+ * a location under `workflow` is a step's, one under `fields` or
+ * `dataSources` a field's. Anything else stands before publishing. */
+function processIssueSubject(loc: string): CheckSubjectName {
+  const head = loc.match(/^[A-Za-z_][A-Za-z0-9_]*/)?.[0];
+  if (head === "workflow") return "steps";
+  if (head === "fields" || head === "dataSources") return "fields";
+  return "publishing";
+}
+
+function subjectOf(issue: EditorIssue): CheckSubjectName {
+  switch (issue.entityType) {
+    case "step":
+    case "path":
+    case "timer":
+    case "action":
+      return "steps";
+    case "field":
+    case "dataSource":
+      return "fields";
+    case "process":
+      return processIssueSubject(issue.loc);
+    default:
+      return "publishing";
+  }
+}
+
+/** The index in a `loc`'s `steps[i]` segment. A location naming no step
+ * reads -1, so it stands above the step rows. */
+function stepIndexOf(loc: string): number {
+  const m = loc.match(/(?:^|\.)steps\[(\d+)\]/);
+  return m ? Number(m[1]) : -1;
+}
+
+/** The Checks tab's rows by subject (`studio-checks-rail`): every subject in
+ * display order, each with its issues. Inside Steps the rows follow the
+ * draft's step order, and a stable sort keeps every other order. */
+export function groupChecksBySubject(validation: Pick<ValidationResult, "issues">): CheckSubject[] {
+  return CHECK_SUBJECTS.map((subject) => {
+    const issues = validation.issues.filter((issue) => subjectOf(issue) === subject);
+    if (subject === "steps") issues.sort((a, b) => stepIndexOf(a.loc) - stepIndexOf(b.loc));
+    return { subject, issues };
+  });
+}
+
+/** The severity word a row prints: the same rule as `checksDotState`, where a
+ * `view` finding is advisory and every other source blocks. */
+export function issueSeverity(issue: Pick<EditorIssue, "source">): "blocker" | "advisory" {
+  return issue.source === "view" ? "advisory" : "blocker";
+}

@@ -1,9 +1,15 @@
+import { useId, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { colors, focus, space } from "form-ui/tokens.stylex";
-import { t } from "../catalog.js";
-import { issueSourceLabel } from "./shared/IssueList";
-import { allChecksClear, groupChecksBySource } from "../draft/checksRail";
-import type { EditorIssue } from "../draft/issues";
+import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
+import { t, type CatalogKey } from "../catalog.js";
+import {
+  allChecksClear,
+  groupChecksBySource,
+  groupChecksBySubject,
+  issueSeverity,
+  type CheckSubjectName,
+} from "../draft/checksRail";
+import { issueText, type EditorIssue, type IssueSource } from "../draft/issues";
 import type { ValidationResult } from "../draft/validation";
 
 const styles = stylex.create({
@@ -41,55 +47,138 @@ const styles = stylex.create({
     paddingInline: 0,
     marginBlock: 0,
   },
-  checksGroup: {
+  // The column the rows stand in. It caps at the field card's width and sits
+  // flush left, so a wide Checks tab does not stretch a sentence.
+  checksColumn: {
+    maxWidth: "52rem",
+  },
+  // One subject: its heading over a hairline, then its rows.
+  checksSubject: {
     paddingBlock: space.s2,
     paddingInline: 0,
     borderTopWidth: { default: 1, ":first-of-type": 0 },
     borderTopStyle: "solid",
     borderTopColor: colors.border,
   },
-  // The heading's layout alone. Its face, size, transform, tracking and color
-  // come from `issueSourceLabel`, which this composes over.
-  checksGroupHeading: {
+  // The Title style (`DESIGN.md` Hierarchy) on an `h3`, which the global
+  // `h2` rule does not reach.
+  checksSubjectHeading: {
+    fontFamily: fonts.heading,
+    fontWeight: fonts.headingWeight,
+    fontSize: "0.85rem",
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: colors.textMuted,
     marginBlockEnd: space.s1,
     marginBlockStart: 0,
     marginInline: 0,
   },
-  checksGroupHeldBack: {
-    margin: 0,
-    color: colors.refusal,
-    borderLeftWidth: 3,
-    borderLeftStyle: "solid",
-    borderLeftColor: `color-mix(in srgb, ${colors.refusal} 55%, transparent)`,
-    paddingLeft: space.s2,
-    fontSize: "0.85rem",
-  },
-  checksGroupClear: {
-    margin: 0,
-    color: colors.textMuted,
-    fontSize: "0.85rem",
-  },
-  checksGroupList: {
+  checksList: {
     listStyle: "none",
     margin: 0,
     padding: 0,
   },
-  checksGroupIssue: {
-    paddingBlock: space.s1,
+  checksRow: {
+    paddingBlock: space.s3,
     paddingInline: 0,
     borderTopWidth: { default: 1, ":first-child": 0 },
     borderTopStyle: "solid",
     borderTopColor: colors.border,
+  },
+  // A wrapping flex row, so Fix drops under the sentence once the row's own
+  // width runs short of the sentence's basis plus the control.
+  checksRowMain: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+    gap: space.s2,
+  },
+  checksRowText: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: "35rem",
+    minWidth: 0,
+  },
+  // The Legend style (`DESIGN.md` Hierarchy). The word carries the severity,
+  // so the color never rests alone.
+  severity: {
+    display: "block",
+    fontSize: 11,
+    fontWeight: 400,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    marginBlockEnd: space.s1,
+  },
+  severityBlocker: {
+    color: colors.refusal,
+  },
+  severityAdvisory: {
+    color: colors.textMuted,
+  },
+  sentence: {
+    margin: 0,
+    fontSize: "0.9rem",
+    overflowWrap: "anywhere",
+  },
+  // The authoring command (`DESIGN.md` Buttons): a ghost button in slate,
+  // mono at 11px. It composes over `btn btn-ghost`, whose accent it replaces.
+  command: {
+    flexShrink: 0,
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: {
+      default: colors.textMuted,
+      ":hover": colors.text,
+      ":active": colors.text,
+    },
+    textAlign: "left",
+    backgroundColor: {
+      default: "transparent",
+      ":hover": colors.surfaceMuted,
+      ":active": `color-mix(in srgb, ${colors.text} 14%, transparent)`,
+    },
+  },
+  developer: {
+    marginBlockStart: space.s2,
+  },
+  developerSummary: {
+    width: "fit-content",
+    paddingBlock: space.s1,
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: colors.textMuted,
+    cursor: "pointer",
+  },
+  developerBox: {
+    marginBlockStart: space.s1,
+    padding: space.s2,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.border,
+    fontFamily: fonts.mono,
+    fontSize: 12,
+    overflowWrap: "anywhere",
+  },
+  developerLine: {
+    margin: 0,
+  },
+  // The line under Before publishing: what has not run, and what publishing
+  // checks on its own.
+  checksLine: {
+    margin: 0,
+    paddingBlock: space.s2,
+    color: colors.textMuted,
     fontSize: "0.85rem",
   },
-  checksGroupNote: {
-    margin: 0,
-    paddingTop: space.s1,
-    borderTopWidth: 1,
-    borderTopStyle: "solid",
-    borderTopColor: colors.border,
-    color: colors.textMuted,
+  // An issue's source, the machine-matched category the check came from.
+  // Mono because the engine matches it exactly (`design-language.md`).
+  issueSourceLabel: {
+    fontFamily: fonts.mono,
     fontSize: "0.8rem",
+    fontWeight: 400,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
   },
   // The narrowing line: what the rail is showing, and the control widening it
   // again. It stands above the groups, so an author never reads a filtered
@@ -107,19 +196,6 @@ const styles = stylex.create({
     borderBottomColor: colors.border,
     color: colors.textMuted,
   },
-  // A row in the grouped list. It opens the tab owning the issue's subject, so
-  // it is a real control, flush left and carrying the row's own text alone.
-  checksGroupIssueButton: {
-    display: "block",
-    width: "100%",
-    backgroundColor: { default: "transparent", ":hover": colors.surfaceMuted },
-    color: "inherit",
-    borderWidth: 0,
-    padding: 0,
-    font: "inherit",
-    textAlign: "left",
-    cursor: "pointer",
-  },
 });
 
 interface Props {
@@ -130,10 +206,9 @@ interface Props {
    * cannot verify: an actor without `system:publish` read "ready to publish"
    * here while the menu 900px away refused the act (studio-publish). */
   canPublish: boolean;
-  /** What a row in the grouped list opens: the tab owning that issue's
-   * subject (`studio-process-tabs`). A rail rendered without it prints its
-   * rows as plain text, the way the per-entity placements do. */
-  onOpenIssue?: (issue: EditorIssue) => void;
+  /** What a row's Fix control does: lands on the place that owns the issue
+   * (`studio-process-tabs`). A rail rendered without it prints no control. */
+  onFix?: (issue: EditorIssue) => void;
   /** The one step this rail is narrowed to: the entity ids its issues may
    * name, and the step's own label for the line saying so. Absent means the
    * whole draft, which is what every mount but the Forms tab's badge passes
@@ -145,31 +220,112 @@ interface Props {
   onShowEvery?: () => void;
 }
 
+const SUBJECT_KEYS: Record<CheckSubjectName, CatalogKey> = {
+  steps: "checksRail.subject.steps",
+  fields: "checksRail.subject.fields",
+  publishing: "checksRail.subject.publishing",
+};
+
+/** The command style with `btn btn-ghost` joined into one `className`, since
+ * a `className` written after a spread of `stylex.props` would replace it. */
+function commandProps() {
+  const compiled = stylex.props(styles.command);
+  return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
+}
+
+/** A closed disclosure over machine values, in the mono face. */
+function DeveloperView({ children }: { children: ReactNode }) {
+  return (
+    <details {...stylex.props(styles.developer)}>
+      <summary {...stylex.props(styles.developerSummary)}>{t("checksRail.developerView")}</summary>
+      <div {...stylex.props(styles.developerBox)}>{children}</div>
+    </details>
+  );
+}
+
+/** One open issue: its severity word, its sentence and the Fix control, then
+ * the closed Developer view holding the source, the raw message and the
+ * location. */
+function CheckRow({ issue, onFix }: { issue: EditorIssue; onFix?: (issue: EditorIssue) => void }) {
+  const sentenceId = useId();
+  const severity = issueSeverity(issue);
+  return (
+    <li {...stylex.props(styles.checksRow)}>
+      <div {...stylex.props(styles.checksRowMain)}>
+        <div {...stylex.props(styles.checksRowText)}>
+          <span {...stylex.props(styles.severity, severity === "blocker" ? styles.severityBlocker : styles.severityAdvisory)}>
+            {t(severity === "blocker" ? "checks.severity.blocker" : "checks.severity.advisory")}
+          </span>
+          <p id={sentenceId} {...stylex.props(styles.sentence)}>
+            {issueText(issue)}
+          </p>
+        </div>
+        {onFix && (
+          <button type="button" {...commandProps()} aria-describedby={sentenceId} onClick={() => onFix(issue)}>
+            {t("checksRail.fix")}
+          </button>
+        )}
+      </div>
+      <DeveloperView>
+        <p {...stylex.props(styles.developerLine, styles.issueSourceLabel)}>{issue.source}</p>
+        <p {...stylex.props(styles.developerLine)}>{issue.message}</p>
+        {issue.loc !== "" && <p {...stylex.props(styles.developerLine)}>{issue.loc}</p>}
+      </DeveloperView>
+    </li>
+  );
+}
+
+/** What has not run, in one line. While any check holds back it says more
+ * checks run once the author fixes the rows above, and what publishing checks
+ * on its own. Otherwise it says the second part alone. */
+function HeldBackLine({ heldBack }: { heldBack: readonly IssueSource[] }) {
+  return (
+    <div>
+      <p {...stylex.props(styles.checksLine)}>{t(heldBack.length > 0 ? "checksRail.heldBackLine" : "checksRail.publishLine")}</p>
+      <DeveloperView>
+        {heldBack.length > 0 && (
+          <p {...stylex.props(styles.developerLine)}>
+            {t("checksRail.heldBackKinds")}{" "}
+            {heldBack.map((source, i) => (
+              <span key={source}>
+                {i > 0 && ", "}
+                <span {...stylex.props(styles.issueSourceLabel)}>{source}</span>
+              </span>
+            ))}
+          </p>
+        )}
+        <p {...stylex.props(styles.developerLine)}>{t("checksRail.configHeldBack")}</p>
+        <p {...stylex.props(styles.developerLine)}>{t("checksRail.unknownKeysHeldBack")}</p>
+      </DeveloperView>
+    </div>
+  );
+}
+
 /**
- * The consolidated, source-grouped view of `validation.issues[]`
+ * The consolidated, subject-grouped view of `validation.issues[]`
  * (`studio-checks-rail`). Reads the same array every per-entity `IssueList`
  * placement already filters; this is one more view over it, not a second
  * validation pass.
  *
- * One form: the full grouped list. It stands only in the Checks tab body.
+ * One form: the full list. It stands only in the Checks tab body.
  */
-export function ChecksRail({ validation, canPublish, onOpenIssue, narrowedTo, onShowEvery }: Props) {
-  // Narrowing filters the issues and nothing else: every dimension keeps its
-  // own held-back state, so a narrowed rail still says which checks have not
-  // run rather than reporting a step clear that nothing has checked yet.
-  const shown: ValidationResult = narrowedTo
-    ? { ...validation, issues: validation.issues.filter((i) => narrowedTo.entityIds.includes(i.entityId)) }
-    : validation;
-  const groups = groupChecksBySource(shown);
+export function ChecksRail({ validation, canPublish, onFix, narrowedTo, onShowEvery }: Props) {
+  // Narrowing filters the issues and nothing else: the held-back state reads
+  // the whole draft, so a narrowed rail still says which checks have not run
+  // rather than reporting a step clear that nothing has checked yet.
+  const shown = narrowedTo ? validation.issues.filter((i) => narrowedTo.entityIds.includes(i.entityId)) : validation.issues;
+  const groups = groupChecksBySource(validation);
   const clear = allChecksClear(groups);
+  const heldBack = groups.filter((g) => g.heldBack).map((g) => g.source);
+  const subjects = groupChecksBySubject({ issues: shown });
   // A draft with no step: one sentence when nothing is open, else the sentence
-  // first and the groups under it.
-  const startOnly = validation.noStepYet === true && groups.every((g) => g.issues.length === 0);
+  // first and the subjects under it.
+  const startOnly = validation.noStepYet === true && shown.length === 0;
 
   return (
     <aside {...stylex.props(styles.checksRail)} aria-label={t("checksRail.heading")}>
       <h2 {...stylex.props(styles.checksRailHeading)}>{t("checksRail.heading")}</h2>
-      <div id="studio-checks-rail-groups">
+      <div id="studio-checks-rail-groups" {...stylex.props(styles.checksColumn)}>
         {narrowedTo && (
           <p {...stylex.props(styles.checksRailNarrowed)}>
             {t("checksRail.narrowedTo").replace("{step}", narrowedTo.label)}
@@ -191,48 +347,24 @@ export function ChecksRail({ validation, canPublish, onOpenIssue, narrowedTo, on
         {validation.noStepYet === true && (
           <p {...stylex.props(styles.checksRailStart)}>{t("checksRail.noStepYet")}</p>
         )}
-        {(startOnly ? [] : groups).map((group) => (
-          <section key={group.source} {...stylex.props(styles.checksGroup)}>
-            {/* The source name is the same untranslated machine value
-                IssueList already prints in its own label — a category this
-                validation pipeline itself defines, not authored prose. Both
-                sites read one identity style, `issueSourceLabel`. */}
-            <h3 {...stylex.props(issueSourceLabel, styles.checksGroupHeading)}>{group.source}</h3>
-            {group.heldBack ? (
-              <p {...stylex.props(styles.checksGroupHeldBack)}>{t("checksRail.heldBack")}</p>
-            ) : (
-              <>
-                {group.issues.length === 0 ? (
-                  <p {...stylex.props(styles.checksGroupClear)}>{t("checksRail.groupClear")}</p>
-                ) : (
-                  <ul {...stylex.props(styles.checksGroupList)}>
-                    {group.issues.map((issue, i) => (
-                      <li key={i} {...stylex.props(styles.checksGroupIssue)}>
-                        {onOpenIssue ? (
-                          <button
-                            type="button"
-                            {...stylex.props(styles.checksGroupIssueButton)}
-                            onClick={() => onOpenIssue(issue)}
-                          >
-                            {issue.message}
-                          </button>
-                        ) : (
-                          issue.message
-                        )}
-                      </li>
+        {!startOnly &&
+          subjects.map(({ subject, issues }) => {
+            const line = subject === "publishing";
+            if (issues.length === 0 && !line) return null;
+            return (
+              <section key={subject} {...stylex.props(styles.checksSubject)}>
+                <h3 {...stylex.props(styles.checksSubjectHeading)}>{t(SUBJECT_KEYS[subject])}</h3>
+                {issues.length > 0 && (
+                  <ul {...stylex.props(styles.checksList)}>
+                    {issues.map((issue, i) => (
+                      <CheckRow key={i} issue={issue} onFix={onFix} />
                     ))}
                   </ul>
                 )}
-                {group.registryConfigHeldBack && (
-                  <p {...stylex.props(styles.checksGroupNote)}>{t("checksRail.configHeldBack")}</p>
-                )}
-                {group.unknownKeysHeldBack && (
-                  <p {...stylex.props(styles.checksGroupNote)}>{t("checksRail.unknownKeysHeldBack")}</p>
-                )}
-              </>
-            )}
-          </section>
-        ))}
+                {line && <HeldBackLine heldBack={heldBack} />}
+              </section>
+            );
+          })}
       </div>
     </aside>
   );

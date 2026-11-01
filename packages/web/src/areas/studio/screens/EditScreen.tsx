@@ -1238,7 +1238,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
               canPublish={canPublish}
               narrowedTo={checksNarrowedTo}
               onShowEvery={() => setChecksStepId(undefined)}
-              onOpenIssue={(issue) => openTabFromRow(checkTarget(issue, steps))}
+              onFix={(issue) => openTabFromRow(checkTarget(issue, steps))}
             />,
           )}
           {/* The Settings tab: the process's own settings, its contract and

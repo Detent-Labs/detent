@@ -91,11 +91,22 @@ describe("ActionListEditor's registry badge", () => {
     const html = renderRow(
       action,
       baseValidation({
-        issues: [{ entityType: "action", entityId: "action_b", message: "action type 'not.registered' is not registered", source: "registry", loc: "" }],
+        issues: [
+          {
+            entityType: "action",
+            entityId: "action_b",
+            message: "action type 'not.registered' is not registered",
+            sentence: "An action on “Review” uses a type this server does not offer.",
+            source: "registry",
+            loc: "",
+          },
+        ],
       }),
     );
 
     expect(html).not.toContain("Registry config");
-    expect(html).toContain("not registered");
+    expect(html).toContain("An action on “Review” uses a type this server does not offer.");
+    expect(html).not.toContain("not registered");
+    expect(html).not.toContain(">registry<");
   });
 });

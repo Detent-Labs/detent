@@ -35,7 +35,7 @@ describe("a seeded draft under the studio's own validation", () => {
     // `dimensions.structural`, not off a compiled body's own presence, so
     // the CEL and registry groups must still read held back here, never
     // clear — closing the contradiction with studio-checks-rail's "A
-    // Zod-invalid draft shows every group held back" scenario.
+    // Zod-invalid draft holds its other checks back" scenario.
     expect(compiledResult.dimensions.duration).toBe("not-run");
     expect(compiledResult.dimensions.structural).toBe("not-run");
     const groups = groupChecksBySource(compiledResult);

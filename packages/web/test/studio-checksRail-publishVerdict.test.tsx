@@ -45,6 +45,16 @@ describe("The checks rail's all-clear box", () => {
     expect(html).toContain("This draft is ready to publish.");
   });
 
+  it("draws Before publishing with the second part of the line alone and no row", () => {
+    const html = renderToStaticMarkup(<ChecksRail validation={clear} canPublish={true} />);
+
+    expect(html).toContain("Before publishing");
+    expect(html).toContain("Publishing also checks each plugin&#x27;s settings and any entry the studio cannot see.");
+    expect(html).not.toContain("More checks run");
+    expect(html).not.toContain("Must fix");
+    expect(html).not.toContain("Steps");
+  });
+
   it("names the permission instead of asserting publishability it cannot verify", () => {
     const html = renderToStaticMarkup(<ChecksRail validation={clear} canPublish={false} />);
 
@@ -89,13 +99,15 @@ describe("The checks rail's start state", () => {
     const html = renderToStaticMarkup(<ChecksRail validation={stepless} canPublish={true} />);
 
     expect(html).toContain(SENTENCE);
-    expect(html).not.toContain("checksGroup");
-    expect(html).not.toContain("Held back");
+    expect(html).not.toContain("checksSubject");
+    expect(html).not.toContain("Before publishing");
+    expect(html).not.toContain("More checks run");
+    expect(html).not.toContain("Publishing also checks");
     expect(html).not.toContain("zod");
     expect(html).not.toContain("Invalid input");
   });
 
-  it("puts the sentence above the groups when an issue is open", () => {
+  it("puts the sentence above the subjects when an issue is open", () => {
     const withIssue: ValidationResult = {
       ...stepless,
       issues: [{ entityType: "process", entityId: "process", message: "The process needs a name.", source: "zod", loc: "" }],
@@ -105,6 +117,8 @@ describe("The checks rail's start state", () => {
     expect(html).toContain(SENTENCE);
     expect(html).toContain("The process needs a name.");
     expect(html.indexOf(SENTENCE)).toBeLessThan(html.indexOf("The process needs a name."));
+    expect(html).toContain("Before publishing");
+    expect(html).toContain("More checks run once you fix the rows above.");
   });
 
   it("never renders the all-clear box", () => {

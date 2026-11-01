@@ -895,8 +895,6 @@ export const en = {
   "player.formTabOpenedMany": "Opened the {tab} tab. {count} fields still need an entry.",
 
   "checksRail.heading": "Checks",
-  "checksRail.heldBack": "Held back until earlier checks pass.",
-  "checksRail.groupClear": "No open issues in this group.",
   // The validation verdict alone. The rail runs checks; it holds no
   // permission, so it says nothing here about who may publish.
   "checksRail.allClear": "No open issues.",
@@ -912,6 +910,8 @@ export const en = {
   "checksRail.narrowedTo": "Showing the checks on {step}.",
   "checksRail.showEvery": "Show every check",
   "checksRail.fix": "Fix",
+  "checksRail.developerView": "Developer view",
+  "checksRail.heldBackKinds": "Not run yet:",
   "checksRail.heldBackLine": "More checks run once you fix the rows above. Publishing also checks each plugin's settings and any entry the studio cannot see.",
   "checksRail.publishLine": "Publishing also checks each plugin's settings and any entry the studio cannot see.",
   "checksRail.subject.steps": "Steps",
