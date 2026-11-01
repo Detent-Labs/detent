@@ -26,7 +26,7 @@
 - [x] 2.4 Move `StartPickerDialog` and `PromotionPreviewDialog` onto the frame in `ProcessesScreen.tsx`, with ref openers for + New process and Import. Move their literals into the catalog. Move the key, the id and the hash into the Developer view per D7. The import's Process fact falls back per D7, and its refusal keeps `pre-line`. Add a static test for both.
 - [x] 2.5 Rebuild `RemoveFieldDialog.tsx` on the frame with an optional `names` prop per D8, without the key. Its full names rows arrive in group 3. Update `studio-removeFieldDialog.test.tsx` for the frame.
 - [x] 2.6 Delete `panels/shared/confirmDialog.tsx`, now that its last consumer moved. Replace its `FILES` entry in `studio-no-confirm.test.ts` with `panels/shared/StudioDialog.tsx`.
-- [ ] 2.7 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
+- [x] 2.7 Run `bun run typecheck` and the full gated suite in the foreground. Read its verdict off the named tests.
 
 ## 3. Remove field names its reach (studio-app)
 
