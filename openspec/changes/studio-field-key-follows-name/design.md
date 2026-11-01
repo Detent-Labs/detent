@@ -134,7 +134,8 @@ literals and `child.data.amount`, which the reader count does not count.
 
 - `isFieldKeyLocked(field, published)` drops its `draft` argument and the
   reader clause. A `group` stays outside.
-- `takenFieldKeys(draft, exceptId?)` answers the taken set for derivation.
+- `takenFieldKeys(draft, exceptId?, group = false)` answers the taken set
+  for derivation. A mint passes no id and states `group` itself.
   It holds three parts:
   - every other field's non-empty key;
   - each key `readKeys(draft)` answers that no field carries;
@@ -174,8 +175,12 @@ still bumps the definition-write counter.
 
 The UI count comes from the draft before the write. `FieldEditor` computes
 the patch with `labelChangePatch` on the current draft. When the key moves,
-the count is `countKeyReaders(draft, oldKey)`, or 0 while another field
-carries `oldKey`. A key commit counts the same way. A commit can bind readers
+the count is `countKeyRewrites(draft, fieldId, oldKey, newKey)`. It shares
+one plan, `rewritePlan`, with `rewriteKeyReaders`, so the count equals the
+write. It answers 0 while another field carries the old or the new key.
+
+A key commit counts the same way. Tests drive both writes through the panel's
+exported seams, `commitKeyInput` and `writeLabelFromCatalog`. A commit can bind readers
 from a dangling key, and the count leaves those out, since nothing rewrote
 them. The key commit bumps the definition-write counter too, as `onWrite`
 does for a group.

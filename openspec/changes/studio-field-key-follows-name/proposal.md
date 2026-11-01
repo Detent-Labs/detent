@@ -74,9 +74,10 @@ None.
 - `packages/web/src/areas/studio/draft/key-readers.ts`: reader sites, the
   rewrite and the set of read keys.
 - `packages/web/src/areas/studio/draft/fieldLabel.ts`, a new
-  `draft/fieldKey.ts`, `draft/view-group-sync.ts`.
+  `draft/fieldKey.ts`, and a comment in `draft/mintField.ts`.
 - `packages/web/src/areas/studio/panels/fieldCatalogLogic.ts`,
-  `panels/FieldCatalogPanel.tsx`, `panels/shared/conditionLogic.ts`, a new
+  `panels/FieldCatalogPanel.tsx`, `panels/fieldCheckZone.ts`,
+  `panels/shared/conditionLogic.ts`, a new
   `panels/readByRows.ts`, `screens/FormEditorScreen.tsx`.
 - The studio catalog, `packages/web/src/i18n/catalogs/studio.ts`.
 - The tests under `packages/web/test/` that pin the lock, the notice or the
