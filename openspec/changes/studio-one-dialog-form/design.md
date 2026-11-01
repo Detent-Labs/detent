@@ -145,7 +145,7 @@ export function dialogFocusables(dialog: HTMLDialogElement): HTMLElement[];
 
 `wrapTarget` answers the first stop on a forward Tab from the last one, and the last on a backward Tab from the first. An `active` outside the list answers first or last by direction. An empty list answers undefined, and the listener still calls `preventDefault()` on Tab, so a busy dialog with both controls disabled keeps the focus from leaving.
 
-The hook adds one `keydown` listener on `document` while the dialog is open. A click on a dialog's text leaves the focus on `body`, and a listener on the dialog never hears Tab there.
+The hook adds one `keydown` listener on `document` while the dialog is open. The focus can stand on `body` after a blur, and a listener on the dialog never hears Tab there. Chromium's click on a dialog's text leaves the focus on the dialog.
 
 The diagnosis in `docs/decisions.md` guessed at the three focus mechanisms racing. The hold no longer depends on it: the browser's step past the last stop never runs, so nothing leaves the dialog.
 
@@ -157,7 +157,7 @@ Alternative: leave the wrap to the platform, as the spec says today. That is the
 
 When `busy` falls back to false with the focus outside the open dialog, the frame focuses Cancel. Busy disables both controls, and a disabled control drops the focus.
 
-A caller without a stable ref writes `document.activeElement` into its ref at the press. React's commit-time `autoFocus` moves the focus before a passive effect runs, so the hook cannot capture it itself. `activeControl()` in `dialogFocus.ts` does that read and narrows to `HTMLElement`.
+A caller without a stable ref writes `document.activeElement` into its ref at the press, and the focus return reads that ref. `activeControl()` in `dialogFocus.ts` does that read and narrows to `HTMLElement`.
 
 | Dialog | Opener | After a confirm |
 |---|---|---|

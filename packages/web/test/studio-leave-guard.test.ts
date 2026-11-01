@@ -147,8 +147,8 @@ function scan(source: string): string[] {
   // The question: a clean draft proceeds at once, and a dirty one waits. The
   // opener is read from the press, before the dialog takes the focus.
   const ask = arrowBody(code, "askLeave") ?? "";
-  if (!/^if \(!dirtyRef\.current\) \{ proceed\(\); return; \}/.test(ask)) violations.push("askLeave does not read dirtyRef before it asks");
-  if (!/leaveTrigger\.current = activeControl\(\); setLeaving\(\(\) => proceed\);$/.test(ask)) violations.push("askLeave does not hold the exit for the dialog");
+  if (!ask.startsWith("if (!dirtyRef.current) { proceed(); return; }")) violations.push("askLeave does not read dirtyRef before it asks");
+  if (!ask.endsWith("leaveTrigger.current = activeControl(); setLeaving(() => proceed);")) violations.push("askLeave does not hold the exit for the dialog");
 
   // The wrappers must ask and hand over the exit, or a guarded name guards nothing.
   for (const { name, shape } of WRAPPERS) {

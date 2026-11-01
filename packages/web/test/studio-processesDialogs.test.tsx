@@ -69,7 +69,7 @@ describe("The import preview", () => {
     expect(html).toContain("Publish this version here?</h2>");
     expect(html).toMatch(/<dt[^>]*>Process<\/dt><dd class="value">Laptop Pool<\/dd>/);
     expect(html).toMatch(/<dt[^>]*>Source version<\/dt><dd class="value mono">v4<\/dd>/);
-    expect(html).toContain("This environment assigns its own version number.");
+    expect(html).toContain("This environment assigns its own version number. A call from another process keeps working once that process is promoted too.");
   });
 
   it("falls back to the untitled word for a file with no label, never to the key or the id", () => {
@@ -163,6 +163,10 @@ describe("The start picker", () => {
 
     expect(cancel).toContain('class="btn btn-secondary"');
     expect(cancel).not.toContain("autofocus");
+  });
+
+  it("carries no description, since its body holds its choices", () => {
+    expect(renderPicker([template("approval")])).not.toContain("aria-describedby");
   });
 
   it("has no confirm: the choices then Cancel alone", () => {

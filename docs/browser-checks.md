@@ -453,13 +453,14 @@ Open the caret's menu. Pass, measured: it lists two entries, a call to
 another process and an end.
 
 Select one step other than the initial step. Pass, measured: the bar shows
-Remove step, with no count and no group control. Press Remove step. Pass,
-measured: on `purchase_requisition` the draft drops from 13 steps to 12. The
-bar then shows Add step alone.
+Remove step, with no count and no group control. Press Remove step. Pass: the
+dialog "Remove “{step}”?" opens and the draft keeps the step. Press Remove the
+step. Pass, measured: on `purchase_requisition` the draft drops from 13 steps to
+12. The bar then shows Add step alone.
 
-Select the initial step. Press Remove step. Pass, measured: the start marker
-moves to the first remaining step. On `purchase_requisition` it moved from
-Draft Requisition to Manager Approval.
+Select the initial step. Press Remove step, then Remove the step. Pass,
+measured: the start marker moves to the first remaining step. On
+`purchase_requisition` it moved from Draft Requisition to Manager Approval.
 
 Neither press saves the draft. Reload without saving once the walk ends.
 
@@ -1061,9 +1062,10 @@ selected step.
 
 Press a member of a selection and release without moving. Pass: nothing moves.
 
-Select three steps and choose Remove steps. Pass: those three are gone, the
-others stay, and the canvas bar shows Add step alone. If one of them was the
-initial step, the start marker moved to the first remaining step.
+Select three steps and choose Remove steps. Pass: the dialog "Remove 3 steps?"
+names each one. Press Remove the steps. Pass: those three are gone, the others
+stay, and the canvas bar shows Add step alone. If one of them was the initial
+step, the start marker moved to the first remaining step.
 
 Select two steps and read the ribbon bar. Pass: the collapsed checks summary
 still sits there, with the same count it showed for one step.
@@ -7329,22 +7331,36 @@ Discard the draft from the process list and press Discard draft in the dialog.
 
 Source: `studio-one-dialog-form` task 5.4a.
 
-`e2e/dialog.e2e.ts` covers the keyboard hold, the backdrop, Escape and the
-leave dialog. Three checks stay manual, since only a human eye reads them.
-Open a draft with a dirty edit for all three, in the production bundle.
+`e2e/dialog.e2e.ts` covers the keyboard hold, the backdrop, Escape, the leave
+dialog and the canvas bar's two remove dialogs. It also opens a long dialog by
+keyboard in a short window. `e2e/publish.e2e.ts` presses Escape while a request
+runs. Four checks stay manual, since only a human eye reads them. Open a draft
+with a dirty edit for all four, in the production bundle.
+
+These checks need visible scrollbars. Run them headed, or headless without
+`--hide-scrollbars`. Playwright's headless launch passes that flag. A hidden
+scrollbar takes no width, so a short gutter reads as 16px.
 
 **1. The gutter at 420px.** Resize to 420px wide and open the Publish dialog.
 Pass: 16px of page shows on each side of the dialog. Pass: the facts stack in
 one column, with a term above its value. Pass: no text runs past the dialog's
 border.
 
-**2. The sticky footer at 1024 by 600.** Resize to 1024x600 and open the
-Remove field dialog on a group with many fields. Pass: the heading shows at the
-top, and the dialog scrolls under the footer. Pass: Cancel and the confirm stay
-in view with a hairline above them. Tab to the last name in the list. Pass:
-the focus ring stands clear of the footer.
+**2. The sticky footer at 1024 by 600.** Resize to 1024x600. Focus Remove field
+on a group with many fields, and open the dialog with Enter. A pointer press
+sets another input modality and hides a scroll that only a keyboard open causes.
+Pass: the heading shows at the top, and the dialog scrolls under the footer.
+Pass: Cancel and the confirm stay in view with a hairline above them.
+
+Pass: a list of more than eight names prints five, then "and {count} more". Open
+it and Tab to its last line. Pass: the focus ring stands clear of the footer.
 
 **3. The account menu's focus return.** Open the account menu, "Account" in the
 header, and choose "Tasks" under "Go to". Pass: the dialog "Leave this draft?"
 opens with Cancel focused. Press Cancel. Pass: the focus ring stands on the
 account trigger. Repeat with Escape and get the same result.
+
+**4. A closed Developer view has no tab position.** Publish a draft, then change
+a step's label. Open the Publish dialog with the change list closed. Tab through
+it. Pass: the focus stands on each Developer view's summary, and on nothing
+inside a closed one. No e2e flow sees this, since its draft has never published.

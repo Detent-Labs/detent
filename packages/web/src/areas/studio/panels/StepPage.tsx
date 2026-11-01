@@ -580,6 +580,8 @@ interface Props {
   /** The processes a subprocess step may call. Empty until the fetch
    * resolves, and after a failed one. */
   processes: readonly ProcessSummary[];
+  /** Whether the tab holding this page shows. */
+  visible?: boolean;
 }
 
 /** A called process's file that failed to load. */
@@ -617,6 +619,7 @@ export function StepPage({
   onSectionOpened = NOOP,
   navigate,
   processes,
+  visible = true,
 }: Props) {
   const { draft, mutate, validation, setChildForStep, contentLocale } = useDraft();
   const steps = draft.workflow?.steps ?? [];
@@ -630,6 +633,9 @@ export function StepPage({
   // Whether the removal dialog stands open, and the control that opened it.
   const [removing, setRemoving] = useState(false);
   const removeTriggerRef = useRef<HTMLButtonElement | null>(null);
+  // A hide declines: a hidden tab body must not hold a modal.
+  if (!visible && pendingKind !== null) setPendingKind(null);
+  if (!visible && removing) setRemoving(false);
   // The author's own toggle of More's Developer view. A key check opens it too.
   const [developerOpen, setDeveloperOpen] = useState(false);
   const developerRef = useRef<HTMLDetailsElement | null>(null);
@@ -1050,7 +1056,7 @@ export function StepPage({
               {t("stepPage.removeStep")}
             </button>
           </div>
-          {removing && (
+          {visible && removing && (
             <RemoveStepDialog
               label={label}
               reach={stepRemovalReach(draft, step.id!, fields)}
@@ -1118,7 +1124,7 @@ export function StepPage({
               </button>
             ))}
           </fieldset>
-          {pendingKind && (
+          {visible && pendingKind && (
             <KindSwitchDialog
               kind={pendingKind}
               reach={performedByReach(step, pendingKind)}

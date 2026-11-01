@@ -12,7 +12,7 @@ import type { Draft } from "../draft/types";
 import { t, type CatalogKey } from "../catalog.js";
 import type { RemovalNameRow } from "./RemoveFieldDialog";
 import { readByPlaces } from "./readByRows";
-import { fill, plainStepTextMap, stepText, stepTextMap, wayOutHeading } from "./shared/optionText";
+import { fill, numberRepeats, plainStepTextMap, stepText, stepTextMap, wayOutHeading } from "./shared/optionText";
 
 const WRITER_WORDS: Record<Exclude<WriterPosition, "outputMapping">, CatalogKey> = {
   onEntry: "fieldCatalog.removeWriterOnEntry",
@@ -29,7 +29,8 @@ const unique = (names: readonly string[]) => [...new Set(names)];
  * The fact rows for `reach`, measured on `draft` before any write. A step
  * reads its text, with its steps-rail number where two steps share a label. A
  * field reads its label at `contentLocale`, else the base locale. Each list
- * drops repeats, since two rules on one place read the same.
+ * drops repeats, since two rules on one place read the same. Two fields sharing
+ * a label are two places, so a list of fields numbers them instead.
  */
 export function removalNames(draft: Draft, reach: FieldRemovalReach, contentLocale: string): RemovalNameRow[] {
   const { sites } = reach;
@@ -42,6 +43,8 @@ export function removalNames(draft: Draft, reach: FieldRemovalReach, contentLoca
     (step.id === undefined ? undefined : stepTexts.get(step.id)) ?? stepText(step, contentLocale, baseLocale);
   const fieldWord = (field: DraftField) =>
     resolveDraftLocalizedText(field.label, contentLocale, baseLocale)?.trim() || t("condition.unnamedField");
+  // A field carrying two mappings onto the removed one is still one field.
+  const fieldWords = (fields: readonly DraftField[]) => numberRepeats([...new Set(fields)], fieldWord);
 
   const writers = sites.writers.map(({ step, position, path }) => {
     const slots = { step: stepWord(step) };
@@ -68,11 +71,11 @@ export function removalNames(draft: Draft, reach: FieldRemovalReach, contentLoca
   });
 
   const rows: RemovalNameRow[] = [
-    { term: t("fieldCatalog.removeDialogFieldsInsideTerm"), names: sites.fieldsInside.map(fieldWord) },
+    { term: t("fieldCatalog.removeDialogFieldsInsideTerm"), names: fieldWords(sites.fieldsInside) },
     { term: t("fieldCatalog.removeDialogAskedOnTerm"), names: sites.steps.map(stepWord) },
     { term: t("fieldCatalog.removeDialogWrittenByTerm"), names: writers },
     { term: t("fieldCatalog.removeDialogPartOfTerm"), names: contract },
-    { term: t("fieldCatalog.removeDialogFilledInFromTerm"), names: sites.columnMappings.map(fieldWord) },
+    { term: t("fieldCatalog.removeDialogFilledInFromTerm"), names: fieldWords(sites.columnMappings) },
     { term: t("fieldCatalog.removeDialogReadByTerm"), names: readByPlaces(draft, sites.celReads, contentLocale) },
     { term: t("fieldCatalog.removeDialogSettingsTerm"), names: settings },
   ];

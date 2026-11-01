@@ -2228,16 +2228,51 @@ local to this section. Paths under `panels/`, `draft/` and `screens/` start at
 
 ## Open from studio-one-dialog-form (needs its own OpenSpec change)
 
-- **DIALOG-1: the step page's two dialogs can stand modal in a hidden tab
-  body.** `panels/StepPage.tsx` mounts Remove this step and the kind switch.
-  The Steps tab body stays mounted and takes `hidden` when another tab opens.
-  The Fields tab's dialogs clear their pending state when their body hides, and
-  these two do not. Risk (Low): a browser Back under an open dialog leaves a
-  modal in a body nobody sees.
+The change put every studio confirmation in one dialog form. It left six points
+to later changes. The DIALOG tag is local to this section.
 
-  Upgrade entry: pass `visible` into `StepPage` and clear `removing` and
-  `pendingKind` in the render that hides it, as `EntityTabs.tsx` does for
-  `pendingRemoval`.
+- **DIALOG-2: a busy dialog announces nothing.** A confirm disables both
+  controls while its request runs, and the focus falls to the body or the
+  dialog. Only the confirm's label changes. Risk (Low): a screen reader hears
+  silence until the refusal's alert or the close.
+
+  Upgrade entry: a polite live region inside `StudioDialog` that follows `busy`.
+- **DIALOG-3: Remove this step counts where Remove field names.** FIELDCARD-25
+  names the field dialog alone, so Remove this step, Remove data source and the
+  kind switch keep their counts. Risk (Low): an author must leave the dialog to
+  learn which ways out lead to the step.
+
+  Upgrade entry: a `sites` list on `stepRemovalReach`, printed through
+  `DialogNames`.
+- **DIALOG-4: no dialog carries `alertdialog`.** Every dialog takes the native
+  `dialog` role, the destructive ones too. Risk (Low): a screen reader does not
+  mark a removal as more urgent than a choice.
+
+  Upgrade entry: a `role` on `StudioDialog`, set where the confirm is
+  `DestructiveConfirm`.
+- **DIALOG-5: an import's refusal keeps server text in the alert.** The import
+  preview prints the located `describeCaughtError` lines in its `role="alert"`
+  paragraph. `environment-promotion` asks for that located detail. The header
+  bar's Publish moves the same text into a closed Developer view, so the two
+  refusals disagree. A CEL check message can quote source. Risk (Medium): an
+  author reads a location or CEL outside a Developer view.
+
+  Upgrade entry: reuse `describePublishRefusal` in `ProcessesScreen.tsx`, with a
+  delta on `environment-promotion`.
+- **DIALOG-6: a browser Back under Arrange or Restore leaves the dialog open.**
+  `EditScreen.tsx` mounts both above the tab row, so a Back keeps them over the
+  next tab. A confirm still acts correctly. Risk (Low): the question stands over
+  a tab the author did not ask it on.
+
+  Upgrade entry: clear `arrangeAsked` and `restoreAsked` in the render that
+  changes the address, as the canvas bar's remove dialogs do on a hide.
+- **DIALOG-7: `activeControl()` reads `body` where a press does not focus a
+  button.** Safari and Firefox on macOS leave the focus in place on a mouse
+  press. The opener ref then holds `body`, so a decline returns the focus nowhere.
+  The act itself stays right. Risk (Low): a mouse user on those browsers loses
+  their place after a decline.
+
+  Upgrade entry: read `event.currentTarget` where a handler has the event.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

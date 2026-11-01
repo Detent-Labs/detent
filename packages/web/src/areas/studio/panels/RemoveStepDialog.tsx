@@ -8,8 +8,8 @@ interface Props {
   label: string;
   /** What the removal reaches, measured on the draft before any write. */
   reach: StepRemovalReach;
-  /** The Remove this step control, for the focus return on a decline. */
-  triggerRef: RefObject<HTMLButtonElement | null>;
+  /** The control that opened this dialog, for the focus return on a decline. */
+  triggerRef: RefObject<HTMLElement | null>;
   /** Handles Cancel and the native `cancel` event (Escape). */
   onCancel: () => void;
   /** Handles the confirming control. */
@@ -18,8 +18,8 @@ interface Props {
 
 /**
  * The Remove this step confirmation (`studio-step-page`: "Removing a step
- * confirms first", "The removal dialog counts what the removal reaches"). The
- * heading names the step, so the facts carry the counts alone. A count row
+ * confirms first", "The removal dialog counts what the removal reaches"), which
+ * the canvas bar's Remove step opens too. The heading names the step, so the facts carry the counts alone. A count row
  * stands only where its count is above zero.
  */
 export function RemoveStepDialog({ label, reach, triggerRef, onCancel, onConfirm }: Props) {

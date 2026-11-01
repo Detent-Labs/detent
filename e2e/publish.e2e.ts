@@ -22,18 +22,31 @@ async function openPublishDialog(page: Page): Promise<Locator> {
 
 test("a refused publish shows its reason inside the dialog", async ({ page }) => {
   // A publish-validation refusal, the shape `parseErrorBody` in packages/web/src/api/client.ts maps to a message.
-  await page.route("**/drafts/*/publish", (route) =>
-    route.request().method() === "POST"
-      ? route.fulfill({
-          status: 422,
-          contentType: "application/json",
-          body: JSON.stringify({ error: { type: "schema-validation", message: REFUSAL, issues: [{ loc: "", message: REFUSAL }] } }),
-        })
-      : route.fallback(),
-  );
+  // The answer waits for the Escape presses below, so the request stays busy through them.
+  let answer = () => {};
+  const answered = new Promise<void>((resolve) => {
+    answer = resolve;
+  });
+  await page.route("**/drafts/*/publish", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    await answered;
+    await route.fulfill({
+      status: 422,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { type: "schema-validation", message: REFUSAL, issues: [{ loc: "", message: REFUSAL }] } }),
+    });
+  });
 
   const dialog = await openPublishDialog(page);
   await dialog.getByRole("button", { name: "Publish", exact: true }).click();
+
+  // A busy dialog ignores Escape. The third press closes natively in Chromium, and the frame opens it again.
+  await expect(dialog.getByRole("button", { name: "Cancel", exact: true })).toBeDisabled();
+  for (let press = 0; press < 3; press += 1) {
+    await page.keyboard.press("Escape");
+    await expect(dialog, `Escape press ${press + 1}`).toBeVisible();
+  }
+  answer();
 
   // A refusal with no location reads the fallback sentence; the server's text waits in a closed Developer view.
   await expect(dialog.getByRole("alert")).toContainText(FALLBACK);

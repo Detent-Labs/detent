@@ -590,8 +590,11 @@ the Legend style. A done one carries a check icon named Done.
   they stack.
 - Notes follow the facts, in slate at 0.9rem.
 - The controls stand in a sticky footer under a 1px hairline. The confirm comes
-  first. Cancel comes last, outlined in ink, and takes the opening focus.
+  first. Cancel comes last, outlined in ink, and takes the opening focus unless
+  the dialog commits nothing.
 - A long body scrolls under the footer, so the controls stay in view.
+- A list of more than eight names prints five. A closed disclosure holds the
+  rest and counts them, in slate at the list's own size.
 
 ### Inputs / Fields
 

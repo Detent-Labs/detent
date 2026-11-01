@@ -4,7 +4,8 @@ import { wrapTarget } from "../src/areas/studio/panels/shared/dialogFocus.js";
 /**
  * Where Tab goes inside a modal dialog (`spa-accessibility`). `wrapTarget` is
  * generic, so plain strings stand in for elements. `dialogFocusables` reads a
- * real DOM, and `e2e/dialog.e2e.ts` covers it.
+ * real DOM. `e2e/dialog.e2e.ts` runs the wrap through it. No control stands in a
+ * closed `details` on that draft, so `docs/browser-checks.md` checks that filter.
  */
 const stops = ["first", "middle", "last"];
 

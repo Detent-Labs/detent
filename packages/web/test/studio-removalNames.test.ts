@@ -204,6 +204,34 @@ describe("removalNames drops repeats", () => {
     expect(rows["Written by"]).toStrictEqual(["What happens when Review is entered"]);
   });
 
+  it("keeps two fields inside a group that share a label as two lines", () => {
+    const draft = draftOf({
+      fields: [
+        {
+          id: id("fld_group"),
+          key: "grp",
+          label: { en: "Group" },
+          type: "group",
+          fields: [leaf("fld_a", "Amount"), leaf("fld_b", "Amount"), leaf("fld_c", ""), leaf("fld_d", "")],
+        },
+      ],
+    });
+
+    expect(rowsOf(draft, "fld_group")["Fields inside it"]).toStrictEqual(["Amount", "Amount (2)", "(unnamed field)", "(unnamed field) (2)"]);
+  });
+
+  it("keeps two staying fields that share a label as two lines", () => {
+    const draft = draftOf({
+      fields: [
+        leaf("fld_name", "Name"),
+        leaf("fld_one", "Person", { columnMapping: { a: id("fld_name") } }),
+        leaf("fld_two", "Person", { columnMapping: { a: id("fld_name") } }),
+      ],
+    });
+
+    expect(rowsOf(draft, "fld_name")["Filled in from"]).toStrictEqual(["Person", "Person (2)"]);
+  });
+
   it("names a staying field once however many of its mappings target the removed field", () => {
     const draft = draftOf({
       fields: [leaf("fld_name", "Name"), leaf("fld_person", "Person", { columnMapping: { a: id("fld_name"), b: id("fld_name") } })],

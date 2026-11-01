@@ -679,6 +679,9 @@ function KindPicker({
   const rawTriple = [field.type, field.format, field.control].filter((m) => typeof m === "string").join(" / ");
   // A Text field with choices asks for one of them, not a free line.
   const withChoices = (field.options?.length ?? 0) > 0 || field.dataSource !== undefined;
+  // The picker's own word for a kind.
+  const kindWord = (name: string) => (name === CUSTOM_KIND ? t("fieldCatalog.customTypeOption") : fieldKindLabel(name as FieldKindName).name);
+  const oldKind = custom ? CUSTOM_KIND : kind;
   const kindNote =
     kind === undefined ? undefined : kind === "text" && withChoices ? t("fieldCard.kindNoteWithChoices") : fieldKindLabel(kind).note;
   return (
@@ -706,6 +709,8 @@ function KindPicker({
       {visible && pendingKind !== undefined && (
         <KindDropDialog
           label={label}
+          from={oldKind === undefined ? undefined : kindWord(oldKind)}
+          to={kindWord(pendingKind.raw)}
           dropped={pendingKind.dropped}
           triggerRef={kindSelect}
           onCancel={() => setPendingKind(undefined)}

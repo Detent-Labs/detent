@@ -37,8 +37,7 @@ export function dialogFocusables(dialog: HTMLDialogElement): HTMLElement[] {
 }
 
 /** The control holding the focus now. A caller with no stable opener ref writes
- * this into its ref at the press: React's commit-time `autoFocus` moves the
- * focus before a passive effect runs, so the dialog cannot read it itself. */
+ * this into its ref at the press, and the dialog's focus return reads that ref. */
 export function activeControl(): HTMLElement | null {
   const active = document.activeElement;
   return active instanceof HTMLElement ? active : null;

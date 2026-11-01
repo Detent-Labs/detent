@@ -604,9 +604,9 @@ interface Props {
  * banner below already reads. Both confirmation dialogs render here too. Publish
  * returns the focus to its own control. Discard draft's entry unmounts when the
  * menu closes, so its dialog returns the focus to the `⋮` trigger. Publish names
- * the process, its id, the revision, the next version, the open issue count and
- * the changes since the base version; Discard names the process, the revision
- * and the last-saved time.
+ * the process, the next version, the open issue count and the changes since the
+ * base version, and its Developer view holds the key, the id and the revision.
+ * Discard names the process and the last-saved time.
  *
  * A publish's findings, the action error and the save-conflict banner all render
  * after the header row as block siblings. A closed menu must never hide the one

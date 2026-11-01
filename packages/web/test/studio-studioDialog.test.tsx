@@ -50,7 +50,7 @@ function buttonTag(html: string, label: string): string {
 
 describe("StudioDialog", () => {
   it("names itself through the heading and describes itself through the body", () => {
-    const html = frame(<DialogNote>Only the draft goes.</DialogNote>);
+    const html = frame(<DialogNote>Only the draft goes.</DialogNote>, { confirm: <span /> });
     const labelledBy = attribute(html, "aria-labelledby");
     const describedBy = attribute(html, "aria-describedby");
     expect(labelledBy).toBeTruthy();
@@ -60,6 +60,10 @@ describe("StudioDialog", () => {
     expect(html).toContain("Remove “Prüfung”?</h2>");
     const body = html.slice(html.indexOf(`id="${describedBy}"`));
     expect(body.slice(0, body.indexOf("</div>"))).toContain("Only the draft goes.");
+  });
+
+  it("describes itself by no body where no confirm stands", () => {
+    expect(frame(<DialogNote>A choice.</DialogNote>)).not.toContain("aria-describedby");
   });
 
   it("carries the literal class beside its compiled one", () => {
@@ -92,7 +96,7 @@ describe("StudioDialog", () => {
   });
 
   it("renders the refusal after the body closes, so the description leaves it out", () => {
-    const html = frame(<DialogNote>The note.</DialogNote>, { refusal: <DialogRefusal detail={null}>The engine refused.</DialogRefusal> });
+    const html = frame(<DialogNote>The note.</DialogNote>, { confirm: <span />, refusal: <DialogRefusal detail={null}>The engine refused.</DialogRefusal> });
     const describedBy = attribute(html, "aria-describedby");
     const body = html.slice(html.indexOf(`id="${describedBy}"`));
     const closes = body.indexOf("</div>");
@@ -103,7 +107,6 @@ describe("StudioDialog", () => {
   it("renders no refusal slot and no alert without a refusal", () => {
     const html = frame(null);
     expect(html).not.toContain("alert");
-    expect(html).not.toContain("refusalSlot");
   });
 
   it("closes with Cancel alone where no confirm stands", () => {
@@ -259,5 +262,32 @@ describe("the notes", () => {
     expect(html).toContain("Developer view</summary>");
     expect(html.match(/<dl/g)?.length).toBe(1);
     expect(html).toContain("proc_1</dd>");
+  });
+});
+
+describe("DialogNames' fold", () => {
+  const namesOf = (count: number) => Array.from({ length: count }, (_, index) => `Name ${index + 1}`);
+  const names = (count: number) => renderToStaticMarkup(<DialogNames term="Steps" names={namesOf(count)} />);
+
+  it("prints eight names whole, with no disclosure", () => {
+    const html = names(8);
+    expect(html.match(/<li>/g)?.length).toBe(8);
+    expect(html).not.toContain("<details");
+    expect(html).not.toContain("more");
+  });
+
+  it("prints nine as five and a closed disclosure holding four, and counts them", () => {
+    const html = names(9);
+    const fold = html.indexOf("<details");
+    expect(html.slice(0, fold).match(/<li>/g)?.length).toBe(5);
+    expect(html.slice(0, fold)).toContain("Name 5");
+    expect(html.slice(0, fold)).not.toContain("Name 6");
+    expect(html.slice(fold)).toMatch(/^<details><summary class="moreNames">and 4 more<\/summary>/);
+    expect(html.slice(fold).match(/<li>/g)?.length).toBe(4);
+    expect(html.slice(fold)).toContain("Name 9");
+  });
+
+  it("counts the folded names of a group's 18", () => {
+    expect(names(18)).toContain(">and 13 more</summary>");
   });
 });

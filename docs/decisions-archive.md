@@ -1415,3 +1415,13 @@ system that resulted; this file explains why it took that shape.
 - **NAMES-6: three screens still lose their `.btn` look.** Tools, Player and
   Versions write a literal `.btn` class beside `stylex.props`. The compiled
   class replaces it, so their back controls differ from the process surface's.
+- **DIALOG-1: the step page's two dialogs can stand modal in a hidden tab
+  body.** `panels/StepPage.tsx` mounts Remove this step and the kind switch.
+  The Steps tab body stays mounted and takes `hidden` when another tab opens.
+  The Fields tab's dialogs clear their pending state when their body hides, and
+  these two do not. Risk (Low): a browser Back under an open dialog leaves a
+  modal in a body nobody sees.
+
+  Upgrade entry: pass `visible` into `StepPage` and clear `removing` and
+  `pendingKind` in the render that hides it, as `EntityTabs.tsx` does for
+  `pendingRemoval`.

@@ -52,7 +52,8 @@ import { ABSOLUTE_TIME, DiscardDraftDialog } from "../panels/DiscardDraftDialog.
 /** Every class this file's own markup renders. The two dialogs stand on
  * `panels/shared/StudioDialog.tsx`. */
 const styles = stylex.create({
-  dialogError: {
+  // The refusal of an import file no dialog opened for.
+  importFileRefusal: {
     color: colors.refusal,
     whiteSpace: "pre-line",
   },
@@ -507,6 +508,9 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
   // The start picker's own state. `templates` is undefined until the picker opens,
   // so the list screen issues no template request an author may never need.
   const [picking, setPicking] = useState(false);
+  // Whether another dialog stands, for `newProcess`'s read after its await.
+  const otherDialogOpen = useRef(false);
+  otherDialogOpen.current = pending !== undefined || pendingDiscard !== undefined;
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const fail = useFail(onUnauthorized, (err) => setError(describeCaughtError(err)));
   const failImport = useFail(onUnauthorized, (err) => setImportError(describeCaughtError(err)));
@@ -564,7 +568,9 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
    * `+ New process` opens the picker rather than minting straight away. The
    * template list is read here, not on mount: an author who always starts empty
    * never pays for it. A failed read still opens the picker, with the empty
-   * choice, since starting empty must not depend on the template route.
+   * choice, since starting empty must not depend on the template route. A
+   * dialog the author opened during the read keeps the screen: the picker stays
+   * shut, since two open dialogs break the keyboard hold.
    */
   const newProcess = async () => {
     setError(undefined);
@@ -578,7 +584,7 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
       setTemplates([]);
       setError(describeCaughtError(err));
     }
-    setPicking(true);
+    if (!otherDialogOpen.current) setPicking(true);
   };
 
   /**
@@ -740,7 +746,7 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
       {/* Only a file the guard rejected lands here — no dialog is open then. A
           publish failure renders inside the dialog instead. */}
       {importError === undefined || pending !== undefined ? null : (
-        <p {...stylex.props(styles.dialogError)} role="alert">
+        <p {...stylex.props(styles.importFileRefusal)} role="alert">
           {importError}
         </p>
       )}

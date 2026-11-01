@@ -17,7 +17,9 @@ import { FieldsTabViews } from "../panels/FieldsTabViews.js";
 import { SettingsTab } from "../panels/SettingsTab.js";
 import { FormsTab } from "../panels/FormsTab.js";
 import { RestoreNotice } from "../panels/RestoreNotice.js";
-import { ArrangeDialog, RestoreOverChangesDialog } from "../panels/confirmations.js";
+import { ArrangeDialog, RemoveStepsDialog, RestoreOverChangesDialog } from "../panels/confirmations.js";
+import { RemoveStepDialog } from "../panels/RemoveStepDialog.js";
+import { stepRemovalReach } from "../draft/stepRemoval.js";
 import { activeControl } from "../panels/shared/dialogFocus.js";
 import { clearStash, readRestorable, stashDraft, tabStorage } from "../draft/draftStash.js";
 import { stepEntityIds } from "../draft/panel-rail.js";
@@ -761,6 +763,50 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     onSelectStep(undefined);
   };
 
+  // The canvas bar's two remove controls ask first. The press takes the focus to
+  // the dialog, so the opener is read from the press. A hide declines, since the
+  // question names a selection the author no longer sees.
+  const [selectionRemovalAsked, setSelectionRemovalAsked] = useState(false);
+  const selectionRemovalTrigger = useRef<HTMLElement | null>(null);
+  const mapVisible = !jsonOpen && openTab === "map";
+  if (!mapVisible && selectionRemovalAsked) setSelectionRemovalAsked(false);
+  const askRemoveSelection = () => {
+    selectionRemovalTrigger.current = activeControl();
+    setSelectionRemovalAsked(true);
+  };
+  const cancelRemoveSelection = () => setSelectionRemovalAsked(false);
+  // The removal empties the selection, so the pressed control unmounts and the
+  // focus lands on the open tab, by the effect that runs after the commit.
+  const confirmRemoveSelection = () => {
+    selectionRemovalTrigger.current = null;
+    setSelectionRemovalAsked(false);
+    deleteSelection();
+    setPendingFocus({ tab: openTab });
+  };
+  const selectionRemovalDialog = () => {
+    // The rail's order and the rail's words, so two steps sharing a label read apart.
+    const selected = steps.flatMap((s) => (s.id && selectedStepIds.includes(s.id) ? [s.id] : []));
+    if (selected.length === 1) {
+      return (
+        <RemoveStepDialog
+          label={stepTexts.get(selected[0]!) ?? t("steps.unnamedStep")}
+          reach={stepRemovalReach(draft, selected[0]!, fields)}
+          triggerRef={selectionRemovalTrigger}
+          onCancel={cancelRemoveSelection}
+          onConfirm={confirmRemoveSelection}
+        />
+      );
+    }
+    return (
+      <RemoveStepsDialog
+        names={selected.map((id) => stepTexts.get(id) ?? t("steps.unnamedStep"))}
+        triggerRef={selectionRemovalTrigger}
+        onCancel={cancelRemoveSelection}
+        onConfirm={confirmRemoveSelection}
+      />
+    );
+  };
+
   /** The DOM hit test behind both the drop branch and the drag-move
    * highlight (design.md: "The hit test runs through the DOM, not through
    * geometry"). `CanvasView` stamps the edge group and its guard label's
@@ -1165,6 +1211,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
             }}
           />
         )}
+        {selectionRemovalAsked && selectionRemovalDialog()}
         <div {...stylex.props(styles.surface)}>
           <ProcessTabRow
             open={openTab}
@@ -1209,7 +1256,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                 onDragMove={onCanvasBarDragMove}
                 selectedStepIds={selectedStepIds}
                 unconnected={unconnected}
-                onDeleteSelection={deleteSelection}
+                onDeleteSelection={askRemoveSelection}
                 groups={groups}
                 onGroupsChange={onGroupsChange}
               />
@@ -1233,7 +1280,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                   groups={groups}
                   onGroupsChange={onGroupsChange}
                   insertTargetPathId={insertTargetPathId}
-                  visible={!jsonOpen && openTab === "map"}
+                  visible={mapVisible}
                 />
               </div>
             </>,
@@ -1266,6 +1313,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                 onSectionOpened={clearSectionRequest}
                 navigate={(target) => openFormEditor(target, "steps")}
                 processes={processes ?? []}
+                visible={!jsonOpen && openTab === "steps" && formEditor === null}
               />
             </div>,
           )}

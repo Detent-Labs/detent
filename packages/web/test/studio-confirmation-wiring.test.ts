@@ -127,6 +127,62 @@ describe("the edit screen's Arrange", () => {
   });
 });
 
+describe("the process list's start picker", () => {
+  const screen = code("screens/ProcessesScreen.tsx");
+
+  it("opens after the template read only where no other dialog stands", () => {
+    expect(screen).toContain("otherDialogOpen.current = pending !== undefined || pendingDiscard !== undefined;");
+    const newProcess = between(screen, "const newProcess =", "const startProcess");
+    expect(inOrder(newProcess, ["await listTemplates(token)", "if (!otherDialogOpen.current) setPicking(true);"])).toBe(true);
+    expect(newProcess.match(/setPicking\(true\)/g)?.length).toBe(1);
+  });
+});
+
+describe("the canvas bar's two remove controls", () => {
+  const screen = code("screens/EditScreen.tsx");
+
+  it("ask first: the bar's press reads the opener and removes nothing", () => {
+    expect(between(code("canvas/CanvasBar.tsx"), "selectedStepIds.length === 1 && ( <button", "</button>")).toContain("onClick={onDeleteSelection}");
+    expect(screen).toContain("onDeleteSelection={askRemoveSelection}");
+    expect(between(screen, "const askRemoveSelection =", "};")).toBe(
+      "const askRemoveSelection = () => { selectionRemovalTrigger.current = activeControl(); setSelectionRemovalAsked(true); ",
+    );
+  });
+
+  it("a confirm clears the ref, removes, and lands on the open tab through the effect", () => {
+    const confirm = between(screen, "const confirmRemoveSelection =", "};");
+    expect(inOrder(confirm, ["selectionRemovalTrigger.current = null", "setSelectionRemovalAsked(false)", "deleteSelection()", "setPendingFocus({ tab: openTab })"])).toBe(true);
+  });
+
+  it("one selected step takes the step page's dialog, and several name each one", () => {
+    const dialog = between(screen, "const selectionRemovalDialog =", "useEffect(");
+    expect(inOrder(dialog, ["if (selected.length === 1)", "<RemoveStepDialog", "stepRemovalReach(draft", "<RemoveStepsDialog"])).toBe(true);
+    expect(between(dialog, "<RemoveStepsDialog", "/>")).toContain("names={selected.map(");
+  });
+
+  it("nothing else calls the removal, and the dialog stands with a hide declining it", () => {
+    expect(screen.match(/deleteSelection/g)?.length).toBe(2);
+    expect(screen).toContain('if (!mapVisible && selectionRemovalAsked) setSelectionRemovalAsked(false);');
+    expect(screen).toContain("{selectionRemovalAsked && selectionRemovalDialog()}");
+  });
+});
+
+describe("the step page's two dialogs", () => {
+  const page = code("panels/StepPage.tsx");
+
+  it("a hide clears each waiting dialog during the render", () => {
+    expect(page).toContain("visible = true,");
+    expect(page).toContain("if (!visible && pendingKind !== null) setPendingKind(null);");
+    expect(page).toContain("if (!visible && removing) setRemoving(false);");
+    expect(page).toContain("{visible && removing && ( <RemoveStepDialog");
+    expect(page).toContain("{visible && pendingKind && ( <KindSwitchDialog");
+  });
+
+  it("the Steps tab hands its visibility to the page, the form editor counting as a hide", () => {
+    expect(between(code("screens/EditScreen.tsx"), "<StepPage ", "/>")).toContain('visible={!jsonOpen && openTab === "steps" && formEditor === null}');
+  });
+});
+
 describe("the field card's two dialogs", () => {
   const panel = code("panels/FieldCatalogPanel.tsx");
 
@@ -144,6 +200,13 @@ describe("the field card's two dialogs", () => {
   it("a kind pick that drops something waits, and one that drops nothing writes", () => {
     const askKind = between(panel, "const askKind =", "const custom");
     expect(askKind).toContain("if (dropped.length === 0) changeKind(raw, onChange); else setPendingKind({ raw, dropped });");
+  });
+
+  it("the kind dialog names the old and the new kind in the picker's own words", () => {
+    const dialog = between(panel, "<KindDropDialog", "/>");
+    expect(dialog).toContain("from={oldKind === undefined ? undefined : kindWord(oldKind)}");
+    expect(dialog).toContain("to={kindWord(pendingKind.raw)}");
+    expect(panel).toContain("const oldKind = custom ? CUSTOM_KIND : kind;");
   });
 
   it("each dialog returns the focus to its own control", () => {

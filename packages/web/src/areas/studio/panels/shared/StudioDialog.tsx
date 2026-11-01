@@ -12,7 +12,7 @@ const styles = stylex.create({
   // stays 0 for the sticky footer, and the end scroll padding keeps a Tab stop
   // clear of that footer.
   dialog: {
-    width: "min(34rem, 100vw - 32px)",
+    width: "min(34rem, 100% - 32px)",
     maxWidth: "none",
     maxHeight: "85vh",
     overflowY: "auto",
@@ -95,6 +95,11 @@ const styles = stylex.create({
     margin: 0,
     padding: 0,
   },
+  // The fold's summary, in the body face at the list's own size.
+  moreNames: {
+    cursor: "pointer",
+    color: colors.textMuted,
+  },
   note: {
     color: colors.textMuted,
     fontSize: "0.9rem",
@@ -155,25 +160,27 @@ const BusyContext = createContext(false);
  * holds:
  *
  * The `autoFocus` prop on Cancel states the intent and is the property a
- * rendered string carries, so a static-markup test can assert it. On the client
- * it is NOT an attribute: React 19 skips it in `setProp` and calls `.focus()`
- * from `commitMount` instead.
+ * rendered string carries, so a static-markup test can assert it. It serves the
+ * markup alone. On the client it is NOT an attribute: React 19 skips it in
+ * `setProp` and calls `.focus()` from `commitMount`, and a focus inside a closed
+ * dialog does nothing, so the opener keeps the focus until `showModal()`.
  *
- * That client focus lands before this passive effect runs, and `showModal()`
- * then re-runs the dialog's own focusing steps. Those steps look for the
+ * `showModal()` runs the dialog's own focusing steps. Those steps look for the
  * `autofocus` ATTRIBUTE, find none, and fall to the first focusable descendant,
  * which for a dialog whose first control commits an irreversible act would prime
- * that act instead. Those steps may also scroll to it. So the effect resets the
- * scroll, leaving the heading in view, and focuses again after `showModal()`.
+ * that act instead. Those steps may also scroll to it. So the effect focuses
+ * again after `showModal()`. It resets the scroll last, leaving the heading in
+ * view: a tab panel's `scrollKeyboardFocusIntoView` runs on that focus, and
+ * scrolls a control inside the end scroll padding.
  *
  * The cleanup covers every route that unmounts the dialog: Cancel, Escape, and
  * a completed request all end with the caller unmounting it. Without this
  * cleanup, focus drops to `<body>` and a keyboard user restarts their traversal
  * from the top of the screen.
  *
- * The keyboard hold listens on `document`, since a click on a dialog's text
- * leaves the focus on `body`, where a listener on the dialog never hears Tab. An
- * empty list still takes the `preventDefault()`, so a busy dialog with both
+ * The keyboard hold listens on `document`, since the focus can stand on `body`,
+ * where a listener on the dialog never hears Tab. A blur leaves it there, and a
+ * click on a dialog's text leaves it on the dialog in Chromium. An empty list still takes the `preventDefault()`, so a busy dialog with both
  * controls disabled keeps the focus from leaving.
  */
 function useStudioDialog(triggerRef: RefObject<HTMLElement | null>, initialFocusRef?: RefObject<HTMLElement | null>) {
@@ -182,11 +189,9 @@ function useStudioDialog(triggerRef: RefObject<HTMLElement | null>, initialFocus
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog) {
-      dialog.showModal();
-      dialog.scrollTop = 0;
-    }
+    dialog?.showModal();
     (initialFocusRef?.current ?? cancelRef.current)?.focus({ preventScroll: true });
+    if (dialog) dialog.scrollTop = 0;
     return () => triggerRef.current?.focus();
   }, [triggerRef, initialFocusRef]);
 
@@ -253,7 +258,7 @@ export function StudioDialog({ heading, triggerRef, onCancel, confirm, refusal, 
       ref={dialogRef}
       {...btn("studio-dialog", styles.dialog)}
       aria-labelledby={headingId}
-      aria-describedby={bodyId}
+      aria-describedby={confirm ? bodyId : undefined}
       // The caller unmounts the dialog, so the platform never closes one React
       // still holds.
       onCancel={(event) => {
@@ -261,10 +266,17 @@ export function StudioDialog({ heading, triggerRef, onCancel, confirm, refusal, 
         if (!busy) onCancel();
       }}
       // Chromium's close watcher can skip `cancel` on a repeat press and close
-      // natively, and `close` fires for that route alone.
+      // natively, and `close` fires for that route alone. A busy dialog opens
+      // again. Its focusing steps can land on a Developer view's summary, so the
+      // blur leaves the focus for the request's end to hand to Cancel.
       onClose={() => {
-        if (busy) dialogRef.current?.showModal();
-        else onCancel();
+        const dialog = dialogRef.current;
+        if (!busy) onCancel();
+        else if (dialog) {
+          dialog.showModal();
+          activeControl()?.blur();
+          dialog.scrollTop = 0;
+        }
       }}
     >
       <h2 id={headingId} {...stylex.props(styles.heading)}>
@@ -376,16 +388,42 @@ interface DialogNamesProps {
   names: readonly string[];
 }
 
-/** One row, value a list of names with no marker. It renders nothing for an empty list. */
+/** The longest list that prints whole, and what a longer one prints before its fold. */
+const NAMES_UNFOLDED = 8;
+const NAMES_BEFORE_FOLD = 5;
+
+function NameList({ names }: { names: readonly string[] }) {
+  return (
+    <ul {...stylex.props(styles.names)}>
+      {names.map((name, index) => (
+        <li key={index}>{name}</li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * One row, value a list of names with no marker. It renders nothing for an empty
+ * list. A list longer than eight prints five, and a closed disclosure holds the
+ * rest and counts them.
+ */
 export function DialogNames({ term, names }: DialogNamesProps) {
   if (names.length === 0) return null;
+  if (names.length <= NAMES_UNFOLDED) {
+    return (
+      <Row term={term}>
+        <NameList names={names} />
+      </Row>
+    );
+  }
+  const folded = names.slice(NAMES_BEFORE_FOLD);
   return (
     <Row term={term}>
-      <ul {...stylex.props(styles.names)}>
-        {names.map((name, index) => (
-          <li key={index}>{name}</li>
-        ))}
-      </ul>
+      <NameList names={names.slice(0, NAMES_BEFORE_FOLD)} />
+      <details>
+        <summary {...stylex.props(styles.moreNames)}>{t("dialog.moreNames").replace("{count}", () => String(folded.length))}</summary>
+        <NameList names={folded} />
+      </details>
     </Row>
   );
 }

@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 import { t } from "../catalog.js";
-import { DestructiveConfirm, DialogCount, DialogFacts, DialogNote, StudioDialog } from "./shared/StudioDialog.js";
+import { fill } from "./shared/optionText.js";
+import { DestructiveConfirm, DialogCount, DialogFacts, DialogNames, DialogNote, StudioDialog } from "./shared/StudioDialog.js";
 
 /**
  * The confirmations that hold one or two sentences: each a small named
@@ -61,11 +62,15 @@ export function RestoreOverChangesDialog({ triggerRef, onCancel, onConfirm }: Co
 interface KindDropDialogProps extends ConfirmationProps {
   /** The field's resolved label, or the unnamed-field text. */
   label: string;
+  /** The old kind's name in the picker. Undefined where the picker names no kind for it. */
+  from: string | undefined;
+  /** The new kind's name in the picker. */
+  to: string;
   /** What the new kind cannot keep. Never empty: a change that drops nothing asks nothing. */
   dropped: readonly ("format" | "control")[];
 }
 
-export function KindDropDialog({ label, dropped, triggerRef, onCancel, onConfirm }: KindDropDialogProps) {
+export function KindDropDialog({ label, from, to, dropped, triggerRef, onCancel, onConfirm }: KindDropDialogProps) {
   const body =
     dropped.length === 2
       ? t("kindDropDialog.bodyBoth")
@@ -74,8 +79,12 @@ export function KindDropDialog({ label, dropped, triggerRef, onCancel, onConfirm
         : t("kindDropDialog.bodyControl");
   return (
     <StudioDialog
-      // A replacer function, so a label holding a `$` pattern fills in as written.
-      heading={t("kindDropDialog.heading").replace("{field}", () => label)}
+      // `fill` takes one pass, so a label holding a `$` pattern or a slot fills in as written.
+      heading={
+        from === undefined
+          ? fill(t("kindDropDialog.headingNoOldKind"), { field: label })
+          : fill(t("kindDropDialog.heading"), { field: label, from, to })
+      }
       triggerRef={triggerRef}
       onCancel={onCancel}
       confirm={<DestructiveConfirm onClick={onConfirm}>{t("kindDropDialog.confirm")}</DestructiveConfirm>}
@@ -138,6 +147,28 @@ export function ReplaceTemplateDialog({ name, triggerRef, onCancel, onConfirm }:
       confirm={<DestructiveConfirm onClick={onConfirm}>{t("templateReplaceDialog.confirm")}</DestructiveConfirm>}
     >
       <DialogNote>{t("templateReplaceDialog.body")}</DialogNote>
+    </StudioDialog>
+  );
+}
+
+interface RemoveStepsDialogProps extends ConfirmationProps {
+  /** Each selected step's text, as the steps rail reads it. */
+  names: readonly string[];
+}
+
+export function RemoveStepsDialog({ names, triggerRef, onCancel, onConfirm }: RemoveStepsDialogProps) {
+  return (
+    <StudioDialog
+      heading={t("canvas.removeStepsHeading").replace("{count}", () => String(names.length))}
+      triggerRef={triggerRef}
+      onCancel={onCancel}
+      confirm={<DestructiveConfirm onClick={onConfirm}>{t("canvas.removeStepsConfirm")}</DestructiveConfirm>}
+    >
+      <DialogFacts>
+        <DialogNames term={t("canvas.removeStepsTerm")} names={names} />
+      </DialogFacts>
+      <DialogNote>{t("canvas.removeStepsNote")}</DialogNote>
+      <DialogNote>{t("dialog.noUndo")}</DialogNote>
     </StudioDialog>
   );
 }

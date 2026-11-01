@@ -48,6 +48,22 @@ test("a dialog holds the keyboard, ignores the backdrop and returns the focus", 
   await page.keyboard.press("Tab");
   expect(await focusOnControl(dialog)).toBe(true);
 
+  // The same click, then Shift+Tab.
+  await dialog.getByText("Next version", { exact: true }).click();
+  expect(await focusOnControl(dialog)).toBe(false);
+  await page.keyboard.press("Shift+Tab");
+  const cancel = dialog.getByRole("button", { name: "Cancel", exact: true });
+  await expect(cancel).toBeFocused();
+
+  // Chromium's click leaves the focus on the dialog, where any listener hears Tab. On the body only a document
+  // listener does. Without one, the browser's own step from Publish lands on the Developer view's summary.
+  const confirm = dialog.getByRole("button", { name: "Publish", exact: true });
+  await confirm.focus();
+  await confirm.blur();
+  expect(await page.locator("body").evaluate((body) => body.ownerDocument.activeElement === body)).toBe(true);
+  await page.keyboard.press("Shift+Tab");
+  await expect(cancel).toBeFocused();
+
   // A press on the backdrop closes nothing.
   await page.mouse.click(4, 4);
   await expect(dialog).toBeVisible();
@@ -73,4 +89,68 @@ test("the back control on a dirty draft asks before it leaves", async ({ page })
   await dialog.getByRole("button", { name: "Leave without saving" }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole("link", { name: DRAFT_NAME, exact: true })).toBeVisible();
+});
+
+test("a long dialog opened by keyboard in a tab panel opens with its heading in view", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 240 });
+  await page.goto("/studio");
+  await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
+  await page.getByRole("tab", { name: "Fields" }).click();
+  await page.getByRole("button", { name: "Asset Tag" }).click();
+  const remove = page.getByRole("button", { name: "Remove field", exact: true });
+  await remove.focus();
+  await page.keyboard.press("Enter");
+
+  const dialog = page.getByRole("dialog", { name: "Remove “Asset Tag”?" });
+  await expect(dialog).toBeVisible();
+  const cancel = dialog.getByRole("button", { name: "Cancel", exact: true });
+  await expect(cancel).toBeFocused();
+  // The body runs longer than the dialog, or the rest of this flow proves nothing.
+  const scroll = await dialog.evaluate((element) => ({ top: element.scrollTop, overflow: element.scrollHeight - element.clientHeight }));
+  expect(scroll.overflow).toBeGreaterThan(0);
+  expect(scroll.top).toBe(0);
+  await expect(dialog.getByRole("heading", { name: "Remove “Asset Tag”?" })).toBeInViewport({ ratio: 1 });
+  await expect(cancel).toBeInViewport({ ratio: 1 });
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(remove).toBeFocused();
+});
+
+test("the canvas bar's remove controls ask first and name what goes", async ({ page }) => {
+  await page.goto("/studio");
+  await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
+  await page.getByRole("tab", { name: "Map" }).click();
+  const first = page.locator(".canvas-node").filter({ hasText: "On the Shelf" });
+  const second = page.locator(".canvas-node").filter({ hasText: "Issued" });
+
+  // One step takes the step page's dialog. A decline keeps it and returns the focus.
+  await second.click();
+  const removeOne = page.getByRole("button", { name: "Remove step", exact: true });
+  await removeOne.click();
+  const one = page.getByRole("dialog", { name: "Remove “Issued”?" });
+  await expect(one.getByRole("button", { name: "Remove the step", exact: true })).toBeVisible();
+  await one.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(one).toBeHidden();
+  await expect(removeOne).toBeFocused();
+  await expect(second).toBeVisible();
+
+  // Several take the dialog that names each one.
+  await first.click({ modifiers: ["Shift"] });
+  const removeBoth = page.getByRole("button", { name: "Remove steps", exact: true });
+  await removeBoth.click();
+  const both = page.getByRole("dialog", { name: "Remove 2 steps?" });
+  await expect(both.getByRole("listitem")).toHaveText(["On the Shelf", "Issued"]);
+  await both.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(both).toBeHidden();
+  await expect(removeBoth).toBeFocused();
+  await expect(first).toBeVisible();
+
+  // A confirm removes them, and the focus lands on the open tab.
+  await removeBoth.click();
+  await both.getByRole("button", { name: "Remove the steps", exact: true }).click();
+  await expect(both).toBeHidden();
+  await expect(first).toBeHidden();
+  await expect(second).toBeHidden();
+  await expect(page.getByRole("tab", { name: "Map" })).toBeFocused();
 });

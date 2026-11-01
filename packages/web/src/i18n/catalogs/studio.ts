@@ -24,6 +24,7 @@ export const en = {
   // The one dialog form's own words (`panels/shared/StudioDialog.tsx`).
   "dialog.cancel": "Cancel",
   "dialog.noUndo": "The studio has no undo.",
+  "dialog.moreNames": "and {count} more",
 
   // The confirmations that stand in `panels/confirmations.tsx`.
   "leaveDialog.heading": "Leave this draft?",
@@ -35,10 +36,11 @@ export const en = {
   "restoreDialog.heading": "Replace your current changes?",
   "restoreDialog.body": "The restored copy takes their place.",
   "restoreDialog.confirm": "Replace them",
-  "kindDropDialog.heading": "Change the kind of “{field}”?",
-  "kindDropDialog.bodyFormat": "The new kind cannot keep this field's format.",
+  "kindDropDialog.heading": "Change “{field}” from {from} to {to}?",
+  "kindDropDialog.headingNoOldKind": "Change the kind of “{field}”?",
+  "kindDropDialog.bodyFormat": "The new kind cannot keep how this field checks its value.",
   "kindDropDialog.bodyControl": "The new kind cannot keep how this field asks for its value.",
-  "kindDropDialog.bodyBoth": "The new kind keeps neither this field's format nor how it asks for its value.",
+  "kindDropDialog.bodyBoth": "The new kind keeps neither how this field checks its value nor how it asks for it.",
   "kindDropDialog.confirm": "Change kind",
   "technicalDialog.heading": "Mark “{field}” as technical?",
   "technicalDialog.clearsTerm": "Required and read-only settings it clears",
@@ -1075,6 +1077,10 @@ export const en = {
   "canvas.selectionHeading": "Steps selected",
   "canvas.selectionRemoveOne": "Remove step",
   "canvas.selectionRemove": "Remove steps",
+  "canvas.removeStepsHeading": "Remove {count} steps?",
+  "canvas.removeStepsTerm": "Steps",
+  "canvas.removeStepsNote": "The ways out leading to them stay, and the checks report them.",
+  "canvas.removeStepsConfirm": "Remove the steps",
   "canvas.groupCreate": "Group these steps",
   "canvas.groupDefaultName": "Group",
   "canvas.groupName": "Group name",
@@ -1380,7 +1386,7 @@ export const en = {
   "processList.importHeading": "Publish this version here?",
   "processList.importSourceVersion": "Source version",
   "processList.importNote":
-    "This environment assigns its own version number. The definition keeps its process id, so a subprocess reference stays valid once its child is promoted too.",
+    "This environment assigns its own version number. A call from another process keeps working once that process is promoted too.",
   "processList.importCollision": "Another process already uses this internal name. Importing leaves both, and nobody can delete a published process.",
   "processList.importCollisionId": "Other process with this key",
   "processList.importSourceHash": "Source hash",

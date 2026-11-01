@@ -194,6 +194,8 @@ export function useDraftToolbarActions({
    */
   const runPublish = () =>
     withUnauthorized(async () => {
+      // The slot leaves and returns, so a repeated refusal scrolls and announces again.
+      clearError();
       if (isDraftDirty(draft, savedBody, saveState.layout, savedLayout) && !(await doSave())) {
         setPendingDialog(null);
         return;
@@ -238,6 +240,7 @@ export function useDraftToolbarActions({
   /** The act the discard dialog confirms. */
   const runDiscard = () =>
     withUnauthorized(async () => {
+      clearError();
       setDiscarding(true);
       try {
         await deleteDraft(processId, token);
