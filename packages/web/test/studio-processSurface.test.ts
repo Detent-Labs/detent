@@ -205,6 +205,20 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     expect(code.indexOf("{disclosures.map(")).toBeGreaterThan(code.indexOf("{connectHandles.map("));
   });
 
+  it("keeps focus on the node from a press on its connect handle, and moves the roving stop there", () => {
+    const code = stripComments(read(CANVAS));
+    const down = code.slice(code.indexOf("const onHandlePointerDown"), code.indexOf("const onHandlePointerMove"));
+    const handles = code.slice(code.indexOf("{connectHandles.map("), code.indexOf("{disclosures.map("));
+
+    expect(down).toContain('moveFocus({ kind: "step", stepId })');
+    // Pointer capture and the drag stay as they were.
+    expect(down).toContain("capturePointer(e)");
+    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, start: p, current: p })");
+    // Without this the press's default focused the canvas svg, which drew
+    // its outline around the whole graph.
+    expect(handles).toContain("onMouseDown={(e) => e.preventDefault()}");
+  });
+
   it("writes nothing from a click on the connect handle, only from a drag past the threshold", () => {
     const code = stripComments(read(CANVAS));
     const down = code.slice(code.indexOf("const onHandlePointerDown"), code.indexOf("const onHandlePointerMove"));

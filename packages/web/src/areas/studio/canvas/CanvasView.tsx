@@ -1264,6 +1264,8 @@ export function CanvasView({
     e.stopPropagation();
     capturePointer(e);
     setRejectMessage(null);
+    // The roving stop follows the press, as a press on the node moves it.
+    moveFocus({ kind: "step", stepId });
     const p = toSvgPoint(e);
     setConnectDrag({ sourceStepId: stepId, start: p, current: p });
   };
@@ -1815,6 +1817,10 @@ export function CanvasView({
               r={HANDLE_HIT_RADIUS}
               {...stylex.props(styles.connectHandleHit, h.isTerminal && styles.connectHandleHitTerminal)}
               onPointerDown={(e) => onHandlePointerDown(e, h.stepId)}
+              // The mouse press's default would move focus off the node the
+              // press just focused, to the canvas `<svg>`, which draws its
+              // outline around the whole graph.
+              onMouseDown={(e) => e.preventDefault()}
               onPointerUp={onHandlePointerUp}
               // The handle belongs to its node: a double-click opens the step,
               // as it did while the handle drew inside the node's group.
