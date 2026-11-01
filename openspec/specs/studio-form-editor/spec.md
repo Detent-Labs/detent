@@ -10,34 +10,83 @@ reading an ordered list of field names.
 
 <!-- antislop: allow synonym-rotation -->
 
-### Requirement: The form editor opens as a full-screen routed page over the step's view
+### Requirement: The form editor opens under the tab row
 
-Two places open the form editor. The step page's Step form fields section
-opens it for the step it holds. The Forms tab's card opens it for that card's
-step. Both reach the same routed page at `edit/form/:stepId`.
+The editor SHALL stand under the tab row, in place of one tab's body. That
+tab SHALL stand current: Forms when a Forms card opened the editor, Steps in
+every other case. A direct load counts as Steps.
 
-The editor SHALL open as a full-screen routed page. It replaces the native
-`<dialog>` this capability used before.
-
-Leaving the editor SHALL return to the place the author came from. An author
-who came from the Forms tab returns to the Forms tab. An author who came from
-the step page returns to that step.
-
-<!-- The screen's Discard control drops every unsaved change; removing a card takes one entry off the form. -->
-<!-- antislop: allow synonym-rotation -->
-The editor SHALL write directly to the in-browser draft as the author works.
-It offers no Save button of its own. The screen's existing Save, Discard and
-Publish controls stay the only ones that persist.
-
-Navigating away from the editor and back SHALL carry the same draft state a
-re-opened modal would have carried. The editor's writes already land in the
-draft on every change, so it needs no separate state-preservation step.
+Pressing any tab SHALL leave the editor and open that tab. The raw JSON view
+SHALL stand in place of the editor while open, as in place of any tab body.
 
 #### Scenario: Opening the editor shows the current form
 
 - **WHEN** the developer opens the form editor for a step that already has
   view fields
 - **THEN** the page renders those fields in their current order and layout
+
+#### Scenario: The step page's editor keeps Steps current
+
+- **WHEN** the author opens the form editor from the Approve step's Form
+  section
+- **THEN** the tab row stands above the editor with Steps current
+
+#### Scenario: A Forms card's editor keeps Forms current
+
+- **WHEN** the author opens the form editor from the Approve card on the
+  Forms tab
+- **THEN** the tab row stands above the editor with Forms current
+
+#### Scenario: A tab press leaves the editor
+
+- **WHEN** the author presses the Fields tab while the editor is open
+- **THEN** the Fields tab opens and the editor closes
+- **AND** the draft keeps every change the editor made
+
+### Requirement: A breadcrumb leads out of the form editor
+
+A breadcrumb SHALL stand at the editor's top edge, in place of a back
+control. It reads the current tab's name, the step's label, then "Form".
+The first crumb SHALL return to the current tab. The second SHALL open the
+step's page on the Steps tab. The third SHALL mark the current place and
+take no press.
+
+Leaving the editor SHALL return the author to the current tab. That is the
+Forms tab after a Forms card, and the step's page in every other case.
+
+#### Scenario: The breadcrumb names the way back
+
+- **WHEN** the author opens the form editor from the Approve step's Form
+  section
+- **THEN** the breadcrumb reads "Steps", "Approve", "Form"
+
+#### Scenario: Leaving returns to the Forms tab
+
+- **WHEN** the developer opens the form editor from a Forms tab card and then
+  leaves it
+- **THEN** the Forms tab is the open one
+
+#### Scenario: The step crumb opens the step's page
+
+- **WHEN** the author presses the "Approve" crumb
+- **THEN** the Steps tab opens on Approve's step page
+
+#### Scenario: The last crumb names the current place
+
+- **WHEN** an assistive technology reads the breadcrumb
+- **THEN** it reads a navigation landmark named "Breadcrumb"
+- **AND** the crumb "Form" carries `aria-current="page"` and is no button
+
+### Requirement: The form editor writes straight into the draft
+
+<!-- The screen's Discard control drops every unsaved change; removing a card takes one entry off the form. -->
+<!-- antislop: allow synonym-rotation -->
+The editor SHALL write directly to the in-browser draft as the author works.
+It offers no Save button. The screen's Save, Discard and Publish controls
+stay the only ones that persist.
+
+Navigating away and back SHALL carry the same draft state, since every
+change already lands in the draft.
 
 #### Scenario: Navigating away keeps every change
 
@@ -52,12 +101,6 @@ draft on every change, so it needs no separate state-preservation step.
   without an intervening save
 - **THEN** the page carries the same fields, in the same order, the developer
   left it in
-
-#### Scenario: Leaving returns to the Forms tab
-
-- **WHEN** the developer opens the form editor from a Forms tab card and then
-  leaves it
-- **THEN** the Forms tab is the open one
 
 ### Requirement: A left palette lists catalog fields not yet on the form, and offers minting a new one
 
@@ -80,11 +123,20 @@ On a tabbed form, a drop can place a member inside a group card another tab
 draws. The canvas SHALL then show the card's tab, where the member landed. A
 drop that changed nothing on the shown canvas would read as a failure.
 
-The palette SHALL also offer an "add a field to the process" section, by
-type. Dragging one of those entries onto the canvas SHALL mint a new
-catalog field of that type. It SHALL add that field to the view, at the
-drop position, in the same move. A minted field is a top-level catalog
-field, so it joins no group.
+The palette SHALL also offer an "add a field to the process" section. It
+SHALL list every kind the engine's curated field-kind table names, in the
+table's order, sixteen today. Each entry SHALL show the kind's icon and
+name. The Fields tab's kind picker prints the same words.
+
+Dragging one of those entries onto the canvas SHALL mint a new catalog field
+of that kind. It SHALL add that field to the view, at the drop position, in
+the same move. Pressing the entry SHALL mint the field and place it last.
+A minted field is a top-level catalog field, so it joins no group.
+
+A minted field of a choice kind SHALL carry two choices at once. It then
+asks a real choice from the first draw. The choice kinds are One choice,
+Several choices and Checkboxes. The seeded choices SHALL carry the
+base-locale labels "Choice 1" and "Choice 2".
 
 A field already on the view SHALL NOT appear in the palette's
 place-an-existing-field list. Removing a field from the canvas SHALL
@@ -96,11 +148,6 @@ already uses for the field (`studio-app`). It SHALL NOT show the field's
 raw `key` or its raw `type` string as visible text. A field the catalog
 nests inside a group SHALL indent under that group's own row. The indent
 matches the same hierarchy the entity rail already draws.
-
-This presentation rule reaches the
-place-an-existing-field list alone. The "add a field to the process"
-section names a field kind, not an existing catalog field, and stays
-unchanged.
 
 #### Scenario: A field leaves the palette once placed
 
@@ -181,6 +228,115 @@ unchanged.
 - **THEN** the palette lists the group's own row
 - **AND** the member's row indents under it, the same depth the Fields
   tab's entity rail draws for that member
+
+#### Scenario: The palette offers every curated kind
+
+- **WHEN** the author opens the form editor
+- **THEN** the "add a field to the process" section lists sixteen kinds,
+  from Text to Group
+- **AND** it lists "Number"
+
+#### Scenario: Number mints a number field
+
+- **WHEN** the author presses the palette's "Number" kind
+- **THEN** a new catalog field of type `number` exists in the draft
+
+#### Scenario: A choice kind mints a choice
+
+- **WHEN** the author presses the palette's "One choice" kind
+- **THEN** the new field reads as One choice in the Fields tab
+- **AND** it carries two choices, labelled "Choice 1" and "Choice 2"
+
+### Requirement: A new field takes its name on its card
+
+A palette kind's press or drop SHALL place the new card with a name input in
+place of its label. A group card takes the input in place of its legend's
+name. The input SHALL take the focus with its text selected. The first
+keystroke then replaces that text.
+
+Enter or Escape SHALL end the naming and move the focus onto the card's own
+control. Moving the focus elsewhere ends it too. A card whose field has no
+label, in the content locale or the base locale, SHALL keep the input.
+
+#### Scenario: The first keystroke names the field
+
+- **WHEN** the author presses the palette's "Number" kind and types
+  "Amount"
+- **THEN** the new card reads "Amount"
+- **AND** the catalog holds a field labelled "Amount"
+
+#### Scenario: A drop names the field the same way
+
+- **WHEN** the author drops the palette's "Date" kind on the canvas
+- **THEN** the new card shows the name input, and the input holds the focus
+
+#### Scenario: Enter ends the naming
+
+- **WHEN** the author types a name into a new card's input and presses
+  Enter
+- **THEN** the card prints the name as its label
+- **AND** the focus stands on the card's own control
+
+#### Scenario: An unnamed field keeps its input
+
+- **WHEN** the author ends the naming with the input empty
+- **THEN** the card keeps the name input
+
+#### Scenario: A new group takes its name on its legend
+
+- **WHEN** the author presses the palette's "Group" kind
+- **THEN** the new group card's legend shows the name input, holding the
+  focus
+
+#### Scenario: An untranslated label keeps its card
+
+- **WHEN** the content locale differs from the base locale
+- **AND** a field carries a label in the base locale alone
+- **THEN** its card prints that label, and shows no name input
+
+### Requirement: A new field starts with its kind's name
+
+A minted field's label SHALL start as the kind's name in the base locale.
+The draft then never holds a field without a label. No structural check
+result appears while the author names it.
+
+#### Scenario: A new field starts clean
+
+- **WHEN** the author presses the palette's "Date" kind
+- **THEN** the new field's label reads "Date" in the base locale
+- **AND** the draft shows no structural check result for it
+
+### Requirement: The name input states its purpose
+
+The name input SHALL carry the accessible name "Field name" and the
+placeholder "Name this field…".
+
+#### Scenario: A screen reader names the input
+
+- **WHEN** an assistive technology reads a new card's name input
+- **THEN** it reads the name "Field name"
+
+### Requirement: A name given in the form editor sets the key
+
+A label written on a card or in the strip SHALL set the field's key. It
+follows the rule of the Fields tab's label control. A field's key follows
+the label until a CEL expression reads the key or a published version holds
+the field. It stays unique across the whole catalog.
+
+A group's key follows its label the way the Fields tab's group label does,
+and no publish locks it. A group's label also rewrites the view entries
+naming the group's key.
+
+#### Scenario: A new field's key follows its name
+
+- **WHEN** the author names a new field "Amount"
+- **THEN** the field's key reads `amount`
+
+#### Scenario: A taken key gains a number
+
+- **WHEN** the catalog already holds a field with the key `amount`
+- **AND** the author names a new field "Amount"
+- **THEN** the new field's key reads `amount_2`
 
 ### Requirement: The canvas places fields at the view's column count, in array order
 
@@ -300,24 +456,48 @@ columns gets the spanning field back.
 - **THEN** that card renders full width at the new count, and the
   draft still records its `span` as `2`
 
-### Requirement: Each placed field shows its overrides as marks on its card
+### Requirement: A placed field's card prints its label and its kind
 
-A placed field's card SHALL mark required and readonly. It SHALL show
-a CEL badge when `visible`, `required`, or `readonly` is an expression
-rather than a literal. It SHALL show a dashed border when `visible`
-resolves to a conditionally-hidden expression.
+A placed field's card SHALL print the field's label in the written face. It
+SHALL print the kind's icon and the kind's name. That name is the word the
+Fields tab's entity rail prints for the field. The card SHALL NOT print the
+field's `key`. Some fields match no curated kind by type, format and
+control. Such a card prints that triple in mono, as the entity rail does.
+
+A group card's legend SHALL print the group's label. A note's card SHALL
+print its text and the kind word "Note".
+
+#### Scenario: A card reads label and kind
+
+- **WHEN** a view holds an entry for the field labelled "First and last
+  name", key `full_name`, kind Text
+- **THEN** its card reads "First and last name" and "Text"
+- **AND** the card shows no `full_name` text
+
+#### Scenario: A group card's legend reads its label
+
+- **WHEN** a view holds a group entry for the group labelled "Applicant"
+- **THEN** the group card's legend reads "Applicant"
+
+### Requirement: A placed field's card marks its overrides in words
+
+A placed field's card SHALL mark required and readonly. It SHALL mark
+"Condition" when `visible`, `required` or `readonly` holds an expression in
+place of a literal. It SHALL show a dashed border when `visible` holds an
+expression.
+
+The card SHALL print no width mark. The canvas draws a card's width itself.
 
 #### Scenario: A literal override shows as a plain mark
 
 - **WHEN** a placed field's `required` is the literal `true`
-- **THEN** its card shows a required mark with no CEL badge
+- **THEN** its card shows the mark "Required" and no "Condition" mark
 
-#### Scenario: An expression override shows the CEL badge
+#### Scenario: An expression override shows the condition mark
 
-- **WHEN** a placed field's `visible` is a CEL expression rather than
-  a literal
-- **THEN** its card shows the CEL badge, and a dashed border marking
-  it conditionally hidden
+- **WHEN** a placed field's `visible` holds a CEL expression
+- **THEN** its card shows the mark "Condition" and a dashed border
+- **AND** the card shows no "CEL" text
 
 ### Requirement: A selected field's strip sets its overrides and span
 
@@ -528,18 +708,43 @@ disable. The developer keeps a path to uncheck either one.
 - **THEN** the strip shows no control for `group`
 - **AND** the view entry keeps the `group` it carries
 
+### Requirement: The strip names the selected field
+
+The selected field's strip SHALL carry a Name control as its first control.
+It writes the field's label for the content locale, for a field at any
+nesting depth.
+
+The strip's heading SHALL print the field's label in the written face. A
+field with no label reads "(unnamed field)".
+
+#### Scenario: The strip renames a placed field
+
+- **WHEN** the author selects a placed field labelled "Amount" and changes
+  its Name to "Total"
+- **THEN** the card and the strip's heading read "Total"
+
+#### Scenario: The strip renames a group's member
+
+- **WHEN** the author selects a field the catalog nests inside a group and
+  changes its Name
+- **THEN** the catalog's nested field carries the new label
+
 ### Requirement: The strip and the card marks print each flag's one name
 
-The selected field's strip SHALL caption its three flag controls "Asked",
-"Required" and "Read-only", and its span control "Width". A placed field's
-card SHALL print its marks as "Required" and "Read-only". A note's strip
-SHALL caption its text "Text", its group "Group" and its tab "Tab". No
-caption on the form editor SHALL be the JSON key the control writes.
+The selected field's strip SHALL caption its controls "Name", "Asked",
+"Required", "Read-only" and "Width". The Width control SHALL offer "One
+column" and "Both columns". A placed field's card SHALL print its marks as
+"Required", "Read-only" and "Condition". A note's strip SHALL caption its
+text "Text", its group "Group" and its tab "Tab". No caption on the form
+editor SHALL be the JSON key the control writes. No option SHALL be the raw
+value it writes.
 
 #### Scenario: The strip captions its controls in words
 
 - **WHEN** an author selects a placed field
-- **THEN** the strip's captions read Asked, Required, Read-only and Width
+- **THEN** the strip's captions read Name, Asked, Required, Read-only and
+  Width
+- **AND** the Width choices read One column and Both columns
 
 #### Scenario: A card's marks read in words
 
@@ -551,6 +756,7 @@ caption on the form editor SHALL be the JSON key the control writes.
 
 - **WHEN** an author selects a note
 - **THEN** the strip's captions read Text, Asked, Width and Group
+- **AND** the Width choices read One column and Both columns
 
 <!-- antislop: allow trailing-negation - a MODIFIED heading must match the live spec's wording exactly -->
 
@@ -680,6 +886,9 @@ editor, the note strip is the one place an author makes that choice. The
 renderer honors a note's `group`, per the `form-ui` capability. A strip
 omitting the control would leave that choice out of an author's reach.
 
+The group control SHALL list each group card of the view by the group's
+label. It writes the group's key, and it prints no key.
+
 The strip SHALL offer no requiredness, no readonly state and no validation. A
 note carries none of those. Offering them would invite an author to expect a
 value the note never holds.
@@ -698,9 +907,10 @@ value the note never holds.
 
 #### Scenario: An author places a note inside a group from its strip
 
-- **WHEN** an author selects a note and picks a group field's key in its strip
-- **THEN** the draft records that key as the note's `group`, and the note
-  renders inside that group's container
+- **WHEN** an author selects a note and picks the group labelled "Applicant"
+  in its strip
+- **THEN** the draft records that group's key as the note's `group`, and the
+  note renders inside that group's container
 
 #### Scenario: The editor reports a note missing its base-locale text
 
@@ -730,11 +940,13 @@ Form section. The `studio-app` capability states its rule.
 
 ### Requirement: The form editor renders from compiled styles
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: the body is copied from the live requirement with one cited name swapped. -->
 The screen `screens/FormEditorScreen.tsx` SHALL render from compiled
 component styles, reading `form-ui/tokens.stylex`. The rendered result SHALL
 match the previous stylesheet declaration for declaration, apart from the
-width at which the preview turns. The requirement "The preview stands under
-the canvas at 80rem and below" states that width.
+width at which the preview turns. The requirement "The preview yields its
+column at 80rem and below" states that width.
 
 The "How it will look" preview has a two-column layout. It SHALL pick
 its style from a parameterized style function, keyed on the column
@@ -763,8 +975,8 @@ to read. No stylesheet SHALL select on it after migration.
 
 The form editor SHALL carry a preview of what a participant meets. In a
 window wider than 80rem, the preview SHALL stand beside the form canvas, in
-the editor's trailing pane. The requirement "The preview stands under the
-canvas at 80rem and below" states where it stands in a narrower window.
+the editor's trailing pane. The requirement "The preview yields its column
+at 80rem and below" states where it stands in a narrower window.
 
 The preview SHALL mount the same `packages/form-ui` renderer the Player mounts.
 No second renderer SHALL exist for it. What an author reads in the preview is
@@ -827,7 +1039,7 @@ form canvas SHALL reach the preview at once, without a reload.
 - **WHEN** a view entry declares `required: true`
 - **THEN** the preview marks that entry's label as required
 
-### Requirement: The preview stands under the canvas at 80rem and below
+### Requirement: The preview yields its column at 80rem and below
 
 The form editor SHALL keep three columns only in a window wider than 80rem,
 1280px. Those are the palette, the form canvas and the participant preview.
@@ -837,15 +1049,13 @@ the palette and the canvas, across both. The canvas then takes the width the
 preview held. The 2px divider SHALL move from the preview's leading edge to
 its top edge.
 
-This width protects a field key on a card. In three columns at 1100px, a
-card's key wrapped one character per line.
+This width keeps a card's label readable beside its kind and its marks.
 
 #### Scenario: Above 80rem the preview stands beside the canvas
 
 - **WHEN** an author opens the form editor on IT Offboarding's "Submit the
   Exit Notification" step, in a window 1300px wide
 - **THEN** the palette, the canvas and the preview stand in three columns
-- **AND** the key `full_name` reads on one line on its card
 
 #### Scenario: At 80rem the preview stands under the canvas
 
@@ -854,11 +1064,11 @@ card's key wrapped one character per line.
 - **AND** the preview stands under both, with the 2px divider on its top
   edge alone
 
-#### Scenario: A laptop window keeps a key on one line
+#### Scenario: A laptop window keeps a label on one line
 
 - **WHEN** the same form editor opens in a window 1100px wide
 - **THEN** the preview stands under the palette and the canvas
-- **AND** the key `full_name` reads on one line on its card
+- **AND** a two-word label reads on one line on its card
 
 ### Requirement: A tab strip above the canvas authors the form's tabs
 
@@ -1182,33 +1392,3 @@ SHALL move with it.
 - **THEN** the group card names the first tab
 - **AND** its members still sit inside it, carrying no `tab`
 
-### Requirement: A placed field's key breaks at its underscores before anywhere else
-
-A placed field's card SHALL render the field's `key` so it wraps at a `_`
-character first. On a wrap it SHALL break immediately after a `_` character
-in preference to any other position. It SHALL break elsewhere only when a
-single run does not fit the card's width. A run is the span between two `_`
-characters. It can also be the span before the first `_`, or the span after
-the last `_`.
-
-The card's key is a mono, unspaced identifier. A break at an arbitrary
-character reads as garbled text; a break after `_` still reads as two whole
-segments.
-
-#### Scenario: A narrow card breaks the key at its underscore
-
-- **WHEN** a placed field's card is too narrow for its key to fit on one
-  line
-- **AND** the key contains at least one `_`
-- **THEN** the key wraps immediately after a `_`
-- **AND** no line of the wrapped key ends or begins in the middle of a
-  contiguous run of letters
-- **AND** that run itself fits the card
-
-#### Scenario: An oversized run breaks only as a last resort
-
-- **WHEN** a placed field's card is narrower than a single
-  underscore-delimited run of the key
-- **THEN** that run breaks so the key stays inside the card
-- **AND** every other run in the same key still breaks at its own `_`
-  boundary first

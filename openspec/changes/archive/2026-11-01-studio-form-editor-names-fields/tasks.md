@@ -77,15 +77,15 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Run `bun run typecheck` and report its last lines.
-- [ ] 5.2 Run `bun run build` and report its last lines.
-- [ ] 5.3 Run `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test` and report pass, skip and fail.
-- [ ] 5.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and report its exit code.
-- [ ] 5.5 On the host, run the same pipe with `whitespace.sh` and report its exit code.
-- [ ] 5.6 Browser check on the production build: mint, name, breadcrumb, tab row, Form section, the Fields route.
-- [ ] 5.6a In that check, measure a label at 1100px, a two-column card's input and the palette at 1280px.
-- [ ] 5.7 Run `/impeccable critique` and `/impeccable audit` on the form editor, plus `impeccable detect --json`.
-- [ ] 5.8 Fix every P0 and P1 the audit reports, then rerun 5.1 to 5.3.
+- [x] 5.1 Run `bun run typecheck` and report its last lines.
+- [x] 5.2 Run `bun run build` and report its last lines.
+- [x] 5.3 Run `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test` and report pass, skip and fail.
+- [x] 5.4 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and report its exit code.
+- [x] 5.5 On the host, run the same pipe with `whitespace.sh` and report its exit code.
+- [x] 5.6 Browser check on the production build: mint, name, breadcrumb, tab row, Form section, the Fields route.
+- [x] 5.6a In that check, measure a label at 1100px, a two-column card's input and the palette at 1280px.
+- [x] 5.7 Run `/impeccable critique` and `/impeccable audit` on the form editor, plus `impeccable detect --json`.
+- [x] 5.8 Fix every P0 and P1 the audit reports, then rerun 5.1 to 5.3.
 
 ## Workflow follow-up
 

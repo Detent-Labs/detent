@@ -269,7 +269,7 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
 
     Specs: `definition-contract`, `runtime-api`, `cel-expressions`.
 
-64. **Studio UI overhaul: CHANGES 1, 2, 4, 8 AND 9 DONE, REST NOT STARTED.** Decided 2026-10-30 in a design
+64. **Studio UI overhaul: CHANGES 1, 2, 4, 6, 8 AND 9 DONE, REST NOT STARTED.** Decided 2026-10-30 in a design
     session with the owner. The concept reworks how an author handles steps
     and fields in the studio. The owner weights that authoring loop above
     canvas gestures, navigation chrome and safety prompts. The canvas is the
@@ -309,6 +309,7 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
        under the condition builder. Shipped 2026-10-31.
     5. `studio-map-labels`. Needs: 4. Resolves: c1, M3 in part.
     6. `studio-form-editor-names-fields`. Needs: 2. Resolves: B1, M5.
+       Shipped 2026-11-01.
     7. `studio-field-key-follows-name`. Needs: 4. Resolves: B3, the
        guard-field-key-renames entry.
     8. `studio-process-list-names`. Needs: none. Resolves: M9, c2. Shipped
