@@ -366,7 +366,7 @@ describe("a section the step's kind leaves out", () => {
           expect(answer.tier).toBe(4);
           expect(answer.place).toBe("page");
           expect(answer.sentence).toContain(`“${STEP_NAMES[index]}”`);
-          for (const section of [...new Set([...sectionsFor("participant"), ...sectionsFor("subprocess"), ...sectionsFor("terminal")])]) {
+          for (const section of new Set([...sectionsFor("participant"), ...sectionsFor("subprocess"), ...sectionsFor("terminal")])) {
             expect(answer.sentence).not.toContain(t(sectionLabel(section, kind)));
           }
         }
