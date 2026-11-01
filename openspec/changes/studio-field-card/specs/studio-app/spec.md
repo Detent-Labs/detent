@@ -171,6 +171,8 @@ own `default` along where it equals the old value.
 - **WHEN** the draft's base version holds the field without the choice
 - **AND** the developer adds a choice and names it "In review"
 - **THEN** the option's value reads `in_review` and follows a later rename
+- **AND** the Developer view keeps the published sentence while any choice
+  stays locked
 
 #### Scenario: A moved value carries the default along
 
@@ -1179,7 +1181,8 @@ a default, a validation rule or a column mapping stands inside More, which
 opens for it.
 
 A check on the key or on the technical marker opens More too, so its
-control shows. The key's Developer view opens with it.
+control shows. The key's Developer view opens with it. The technical
+marker's check stands under Kind.
 
 A check the view cannot place SHALL stand at the top of the card. No check
 SHALL go unshown for want of a matching section.
@@ -1855,6 +1858,7 @@ than let the remaining badges shift into it.
 - **AND** no cell's field declares `technical: true`
 - **THEN** that row header offers no `required` toggle badge
 
+<!-- The heading keeps the live spec's wording, since a MODIFIED block keeps every scenario; the badge keeps its slot order, not a pixel edge. -->
 #### Scenario: A column header with only one eligible badge still aligns with its column's checkboxes
 
 - **WHEN** every one of a column's live cells is a technical field

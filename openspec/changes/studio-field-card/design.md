@@ -148,8 +148,8 @@ A new module `draft/choiceValue.ts` decides the value:
 The section's Developer view (`<details>`, closed) lists each choice's value
 in an editable mono input captioned "Stored value". One sentence stands
 under the list. It reads "The value follows the name until the first
-publish." or "This field is in a published version. The name no longer sets
-its values."
+publish." while no choice is locked. It reads "This field is in a published
+version. The name no longer sets its values." while any choice is locked.
 
 A field bound to a data source draws the sentence "The choices come from
 {source}." in place of the rows. The add control stays out. `{source}` is

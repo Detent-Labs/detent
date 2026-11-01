@@ -29,7 +29,7 @@ of their own.
   field's key already follows. The values stand in a Developer view inside
   the section.
 - Asked on lists each step whose form holds the field. A row prints the
-  marks Required, Read-only and Hidden as words, and the step's own
+  marks Required, Read-only and Not asked as words, and the step's own
   condition as a sentence. Each row offers Open the form and Show on the
   map. The requiredness control and the Only ask this when condition stand
   under the rows.

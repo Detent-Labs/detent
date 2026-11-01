@@ -24,6 +24,14 @@ the literal input back.
   input would
 - **AND** the Developer view stands open with that source
 
+#### Scenario: The value picker prints choice names
+
+- **WHEN** a field carries the choices `open` and `closed`, named Open and
+  Closed, and one choice with no name
+- **THEN** the Default value picker offers "Open", "Closed" and "(unnamed
+  choice)"
+- **AND** no option prints `open` or `closed` as its text
+
 #### Scenario: Clearing the expression restores the value input
 
 - **WHEN** an author empties the Developer view's CEL input
