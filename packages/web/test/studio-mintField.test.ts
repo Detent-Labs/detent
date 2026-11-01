@@ -2,6 +2,8 @@ import { describe, expect, it } from "bun:test";
 import { FIELD_KINDS } from "workflow-engine/schema";
 import { baseTypeForPaletteKind, mintCatalogField, PALETTE_FIELD_KINDS } from "../src/areas/studio/draft/mintField.js";
 import { fieldKindLabel } from "../src/areas/studio/draft/field-type-labels.js";
+import { labelChangePatch } from "../src/areas/studio/panels/fieldCatalogLogic.js";
+import type { Draft } from "../src/areas/studio/draft/types.js";
 import { insertViewField, isDraftViewField } from "../src/areas/studio/draft/view-layout.js";
 
 describe("baseTypeForPaletteKind", () => {
@@ -34,10 +36,10 @@ describe("mintCatalogField", () => {
     expect(a.id?.startsWith("field_")).toBe(true);
   });
 
-  it("seeds label and an empty key, and carries the kind's own type and format", () => {
+  it("seeds label and the key it derives, and carries the kind's own type and format", () => {
     const field = mintCatalogField("date", { en: "hello" }, "en");
     expect(field.label).toEqual({ en: "hello" });
-    expect(field.key).toBe("");
+    expect(field.key).toBe("hello");
     expect(field.type).toBe("string");
     expect(field.format).toBe("date");
   });
@@ -52,6 +54,33 @@ describe("mintCatalogField", () => {
   it("keeps the content-locale seed beside the base-locale kind name", () => {
     expect(mintCatalogField("number", { de: "" }, "en").label).toEqual({ de: "", en: "Number" });
     expect(mintCatalogField("number", undefined, "en").label).toEqual({ en: "Number" });
+  });
+
+  it("derives the key from the kind's name, deduped against the catalog", () => {
+    const taken = new Set<string>();
+    const first = mintCatalogField("date", { en: "" }, "en", taken);
+    taken.add(first.key!);
+    const second = mintCatalogField("date", { en: "" }, "en", taken);
+
+    expect(first.key).toBe("date");
+    expect(second.key).toBe("date_2");
+    expect(mintCatalogField("dateTime", { de: "" }, "en").key).toBe("date_and_time");
+  });
+
+  it("lets a typed name take the key over from the minted one", () => {
+    const draft = {
+      baseLocale: "en",
+      fields: [mintCatalogField("date", { en: "" }, "en"), mintCatalogField("date", { en: "" }, "en", new Set(["date"]))],
+    } as unknown as Draft;
+    const keys = (draft.fields ?? []).map((field) => {
+      for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {
+        Object.assign(field, labelChangePatch(draft, field, { en: "Due date".slice(0, n) }, "en", new Set()));
+      }
+      return field.key;
+    });
+
+    expect(draft.fields![0]!.label).toEqual({ en: "Due date" });
+    expect(keys).toEqual(["due_date", "due_date_2"]);
   });
 
   it("mints a Number as a number field with no format or control", () => {

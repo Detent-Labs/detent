@@ -341,12 +341,12 @@ describe("A card's controls name the entry they act on", () => {
   );
   const canvas = canvasHtml(render(draft));
 
-  it("names the field in each leaf control and keeps the short visible text", () => {
+  it("names the field in each leaf control, each name opening with its visible text", () => {
     const card = cardBlock(canvas, formCardBodyId(AMOUNT));
 
-    expect(card).toContain('aria-label="Move Cost $&amp; up"');
-    expect(card).toContain('aria-label="Move Cost $&amp; down"');
-    expect(card).toContain('aria-label="Remove Cost $&amp;"');
+    expect(card).toContain('aria-label="Move up: Cost $&amp;"');
+    expect(card).toContain('aria-label="Move down: Cost $&amp;"');
+    expect(card).toContain('aria-label="Remove: Cost $&amp;"');
     expect(card).toContain(">Move up<");
     expect(card).toContain(">Remove<");
   });
@@ -354,18 +354,18 @@ describe("A card's controls name the entry they act on", () => {
   it("names a note as the note", () => {
     const card = cardBlock(canvas, "Read this first");
 
-    expect(card).toContain('aria-label="Move the note up"');
-    expect(card).toContain('aria-label="Move the note down"');
-    expect(card).toContain('aria-label="Remove the note"');
+    expect(card).toContain('aria-label="Move up: the note"');
+    expect(card).toContain('aria-label="Move down: the note"');
+    expect(card).toContain('aria-label="Remove: the note"');
   });
 
   it("names the group in a group card's controls", () => {
     const legendStart = canvas.lastIndexOf("<legend", canvas.indexOf(formCardBodyId(GROUP)));
     const legend = canvas.slice(legendStart, canvas.indexOf("</legend>", legendStart));
 
-    expect(legend).toContain('aria-label="Move Applicant up"');
-    expect(legend).toContain('aria-label="Move Applicant down"');
-    expect(legend).toContain('aria-label="Remove Applicant"');
+    expect(legend).toContain('aria-label="Move up: Applicant"');
+    expect(legend).toContain('aria-label="Move down: Applicant"');
+    expect(legend).toContain('aria-label="Remove (0): Applicant"');
     expect(legend).toContain(">Remove (0)<");
   });
 });

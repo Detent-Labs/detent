@@ -3,7 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { FIELD_KINDS, type FieldId, type FieldKindName, type Step, type View, type ViewNote } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
-import type { DraftField } from "../draft/fields";
+import { draftFields, type DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
 import { t } from "../catalog.js";
 import { updateInDraftArray } from "../draft/draft-array-crud";
@@ -1147,7 +1147,8 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
    * `naming` holds. The selection clears: it is an array index the insert
    * shifts. */
   const mintAndPlace = (kind: FieldKindName, slot: number) => {
-    const field = mintCatalogField(kind, seedLocalizedText(contentLocale), baseLocale);
+    const taken = new Set(draftFields(draft).map((f) => f.key ?? "").filter((key) => key !== ""));
+    const field = mintCatalogField(kind, seedLocalizedText(contentLocale), baseLocale, taken);
     const fieldId = field.id as FieldId;
     mutate((d) => {
       d.fields ??= [];
@@ -1461,7 +1462,9 @@ export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpe
                 <button
                   type="button"
                   className="btn btn-secondary btn-destructive"
-                  aria-label={named("formEditor.removeNamed", groupName)}
+                  aria-label={t("formEditor.removeGroupNamed")
+                    .replace("{count}", () => String(removalCount))
+                    .replace("{field}", () => groupName)}
                   onClick={() => removeRow(rowIndex)}
                 >
                   {t("formEditor.removeGroup").replace("{count}", String(removalCount))}

@@ -21,7 +21,9 @@ import type { Draft } from "../draft/types.js";
  *
  * The prior derivation is deduped against `taken` too, so a key that took a
  * `_2` suffix beside another field's key still reads as derived and keeps
- * following the label.
+ * following the label. So does the prior derivation with any `_<n>` suffix:
+ * the field that forced the suffix may have taken another key since.
+ * (`deriveKey` yields `[a-z0-9_]` only, so the pattern needs no escaping.)
  *
  * `locked` is the caller's verdict that a CEL expression reads the key or a
  * published version holds the field (`isFieldKeyLocked`). It stops auto-fill
@@ -40,8 +42,9 @@ export function nextFieldKey(
   locked = false,
 ): string | undefined {
   if (locked && currentKey !== "") return undefined;
-  const priorDerived = dedupeKey(deriveKey(resolveDraftLocalizedText(priorLabel, baseLocale, baseLocale) ?? ""), taken);
-  if (!shouldAutoDeriveKey(currentKey, priorDerived)) return undefined;
+  const priorBase = deriveKey(resolveDraftLocalizedText(priorLabel, baseLocale, baseLocale) ?? "");
+  const priorSuffixed = priorBase !== "" && new RegExp(`^${priorBase}_[0-9]+$`).test(currentKey);
+  if (!shouldAutoDeriveKey(currentKey, dedupeKey(priorBase, taken)) && !priorSuffixed) return undefined;
 
   const newDerived = deriveKey(resolveDraftLocalizedText(newLabel, baseLocale, baseLocale) ?? "");
   return dedupeKey(newDerived, taken);

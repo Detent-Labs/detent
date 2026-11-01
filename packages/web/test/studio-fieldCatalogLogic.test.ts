@@ -25,9 +25,9 @@ import { moveFieldAndSyncViews, writeGroupLabel } from "../src/areas/studio/draf
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 describe("nextFieldKey", () => {
-  it("derives a newly-minted top-level field's key (key '') from its label", () => {
+  it("derives a newly-minted top-level field's key from its label, over the minted key", () => {
     const field = mintCatalogField("text", undefined, "en");
-    expect(field.key).toBe("");
+    expect(field.key).toBe("text");
 
     const label = mergeLocalizedTextEntry(undefined, "en", "Requested amount");
 
@@ -678,5 +678,12 @@ describe("a key that took a suffix keeps following the label", () => {
 
     expect(nextFieldKey("amount_2", priorLabel, { en: "Amount " }, "en", taken)).toBe("amount_2");
     expect(nextFieldKey("amt", priorLabel, { en: "Amount " }, "en", taken)).toBeUndefined();
+  });
+});
+
+describe("a suffixed key whose cause moved on", () => {
+  it("keeps following the label once the field that forced the suffix took another key", () => {
+    expect(nextFieldKey("date_2", { en: "Date" }, { en: "S" }, "en", new Set(["due_date"]))).toBe("s");
+    expect(nextFieldKey("date_x", { en: "Date" }, { en: "S" }, "en", new Set(["due_date"]))).toBeUndefined();
   });
 });

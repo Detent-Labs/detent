@@ -374,14 +374,15 @@ export const en = {
   "formEditor.moveDown": "Move down",
   "formEditor.remove": "Remove",
   "formEditor.removeGroup": "Remove ({count})",
-  // A card control's accessible name, naming the entry it acts on. The
-  // visible text stays the short form above.
-  "formEditor.moveUpNamed": "Move {field} up",
-  "formEditor.moveDownNamed": "Move {field} down",
-  "formEditor.removeNamed": "Remove {field}",
-  "formEditor.moveNoteUp": "Move the note up",
-  "formEditor.moveNoteDown": "Move the note down",
-  "formEditor.removeNote": "Remove the note",
+  // A card control's accessible name, naming the entry it acts on. Each
+  // begins with the control's visible text above (WCAG 2.5.3).
+  "formEditor.moveUpNamed": "Move up: {field}",
+  "formEditor.moveDownNamed": "Move down: {field}",
+  "formEditor.removeNamed": "Remove: {field}",
+  "formEditor.removeGroupNamed": "Remove ({count}): {field}",
+  "formEditor.moveNoteUp": "Move up: the note",
+  "formEditor.moveNoteDown": "Move down: the note",
+  "formEditor.removeNote": "Remove: the note",
   "formEditor.markRequired": "Required",
   "formEditor.markReadonly": "Read-only",
   "formEditor.markCel": "CEL",

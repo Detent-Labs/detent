@@ -1,5 +1,6 @@
 import { FIELD_KINDS, type FieldKindName } from "workflow-engine/schema";
 import { t } from "../catalog.js";
+import { dedupeKey, deriveKey } from "./deriveKey.js";
 import { fieldKindLabel } from "./field-type-labels.js";
 import type { DraftField } from "./fields";
 import { mintId } from "./ids";
@@ -32,11 +33,22 @@ export function baseTypeForPaletteKind(kind: FieldKindName): (typeof FIELD_KINDS
  * locale, since every `LocalizedText` needs a non-empty base-locale entry.
  * For the same reason an empty base-locale entry of `label` takes the kind's
  * name (`fieldKindLabel(kind).name`), and every other entry stays as given.
+ *
+ * The key derives from the base-locale label and dedupes against `taken`,
+ * every key the catalog already holds at any depth, so a second Date mints
+ * `date_2`. A later label edit compares the key with that same deduped
+ * derivation (`nextFieldKey`), so the key keeps following the label.
  */
-export function mintCatalogField(kind: FieldKindName, label: DraftField["label"], baseLocale: string): DraftField {
+export function mintCatalogField(
+  kind: FieldKindName,
+  label: DraftField["label"],
+  baseLocale: string,
+  taken: ReadonlySet<string> = new Set(),
+): DraftField {
   const { type, format, control } = baseTypeForPaletteKind(kind);
   const seeded = label?.[baseLocale] ? label : { ...label, [baseLocale]: fieldKindLabel(kind).name };
-  const field: DraftField = { id: mintId("field"), key: "", label: seeded, type };
+  const key = dedupeKey(deriveKey(seeded[baseLocale] ?? ""), taken);
+  const field: DraftField = { id: mintId("field"), key, label: seeded, type };
   if (format !== undefined) field.format = format;
   if (control !== undefined) field.control = control;
   if (type === "group") field.fields = [];
