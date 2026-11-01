@@ -7,6 +7,7 @@ import type { SectionName } from "../src/areas/studio/panels/sectionsFor.js";
 import {
   defaultOpenSection,
   nextOpenSection,
+  openSectionFor,
   sectionSummary,
   type SectionState,
   type SummaryInput,
@@ -195,6 +196,22 @@ describe("sectionSummary: More", () => {
     expect(sectionSummary("more", input(step)).text).toBe("Cancellable here, Comments off, Attachments on");
   });
 
+  it("counts no collaboration override on a subprocess step, which draws no collaboration control", () => {
+    expect(sectionSummary("more", input(call({ collaboration: { comments: false } })))).toEqual({
+      text: "Follows the process settings",
+      mono: false,
+      state: "optional",
+    });
+  });
+
+  it("counts no cancelling override on an end step, which draws no cancelling control", () => {
+    expect(sectionSummary("more", input(end({ cancellable: false })))).toEqual({
+      text: "Follows the process settings",
+      mono: false,
+      state: "optional",
+    });
+  });
+
   it("names a single override alone", () => {
     expect(sectionSummary("more", input(task({ collaboration: { attachments: true } })))).toEqual({
       text: "Attachments on",
@@ -256,5 +273,21 @@ describe("nextOpenSection", () => {
   it("opens the pressed section otherwise", () => {
     expect(nextOpenSection("assignment", "form")).toBe("form");
     expect(nextOpenSection(undefined, "form")).toBe("form");
+  });
+});
+
+describe("openSectionFor", () => {
+  const ends: SectionName[] = ["assignment", "form", "howItEnds", "lifecycle", "more"];
+
+  it("keeps an open section the list still holds", () => {
+    expect(openSectionFor("form", ends, "assignment")).toBe("form");
+  });
+
+  it("opens the fallback where the list dropped the open section", () => {
+    expect(openSectionFor("paths", ends, "howItEnds")).toBe("howItEnds");
+  });
+
+  it("keeps a deliberate close closed", () => {
+    expect(openSectionFor(undefined, ends, "assignment")).toBeUndefined();
   });
 });

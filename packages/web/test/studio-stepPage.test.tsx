@@ -509,11 +509,18 @@ describe("A step page section's own open issues", () => {
   });
 
   it("draws an advisory badge in slate, a blocker in refusal", () => {
+    // The test runner's StyleX stub resolves a style to its own key
+    // (`test/preload-stylex.ts`), so the class names the tone's style, and
+    // the module's source binds each style to its role.
     const view: EditorIssue = { entityType: "step", entityId: "step_a", message: "a", source: "view", loc: "workflow.steps[0].view.fields[0].required" };
     const cel: EditorIssue = { ...view, message: "b", source: "cel" };
     const badge = (issues: EditorIssue[]) => /<span class="([^"]+)" aria-label="1 open issue"/.exec(section(render({ issues }), "Form").header)![1];
+    const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
 
-    expect(badge([view])).not.toBe(badge([cel]));
+    expect(badge([view])).toBe("badge badgeAdvisory");
+    expect(badge([cel])).toBe("badge badgeBlocker");
+    expect(source).toMatch(/badgeBlocker: \{\s*color: colors\.refusal,\s*\}/);
+    expect(source).toMatch(/badgeAdvisory: \{\s*color: colors\.textMuted,\s*\}/);
   });
 
   it("keeps a step-level issue no section claims on the masthead, and no header counts it", () => {

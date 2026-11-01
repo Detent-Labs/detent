@@ -10,7 +10,7 @@ import type { Draft } from "../draft/types.js";
 import type { DraftStep } from "../draft/createStep.js";
 import type { DraftField } from "../draft/fields.js";
 import type { ProcessSummary } from "../api/types.js";
-import { performedByFor } from "../draft/performedBy.js";
+import { performedByFor, type PerformedBy } from "../draft/performedBy.js";
 import { assignmentWord, processLabel } from "../draft/guided-labels.js";
 import { t, type CatalogKey } from "../catalog.js";
 import { formCounts, formSizeText } from "./formCardRows.js";
@@ -42,14 +42,25 @@ export interface SummaryInput {
 
 const plain = (text: string, state: SectionState): SectionSummary => ({ text, mono: false, state });
 
-/** The override words More's summary names, one per key the step sets. */
-function overrideWords(step: DraftStep): string[] {
+/**
+ * The override words More's summary names, one per key the step sets and
+ * the kind draws a control for: `cancellable` on a task or subprocess step,
+ * `comments` and `attachments` on a task or end step. A key the body draws
+ * no control for stays out of the summary and the done state, so the header
+ * never names what the author cannot change there. A kind switch keeps
+ * `collaboration`, which no kind bounds.
+ */
+function overrideWords(step: DraftStep, performedBy: PerformedBy): string[] {
   const words: CatalogKey[] = [];
-  if (step.cancellable !== undefined) words.push(step.cancellable ? "stepSummary.cancellableYes" : "stepSummary.cancellableNo");
-  const comments = step.collaboration?.comments;
-  if (comments !== undefined) words.push(comments ? "stepSummary.commentsOn" : "stepSummary.commentsOff");
-  const attachments = step.collaboration?.attachments;
-  if (attachments !== undefined) words.push(attachments ? "stepSummary.attachmentsOn" : "stepSummary.attachmentsOff");
+  if (performedBy !== "terminal" && step.cancellable !== undefined) {
+    words.push(step.cancellable ? "stepSummary.cancellableYes" : "stepSummary.cancellableNo");
+  }
+  if (performedBy !== "subprocess") {
+    const comments = step.collaboration?.comments;
+    if (comments !== undefined) words.push(comments ? "stepSummary.commentsOn" : "stepSummary.commentsOff");
+    const attachments = step.collaboration?.attachments;
+    if (attachments !== undefined) words.push(attachments ? "stepSummary.attachmentsOn" : "stepSummary.attachmentsOff");
+  }
   return words.map((key) => t(key));
 }
 
@@ -110,7 +121,7 @@ export function sectionSummary(section: SectionName, input: SummaryInput): Secti
       return plain(fill(t("stepSummary.actions"), { entered: String(entered), left: String(left) }), "done");
     }
     case "more": {
-      const words = overrideWords(step);
+      const words = overrideWords(step, performedBy);
       return words.length === 0 ? plain(t("stepSummary.moreDefaults"), "optional") : plain(words.join(", "), "done");
     }
   }
@@ -134,6 +145,20 @@ export function defaultOpenSection(
     sections.find((s) => states.get(s) === "todo") ??
     sections[0]
   );
+}
+
+/**
+ * The section that stands open for one render. A kind switch can drop the
+ * open section from the step's list, Ways out on a step that becomes an end,
+ * and then `fallback` stands open in its place. A deliberate close, `open`
+ * undefined, stays closed.
+ */
+export function openSectionFor(
+  open: SectionName | undefined,
+  sections: readonly SectionName[],
+  fallback: SectionName | undefined,
+): SectionName | undefined {
+  return open !== undefined && !sections.includes(open) ? fallback : open;
 }
 
 /** The open section after a header press: pressing the open header closes

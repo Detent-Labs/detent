@@ -30,7 +30,14 @@ import { nextStepKey, nextCollaborationOverride } from "./stepsPanelLogic.js";
 import { formCounts } from "./formCardRows.js";
 import { sectionLabel, sectionsFor, type SectionName } from "./sectionsFor.js";
 import { headingIssues, issuesBySection, sectionOfIssue } from "./sectionIssues.js";
-import { defaultOpenSection, nextOpenSection, sectionSummary, type SectionState, type SectionSummary } from "./stepSummaries.js";
+import {
+  defaultOpenSection,
+  nextOpenSection,
+  openSectionFor,
+  sectionSummary,
+  type SectionState,
+  type SectionSummary,
+} from "./stepSummaries.js";
 import { stepRemovalReach } from "../draft/stepRemoval.js";
 import { stepText } from "./shared/optionText.js";
 import type { EditorIssue } from "../draft/issues.js";
@@ -575,14 +582,17 @@ export function StepPage({
         ])
       : [],
   );
-  const [openSection, setOpenSection] = useState<SectionName | undefined>(() =>
+  const opening = () =>
     defaultOpenSection(
       sections,
       new Map(sections.map((s) => [s, counted.get(s)?.length ?? 0])),
       new Map(sections.map((s) => [s, summaries.get(s)!.state])),
       selectedPathId,
-    ),
-  );
+    );
+  const [openSection, setOpenSection] = useState<SectionName | undefined>(opening);
+  // A kind switch keeps the page mounted, and can drop the open section from
+  // the new kind's list. The page's opening section then stands open instead.
+  const shownOpen = openSectionFor(openSection, sections, opening());
   // A way out selected on the canvas opens Ways out, where its row carries
   // the current mark.
   const holdsPaths = sections.includes("paths");
@@ -886,7 +896,7 @@ export function StepPage({
    * body renders, and a closed one carries `hidden` (`studio-step-page`). */
   const renderSection = (section: SectionName) => {
     const summary = summaries.get(section)!;
-    const open = openSection === section;
+    const open = shownOpen === section;
     const headerId = `step-section-${section}`;
     const bodyId = `${headerId}-body`;
     return (
@@ -898,7 +908,7 @@ export function StepPage({
             aria-expanded={open}
             aria-controls={bodyId}
             {...stylex.props(styles.sectionHeader)}
-            onClick={() => setOpenSection((current) => nextOpenSection(current, section))}
+            onClick={() => setOpenSection(nextOpenSection(shownOpen, section))}
           >
             <span {...stylex.props(styles.sectionName)}>{t(sectionLabel(section, performedBy))}</span>
             <span
