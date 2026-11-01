@@ -48,7 +48,7 @@ export function fieldKindLabel(kind: FieldKindName): { name: string; note: strin
  * `fieldKindIcon` so neither can read a field's kind differently from the
  * other (design.md, decision: "One icon per kind, through the branches
  * `fieldKindWord` already takes"). Stays private: a caller outside this file
- * wants the word or the icon, never the branch itself.
+ * wants the word, the icon, or `isUnmatchedKind`'s answer.
  */
 type FieldKindBranch =
   | { readonly kind: "named"; readonly name: FieldKindName }
@@ -79,6 +79,16 @@ export function fieldKindWord(field: { type?: unknown; format?: unknown; control
   if (branch.kind === "plugin") return t("fieldCatalog.customTypeOption");
   if (branch.kind === "named") return fieldKindLabel(branch.name).name;
   return [field.type, field.format, field.control].filter((m) => typeof m === "string").join(" / ");
+}
+
+/**
+ * Whether `fieldKindWord` answers the raw triple for this field: a triple the
+ * curated table names no kind for, and no plugin envelope. That word is a
+ * machine value, so a call site prints it in the mono face with no case
+ * transform.
+ */
+export function isUnmatchedKind(field: { type?: unknown; format?: unknown; control?: unknown }): boolean {
+  return classifyField(field).kind === "unmatched";
 }
 
 /**

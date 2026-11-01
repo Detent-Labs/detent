@@ -279,7 +279,10 @@ The control SHALL stand at least 24px tall, the minimum target size of WCAG
 On an empty form's card the control SHALL stand alone in the foot, at the
 row's trailing edge.
 
-Leaving the form editor SHALL return to the Forms tab where the author started.
+The form editor a card opens SHALL stand under the tab row with the Forms tab
+current. Its breadcrumb SHALL lead with "Forms" (`studio-form-editor`).
+Leaving the form editor SHALL return to the Forms tab where the author
+started.
 
 #### Scenario: An empty form offers to start one
 
@@ -308,6 +311,12 @@ Leaving the form editor SHALL return to the Forms tab where the author started.
 
 - **WHEN** an author opens the form editor from a card and then leaves it
 - **THEN** the Forms tab is the open one
+
+#### Scenario: The editor keeps the Forms tab current
+
+- **WHEN** an author opens the form editor from the Intake card
+- **THEN** the tab row stands above the editor with the Forms tab current
+- **AND** the breadcrumb's first crumb reads "Forms"
 
 ### Requirement: A card reports its step's form issues
 

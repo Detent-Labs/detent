@@ -16,10 +16,11 @@ import { describe, expect, it } from "bun:test";
  *
  * The stash goes stale in two places. A successful save and a discarded draft
  * each call `dropStash()`, and the discard does it before `navigate`, which
- * unmounts the screen. `RestoreNotice` renders only while a stash exists and
- * no form editor is open, since either button moves focus to the open tab and
- * a form editor has no tab row. Its two buttons call the restore and discard
- * handlers. Both buttons wait while a save or publish runs (`requestRunning`),
+ * unmounts the screen. `RestoreNotice` renders while a stash exists, the form
+ * editor's address included: the editor stands under the tab row, so either
+ * button's focus move to the open tab finds one. A gate on `formStepId` would
+ * hide the notice over the editor. Its two buttons call the restore and
+ * discard handlers. Both buttons wait while a save or publish runs (`requestRunning`),
  * because a restore during a save would let the save's answer overwrite the
  * stored revision. The outer
  * `EditScreen` loads the draft before any draft exists, so it keeps the raw
@@ -113,9 +114,10 @@ function scan(source: string): string[] {
   const notice = openingTag(code, "RestoreNotice");
   if (notice === undefined) violations.push("RestoreNotice is not rendered");
   else {
-    if (!/\bformStepId\s*===\s*undefined\s*&&\s*stash\s*&&\s*$/.test(code.slice(0, notice.start))) {
-      violations.push("RestoreNotice is not gated on stash and on the tab row");
-    }
+    // The expression the element sits in, from its opening brace.
+    const gate = /\{([^{}]*)$/.exec(code.slice(0, notice.start))?.[1] ?? "";
+    if (!/\bstash\s*&&\s*$/.test(gate)) violations.push("RestoreNotice is not gated on stash");
+    if (/\bformStepId\b/.test(gate)) violations.push("RestoreNotice is gated on formStepId");
     if (propValue(notice.tag, "onRestore") !== "restoreStash") violations.push("RestoreNotice onRestore is not restoreStash");
     if (propValue(notice.tag, "onDiscard") !== "discardStash") violations.push("RestoreNotice onDiscard is not discardStash");
     if (propValue(notice.tag, "disabled") !== "requestRunning") violations.push("RestoreNotice disabled is not requestRunning");
@@ -208,18 +210,18 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
   });
 
   it("a missing RestoreNotice is flagged", () => {
-    const gone = mutate(real, /\{formStepId === undefined && stash && <RestoreNotice[^>]*\/>\}/, "");
+    const gone = mutate(real, /\{stash && <RestoreNotice[^>]*\/>\}/, "");
     expect(scan(gone)).toEqual(["RestoreNotice is not rendered"]);
   });
 
   it("a RestoreNotice shown with no stash is flagged", () => {
-    const always = mutate(real, /\{formStepId === undefined && stash && (<RestoreNotice)/, "{formStepId === undefined && $1");
-    expect(scan(always)).toEqual(["RestoreNotice is not gated on stash and on the tab row"]);
+    const always = mutate(real, /\{stash && (<RestoreNotice)/, "{$1");
+    expect(scan(always)).toEqual(["RestoreNotice is not gated on stash"]);
   });
 
-  it("a RestoreNotice shown while a form editor is open is flagged", () => {
-    const inEditor = mutate(real, /\{formStepId === undefined && (stash && <RestoreNotice)/, "{$1");
-    expect(scan(inEditor)).toEqual(["RestoreNotice is not gated on stash and on the tab row"]);
+  it("a RestoreNotice hidden while a form editor is open is flagged", () => {
+    const hidden = mutate(real, /\{(stash && <RestoreNotice)/, "{formStepId === undefined && $1");
+    expect(scan(hidden)).toEqual(["RestoreNotice is gated on formStepId"]);
   });
 
   it("a RestoreNotice whose buttons call the wrong handlers is flagged", () => {
@@ -277,8 +279,8 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
   it("a RestoreNotice in a comment is not rendered", () => {
     const gone = mutate(
       real,
-      /\{formStepId === undefined && stash && <RestoreNotice[^>]*\/>\}/,
-      "{/* {formStepId === undefined && stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} />} */}",
+      /\{stash && <RestoreNotice[^>]*\/>\}/,
+      "{/* {stash && <RestoreNotice onRestore={restoreStash} onDiscard={discardStash} />} */}",
     );
     expect(scan(gone)).toEqual(["RestoreNotice is not rendered"]);
   });

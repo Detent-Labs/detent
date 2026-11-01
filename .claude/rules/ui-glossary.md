@@ -43,7 +43,7 @@ nav, the header bar, the tab row, then one tab body.
 | process surface | the one screen a draft opens on: the tab row and the body under it | `screens/EditScreen.tsx` |
 | screen nav | the row above the header bar. It holds Back to processes and nothing else | `screens/EditScreen.tsx` |
 | header bar | the process-identity row: name, key, revision, dirty/saved state, Save, Discard draft, Publish, the `⋮` menu | `panels/ProcessHeaderBar.tsx` |
-| restore notice | the notice under the header bar that offers a stored copy of unsaved work after a session ended | `panels/RestoreNotice.tsx` |
+| restore notice | the notice under the header bar that offers a stored copy of unsaved work after a session ended. It stands over the form editor too | `panels/RestoreNotice.tsx` |
 | tab row | the row of six tabs over the body | `panels/ProcessTabRow.tsx` |
 | edge fade | the fade at an edge of the tab row with more tabs past it | `panels/ProcessTabRow.tsx` |
 | tab | one of the six. The authoring order runs Map, Steps, Fields, Forms, Checks and Settings | `routing.ts` |
@@ -56,6 +56,10 @@ open view adds one segment, as in `/edit/fields/matrix`. All six bodies stay
 mounted at once, and `hidden` shows one. A body keeps its own
 half-typed state across a switch: an outcome name, a selected field.
 Unmounting on every switch would lose that state.
+
+The form editor opens inside the origin tab's panel, under the tab row. The
+origin tab's own body stays mounted beside it, hidden. The route carries the
+step's id as `formStepId`, and a press on any tab leaves the editor.
 
 A hidden field matrix draws the last draft it drew while visible. The commit
 that reveals the view draws the live draft. Typing on the Catalog view
@@ -99,15 +103,17 @@ Every other term below belongs to one tab.
 | change list | the folded register of entity rows the Publish dialog and the Versions screen both draw over `describeChanges`'s output | `panels/ChangeList.tsx`, `panels/PublishChanges.tsx` |
 | Forms tab | the tab holding one card per step that declares a view, with a legend above the cards | `panels/FormsTab.tsx` |
 | form card | one bordered plate on the Forms tab. It carries a kicker, a heading, a count and a miniature | `panels/FormsTab.tsx` (`FormCard`), row data in `panels/formCardRows.ts` |
-| form editor | the screen a step's own form opens on: the palette, the form canvas and the form preview | `screens/FormEditorScreen.tsx` |
+| form editor | the page a step's own form opens on. It stands inside the origin tab's panel, under the tab row: Steps, or Forms after a Forms card. It holds the breadcrumb, the palette, the form canvas and the form preview | `screens/FormEditorScreen.tsx`, mounted by `screens/EditScreen.tsx` |
+| breadcrumb | the three-crumb path at the form editor's top: the origin tab, the step, then Form. The first two crumbs are buttons and the last is the current page | `screens/FormEditorScreen.tsx` |
 | form canvas | the drop target where an author arranges a step's view entries into groups and tabs. Bare *canvas* names only the graph surface above | `screens/FormEditorScreen.tsx` |
 | form preview | the form editor's trailing pane, under the canvas at 80rem and below, mounting the renderer a participant meets | `panels/FormPreview.tsx` |
 | form tab strip | the row of a step form's own tabs, above the form canvas | `panels/FormTabStrip.tsx` |
 | checks rail | the validation issue list, grouped by check | `panels/ChecksRail.tsx` |
 | Access view | the Settings tab's view over the process's Developer, Owner and Reader access lists | `panels/AccessPanel.tsx` inside `panels/SettingsTab.tsx` |
 
-The word *section* also names a form's group, on the form editor's palette and
-the Forms tab's legend. The table's row names the step page's subject group.
+The word *section* also names a form's group on the Forms tab's legend. The
+form editor's palette says *Group*. The table's row names the step page's
+subject group.
 
 *issue* is the word for one validation result, whatever check raised it
 (`draft/issues.ts`'s `EditorIssue`, rendered by `panels/shared/IssueList.tsx`).

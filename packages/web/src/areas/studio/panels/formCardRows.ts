@@ -161,16 +161,12 @@ export function formCardRows(draft: Draft, issues: readonly EditorIssue[], conte
 
   const rowFor = (step: DraftStep): FormCardRow | undefined => {
     if (step.id === undefined || step.view === undefined) return undefined;
-    const viewEntries: DraftViewEntry[] = step.view.fields ?? [];
-    const marks = viewEntries
-      .map((entry, index) => miniatureEntry(entry, index, byId))
-      .filter((entry): entry is MiniatureEntry => entry !== undefined);
+    const marks = miniatureEntries(step, byId);
     return {
       stepId: step.id,
       label: resolveDraftLocalizedText(step.label, contentLocale, baseLocale) || step.key || t("steps.unnamedStep"),
       role: roleStampFor(step, initialStep).role,
-      fieldCount: marks.filter((m) => !m.groupBreak).length,
-      requiredCount: marks.filter((m) => !m.groupBreak && m.requirement === "required").length,
+      ...countsOf(marks),
       entries: marks,
       issues: viewIssues(issues, step.id),
     };
@@ -179,6 +175,51 @@ export function formCardRows(draft: Draft, issues: readonly EditorIssue[], conte
   return (draft.workflow?.steps ?? [])
     .map(rowFor)
     .filter((row): row is FormCardRow => row !== undefined);
+}
+
+/** The marks of one step's view, notes dropped. */
+function miniatureEntries(step: DraftStep, byId: Map<string, DraftField>): MiniatureEntry[] {
+  const viewEntries: DraftViewEntry[] = step.view?.fields ?? [];
+  return viewEntries
+    .map((entry, index) => miniatureEntry(entry, index, byId))
+    .filter((entry): entry is MiniatureEntry => entry !== undefined);
+}
+
+function countsOf(marks: readonly MiniatureEntry[]): { fieldCount: number; requiredCount: number } {
+  return {
+    fieldCount: marks.filter((m) => !m.groupBreak).length,
+    requiredCount: marks.filter((m) => !m.groupBreak && m.requirement === "required").length,
+  };
+}
+
+/**
+ * The two counts a form's size text reads, for one step: how many entries
+ * draw a mark (a group entry and a note draw none) and how many of those read
+ * a literal `required: true`. The same rule the Forms tab's cards apply
+ * (`formCardRows`), so the step page and a card state one number. A step with
+ * no view counts zero for both.
+ */
+export function formCounts(step: DraftStep, fields: DraftField[] | undefined): { fieldCount: number; requiredCount: number } {
+  const byId = new Map(
+    flattenDraftFields(fields).filter((f) => f.id !== undefined).map((f) => [f.id!, f]),
+  );
+  return countsOf(miniatureEntries(step, byId));
+}
+
+/**
+ * A form's size in words (`studio-forms-overview`: "A card names its step and
+ * counts the fields it draws"): the field count, with the required count
+ * beside it when any entry is required. `undefined` at zero fields, where a
+ * caller prints its own empty text or none.
+ */
+export function formSizeText(fieldCount: number, requiredCount: number): string | undefined {
+  if (fieldCount === 0) return undefined;
+  if (requiredCount > 0) {
+    return (fieldCount === 1 ? t("formsTab.miniatureLabelOne") : t("formsTab.miniatureLabel"))
+      .replace("{count}", String(fieldCount))
+      .replace("{required}", String(requiredCount));
+  }
+  return fieldCount === 1 ? t("formsTab.fieldCountOne") : t("formsTab.fieldCount").replace("{count}", String(fieldCount));
 }
 
 /** A note draws no mark, so it yields `undefined` here — `formCardRows`

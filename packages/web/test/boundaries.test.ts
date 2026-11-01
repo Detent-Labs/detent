@@ -79,9 +79,12 @@ describe("area boundaries", () => {
     // (StepPage.tsx), the field label, the field description and the option
     // label (FieldCatalogPanel.tsx's FieldEditor, one component rendering a
     // field at any nesting depth), and a note's text (FormEditorScreen.tsx's
-    // NoteEditorStrip). This confirms the rule actually finds every site
+    // NoteEditorStrip). FormEditorScreen.tsx adds two more: the strip's Name
+    // control (FormEditorStrip), beside its warning, and a card's name input
+    // (CardNameInput), exempt because it shows only while naming or while no
+    // locale holds a label. This confirms the rule actually finds every site
     // rather than silently checking zero.
-    expect(sitesChecked).toBe(7);
+    expect(sitesChecked).toBe(9);
   });
 });
 

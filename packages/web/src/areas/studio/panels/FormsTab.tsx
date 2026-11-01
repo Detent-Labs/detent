@@ -3,7 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
-import { FORMS_LEGEND, formCardRows, type FormCardRow, type MiniatureEntry } from "./formCardRows.js";
+import { FORMS_LEGEND, formCardRows, formSizeText, type FormCardRow, type MiniatureEntry } from "./formCardRows.js";
 
 /** Forced-colors mode maps an ordinary `background-color` to `Canvas`, so the
  * required mark's fill and the group break's line both need a system-color
@@ -352,27 +352,9 @@ function Legend() {
   );
 }
 
-/**
- * The foot's count text (`studio-forms-overview`: "A card names its step and
- * counts the fields it draws"). Undefined where the view draws no mark, and
- * `FormCard` then renders no count span, so the foot holds the open control
- * alone.
- */
-function footCountText(row: FormCardRow): string | undefined {
-  if (row.fieldCount === 0) return undefined;
-  if (row.requiredCount > 0) {
-    return (row.fieldCount === 1 ? t("formsTab.miniatureLabelOne") : t("formsTab.miniatureLabel"))
-      .replace("{count}", String(row.fieldCount))
-      .replace("{required}", String(row.requiredCount));
-  }
-  return row.fieldCount === 1
-    ? t("formsTab.fieldCountOne")
-    : t("formsTab.fieldCount").replace("{count}", String(row.fieldCount));
-}
-
 function FormCard({ row, onOpenForm, onOpenChecks }: { row: FormCardRow } & Props) {
   const empty = row.fieldCount === 0;
-  const countText = footCountText(row);
+  const countText = formSizeText(row.fieldCount, row.requiredCount);
   // The check badge's accessible name (`studio-forms-overview`: "A card
   // reports its step's form issues"): one whole sentence that leads with the
   // visible count and names the step as the heading prints it. `{step}` fills

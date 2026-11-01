@@ -122,6 +122,12 @@ hold SHALL open that first view too.
 The form editor and the step target SHALL stay their own sub-states. The form
 editor SHALL keep winning where both arrive.
 
+On the form editor's address, the tab row SHALL stand Steps current. An open
+from a Forms card SHALL stand Forms current until the author leaves the
+editor. A
+reload of the form editor's address stands Steps current
+(`studio-form-editor`).
+
 Every address the eleven-tab row answered SHALL still open a place. The
 address `/edit/canvas` SHALL open Map. The address `/edit/paths` SHALL open
 Steps. The address `/edit/matrix` SHALL open the Fields tab's matrix view.
@@ -160,6 +166,11 @@ screen. The retired `/edit/panels/:view` addresses SHALL follow the same map.
 
 - **WHEN** an author opens `/studio/processes/p1/edit/changes`
 - **THEN** the Versions screen opens for that process
+
+#### Scenario: The form editor's address stands Steps current
+
+- **WHEN** an author loads `/studio/processes/p1/edit/form/step_1` directly
+- **THEN** the form editor opens with the Steps tab current
 
 ### Requirement: The header bar's menu holds what is not a tab
 

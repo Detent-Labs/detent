@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type DragEvent, type FocusEvent, type KeyboardEvent } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
-import type { FieldId, Step, View, ViewNote } from "workflow-engine/schema";
+import { FIELD_KINDS, type FieldId, type FieldKindName, type Step, type View, type ViewNote } from "workflow-engine/schema";
 import type { DraftOf } from "../draft/types";
-import type { DraftField } from "../draft/fields";
+import { draftFields, type DraftField } from "../draft/fields";
 import { useDraft } from "../draft/store";
-import { t, type CatalogKey } from "../catalog.js";
+import { t } from "../catalog.js";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import {
   addViewTab,
@@ -43,7 +43,9 @@ import {
   type DragScope,
   type ViewTreeNode,
 } from "../draft/view-tree";
-import { PALETTE_FIELD_KINDS, mintCatalogField, type PaletteFieldKind } from "../draft/mintField";
+import { PALETTE_FIELD_KINDS, mintCatalogField } from "../draft/mintField";
+import { writeFieldLabel } from "../draft/fieldLabel";
+import { usePublishedFieldIds } from "../draft/publishedFields";
 import { seedLocalizedText, missingTranslationWarning, resolveDraftLocalizedText, type DraftLocalizedText } from "../draft/localized-text";
 import { BooleanOrExpressionInput } from "../panels/shared/BooleanOrExpressionInput";
 import { LocalizedTextInput } from "../panels/shared/LocalizedTextInput";
@@ -51,16 +53,17 @@ import { isExpression, type BoolOrExpr } from "../panels/shared/overrideMode";
 import { effectiveFlag, gatedKeys, setFlag, writtenFieldCounts, type FlagKey, type WrittenAccessor } from "../draft/view-flags";
 import { PanelsRailFieldRow } from "../panels/EntityTabs";
 import { flattenRailFields } from "../draft/panel-rail";
-import { fieldKindIcon, fieldKindWord } from "../draft/field-type-labels";
+import { fieldKindIcon, fieldKindLabel, fieldKindWord, isUnmatchedKind } from "../draft/field-type-labels";
 import { FormPreview } from "../panels/FormPreview";
 import { FormTabStrip, formTabDomId, formTabPanelDomId } from "../panels/FormTabStrip";
 import { scrollKeyboardFocusIntoView } from "../focusScroll.js";
+import type { ProcessTab } from "../routing.js";
 
 type DraftStep = DraftOf<Step>;
 type DraftView = DraftOf<View>;
 
 /** The width at and below which the preview no longer fits beside the canvas.
- * In three columns under it, a card's field key wraps. `FormPreview.tsx`
+ * In three columns under it, a card's label wraps. `FormPreview.tsx`
  * declares the same constant, so the preview's divider turns with this grid. */
 const PREVIEW_NARROW = "@media (max-width: 80rem)";
 
@@ -76,15 +79,17 @@ const styles = stylex.create({
     flexDirection: "column",
     gap: space.s1,
   },
-  formCel: {
-    fontFamily: fonts.mono,
+  // The "Condition" mark: the Label role inside the 2px accent border, on a
+  // card and beside a strip's checkbox.
+  formCondition: {
     fontSize: "11px",
+    fontWeight: 400,
     textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    color: colors.accent,
+    letterSpacing: "0.1em",
+    color: colors.textMuted,
     borderWidth: 2,
     borderStyle: "solid",
-    borderColor: "currentcolor",
+    borderColor: colors.accent,
     paddingBlock: 0,
     paddingInline: space.s1,
   },
@@ -97,7 +102,11 @@ const styles = stylex.create({
     paddingBlock: space.s1,
     paddingInline: space.s2,
   },
+  // 24px tall, the WCAG 2.5.8 target floor. `list-item` keeps the
+  // disclosure marker a `min-height` would otherwise not need to touch.
   studioDevviewSummary: {
+    display: "list-item",
+    minHeight: 24,
     cursor: "pointer",
     color: colors.textMuted,
     fontFamily: fonts.mono,
@@ -116,8 +125,8 @@ const styles = stylex.create({
   },
   formStripHeading: {
     flexBasis: "100%",
-    fontFamily: fonts.mono,
     margin: 0,
+    overflowWrap: "anywhere",
   },
   studioWarning: {
     color: colors.refusal,
@@ -133,21 +142,53 @@ const styles = stylex.create({
     borderStyle: "solid",
     borderColor: colors.border,
   },
+  // The breadcrumb, then the `h2` under it.
   formEditorHeader: {
     display: "flex",
-    alignItems: "baseline",
-    gap: space.s3,
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s1,
     paddingBlock: space.s3,
     paddingInline: space.s4,
     borderBottomWidth: 2,
     borderBottomStyle: "solid",
     borderBottomColor: colors.divider,
   },
-  // `.studio-form-editor-header .studio-back`.
-  studioBack: {
-    display: "block",
-    paddingLeft: 0,
-    marginBottom: 0,
+  crumbs: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    gap: space.s1,
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+  },
+  crumb: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: space.s1,
+  },
+  // The authoring command's look in the written face: body text in slate,
+  // ink under the pointer, no underline. `global.css` draws the focus ring.
+  crumbControl: {
+    font: "inherit",
+    color: {
+      default: colors.textMuted,
+      ":hover": colors.text,
+      ":active": colors.text,
+    },
+    backgroundColor: "transparent",
+    borderStyle: "none",
+    paddingBlock: space.s1,
+    paddingInline: 0,
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  crumbSeparator: {
+    color: colors.textMuted,
+  },
+  crumbCurrent: {
+    color: colors.text,
   },
   // `.studio-form-editor-header h2`: a descendant selector on a bare `<h2>`.
   formEditorHeading: {
@@ -155,11 +196,6 @@ const styles = stylex.create({
     alignItems: "baseline",
     gap: space.s2,
     margin: 0,
-  },
-  formEditorStep: {
-    fontFamily: fonts.mono,
-    fontSize: "0.8em",
-    color: colors.textMuted,
   },
   // Three columns: the palette, the canvas, and the participant preview in
   // the trailing pane (`studio-form-editor`). At 80rem and below the preview
@@ -208,7 +244,7 @@ const styles = stylex.create({
   // touch-action: manipulation }` declaration (D6) and its own `:hover`.
   formPaletteField: {
     display: "flex",
-    alignItems: "baseline",
+    alignItems: "center",
     gap: space.s2,
     width: "100%",
     backgroundColor: "transparent",
@@ -228,13 +264,18 @@ const styles = stylex.create({
       backgroundColor: colors.surfaceMuted,
     },
   },
+  // The row's own bottom hairline, dashed; the other three sides stay bare.
   formPaletteFieldMint: {
-    borderStyle: "dashed",
+    borderBottomStyle: "dashed",
   },
-  formPaletteKey: {
+  formPaletteKindIcon: {
+    flex: "none",
+    display: "inline-flex",
+    color: colors.textMuted,
+  },
+  formPaletteKindName: {
     flex: 1,
     minWidth: 0,
-    fontFamily: fonts.mono,
     overflowWrap: "anywhere",
   },
   formAddNote: {
@@ -358,31 +399,65 @@ const styles = stylex.create({
       backgroundColor: colors.surfaceMuted,
     },
   },
-  formCardKey: {
-    flex: "auto",
-    minWidth: 0,
-    fontFamily: fonts.mono,
-    overflowWrap: "break-word",
-  },
-  formCardNotePreview: {
-    flex: 1,
+  // The card's identity: the label, or a note's text, on a line of its own.
+  formCardLabel: {
+    flexBasis: "100%",
     minWidth: 0,
     overflowWrap: "anywhere",
   },
-  formCardMarks: {
-    display: "flex",
-    alignItems: "baseline",
-    gap: space.s1,
-  },
-  // `.studio-form-mark, .studio-form-card-span, .studio-form-card-type`'s
-  // shared declaration.
-  formMachineMark: {
-    fontFamily: fonts.mono,
+  // The Label role (`DESIGN.md`'s Hierarchy section): the kind line and the
+  // "Required" and "Read-only" marks.
+  formCardLabelRole: {
     fontSize: "11px",
+    fontWeight: 400,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
     color: colors.textMuted,
   },
-  formCardSpan: {
-    fontVariantNumeric: "tabular-nums",
+  formCardKind: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.s1,
+    minWidth: 0,
+  },
+  // The card's second line: the kind, then the marks after it.
+  formCardKindRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: space.s2,
+    flexBasis: "100%",
+    minWidth: 0,
+  },
+  // The raw `{type, format, control}` triple no curated kind names: a machine
+  // value (design-language rule 4).
+  formCardKindRaw: {
+    fontFamily: fonts.mono,
+    textTransform: "none",
+    letterSpacing: "normal",
+  },
+  // A card in the naming variant: the input takes the first row beside the
+  // edge, and the move and Remove controls wrap onto a second row.
+  formCardNaming: {
+    flexWrap: "wrap",
+  },
+  formCardNameBox: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    flex: 1,
+    minWidth: 0,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+  },
+  formCardNameField: {
+    width: "100%",
+    minWidth: 0,
+  },
+  formCardMovesWrapped: {
+    flexBasis: "100%",
+    paddingInline: space.s3,
+    paddingBottom: space.s2,
   },
   formCardMoves: {
     display: "flex",
@@ -495,6 +570,9 @@ const styles = stylex.create({
     paddingBlock: space.s1,
     paddingInline: 0,
   },
+  formGroupLegendNaming: {
+    flexWrap: "wrap",
+  },
   formGroupMembersSpacing: {
     marginTop: space.s3,
   },
@@ -531,42 +609,138 @@ const styles = stylex.create({
  * existing catalog field or mints a new one; a card drag reorders one. All
  * three land on the same drop targets, so the payload says which array
  * change to make. */
-type Dragging = { kind: "palette"; ref: FieldId } | { kind: "card"; index: number } | { kind: "mint"; fieldKind: PaletteFieldKind };
+type Dragging = { kind: "palette"; ref: FieldId } | { kind: "card"; index: number } | { kind: "mint"; fieldKind: FieldKindName };
 
-/** A field's `type` is either a literal type name or a `{ type, config }`
- * plugin envelope. A card shows the envelope's own `type`, and nothing at all
- * for a field whose type the author has not chosen yet. */
-function typeLabel(type: DraftField["type"]): string | undefined {
-  return typeof type === "string" ? type : type?.type;
+/** The element id of the editor's `h2`, which takes the focus when the editor
+ * opens. */
+export const FORM_EDITOR_HEADING_ID = "form-editor-heading";
+
+/** The element id of a card's name input, which takes the focus when a
+ * minted card opens for naming. */
+export const formCardNameInputId = (fieldId: string) => `form-card-name-${fieldId}`;
+
+/** The element id of a card's own control: a leaf card's body button, or a
+ * group card's legend name. Enter or Escape in the name input moves the focus
+ * there. */
+export const formCardBodyId = (fieldId: string) => `form-card-body-${fieldId}`;
+
+/** Whether a label holds text in the content locale or the base locale. An
+ * empty string counts as no text, which `resolveDraftLocalizedText` keeps. */
+function hasLabelText(label: DraftLocalizedText, contentLocale: string, baseLocale: string): boolean {
+  return !!label?.[contentLocale] || !!label?.[baseLocale];
 }
 
-/** Renders a field's `key` with a break opportunity right after each `_`,
- * so a wrap lands between underscore-delimited segments instead of at an
- * arbitrary character. Splitting on `_` and rejoining with a literal `_`
- * plus a `<wbr/>` reproduces the original string exactly, including a run
- * of adjacent underscores (the empty segment between them renders as an
- * empty text node). */
-function renderFieldKey(key: string): ReactNode[] {
-  const segments = key.split("_");
-  return segments.flatMap((segment, index) => (index === 0 ? [segment] : [`_`, <wbr key={index} />, segment]));
+/** Whether a field's card shows its name input in place of its own control:
+ * while it is naming, or while neither the content locale nor the base locale
+ * holds a label (`studio-form-editor`: "A card whose field has no label ...
+ * SHALL keep the input"). */
+export function cardShowsNameInput(
+  fieldId: string,
+  naming: string | undefined,
+  label: DraftLocalizedText,
+  contentLocale: string,
+  baseLocale: string,
+): boolean {
+  return naming === fieldId || !hasLabelText(label, contentLocale, baseLocale);
 }
 
-/** `btn btn-ghost` plus compiled styles, as one set of props — the same join
- * `FormTabStrip.tsx`'s `ghost()` makes, since spreading `stylex.props(...)`
- * beside a `className` attribute drops whichever of the two the JSX writes
- * first. */
-function ghost(...style: stylex.StyleXStyles[]) {
+/** The naming state after a key in a card's name input. Enter or Escape ends
+ * the naming once the label holds text in the content locale or the base
+ * locale. A label without text keeps it, so the card keeps its input through
+ * the next keystroke instead of swapping it out from under the focus. Any
+ * other key leaves the state as it is. */
+export function namingAfterKey<T extends string>(
+  key: string,
+  fieldId: T,
+  naming: T | undefined,
+  label: DraftLocalizedText,
+  contentLocale: string,
+  baseLocale: string,
+): T | undefined {
+  if (key !== "Enter" && key !== "Escape") return naming;
+  return hasLabelText(label, contentLocale, baseLocale) ? undefined : fieldId;
+}
+
+/** A label for display: the content locale's text, else the base locale's.
+ * Unlike `resolveDraftLocalizedText`, a cleared translation falls through to
+ * the base locale. */
+function displayLabel(label: DraftLocalizedText, contentLocale: string, baseLocale: string): string | undefined {
+  return label?.[contentLocale] || label?.[baseLocale] || undefined;
+}
+
+/** A card control's accessible name: `key`'s sentence with `{field}` filled
+ * by a replacer function, so a label holding `$&` reads as typed. */
+function named(key: "formEditor.moveUpNamed" | "formEditor.moveDownNamed" | "formEditor.removeNamed", field: string): string {
+  return t(key).replace("{field}", () => field);
+}
+
+/** A card's kind line: the kind's icon and its name, the words the Fields
+ * tab's entity rail prints for the field. A triple no kind names prints its
+ * raw members, a machine value: mono, with no case transform. */
+function CardKindLine({ field }: { field: DraftField }) {
+  const KindIcon = fieldKindIcon(field);
+  return (
+    <span {...stylex.props(styles.formCardLabelRole, styles.formCardKind, isUnmatchedKind(field) && styles.formCardKindRaw)}>
+      <KindIcon size={18} strokeWidth={1.75} aria-hidden="true" />
+      {fieldKindWord(field)}
+    </span>
+  );
+}
+
+/**
+ * The naming variant of a card (`studio-form-editor`: "A new field takes its
+ * name on its card"): the name input over the kind line, in place of the
+ * card's draggable control. It is not draggable, so the input keeps text
+ * selection. The wrapper takes the key and focus events, since React's
+ * bubble from the input.
+ */
+function CardNameInput({
+  field,
+  fieldId,
+  onChange,
+  onKeyDown,
+  onFocus,
+  onBlur,
+}: {
+  field: DraftField;
+  fieldId: string;
+  onChange: (label: DraftLocalizedText) => void;
+  onKeyDown: (e: KeyboardEvent) => void;
+  onFocus: (e: FocusEvent) => void;
+  onBlur: (e: FocusEvent) => void;
+}) {
+  return (
+    <div {...stylex.props(styles.formCardNameBox)} onKeyDown={onKeyDown} onFocus={onFocus} onBlur={onBlur}>
+      {/* translation-warning-exempt: this input shows only while the card is
+          naming, or while neither the content locale nor the base locale
+          holds a label. The strip's Name control carries the warning. */}
+      <LocalizedTextInput
+        id={formCardNameInputId(fieldId)}
+        value={field.label}
+        onChange={onChange}
+        ariaLabel={t("formEditor.nameInputLabel")}
+        placeholder={t("formEditor.namePlaceholder")}
+        autoComplete="off"
+        {...stylex.props(styles.formCardNameField)}
+      />
+      <CardKindLine field={field} />
+    </div>
+  );
+}
+
+/** Literal `.btn` classes plus compiled styles, as one set of props, since
+ * spreading `stylex.props(...)` beside a `className` attribute drops
+ * whichever of the two the JSX writes first. */
+function btn(classes: string, ...style: stylex.StyleXStyles[]) {
   const compiled = stylex.props(...style);
-  return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
+  return { ...compiled, className: `${classes} ${compiled.className ?? ""}`.trim() };
 }
 
-const MINT_KIND_LABEL: Record<PaletteFieldKind, CatalogKey> = {
-  text: "formEditor.mintText",
-  choice: "formEditor.mintChoice",
-  date: "formEditor.mintDate",
-  file: "formEditor.mintFile",
-  section: "formEditor.mintSection",
-};
+/** `btn btn-ghost` plus compiled styles — the same join `FormTabStrip.tsx`'s
+ * `ghost()` makes. */
+function ghost(...style: stylex.StyleXStyles[]) {
+  return btn("btn btn-ghost", ...style);
+}
 
 /** One override field: a plain checkbox, always reachable, and a
  * "Developer view" disclosure holding the same field's CEL escape hatch —
@@ -601,7 +775,7 @@ function OverrideField({
           onChange={(e) => onChange(e.target.checked)}
         />
       </label>
-      {cel && <span {...stylex.props(styles.formCel)}>{t("formEditor.markCel")}</span>}
+      {cel && <span {...stylex.props(styles.formCondition)}>{t("formEditor.markCondition")}</span>}
       <details {...stylex.props(styles.studioDevview)}>
         <summary {...stylex.props(styles.studioDevviewSummary)}>{t("formEditor.developerView")}</summary>
         <BooleanOrExpressionInput label={label} value={value} flagKey={flagKey} onChange={onChange} />
@@ -612,8 +786,9 @@ function OverrideField({
 
 /** One choice in a strip's tab picker: the tab's minted `key`, and its label
  * already resolved for the content locale. Both strips take their options
- * this way rather than reading the draft, so neither needs a locale of its
- * own and `FormEditorStrip` stays renderable with no provider around it. */
+ * this way rather than resolving each tab's label themselves. Both strips
+ * still read `useDraft()` for their own localized inputs, so each renders
+ * inside a `DraftContext` provider. */
 export interface TabOption {
   key: string;
   label: string;
@@ -678,7 +853,12 @@ function TabPicker({
 
 export interface FormEditorStripProps {
   row: DraftViewField;
+  /** The heading: the field's label resolved for the content locale, or
+   * `formEditor.unnamedField`. */
   label: string;
+  /** The field's whole label, which the Name control edits and its
+   * translation warning reads. */
+  fieldLabel: DraftLocalizedText;
   ownStepIndex: number;
   written: WrittenAccessor;
   technicalFieldIds: Set<string>;
@@ -688,31 +868,50 @@ export interface FormEditorStripProps {
   /** The tab this entry draws on: its own on a root entry, its group's on a
    * member of one. */
   tabValue: string | undefined;
+  onChangeLabel: (label: DraftLocalizedText) => void;
   onChangeFlag: (key: FlagKey, next: BoolOrExpr) => void;
   onChangeSpan: (span: 1 | 2) => void;
   onChangeTab: (tab: string) => void;
 }
 
+/** The Width select both strips carry: values 1 and 2, printed in words. */
+function SpanSelect({ value, onChange }: { value: 1 | 2 | undefined; onChange: (span: 1 | 2) => void }) {
+  return (
+    <label {...stylex.props(styles.formStripField)}>
+      {t("formEditor.span")}
+      <select value={String(value ?? 1)} onChange={(e) => onChange(Number(e.target.value) as 1 | 2)}>
+        <option value="1">{t("formEditor.spanOne")}</option>
+        <option value="2">{t("formEditor.spanBoth")}</option>
+      </select>
+    </label>
+  );
+}
+
 /**
- * The selected field's overrides — pulled out of `FormEditorScreen` so a
+ * The selected field's name and overrides — pulled out of `FormEditorScreen` so a
  * server render can exercise it directly with an arbitrary `row`, without
  * simulating the click that selects one (`renderToStaticMarkup` fires no DOM
  * events). Purely presentational: every write goes back through its
- * callback props, `FormEditorScreen`'s own `setViewFlag`/`updateRow`.
+ * callback props, `FormEditorScreen`'s own `writeLabel`, `setViewFlag` and
+ * `updateRow`.
  */
 export function FormEditorStrip({
   row,
   label,
+  fieldLabel,
   ownStepIndex,
   written,
   technicalFieldIds,
   isGroup,
   tabOptions,
   tabValue,
+  onChangeLabel,
   onChangeFlag,
   onChangeSpan,
   onChangeTab,
 }: FormEditorStripProps) {
+  const { draft, contentLocale } = useDraft();
+  const warning = missingTranslationWarning(fieldLabel, contentLocale, draft.baseLocale);
   // A technical field's view entry may declare neither key at all (the
   // definition contract rejects both) — the strip removes the `required`/
   // `readonly` controls entirely rather than disabling them, since a
@@ -724,6 +923,11 @@ export function FormEditorStrip({
   return (
     <section {...stylex.props(styles.formStrip)} aria-label={t("formEditor.stripLabel")}>
       <h3 {...stylex.props(styles.formStripHeading)}>{label}</h3>
+      <label {...stylex.props(styles.formStripField)}>
+        {t("formEditor.nameLabel")}
+        <LocalizedTextInput value={fieldLabel} onChange={onChangeLabel} />
+      </label>
+      {warning && <p {...stylex.props(styles.studioWarning)}>{warning}</p>}
       <OverrideField
         label={t("formEditor.visible")}
         flagKey="visible"
@@ -751,27 +955,20 @@ export function FormEditorStrip({
       {/* No span control on a group: it draws at the form's full width and
           `form-ui` reads no span on it, so the control would write a value
           nothing renders. */}
-      {!isGroup && (
-        <label {...stylex.props(styles.formStripField)}>
-          {t("formEditor.span")}
-          <select value={String(row.span ?? 1)} onChange={(e) => onChangeSpan(Number(e.target.value) as 1 | 2)}>
-            <option value="1">1</option>
-            <option value="2">2</option>
-          </select>
-        </label>
-      )}
+      {!isGroup && <SpanSelect value={row.span} onChange={onChangeSpan} />}
       <TabPicker options={tabOptions} value={tabValue} inGroup={!!row.group} onChange={onChangeTab} />
     </section>
   );
 }
 
-/** A selected note's strip props. `groupKeys` lists the keys of the group
- * cards this step's view carries: a note has no catalog parent, so its group
- * is a per-step choice among those cards. */
+/** A selected note's strip props. `groupOptions` lists the group cards this
+ * step's view carries, each as the group's `key` and its label resolved for
+ * the content locale: a note has no catalog parent, so its group is a
+ * per-step choice among those cards. */
 export interface NoteEditorStripProps {
   row: DraftOf<ViewNote>;
   baseLocale: string | undefined;
-  groupKeys: string[];
+  groupOptions: { key: string; label: string }[];
   /** The same two the field strip takes: a note takes a tab the same way a
    * field does (`studio-form-editor`: "This requirement covers both entry
    * kinds"). */
@@ -794,7 +991,7 @@ export interface NoteEditorStripProps {
 export function NoteEditorStrip({
   row,
   baseLocale,
-  groupKeys,
+  groupOptions,
   tabOptions,
   tabValue,
   onChangeText,
@@ -815,20 +1012,14 @@ export function NoteEditorStrip({
         <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(row.text, contentLocale, baseLocale)}</p>
       )}
       <OverrideField label={t("formEditor.visible")} flagKey="visible" value={row.visible} onChange={onChangeVisible} />
-      <label {...stylex.props(styles.formStripField)}>
-        {t("formEditor.span")}
-        <select value={String(row.span ?? 1)} onChange={(e) => onChangeSpan(Number(e.target.value) as 1 | 2)}>
-          <option value="1">1</option>
-          <option value="2">2</option>
-        </select>
-      </label>
+      <SpanSelect value={row.span} onChange={onChangeSpan} />
       <label {...stylex.props(styles.formStripField)}>
         {t("formEditor.group")}
         <select value={row.group ?? ""} onChange={(e) => onChangeGroup(e.target.value === "" ? undefined : e.target.value)}>
           <option value="">{t("formEditor.noGroup")}</option>
-          {groupKeys.map((k) => (
-            <option key={k} value={k}>
-              {k}
+          {groupOptions.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -846,22 +1037,27 @@ interface Props {
   step: DraftStep;
   index: number;
   fields: DraftField[];
+  /** Returns to the tab that opened the editor: the breadcrumb's first crumb. */
   onBack: () => void;
+  /** The tab that opened the editor, which the first crumb names. */
+  originTab: ProcessTab;
+  /** Opens the step's page on the Steps tab: the breadcrumb's step crumb. */
+  onOpenStep: () => void;
 }
 
 /**
- * The visual form editor, as a full-screen routed page (`studio-form-editor`
- * capability): a palette of unplaced catalog fields plus an "add a field to
- * the process" mint section, a canvas that draws the form at its declared
- * column count, and a strip editing the selected field's overrides.
+ * The visual form editor (`studio-form-editor` capability): a breadcrumb out,
+ * a palette of unplaced catalog fields plus an "add a field to the process"
+ * mint section, a canvas that draws the form at its declared column count,
+ * and a strip editing the selected field's name and overrides.
  *
  * No Save. Every change writes straight into the in-browser draft through
- * `mutate()`, the same call `ViewEditor`'s own `move()` used before it, and
- * `FormEditorDialog` after that. The screen's Save/Discard/Publish toolbar
- * stays the only thing that persists.
+ * `mutate()`. The header bar's Save, Discard and Publish stay the only
+ * controls that persist.
  */
-export function FormEditorScreen({ step, index, fields, onBack }: Props) {
+export function FormEditorScreen({ step, index, fields, onBack, originTab, onOpenStep }: Props) {
   const { draft, mutate, contentLocale } = useDraft();
+  const published = usePublishedFieldIds();
   const processLabel =
     resolveDraftLocalizedText(draft.label, contentLocale, draft.baseLocale ?? "en") || t("headerBar.unnamedProcess");
   const written = useMemo(() => writtenFieldCounts(draft), [draft]);
@@ -879,13 +1075,31 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
    * The tab actually shown is derived from it on every render by `shownTab`,
    * so removing the open tab or opening another step needs no repair here. */
   const [activeTab, setActiveTab] = useState<string | undefined>(undefined);
+  /** The field whose card shows its name input after a mint, until Enter,
+   * Escape or a blur ends the naming. */
+  const [naming, setNaming] = useState<FieldId | undefined>(undefined);
 
   // The selection belongs to the step this page was opened for, and so does
   // the open tab: another step's tab keys name nothing here.
+  // The heading takes the focus on every open, whatever route opened the
+  // editor: the control that opened it sits in a body the editor hides.
   useEffect(() => {
     setSelected(undefined);
     setActiveTab(undefined);
+    setNaming(undefined);
+    document.getElementById(FORM_EDITOR_HEADING_ID)?.focus();
   }, [step.id]);
+
+  // A minted card's input takes the focus at once, its seeded kind name
+  // selected, so the first keystroke replaces the name. An input that already
+  // holds the focus set `naming` itself and keeps its caret.
+  useEffect(() => {
+    if (naming === undefined) return;
+    const input = document.getElementById(formCardNameInputId(naming));
+    if (!(input instanceof HTMLInputElement) || document.activeElement === input) return;
+    input.focus();
+    input.select();
+  }, [naming]);
 
   const rows: DraftViewEntry[] = step.view?.fields ?? [];
   const baseLocale = draft.baseLocale ?? "en";
@@ -960,19 +1174,51 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   /** Mints a catalog field and places it on this step's view, in one Draft
    * mutation: both the new `fields` entry and the new `view`
    * row commit together, so a mid-mutation reader never sees one without
-   * the other. */
-  const mintAndPlace = (kind: PaletteFieldKind, slot: number) => {
+   * the other. The field is minted outside the recipe, so its id is the one
+   * `naming` holds. The selection clears: it is an array index the insert
+   * shifts. */
+  const mintAndPlace = (kind: FieldKindName, slot: number) => {
+    const taken = new Set(draftFields(draft).map((f) => f.key ?? "").filter((key) => key !== ""));
+    const field = mintCatalogField(kind, seedLocalizedText(contentLocale), baseLocale, taken);
+    const fieldId = field.id as FieldId;
     mutate((d) => {
-      const field = mintCatalogField(kind, seedLocalizedText(contentLocale));
       d.fields ??= [];
-      d.fields.push(field);
+      d.fields.push(structuredClone(field));
       const s = d.workflow?.steps?.[index];
       if (!s) return;
       s.view ??= { fields: [] };
-      s.view.fields = fillMissingTabs(insertViewField(s.view.fields ?? [], field.id!, slot), shown);
+      s.view.fields = fillMissingTabs(insertViewField(s.view.fields ?? [], fieldId, slot), shown);
     });
     setSelected(undefined);
+    setNaming(fieldId);
   };
+
+  /** The one label writer for the card input and the strip's Name control:
+   * `writeFieldLabel` sets the key by the Fields tab's rule, for a field at
+   * any depth (`studio-form-editor`: "A name given in the form editor sets
+   * the key"). */
+  const writeLabel = (fieldId: FieldId, label: DraftLocalizedText) => {
+    mutate((d) => writeFieldLabel(d, fieldId, label, baseLocale, published));
+  };
+
+  /** Enter or Escape ends the naming, and the focus moves onto the card's own
+   * control on the next frame, once the card has drawn it. A card still
+   * without a label keeps its input and its naming (`namingAfterKey`), so the
+   * focus stays in the input and the next keystroke lands there too. */
+  const nameKeyDown = (fieldId: FieldId) => (e: KeyboardEvent) => {
+    if (e.key !== "Enter" && e.key !== "Escape") return;
+    e.preventDefault();
+    const next = namingAfterKey(e.key, fieldId, naming, fieldFor(fieldId)?.label, contentLocale, baseLocale);
+    setNaming(next);
+    if (next !== undefined) return;
+    requestAnimationFrame(() => document.getElementById(formCardBodyId(fieldId))?.focus());
+  };
+  /** Focus on a card's name input starts the naming, so a card whose label is
+   * empty keeps its input while the author types into it on a second visit.
+   * Without it the first keystroke gives the label text, the card draws its
+   * body, and the input unmounts under the focus. */
+  const nameFocus = (fieldId: FieldId) => () => setNaming(fieldId);
+  const nameBlur = () => setNaming(undefined);
 
   /** Places a note at the end of the view, seeded with a non-empty entry for
    * the body's `baseLocale`. A note inserted with no text at all
@@ -1023,7 +1269,12 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   };
 
   const fieldFor = (ref_: FieldId | undefined) => fields.find((f) => f.id === ref_);
-  const labelFor = (ref_: FieldId | undefined) => fieldFor(ref_)?.key || ref_ || t("formEditor.unnamedField");
+  /** A field's label for display, never its key. */
+  const labelFor = (ref_: FieldId | undefined) =>
+    displayLabel(fieldFor(ref_)?.label, contentLocale, baseLocale) ?? t("formEditor.unnamedField");
+  /** `cardShowsNameInput` for a card's field, if it has an id. */
+  const showsNameInput = (field: DraftField | undefined): field is DraftField & { id: string } =>
+    field?.id !== undefined && cardShowsNameInput(field.id, naming, field.label, contentLocale, baseLocale);
   /** A group's card always draws at the form's full width and `form-ui` reads
    * no `span` on it, so the canvas draws it that way and the strip offers no
    * span control for it. A note names no catalog field, so it is never a
@@ -1034,12 +1285,11 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   const unplacedIds = new Set(unplacedRefs(catalogIds, rows));
   const palette = flattenRailFields(draft.fields).filter((row) => unplacedIds.has(row.id as FieldId));
 
-  const groupKeys = rows
+  const groupOptions = rows
     .filter(isDraftViewField)
     .map((r) => fieldFor(r.ref))
-    .filter((f) => f?.type === "group")
-    .map((f) => f!.key)
-    .filter((k): k is string => k !== undefined && k !== "");
+    .filter((f): f is DraftField & { key: string } => f?.type === "group" && !!f.key)
+    .map((f) => ({ key: f.key, label: labelFor(f.id as FieldId) }));
 
   /** The group an entry DECLARES, as `owningTab` and `drawnRows` read it: a
    * group card's catalog `key`, which is the value another entry's `group`
@@ -1161,11 +1411,17 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
       dropAt(dropSlot(rowIndex, side));
     };
 
-    const members = node.members;
+    // A group with no key yet draws no members (`view-tree.ts`'s
+    // `isGroupCard`), but it still draws as a group card: a minted group
+    // takes its name on its legend, and its first keystroke derives the key
+    // without moving the input to another element.
+    const members = node.members ?? (isGroupRow(row) ? [] : undefined);
     if (members) {
       // A group's card is always a field entry (never a note), so `field` is
       // defined here.
       const groupKey = field?.key;
+      const groupNaming = showsNameInput(field);
+      const groupName = labelFor(fieldRef);
       const memberScope: DragScope = { group: groupKey ?? "" };
       const memberCount = members.length;
       // A drop on the group's own box and a drop on its tail row both name
@@ -1190,23 +1446,36 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
         <li key={`field:${fieldRef}`} {...stylex.props(styles.formGroupLi)} onDragOver={allowDrop(scope)} onDrop={dropOnTail}>
           <span {...stylex.props(styles.formCardEdge)} onDragOver={allowDrop(scope)} onDrop={dropOn("before")} aria-hidden="true" />
           <fieldset className={fieldsetProps.className} style={fieldsetProps.style} data-selected={selected === rowIndex || undefined}>
-            <legend {...stylex.props(styles.formGroupLegend)}>
-              <button
-                type="button"
-                {...stylex.props(styles.formGroupLegendName)}
-                draggable
-                onDragStart={() => setDragging({ kind: "card", index: rowIndex })}
-                onDragEnd={() => setDragging(undefined)}
-                aria-pressed={selected === rowIndex}
-                onClick={() => setSelected(selected === rowIndex ? undefined : rowIndex)}
-              >
-                {labelFor(fieldRef)}
-              </button>
+            <legend {...stylex.props(styles.formGroupLegend, groupNaming && styles.formGroupLegendNaming)}>
+              {groupNaming ? (
+                <CardNameInput
+                  field={field}
+                  fieldId={field.id}
+                  onChange={(label) => writeLabel(field.id as FieldId, label)}
+                  onKeyDown={nameKeyDown(field.id as FieldId)}
+                  onFocus={nameFocus(field.id as FieldId)}
+                  onBlur={nameBlur}
+                />
+              ) : (
+                <button
+                  type="button"
+                  id={fieldRef ? formCardBodyId(fieldRef) : undefined}
+                  {...stylex.props(styles.formGroupLegendName)}
+                  draggable
+                  onDragStart={() => setDragging({ kind: "card", index: rowIndex })}
+                  onDragEnd={() => setDragging(undefined)}
+                  aria-pressed={selected === rowIndex}
+                  onClick={() => setSelected(selected === rowIndex ? undefined : rowIndex)}
+                >
+                  {labelFor(fieldRef)}
+                </button>
+              )}
               <span {...stylex.props(styles.formCardMoves)}>
                 <button
                   type="button"
                   {...ghost(styles.authoringCommand, isFirst && styles.authoringCommandDisabled)}
                   disabled={isFirst}
+                  aria-label={named("formEditor.moveUpNamed", groupName)}
                   onClick={() => move(rowIndex, -1)}
                 >
                   {t("formEditor.moveUp")}
@@ -1215,11 +1484,19 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                   type="button"
                   {...ghost(styles.authoringCommand, isLast && styles.authoringCommandDisabled)}
                   disabled={isLast}
+                  aria-label={named("formEditor.moveDownNamed", groupName)}
                   onClick={() => move(rowIndex, 1)}
                 >
                   {t("formEditor.moveDown")}
                 </button>
-                <button type="button" className="btn btn-secondary btn-destructive" onClick={() => removeRow(rowIndex)}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-destructive"
+                  aria-label={t("formEditor.removeGroupNamed")
+                    .replace("{count}", () => String(removalCount))
+                    .replace("{field}", () => groupName)}
+                  onClick={() => removeRow(rowIndex)}
+                >
                   {t("formEditor.removeGroup").replace("{count}", String(removalCount))}
                 </button>
               </span>
@@ -1242,15 +1519,15 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     }
 
     const span = clampSpan(row.span, columns);
-    const celMarked = isField && (isExpression(row.visible) || isExpression(row.required) || isExpression(row.readonly));
+    const conditionMarked = isField && (isExpression(row.visible) || isExpression(row.required) || isExpression(row.readonly));
     const cardKey = isField ? `field:${row.ref}` : `note:${rowIndex}`;
-    const cardLabel = isField ? labelFor(row.ref) : resolveDraftLocalizedText(row.text, contentLocale, draft.baseLocale ?? "en") || t("formEditor.emptyNote");
-    const cardType = isField ? typeLabel(field?.type) : t("formEditor.noteType");
+    const leafNaming = isField && showsNameInput(field);
     const cardProps = stylex.props(
       styles.formCard,
       selected === rowIndex && styles.formCardSelected,
       hiddenByExpression && styles.formCardConditional,
       columns === 2 && span === 2 && styles.formCardSpanTwo,
+      leafNaming && styles.formCardNaming,
     );
     return (
       <li
@@ -1268,35 +1545,52 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
             its row, so both of its halves are the same card and only these
             edges split it. */}
         <span {...stylex.props(styles.formCardEdge)} onDragOver={allowDrop(scope)} onDrop={dropOn("before")} aria-hidden="true" />
-        <button
-          type="button"
-          {...stylex.props(styles.formCardBody)}
-          draggable
-          onDragStart={() => setDragging({ kind: "card", index: rowIndex })}
-          onDragEnd={() => setDragging(undefined)}
-          aria-pressed={selected === rowIndex}
-          onClick={() => setSelected(selected === rowIndex ? undefined : rowIndex)}
-        >
-          <span {...stylex.props(isField ? styles.formCardKey : styles.formCardNotePreview)}>
-            {isField ? renderFieldKey(cardLabel) : cardLabel}
-          </span>
-          <span {...stylex.props(styles.formCardMarks)}>
-            {isField && row.required === true && <span {...stylex.props(styles.formMachineMark)}>{t("formEditor.markRequired")}</span>}
-            {isField && row.readonly === true && <span {...stylex.props(styles.formMachineMark)}>{t("formEditor.markReadonly")}</span>}
-            {celMarked && <span {...stylex.props(styles.formCel)}>{t("formEditor.markCel")}</span>}
-            <span {...stylex.props(styles.formMachineMark, styles.formCardSpan)}>
-              {span}/{columns}
+        {leafNaming && field ? (
+          <CardNameInput
+            field={field}
+            fieldId={field.id!}
+            onChange={(label) => writeLabel(field.id as FieldId, label)}
+            onKeyDown={nameKeyDown(field.id as FieldId)}
+            onFocus={nameFocus(field.id as FieldId)}
+            onBlur={nameBlur}
+          />
+        ) : (
+          <button
+            type="button"
+            id={isField && row.ref ? formCardBodyId(row.ref) : undefined}
+            {...stylex.props(styles.formCardBody)}
+            draggable
+            onDragStart={() => setDragging({ kind: "card", index: rowIndex })}
+            onDragEnd={() => setDragging(undefined)}
+            aria-pressed={selected === rowIndex}
+            onClick={() => setSelected(selected === rowIndex ? undefined : rowIndex)}
+          >
+            <span {...stylex.props(styles.formCardLabel)}>
+              {isField
+                ? labelFor(row.ref)
+                : resolveDraftLocalizedText(row.text, contentLocale, baseLocale) || t("formEditor.emptyNote")}
             </span>
-          </span>
-          <span {...stylex.props(styles.formMachineMark)}>{cardType}</span>
-        </button>
+            {/* The second line: the kind, then the marks after it. */}
+            <span {...stylex.props(styles.formCardKindRow)}>
+              {isField ? (
+                field && <CardKindLine field={field} />
+              ) : (
+                <span {...stylex.props(styles.formCardLabelRole, styles.formCardKind)}>{t("formEditor.noteKind")}</span>
+              )}
+              {isField && row.required === true && <span {...stylex.props(styles.formCardLabelRole)}>{t("formEditor.markRequired")}</span>}
+              {isField && row.readonly === true && <span {...stylex.props(styles.formCardLabelRole)}>{t("formEditor.markReadonly")}</span>}
+              {conditionMarked && <span {...stylex.props(styles.formCondition)}>{t("formEditor.markCondition")}</span>}
+            </span>
+          </button>
+        )}
         {/* The keyboard route to the same array change a drag makes. A drag
             handle alone leaves reordering unreachable without a pointer. */}
-        <span {...stylex.props(styles.formCardMoves)}>
+        <span {...stylex.props(styles.formCardMoves, leafNaming && styles.formCardMovesWrapped)}>
           <button
             type="button"
             {...ghost(styles.authoringCommand, isFirst && styles.authoringCommandDisabled)}
             disabled={isFirst}
+            aria-label={isField ? named("formEditor.moveUpNamed", labelFor(row.ref)) : t("formEditor.moveNoteUp")}
             onClick={() => move(rowIndex, -1)}
           >
             {t("formEditor.moveUp")}
@@ -1305,11 +1599,17 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
             type="button"
             {...ghost(styles.authoringCommand, isLast && styles.authoringCommandDisabled)}
             disabled={isLast}
+            aria-label={isField ? named("formEditor.moveDownNamed", labelFor(row.ref)) : t("formEditor.moveNoteDown")}
             onClick={() => move(rowIndex, 1)}
           >
             {t("formEditor.moveDown")}
           </button>
-          <button type="button" {...ghost(styles.authoringCommand)} onClick={() => removeRow(rowIndex)}>
+          <button
+            type="button"
+            {...ghost(styles.authoringCommand)}
+            aria-label={isField ? named("formEditor.removeNamed", labelFor(row.ref)) : t("formEditor.removeNote")}
+            onClick={() => removeRow(rowIndex)}
+          >
             {t("formEditor.remove")}
           </button>
         </span>
@@ -1318,6 +1618,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
   };
 
   const selectedRow = selected !== undefined ? rows[selected] : undefined;
+  const stepLabel = displayLabel(step.label, contentLocale, baseLocale) ?? t("steps.unnamedStep");
 
   return (
     // ponytail: same shortcut as `EditScreen.tsx`'s tab body, and the same
@@ -1329,12 +1630,36 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
     // own `windowBlurred` guard (`focusScrollsRow`).
     <div onFocusCapture={scrollKeyboardFocusIntoView} {...stylex.props(styles.formEditorPage)}>
       <header {...stylex.props(styles.formEditorHeader)}>
-        <button type="button" className="btn btn-ghost" {...stylex.props(styles.studioBack)} onClick={onBack}>
-          {t("formEditor.back")}
-        </button>
-        <h2 id="form-editor-heading" {...stylex.props(styles.formEditorHeading)}>
-          {t("formEditor.heading")}
-          <span {...stylex.props(styles.formEditorStep)}>{resolveDraftLocalizedText(step.label, contentLocale, draft.baseLocale ?? "en") || step.key || t("steps.unnamedStep")}</span>
+        {/* The way out (`studio-form-editor`: "A breadcrumb leads out of the
+            form editor"): the tab that opened the editor, the step's page,
+            then this form, which takes no press. */}
+        <nav aria-label={t("formEditor.breadcrumb")}>
+          <ol {...stylex.props(styles.crumbs)}>
+            <li {...stylex.props(styles.crumb)}>
+              <button type="button" {...stylex.props(styles.crumbControl)} onClick={onBack}>
+                {t(`tabs.${originTab}` as const)}
+              </button>
+            </li>
+            <li {...stylex.props(styles.crumb)}>
+              <span aria-hidden="true" {...stylex.props(styles.crumbSeparator)}>
+                ›
+              </span>
+              <button type="button" {...stylex.props(styles.crumbControl)} onClick={onOpenStep}>
+                {stepLabel}
+              </button>
+            </li>
+            <li {...stylex.props(styles.crumb)}>
+              <span aria-hidden="true" {...stylex.props(styles.crumbSeparator)}>
+                ›
+              </span>
+              <span aria-current="page" {...stylex.props(styles.crumbCurrent)}>
+                {t("formEditor.crumbForm")}
+              </span>
+            </li>
+          </ol>
+        </nav>
+        <h2 id={FORM_EDITOR_HEADING_ID} tabIndex={-1} {...stylex.props(styles.formEditorHeading)}>
+          {t("formEditor.heading").replace("{step}", () => stepLabel)}
         </h2>
       </header>
 
@@ -1348,7 +1673,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
               {palette.map((row) => {
                 const id = row.id as FieldId;
                 const field = fieldFor(id);
-                const label = (field && resolveDraftLocalizedText(field.label, contentLocale, draft.baseLocale ?? "en")) || t("formEditor.unnamedField");
+                const label = labelFor(id);
                 return (
                   <li key={id}>
                     <PanelsRailFieldRow
@@ -1375,7 +1700,9 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
             {t("formEditor.mintHeading")}
           </h3>
           <ul {...stylex.props(styles.formPaletteList)}>
-            {PALETTE_FIELD_KINDS.map((kind) => (
+            {PALETTE_FIELD_KINDS.map((kind) => {
+              const KindIcon = fieldKindIcon(FIELD_KINDS[kind]);
+              return (
               <li key={kind}>
                 {/* A dashed border, not a new color: the same "not there yet"
                     vocabulary a conditionally-visible card already carries
@@ -1389,17 +1716,21 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
                   onDragEnd={() => setDragging(undefined)}
                   onClick={() => mintAndPlace(kind, rows.length)}
                 >
-                  <span {...stylex.props(styles.formPaletteKey)}>{t(MINT_KIND_LABEL[kind])}</span>
+                  <span aria-hidden="true" {...stylex.props(styles.formPaletteKindIcon)}>
+                    <KindIcon size={18} strokeWidth={1.75} />
+                  </span>
+                  <span {...stylex.props(styles.formPaletteKindName)}>{fieldKindLabel(kind).name}</span>
                 </button>
               </li>
-            ))}
+              );
+            })}
           </ul>
 
           {/* A note belongs to no catalog, so it sits beside the palette
               rather than inside it (studio-form-editor: "An author places a
               note on the form canvas"). */}
           <h3 {...stylex.props(styles.formPaletteHeading, styles.formPaletteHeadingBordered)}>{t("formEditor.noteSectionHeading")}</h3>
-          <button type="button" className="btn btn-secondary" {...stylex.props(styles.formAddNote)} onClick={insertNote}>
+          <button type="button" {...btn("btn btn-secondary", styles.formAddNote)} onClick={insertNote}>
             {t("formEditor.addNote")}
           </button>
         </nav>
@@ -1415,8 +1746,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
               <button
                 key={n}
                 type="button"
-                className="btn btn-secondary"
-                {...stylex.props(columns === n && styles.formColumnsOptionPressed)}
+                {...btn("btn btn-secondary", columns === n && styles.formColumnsOptionPressed)}
                 aria-pressed={columns === n}
                 onClick={() => setColumns(n)}
               >
@@ -1477,12 +1807,16 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
             <FormEditorStrip
               row={selectedRow}
               label={labelFor(selectedRow.ref)}
+              fieldLabel={fieldFor(selectedRow.ref)?.label}
               ownStepIndex={index}
               written={written}
               technicalFieldIds={technicalIds}
               isGroup={isGroupRow(selectedRow)}
               tabOptions={tabOptions}
               tabValue={owningTab(selectedRow, rows, groupKeyOf)}
+              onChangeLabel={(label) => {
+                if (selectedRow.ref) writeLabel(selectedRow.ref, label);
+              }}
               onChangeFlag={(key, next) => setViewFlag(selected!, key, next)}
               onChangeSpan={(span) => updateRow(selected!, { span })}
               onChangeTab={(tab) => updateRow(selected!, { tab })}
@@ -1491,7 +1825,7 @@ export function FormEditorScreen({ step, index, fields, onBack }: Props) {
             <NoteEditorStrip
               row={selectedRow}
               baseLocale={draft.baseLocale}
-              groupKeys={groupKeys}
+              groupOptions={groupOptions}
               tabOptions={tabOptions}
               tabValue={owningTab(selectedRow, rows, groupKeyOf)}
               onChangeText={(text) => updateRow(selected!, { text })}

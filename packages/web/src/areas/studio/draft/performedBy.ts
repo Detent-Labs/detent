@@ -1,4 +1,5 @@
 import type { StepType } from "workflow-engine/schema";
+import type { Draft } from "./types";
 
 /**
  * The identity section's "performed by" segmented control (task 3.10):
@@ -14,6 +15,19 @@ export type PerformedBy = "participant" | "subprocess" | "terminal";
 export function performedByFor(type: StepType | undefined, terminal: boolean | undefined): PerformedBy {
   if (terminal) return "terminal";
   return type === "subprocess" ? "subprocess" : "participant";
+}
+
+/** The step a field with no home opens on: the initial step when a person
+ * works it, else the first step in draft order that a person works, else
+ * `undefined`. A person works a step when `performedByFor` answers
+ * `"participant"`. */
+export function firstWorkedStepId(draft: Draft): string | undefined {
+  const steps = draft.workflow?.steps ?? [];
+  const worked = (step: (typeof steps)[number]) =>
+    step.id !== undefined && performedByFor(step.type, step.terminal) === "participant";
+  const initial = steps.find((step) => step.id === draft.workflow?.initialStep);
+  if (initial !== undefined && worked(initial)) return initial.id;
+  return steps.find(worked)?.id;
 }
 
 /** The `terminal` option pins `type` back to `task`: a step chosen as "the

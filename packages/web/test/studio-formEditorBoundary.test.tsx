@@ -5,7 +5,8 @@ import { FormEditorBoundary } from "../src/areas/studio/screens/EditScreen.js";
 import { t } from "../src/areas/studio/catalog.js";
 
 /**
- * A failed form editor chunk stays inside the process surface. `lazy`
+ * A failed form editor chunk stays inside the process surface, and the editor
+ * itself stands inside the open tab's panel (design.md D1). `lazy`
  * rethrows the rejected import during render; with no boundary of its own
  * the shell's boundary replaces the whole studio area and unmounts
  * `DraftProvider`, unsaved draft included.
@@ -48,6 +49,12 @@ function scan(text: string): string[] {
     const boundaryBack = onBackOf(code, open);
     if (boundaryBack === undefined || boundaryBack !== onBackOf(code, at)) violations.push("boundary-back-differs");
   }
+  // The editor stands in the open tab's panel, under the tab row: the
+  // `tabPanel` helper renders it, and no other JSX does.
+  const helperAt = code.search(/\bconst tabPanel = \(/);
+  const helper = helperAt < 0 ? "" : code.slice(helperAt, code.indexOf("\n  };\n", helperAt));
+  const placed = code.match(/\{\s*(?:\w+\s*&&\s*)?formEditor\s*\}/g) ?? [];
+  if (!/\{\s*editorHere\s*&&\s*formEditor\s*\}/.test(helper) || placed.length !== 1) violations.push("editor-outside-panel");
   return violations;
 }
 
@@ -72,6 +79,12 @@ describe("the form editor's chunk boundary", () => {
     const mutated =
       source.slice(0, open.index) + suspense[0] + source.slice(open.index + open[0].length, suspenseAt) + open[0] + source.slice(suspenseAt + suspense[0].length);
     expect(scan(mutated)).toContain("suspense-outside-boundary");
+  });
+
+  it("flags a form editor that stands outside the tab panel", () => {
+    const mutated = source.replace(/\{editorHere && formEditor\}/, "").replace(/(\n\s*)<ProcessTabRow\b/, "$1{formEditor}$1<ProcessTabRow");
+    expect(mutated).not.toBe(source);
+    expect(scan(mutated)).toContain("editor-outside-panel");
   });
 
   it("flags a boundary whose Back goes somewhere else than the form editor's", () => {

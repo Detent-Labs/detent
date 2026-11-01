@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  firstWorkedStepId,
   outcomePatch,
   performedByEdit,
   performedByFor,
@@ -8,6 +9,7 @@ import {
   performedByRemovals,
   pressDecision,
 } from "../src/areas/studio/draft/performedBy.js";
+import type { Draft } from "../src/areas/studio/draft/types.js";
 
 describe("performedByFor", () => {
   it("a task, non-terminal step reads as participant", () => {
@@ -134,5 +136,32 @@ describe("outcomePatch", () => {
     const patch = outcomePatch("");
     expect("outcome" in patch).toBe(true);
     expect(patch.outcome).toBeUndefined();
+  });
+});
+
+describe("firstWorkedStepId", () => {
+  const draftOf = (initialStep: string | undefined, steps: unknown[]): Draft =>
+    ({ workflow: { initialStep, steps } }) as unknown as Draft;
+  const task = (id: string) => ({ id, type: "task" });
+  const end = (id: string) => ({ id, type: "task", terminal: true });
+  const call = (id: string) => ({ id, type: "subprocess" });
+
+  it("answers the initial step when a person works it", () => {
+    expect(firstWorkedStepId(draftOf("step_b", [task("step_a"), task("step_b")]))).toBe("step_b");
+  });
+
+  it("answers the first worked step in draft order when the initial step is an end", () => {
+    expect(firstWorkedStepId(draftOf("step_a", [end("step_a"), call("step_b"), task("step_c"), task("step_d")]))).toBe("step_c");
+  });
+
+  it("answers the first worked step when the initial step is a call to another process or names no step", () => {
+    expect(firstWorkedStepId(draftOf("step_a", [call("step_a"), task("step_b")]))).toBe("step_b");
+    expect(firstWorkedStepId(draftOf(undefined, [call("step_a"), task("step_b")]))).toBe("step_b");
+  });
+
+  it("answers undefined when no step is worked by a person", () => {
+    expect(firstWorkedStepId(draftOf("step_a", [call("step_a"), end("step_b")]))).toBeUndefined();
+    expect(firstWorkedStepId(draftOf(undefined, []))).toBeUndefined();
+    expect(firstWorkedStepId({} as Draft)).toBeUndefined();
   });
 });

@@ -26,6 +26,7 @@ import { FieldValidationEditor } from "./shared/FieldValidationEditor";
 import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { flattenDraftFields } from "../draft/fields";
+import { firstWorkedStepId } from "../draft/performedBy.js";
 import { writeGroupKey, writeGroupLabel } from "../draft/view-group-sync.js";
 import { usePublishedFieldIds } from "../draft/publishedFields.js";
 import { countKeyReaders } from "../draft/key-readers.js";
@@ -609,12 +610,14 @@ interface FieldEditorProps {
   field: DraftField;
   dataSources: DraftDataSource[];
   lists: StudioDataList[] | undefined;
-  /** The step the effect half's empty state routes to — the draft's initial
-   * step, or `undefined` while the workflow carries no step to reach. */
+  /** The step the effect half's empty state routes to (`firstWorkedStepId`),
+   * or `undefined` while no step a person works exists. */
   routeStepId: string | undefined;
   onChange: (patch: Partial<DraftField>) => void;
   onRemove: () => void;
   onShowStep: (stepId: string) => void;
+  /** Opens the form editor for one step: the empty state's route alone. */
+  onOpenForm: (stepId: string) => void;
   /** The move's one write (`EntityTabs.tsx`'s `FieldsTab::moveField`),
    * threaded through `FieldCatalogPanel`. Renders as the selected field's own
    * move control, whatever its nesting depth. */
@@ -651,6 +654,7 @@ function FieldEditor({
   onChange: writeField,
   onRemove,
   onShowStep,
+  onOpenForm,
   onMoveField,
   onAdd,
 }: FieldEditorProps) {
@@ -983,12 +987,12 @@ function FieldEditor({
             {usage.length === 0 ? (
               // The empty tone, never the refusal tone: a field no step asks
               // for yet is an unfinished draft, not a broken one. The route
-              // reaches the canvas on the initial step, which is where an
-              // author puts the field on a view.
+              // opens the form editor for the first step a person works,
+              // where this field stands in the palette.
               <div {...stylex.props(styles.emptyState)}>
                 <p {...stylex.props(styles.studioEmpty)}>{t("fieldCatalog.usedInEmpty")}</p>
                 {routeStepId !== undefined && (
-                  <button type="button" className="btn btn-secondary" onClick={() => onShowStep(routeStepId)}>
+                  <button type="button" className="btn btn-secondary" onClick={() => onOpenForm(routeStepId)}>
                     {t("fieldCatalog.effectEmptyRoute")}
                   </button>
                 )}
@@ -1152,12 +1156,15 @@ interface Props {
    * `FieldsTab::requestRemove`), which removes it at once or confirms first. */
   onRemove: (fieldId: string) => void;
   onShowStep: (stepId: string) => void;
+  /** Opens the form editor for one step: the effect half's empty-state
+   * route (`studio-app`). */
+  onOpenForm: (stepId: string) => void;
   /** The move's one write (`EntityTabs.tsx`'s `FieldsTab::moveField`),
    * forwarded to `FieldEditor` as its own `onMoveField`. */
   onMoveField: (fieldId: string, targetGroupId: string | undefined) => void;
 }
 
-export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowStep, onMoveField }: Props) {
+export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowStep, onOpenForm, onMoveField }: Props) {
   const { draft, mutate, contentLocale } = useDraft();
   const fields = draft.fields ?? [];
   const dataSources = draft.dataSources ?? [];
@@ -1167,8 +1174,7 @@ export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowSt
 
   const field = selectedId === undefined ? undefined : flattenDraftFields(fields).find((f) => f.id === selectedId);
 
-  const steps = draft.workflow?.steps ?? [];
-  const routeStepId = draft.workflow?.initialStep ?? steps[0]?.id;
+  const routeStepId = firstWorkedStepId(draft);
 
   const updateField = (patch: Partial<DraftField>) => {
     const fieldId = field?.id;
@@ -1219,6 +1225,7 @@ export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowSt
           onRemove(field.id);
         }}
         onShowStep={onShowStep}
+        onOpenForm={onOpenForm}
         onMoveField={onMoveField}
         onAdd={onAdd}
       />

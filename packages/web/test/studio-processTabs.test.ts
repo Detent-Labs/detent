@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { checkTarget, formEditorReturnTab, processTabCounts, type TabCountStep } from "../src/areas/studio/draft/process-tabs.js";
+import { checkTarget, formEditorReturnTab, processTabCounts, surfaceTab, type TabCountStep } from "../src/areas/studio/draft/process-tabs.js";
 import * as processTabs from "../src/areas/studio/draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
 import type { EditorIssue, EntityType } from "../src/areas/studio/draft/issues.js";
@@ -206,5 +206,31 @@ describe("formEditorReturnTab", () => {
 
   it("returns to Steps where the surface holds no origin", () => {
     expect(formEditorReturnTab(undefined)).toBe("steps");
+  });
+});
+
+/**
+ * The tab standing current on the process surface. On the form editor's
+ * address the editor stands inside its origin tab's body.
+ */
+describe("surfaceTab", () => {
+  it("answers the route's tab while no form step is open", () => {
+    expect(surfaceTab("fields", undefined, undefined)).toBe("fields");
+  });
+
+  it("ignores a stale origin while no form step is open", () => {
+    expect(surfaceTab("map", undefined, "forms")).toBe("map");
+  });
+
+  it("answers Forms on the form editor's address after a Forms card", () => {
+    expect(surfaceTab("map", "step_1", "forms")).toBe("forms");
+  });
+
+  it("answers Steps on the form editor's address after the step page", () => {
+    expect(surfaceTab("map", "step_1", "steps")).toBe("steps");
+  });
+
+  it("answers Steps on a direct load of the form editor's address", () => {
+    expect(surfaceTab("map", "step_1", undefined)).toBe("steps");
   });
 });

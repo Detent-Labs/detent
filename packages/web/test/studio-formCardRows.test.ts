@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
-import { formCardRows, miniatureBarHeight, viewIssues } from "../src/areas/studio/panels/formCardRows.js";
+import { formCardRows, formCounts, formSizeText, miniatureBarHeight, viewIssues } from "../src/areas/studio/panels/formCardRows.js";
 import * as cardRows from "../src/areas/studio/panels/formCardRows.js";
 
 /**
@@ -422,5 +422,82 @@ describe("A card's issue badge", () => {
     const advisory: EditorIssue = { ...viewIssue("step_a", 0), source: "view" };
 
     expect(viewIssues([advisory], "step_a").blocker).toBe(false);
+  });
+});
+
+describe("A form's size text", () => {
+  it("is undefined at zero fields, whatever the required count says", () => {
+    expect(formSizeText(0, 0)).toBeUndefined();
+    expect(formSizeText(0, 2)).toBeUndefined();
+  });
+
+  it("counts fields alone while none is required", () => {
+    expect(formSizeText(1, 0)).toBe("1 field");
+    expect(formSizeText(4, 0)).toBe("4 fields");
+  });
+
+  it("names the required count beside the field count", () => {
+    expect(formSizeText(1, 1)).toBe("1 field, 1 required");
+    expect(formSizeText(4, 2)).toBe("4 fields, 2 required");
+  });
+
+  it("matches the card's own foot text for every card", () => {
+    const rows = formCardRows(DRAFT, [], "en");
+    const expected: Record<string, string | undefined> = { step_a: "4 fields, 1 required", step_b: undefined };
+
+    expect(rows.map((row) => row.stepId)).toEqual(Object.keys(expected));
+    for (const row of rows) {
+      const step = DRAFT.workflow!.steps!.find((s) => s.id === row.stepId)!;
+      const { fieldCount, requiredCount } = formCounts(step, DRAFT.fields);
+
+      expect(formSizeText(row.fieldCount, row.requiredCount)).toBe(expected[row.stepId]);
+      expect(formSizeText(row.fieldCount, row.requiredCount)).toBe(formSizeText(fieldCount, requiredCount));
+    }
+  });
+});
+
+describe("formCounts", () => {
+  const fields = [
+    { id: AMOUNT, key: "amount", type: "number", label: { en: "Amount" } },
+    { id: PURPOSE, key: "purpose", type: "string", label: { en: "Purpose" } },
+    {
+      id: SECTION,
+      key: "extras",
+      type: "group",
+      label: { en: "Extras" },
+      fields: [{ id: AGREED, key: "agreed", type: "boolean", label: { en: "Agreed" } }],
+    },
+  ] as unknown as Draft["fields"];
+  const stepOf = (view: unknown) => ({ id: "step_a", key: "a", type: "task", view }) as unknown as NonNullable<
+    NonNullable<Draft["workflow"]>["steps"]
+  >[number];
+
+  it("counts field entries and required ones", () => {
+    const step = stepOf({ fields: [{ ref: AMOUNT, required: true }, { ref: PURPOSE }] });
+
+    expect(formCounts(step, fields)).toEqual({ fieldCount: 2, requiredCount: 1 });
+  });
+
+  it("leaves a group entry and a note out of both counts, and counts a nested member", () => {
+    const step = stepOf({
+      fields: [
+        { ref: SECTION, required: true },
+        { ref: AGREED, group: "extras", required: true },
+        { kind: "note", text: { en: "Mind the date" } },
+      ],
+    });
+
+    expect(formCounts(step, fields)).toEqual({ fieldCount: 1, requiredCount: 1 });
+  });
+
+  it("leaves a conditional requirement out of the required count", () => {
+    const step = stepOf({ fields: [{ ref: AMOUNT, required: { lang: "cel", src: "data.purpose != ''" } }] });
+
+    expect(formCounts(step, fields)).toEqual({ fieldCount: 1, requiredCount: 0 });
+  });
+
+  it("counts zero for a step with no view or an empty one", () => {
+    expect(formCounts(stepOf(undefined), fields)).toEqual({ fieldCount: 0, requiredCount: 0 });
+    expect(formCounts(stepOf({ fields: [] }), fields)).toEqual({ fieldCount: 0, requiredCount: 0 });
   });
 });

@@ -963,12 +963,6 @@ recorded rather than fixed. The RAIL tags are local to this section.
   a destructive action stay outlined in the accent. The field catalog's
   trigger also reads "Remove field" on every entity, group included; its own
   dialog a moment later reads "Remove group".
-- **A leaf field's label beside a key-less field derives `_2`.** The leaf
-  label path, `FieldEditor::updateLabel` in `panels/FieldCatalogPanel.tsx`,
-  builds its dedupe set with `""` in it. A label whose key derives empty,
-  such as `!!!`, then takes `_2` instead of its own key. The group path
-  already drops `""` (`draft/view-group-sync.ts`). A leaf key references
-  nothing, so no view breaks.
 - **A span-1 card's label collapses to zero width in a two-column form.**
   Measured at 1440x900 on the form editor canvas: `cost_center` draws eleven
   letters down one column. The member row spends about 315px on Move up, Move
@@ -1523,7 +1517,7 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
 The first review of `studio-narrow-widths` measured the shell header on a
 replica in Chrome 152, on 2026-09-13. That change wraps the header and keeps
 each area nav's buttons on one line. Its browser check, critique and audit
-ran on 2026-09-14. The NAV, ROW, BAR and KEYS tags are local to this section.
+ran on 2026-09-14. The NAV, ROW and BAR tags are local to this section.
 Paths under `panels/` and `screens/` start at `packages/web/src/areas/studio/`.
 
 - **NAV-1: an area nav wider than its line still overflows the header.** The
@@ -1553,12 +1547,6 @@ Paths under `panels/` and `screens/` start at `packages/web/src/areas/studio/`.
   input has no label (`panels/ProcessHeaderBar.tsx:794-796`). Its accessible name
   read "(untitled process)" while it held IT Offboarding. Risk (Medium): a
   screen reader announces an untitled process on every draft (WCAG 4.1.2).
-- **KEYS-1: the form editor still wraps a long key above 80rem.** Three
-  columns leave the canvas 619px at 1300px
-  (`screens/FormEditorScreen.tsx:169`). On "Submit the Exit Notification", 10
-  of 59 canvas keys took two lines there. The last one wrapped at 1381px.
-  Risk (Low): an author reads a long key broken mid-word from 1281px to
-  about 1390px.
 
 ## Open from test-instance-claim-bypass (needs its own OpenSpec change)
 
@@ -1884,6 +1872,40 @@ last six. The SENTENCE tag is local to this section.
 - **SENTENCE-11: the Ways out hint repeats the empty sentence.** "Leave it
   empty to always offer this way out" stands above "No condition yet: this
   always matches." One of the two can go.
+
+## Open from studio-form-editor-names-fields (needs its own OpenSpec change)
+
+The change named fields on the form editor's cards and stood the editor under
+the tab row. It left seven points to later changes. The NAMES tag is local to
+this section.
+
+- **NAMES-1: the Forms tab's legend says "Section" and the palette says
+  "Group".** The form editor's palette names the kind "Group", as the Fields
+  tab does. The Forms tab's legend still reads "Section" for the same group
+  break. Change 11 owns the wording across the Fields tab and can settle which
+  word wins.
+- **NAMES-2: an unnamed card offers no selection beside its input.** A card
+  with an empty label keeps its name input and offers no strip. The input says
+  what to do, and the Fields tab still edits the field. Change 11's field card
+  may answer whether such a card can take a selection.
+- **NAMES-4: a minted key can stay its kind's name.** The key lock counts a
+  base version that has not loaded as published, and a failed fetch never
+  loads. On such a process, naming a new field "Amount" keeps the key
+  `number`. The Fields tab's own add mints an empty key and still derives one.
+- **NAMES-5: naming in a non-base content locale leaves the base label.** A
+  name typed in German lands in `de` alone. The base-locale label keeps the
+  kind's name, so an English participant reads "Date". No translation warning
+  fires, since the base entry has text.
+- **NAMES-6: three screens still lose their `.btn` look.** Tools, Player and
+  Versions write a literal `.btn` class beside `stylex.props`. The compiled
+  class replaces it, so their back controls differ from the process surface's.
+- **NAMES-7: "Put this field on a step" leaves the editor onto Steps.** The
+  form editor opens on the Steps tab, and leaving it lands on the step page.
+  The author reaches the Fields tab's open field again only by hand.
+- **NAMES-8: browser Back out of the form editor drops the focus.** The
+  breadcrumb and a tab press move the focus. The browser's own Back moves
+  none, so the focus falls to the page body. The archived NAMES-3 fix covers
+  only the first two exits.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

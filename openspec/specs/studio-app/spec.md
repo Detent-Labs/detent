@@ -1621,6 +1621,14 @@ lacks the field.
 A `group` field is outside the lock. It has no entry in the flat `data`
 namespace. A change to its key rewrites the view entries that name it.
 
+A key SHALL still count as derived while it reads the prior derivation plus
+a `_<n>` suffix. The collision rule writes that shape. A deduped key thus
+keeps following its label after a sibling's rename. A hand-typed key of
+exactly that shape counts as derived too.
+
+The form editor keys a field it mints at once, from its kind's name
+(`studio-form-editor`). A field the Fields tab adds starts with an empty key.
+
 The developer's first direct write to a field's key field SHALL stop this
 auto-fill for that one field. The stop SHALL hold for the rest of the draft's
 lifetime in the browser. The key field SHALL remain an ordinary, writable text
@@ -1640,8 +1648,9 @@ input throughout.
   the draft's base locale
 - **AND** the developer drops a new field onto the canvas
 - **AND** the developer types a label into it, never touching its key field
-- **THEN** the field's key stays empty. A new field's label seeds under the
-  current content locale. Derivation reads the base-locale entry alone
+- **THEN** the field's key does not follow that label. A new field's label
+  seeds under the current content locale. Derivation reads the base-locale
+  entry alone
 
 #### Scenario: A new nested field's key follows its label as the developer types
 
@@ -1714,6 +1723,14 @@ input throughout.
 - **AND** the developer changes the group's label to "Order request"
 - **THEN** the group's key reads `order_request`
 - **AND** the view entries that named `request` name `order_request`
+
+#### Scenario: A deduped key keeps following its label
+
+- **WHEN** a field labelled "Date" carries the key `date_2`, because another
+  field held `date`
+- **AND** the other field's key has since changed
+- **AND** the developer changes the first field's label to "Due date"
+- **THEN** the field's key reads `due_date`
 
 ### Requirement: A field's key input commits on blur
 
@@ -2536,29 +2553,6 @@ a step binds to the catalog, and a note binds to nothing.
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
-### Requirement: The Form section's configured-field count reads field entries alone
-
-The Form section SHALL report how many of the catalog's fields a step's view
-configures. That line reads `N / M`, where `M` is the catalog's own size.
-
-The first number SHALL count field entries alone. A note occupies no catalog
-row. Counting one would report a step as binding more of the catalog than it
-does. The second number never moves for a note, because the catalog holds
-none.
-
-This count sits in the Form section, not in the form editor. The form editor
-displays no count of its own.
-
-#### Scenario: A note raises no configured-field count
-
-- **WHEN** a step's view holds one field entry and three notes
-- **THEN** the Form section reports that step's configured fields as 1
-
-#### Scenario: A step holding notes alone reports none configured
-
-- **WHEN** a step's view holds notes alone
-- **THEN** the Form section reports that step's configured fields as 0
-
 ### Requirement: The Settings tab declares the process's base locale
 
 The Settings tab's Process view SHALL carry a control that reads and writes
@@ -3221,10 +3215,18 @@ The effect half SHALL show an empty state for as long as no step view
 references the selected field. It SHALL say that no step asks for the
 field yet.
 
-It SHALL offer the route from there to a step view. That route SHALL
-reach the canvas with a step preselected, on the terms the panels
-screen's own step-target rule states.
+It SHALL offer the route from there to a step's form, "Put this field on a
+step". That route SHALL open the form editor (`studio-form-editor`) for the
+first step a person works. The selected field then stands in the editor's
+palette.
 
+A step a person works is neither an end nor a call to another process. The
+route takes the initial step when a person works it. Otherwise it takes the
+first such step in the draft's own order. A draft with no step a person
+works SHALL offer no route.
+
+<!-- antislop: allow trailing-negation -->
+<!-- Why: copied word for word from the live requirement. -->
 The empty state SHALL take the empty tone, never the refusal tone. A
 field no step asks for yet is an unfinished draft, not a broken one.
 
@@ -3238,6 +3240,26 @@ field no step asks for yet is an unfinished draft, not a broken one.
 
 - **WHEN** a step view gains a reference to the selected field
 - **THEN** the effect half lists that step, and the empty state goes
+
+#### Scenario: The route opens the first step's form
+
+- **WHEN** the initial step is a step a person works, labelled Submit
+- **AND** the author presses "Put this field on a step"
+- **THEN** the form editor opens for Submit
+- **AND** the selected field stands in its palette
+
+#### Scenario: The route skips a step no person works
+
+- **WHEN** the initial step calls another process
+- **AND** the next step in the draft's order is one a person works, labelled
+  Review
+- **AND** the author presses "Put this field on a step"
+- **THEN** the form editor opens for Review
+
+#### Scenario: No step a person works offers no route
+
+- **WHEN** every step of the draft is an end or a call to another process
+- **THEN** the effect half offers no "Put this field on a step" control
 
 ### Requirement: The Fields view's definition half states values, a default and a preview
 

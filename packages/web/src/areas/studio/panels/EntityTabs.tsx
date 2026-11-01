@@ -354,6 +354,7 @@ export function FieldsTab({
   token,
   visible,
   onShowStep,
+  onOpenForm,
 }: {
   token: string;
   /** False while the Fields tab hides. Every tab body stays mounted and five
@@ -361,6 +362,9 @@ export function FieldsTab({
    * open. A hide declines that removal. */
   visible: boolean;
   onShowStep: (stepId: string) => void;
+  /** Opens the form editor for one step: the field catalog's empty-state
+   * route. */
+  onOpenForm: (stepId: string) => void;
 }) {
   const { draft, mutate, validation, contentLocale } = useDraft();
 
@@ -649,6 +653,7 @@ export function FieldsTab({
           onAdd={addField}
           onRemove={requestRemove}
           onShowStep={onShowStep}
+          onOpenForm={onOpenForm}
           onMoveField={moveField}
         />
       </div>

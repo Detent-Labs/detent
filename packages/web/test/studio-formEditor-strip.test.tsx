@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FormEditorStrip, NoteEditorStrip } from "../src/areas/studio/screens/FormEditorScreen.js";
 import type { DraftViewField } from "../src/areas/studio/draft/view-layout.js";
@@ -22,20 +23,64 @@ import { DraftContext, type DraftContextValue } from "../src/areas/studio/draft/
  * field catalog's own move control is where an author re-parents a field
  * now, so a select here would offer one lawful value and several the
  * publish rejects.
+ *
+ * Both strips read `useDraft()` through `LocalizedTextInput`, so every mount
+ * below sits inside `DraftContext.Provider`, the way
+ * `studio-formEditor-groupCanvas.test.tsx` supplies it.
  */
+function contextValue(draft: Draft): DraftContextValue {
+  const validation: ValidationResult = {
+    zodValid: true,
+    issues: [],
+    dimensions: {
+      zod: "ran",
+      duration: "ran",
+      structural: "ran",
+      actionType: "ran",
+      assignmentType: "ran",
+      dataSourceType: "ran",
+      registryConfig: "not-run",
+      cel: "ran",
+    },
+    subprocessStepStatus: {},
+    chainingSiteStatus: {},
+  };
+  return {
+    draft,
+    mutate: () => {},
+    replace: () => {},
+    validation,
+    loadedChildren: {},
+    setChildForStep: () => {},
+    registry: undefined,
+    loadedChainingTargets: {},
+    contentLocale: "en",
+    setContentLocale: () => {},
+    usedLocales: ["en"],
+    loadGeneration: 0,
+  };
+}
+
+const withDraft = (node: ReactNode, contentLocale = "en") =>
+  renderToStaticMarkup(
+    <DraftContext.Provider value={{ ...contextValue({ baseLocale: "en" } as unknown as Draft), contentLocale }}>{node}</DraftContext.Provider>,
+  );
+
 const row = (): DraftViewField => ({ ref: "field_amount" as never });
 
 const render = (technicalFieldIds: Set<string>) =>
-  renderToStaticMarkup(
+  withDraft(
     <FormEditorStrip
       row={row()}
       label="Amount"
+      fieldLabel={{ en: "Amount" }}
       ownStepIndex={0}
       written={() => 0}
       technicalFieldIds={technicalFieldIds}
       isGroup={false}
       tabOptions={[]}
       tabValue={undefined}
+      onChangeLabel={() => {}}
       onChangeFlag={() => {}}
       onChangeSpan={() => {}}
       onChangeTab={() => {}}
@@ -69,16 +114,18 @@ describe("FormEditorStrip", () => {
  */
 describe("FormEditorStrip: dominance-scoped gating", () => {
   const renderGated = (written: (fieldId: string, ownStepIndex: number) => number, ownStepIndex = 0) =>
-    renderToStaticMarkup(
+    withDraft(
       <FormEditorStrip
         row={{ ref: "field_amount" as never, required: true }}
         label="Amount"
+        fieldLabel={{ en: "Amount" }}
         ownStepIndex={ownStepIndex}
         written={written}
         technicalFieldIds={new Set()}
         isGroup={false}
         tabOptions={[]}
         tabValue={undefined}
+        onChangeLabel={() => {}}
         onChangeFlag={() => {}}
         onChangeSpan={() => {}}
         onChangeTab={() => {}}
@@ -105,8 +152,7 @@ describe("FormEditorStrip: dominance-scoped gating", () => {
  * form-view-tabs task 5.8: both strips carry a tab picker
  * (`studio-form-editor`: "A selected entry's strip assigns it to a tab"). The
  * field strip carries no group picker beside it. Both mount the same
- * `TabPicker`, with the same four props, so the field strip's renders below
- * need no draft context; the note strip's own render at the end supplies one.
+ * `TabPicker`, with the same four props.
  */
 const TABS = [
   { key: "tab_1", label: "Details" },
@@ -114,16 +160,18 @@ const TABS = [
 ];
 
 const renderTabbed = (over: { tabOptions?: typeof TABS; tabValue?: string; group?: string } = {}) =>
-  renderToStaticMarkup(
+  withDraft(
     <FormEditorStrip
       row={{ ref: "field_amount" as never, group: over.group }}
       label="Amount"
+      fieldLabel={{ en: "Amount" }}
       ownStepIndex={0}
       written={() => 1}
       technicalFieldIds={new Set()}
       isGroup={false}
       tabOptions={over.tabOptions ?? TABS}
       tabValue={over.tabValue}
+      onChangeLabel={() => {}}
       onChangeFlag={() => {}}
       onChangeSpan={() => {}}
       onChangeTab={() => {}}
@@ -184,63 +232,90 @@ describe("the strip's tab picker", () => {
 
 /**
  * A note has no catalog parent, so its own strip keeps the group picker
- * beside the tab picker. `NoteEditorStrip` reads the content locale off the
- * draft context, so this render supplies `DraftContext.Provider` the way
- * `studio-formEditor-groupCanvas.test.tsx` does.
+ * beside the tab picker, listing each group card by its label.
  */
-function contextValue(draft: Draft): DraftContextValue {
-  const validation: ValidationResult = {
-    zodValid: true,
-    issues: [],
-    dimensions: {
-      zod: "ran",
-      duration: "ran",
-      structural: "ran",
-      actionType: "ran",
-      assignmentType: "ran",
-      dataSourceType: "ran",
-      registryConfig: "not-run",
-      cel: "ran",
-    },
-    subprocessStepStatus: {},
-    chainingSiteStatus: {},
-  };
-  return {
-    draft,
-    mutate: () => {},
-    replace: () => {},
-    validation,
-    loadedChildren: {},
-    setChildForStep: () => {},
-    registry: undefined,
-    loadedChainingTargets: {},
-    contentLocale: "en",
-    setContentLocale: () => {},
-    usedLocales: ["en"],
-    loadGeneration: 0,
-  };
-}
-
 describe("the note strip on a tabbed form", () => {
   it("keeps both the group picker and the tab picker", () => {
-    const html = renderToStaticMarkup(
-      <DraftContext.Provider value={contextValue({ baseLocale: "en" } as unknown as Draft)}>
-        <NoteEditorStrip
-          row={{ kind: "note", text: { en: "Heads up" } }}
-          baseLocale="en"
-          groupKeys={["approval"]}
-          tabOptions={TABS}
-          tabValue="tab_1"
-          onChangeText={() => {}}
-          onChangeVisible={() => {}}
-          onChangeSpan={() => {}}
-          onChangeGroup={() => {}}
-          onChangeTab={() => {}}
-        />
-      </DraftContext.Provider>,
-    );
+    const html = renderNote();
 
     expect(html).toContain(">Group<");
     expect(html).toContain(">Tab<");
+  });
+
+  it("lists each group card by its label and writes its key", () => {
+    const html = renderNote();
+
+    expect(html).toContain('<option value="approval">Approval sign-off</option>');
+    expect(html).not.toContain(">approval<");
+  });
+});
+
+function renderNote(): string {
+  return withDraft(
+    <NoteEditorStrip
+      row={{ kind: "note", text: { en: "Heads up" } }}
+      baseLocale="en"
+      groupOptions={[{ key: "approval", label: "Approval sign-off" }]}
+      tabOptions={TABS}
+      tabValue="tab_1"
+      onChangeText={() => {}}
+      onChangeVisible={() => {}}
+      onChangeSpan={() => {}}
+      onChangeGroup={() => {}}
+      onChangeTab={() => {}}
+    />,
+  );
+}
+
+describe("the field strip's Name control", () => {
+  it("leads the strip with Name, holding the label for the content locale", () => {
+    const html = render(new Set());
+
+    expect(html).toContain(">Name<");
+    expect(html).toContain('value="Amount"');
+    expect(html.indexOf(">Name<")).toBeLessThan(html.indexOf(">Asked<"));
+  });
+
+  it("prints the label as the heading", () => {
+    expect(render(new Set())).toMatch(/<h3[^>]*>Amount<\/h3>/);
+  });
+
+  it("warns beside the Name control when the content locale lacks a translation", () => {
+    const html = withDraft(
+      <FormEditorStrip
+        row={row()}
+        label="Amount"
+        fieldLabel={{ en: "Amount" }}
+        ownStepIndex={0}
+        written={() => 0}
+        technicalFieldIds={new Set()}
+        isGroup={false}
+        tabOptions={[]}
+        tabValue={undefined}
+        onChangeLabel={() => {}}
+        onChangeFlag={() => {}}
+        onChangeSpan={() => {}}
+        onChangeTab={() => {}}
+      />,
+      "de",
+    );
+
+    expect(html).toContain("No de translation yet.");
+  });
+});
+
+describe("both strips' Width select", () => {
+  it("offers One column and Both columns on the field strip, writing 1 and 2", () => {
+    const html = render(new Set());
+
+    expect(html).toContain('<option value="1" selected="">One column</option>');
+    expect(html).toContain('<option value="2">Both columns</option>');
+  });
+
+  it("offers One column and Both columns on the note strip, writing 1 and 2", () => {
+    const html = renderNote();
+
+    expect(html).toContain('<option value="1" selected="">One column</option>');
+    expect(html).toContain('<option value="2">Both columns</option>');
   });
 });
