@@ -22,6 +22,9 @@ export type ReadByTarget =
   | { kind: "step"; stepId: string }
   | { kind: "field"; fieldId: string };
 
+/** A target outside the Fields tab: the tab itself selects a `field` one. */
+export type OutsidePlace = Exclude<ReadByTarget, { kind: "field" }>;
+
 export interface ReadByRow {
   /** Where the expression sits, in the author's words. */
   place: string;

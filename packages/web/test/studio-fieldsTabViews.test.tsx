@@ -59,7 +59,7 @@ const DRAFT = {
 function render(view: FieldsView = "catalog"): string {
   return renderToStaticMarkup(
     <DraftContext.Provider value={contextValue(DRAFT)}>
-      <FieldsTabViews view={view} onOpenView={() => {}} token="t" visible onShowStep={() => {}} onOpenForm={() => {}} />
+      <FieldsTabViews view={view} onOpenView={() => {}} token="t" visible onShowStep={() => {}} onOpenForm={() => {}} onOpenPlace={() => {}} />
     </DraftContext.Provider>,
   );
 }

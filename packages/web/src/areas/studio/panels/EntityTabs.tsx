@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import type { DataSourceDef } from "workflow-engine/schema";
@@ -29,6 +29,7 @@ import { flattenRailFields, issueCountForEntityId } from "../draft/panel-rail";
 import { moveFieldAndSyncViews } from "../draft/view-group-sync";
 import { fieldRemovalReach, hasReach, removeFieldAndReferences, type FieldRemovalReach } from "../draft/field-removal";
 import { FieldCatalogPanel } from "./FieldCatalogPanel";
+import type { OutsidePlace, ReadByTarget } from "./readByRows";
 import {
   dataSourceRemovalReach,
   hasDataSourceReach,
@@ -49,29 +50,33 @@ import {
 type DraftDataSource = DraftOf<DataSourceDef>;
 
 /** Below this width the rail and the open editor no longer fit beside one
- * another. The rail holds its 20rem, and `FieldCatalogPanel` stacks its own
- * two halves at the same width, so the whole tab turns at once. */
+ * another. The rail holds its 20rem cap above the editor, and the view body
+ * scrolls both (design.md D13), as the step page's tab body does. */
 const NARROW = "@media (max-width: 64rem)";
 
 const styles = stylex.create({
   // Below the breakpoint the rail and the editor fall under one another, in
-  // source order: list, then the editor.
+  // source order: list, then the editor. The grid then takes its content's
+  // height, and the view body around it scrolls, so the tab holds two scroll
+  // boxes, the rail and the view body, and no third.
   layout: {
     display: "grid",
     flex: "1 1 0",
     gridTemplateColumns: { default: "20rem minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
-    gridTemplateRows: { default: "none", [NARROW]: "auto minmax(0, 1fr)" },
+    gridTemplateRows: { default: "none", [NARROW]: "auto auto" },
     gap: space.s3,
     alignItems: "stretch",
     minHeight: 0,
-    height: "100%",
-    overflow: "hidden",
+    height: { default: "100%", [NARROW]: "auto" },
+    overflow: { default: "hidden", [NARROW]: "visible" },
   },
   layoutChild: {
     minHeight: 0,
   },
+  // Below the breakpoint the editor has no scroll box of its own; the view
+  // body scrolls it. Its padding stays, so a ring keeps its room.
   editor: {
-    overflowY: "auto",
+    overflowY: { default: "auto", [NARROW]: "visible" },
     overscrollBehavior: "contain",
     minWidth: 0,
     // Room for the focus ring: a scroll box clips at its padding edge
@@ -355,6 +360,7 @@ export function FieldsTab({
   visible,
   onShowStep,
   onOpenForm,
+  onOpenPlace,
 }: {
   token: string;
   /** False while the Fields tab hides. Every tab body stays mounted and five
@@ -362,9 +368,12 @@ export function FieldsTab({
    * open. A hide declines that removal. */
   visible: boolean;
   onShowStep: (stepId: string) => void;
-  /** Opens the form editor for one step: the field catalog's empty-state
-   * route. */
+  /** Opens the form editor for one step: an Asked on row's "Open the form"
+   * and the empty state's route. */
   onOpenForm: (stepId: string) => void;
+  /** A Read by row's "Open" for a place outside this tab: a way out, a step
+   * or a form (design.md D4). The tab handles a field's own place itself. */
+  onOpenPlace: (target: OutsidePlace) => void;
 }) {
   const { draft, mutate, validation, contentLocale } = useDraft();
 
@@ -373,6 +382,22 @@ export function FieldsTab({
   const baseLocale = draft.baseLocale ?? "en";
 
   const [selectedFieldIdState, setSelectedFieldId] = useState<string | undefined>(undefined);
+  // The field whose card opens More by itself: a Read by row named that
+  // field's rule or default. The card clears it once More stands open, so a
+  // later manual close holds.
+  const [openMoreFor, setOpenMoreFor] = useState<string | undefined>(undefined);
+  const clearOpenMore = useCallback(() => setOpenMoreFor(undefined), []);
+
+  /** A Read by row's "Open". A field's rule or default selects that field and
+   * opens its More; every other place leaves the tab. */
+  const openPlace = (target: ReadByTarget) => {
+    if (target.kind === "field") {
+      setSelectedFieldId(target.fieldId);
+      setOpenMoreFor(target.fieldId);
+      return;
+    }
+    onOpenPlace(target);
+  };
 
   // `dragFieldId` is the row a pointer picked up. `announcement` is what the
   // live region below reads out after a move or a removal. `refocusId` names
@@ -654,7 +679,10 @@ export function FieldsTab({
           onRemove={requestRemove}
           onShowStep={onShowStep}
           onOpenForm={onOpenForm}
+          onOpenPlace={openPlace}
           onMoveField={moveField}
+          openMoreFor={openMoreFor}
+          onMoreOpened={clearOpenMore}
         />
       </div>
       {/* Outside the keyed `FieldEditor`, which a confirm remounts. A modal

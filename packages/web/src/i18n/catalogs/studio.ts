@@ -101,10 +101,6 @@ export const en = {
   "fieldCatalog.typeDropsControlConfirm": "The new type doesn't allow this field's control. Switch anyway and drop it?",
   "fieldCatalog.typeDropsBothConfirm": "The new type allows neither this field's format nor its control. Switch anyway and drop both?",
   "fieldCatalog.noneOption": "(none)",
-  "fieldCatalog.optionValuePlaceholder": "value",
-  "fieldCatalog.optionLabelPlaceholder": "label",
-  "fieldCatalog.removeOption": "remove",
-  "fieldCatalog.addOption": "+ Add option",
   "fieldCatalog.addSubField": "+ Add field to this group",
   "fieldCatalog.customTypeLabel": "custom type",
   "fieldCatalog.developerView": "Developer view",
@@ -112,7 +108,6 @@ export const en = {
   "fieldCatalog.baseLocaleMark": "base locale",
   "fieldCatalog.translationComplete": "translated",
   "fieldCatalog.translationGap": "{count} missing",
-  "fieldCatalog.technicalLabel": "Technical",
   "fieldCatalog.technicalClearConfirm":
     "Checking Technical will clear {count} required/readonly key(s) across this draft's steps. Continue?",
   "fieldCatalog.previewHeading": "How it will look",
@@ -120,22 +115,17 @@ export const en = {
     "This field's choices come from a data source. They resolve when a participant reaches this step, not here.",
   "fieldCatalog.previewPersonResolvesAtRuntime":
     "This field's people list comes from the groups this process allows. It resolves when a participant reaches this step, not here.",
-  "fieldCatalog.usedInHeading": "Used in",
   "fieldCatalog.usedInEmpty": "No step asks for this field yet.",
   "fieldCatalog.showOnCanvas": "Show on the map",
   "fieldCatalog.readByHeading": "Read by",
   "fieldCatalog.readByEmpty": "No condition reads this field.",
   "fieldCatalog.onlyAskWhenHeading": "Only ask this when",
-  "fieldCatalog.conditionNoSteps": "No step asks for this field yet, so there is nothing to condition.",
   "fieldCatalog.conditionScopeNote": "Writes to: {steps}.",
   "fieldCatalog.conditionClear": "Clear on {steps}",
   "fieldCatalog.conditionDivergentNote": "These steps currently disagree: {steps}.",
   "fieldCatalog.conditionLiteralNote": "This replaces a literal condition on: {steps}.",
   "fieldCatalog.whereValuesHeading": "Where values come from",
   "fieldCatalog.validationHeading": "Validation",
-  "fieldCatalog.whatAsksHeading": "What this field asks",
-  "fieldCatalog.whatKindHeading": "What kind of field",
-  "fieldCatalog.askForThisHeading": "Ask for this",
   // The five control labels of the definition half. They read as words rather
   // than as the JSON members they write, because the zone headings around them
   // are plain questions and a raw `dataSource` beside "Where values come from"
@@ -143,7 +133,6 @@ export const en = {
   // spells the member names (design.md: the developer's vocabulary no longer
   // leads). Each one is a word an author reads, so none is mono.
   "fieldCatalog.kindLabel": "Kind",
-  "fieldCatalog.labelLabel": "Label",
   "fieldCatalog.descriptionLabel": "Description",
   "fieldCatalog.keyLabel": "Key",
   "fieldCatalog.keyFollows": "The key follows the label until the first publish.",
@@ -156,14 +145,10 @@ export const en = {
   "fieldCatalog.rewroteOne": "Updated 1 condition.",
   "fieldCatalog.rewroteMany": "Updated {count} conditions.",
   "fieldCatalog.dataSourceLabel": "Values come from",
-  "fieldCatalog.requiredLabel": "Required",
-  "fieldCatalog.requiredNoSteps": "No step asks for this field yet, so there is nothing to require.",
   "fieldCatalog.requiredTechnicalNote":
     "The process writes this field itself, so no step view may ask a participant for it.",
   "fieldCatalog.requiredScopeNote": "Writes to: {steps}.",
   "fieldCatalog.requiredDivergentNote": "These steps currently disagree: {steps}.",
-  "fieldCatalog.definitionHalfLabel": "What this field is",
-  "fieldCatalog.effectHalfLabel": "Where it acts in the process",
   "fieldCatalog.effectEmptyRoute": "Put this field on a step",
   "fieldCatalog.startHeading": "This process collects nothing yet",
   "fieldCatalog.startBody":
@@ -209,8 +194,6 @@ export const en = {
   "defaultValue.heading": "Default value",
   "defaultValue.literalLabel": "value",
   "defaultValue.celLabel": "CEL expression",
-  "defaultValue.editAsCel": "Edit as CEL",
-  "defaultValue.useValue": "Use a value",
   "defaultValue.clear": "Clear default",
   "defaultValue.unparseable": "This does not parse as CEL.",
   "defaultValue.groupDisabledNote": "A group's own default is never read. Set defaults on its children instead.",
@@ -431,8 +414,8 @@ export const en = {
   "formEditor.tabFromGroup": "The group decides the tab.",
 
   // The condition builder. Its rows and its sentence read words; the CEL
-  // stands only in its Developer view. `rawRow`, `unparseable`, `celReadout`
-  // and `celEmpty` serve the rule builder, which keeps a CEL readout.
+  // stands only in its Developer view. `rawRow` and `unparseable` serve the
+  // rule builder too.
   "condition.empty": "No condition yet: this always matches.",
   "condition.addRow": "+ Add row",
   "condition.removeRow": "Remove row",
@@ -447,8 +430,6 @@ export const en = {
   "condition.rawRow": "Written by hand. Edit it as CEL.",
   "condition.incomplete": "Needs a value before it is written.",
   "condition.joinerHint": "How the rows combine. Click to flip.",
-  "condition.celReadout": "Writes",
-  "condition.celEmpty": "nothing yet",
   "condition.unparseable": "This does not parse as CEL, so the builder cannot open it.",
   "condition.developerView": "Developer view",
   "condition.onlyWhenHeading": "Only when",

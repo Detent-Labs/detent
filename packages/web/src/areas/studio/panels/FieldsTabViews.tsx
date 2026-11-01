@@ -1,8 +1,10 @@
 import * as stylex from "@stylexjs/stylex";
+import { focus } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { HeldDraft } from "../draft/held-while-hidden.js";
 import type { FieldsView, TabView } from "../routing.js";
 import { DataSourcesTab, FieldsTab } from "./EntityTabs.js";
+import type { OutsidePlace } from "./readByRows.js";
 import { FieldMatrixPanel } from "./FieldMatrixPanel.js";
 import { SubRow, subTabDomId, subTabPanelDomId } from "./SubRow.js";
 
@@ -15,11 +17,20 @@ const styles = stylex.create({
     flex: "1 1 auto",
     minHeight: 0,
   },
+  // The view body scrolls (design.md D13). Above 64rem the rail and the
+  // editor fill it and scroll on their own; below it they stack, and this
+  // box scrolls both, as the step page's tab body does. Room for the focus
+  // ring: a scroll box clips at its padding edge, and the scroll padding
+  // keeps that room when a focus scroll stops short of either end.
   view: {
     display: "flex",
     flexDirection: "column",
     flex: "1 1 auto",
     minHeight: 0,
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    padding: focus.reach,
+    scrollPadding: focus.reach,
   },
   // `hidden` alone loses against the compiled `display` above, since an
   // author sheet beats the UA one, so the hidden state picks its own style.
@@ -35,9 +46,11 @@ interface Props {
   /** True while the Fields tab stands open and the JSON surface does not. */
   visible: boolean;
   onShowStep: (stepId: string) => void;
-  /** Opens the form editor for one step: the field catalog's empty-state
-   * route. */
+  /** Opens the form editor for one step: an Asked on row's "Open the form"
+   * and the empty state's route. */
   onOpenForm: (stepId: string) => void;
+  /** A Read by row's "Open" for a way out, a step or a form (design.md D4). */
+  onOpenPlace: (target: OutsidePlace) => void;
 }
 
 /**
@@ -50,7 +63,7 @@ interface Props {
  * The matrix derives from the whole draft. While hidden it reads the draft it
  * last drew, so typing in the catalog skips it (`studio-app`).
  */
-export function FieldsTabViews({ view, onOpenView, token, visible, onShowStep, onOpenForm }: Props) {
+export function FieldsTabViews({ view, onOpenView, token, visible, onShowStep, onOpenForm, onOpenPlace }: Props) {
   const catalogHidden = view !== "catalog";
   const matrixHidden = view !== "matrix";
   const sourcesHidden = view !== "sources";
@@ -74,7 +87,13 @@ export function FieldsTabViews({ view, onOpenView, token, visible, onShowStep, o
         hidden={catalogHidden}
         {...stylex.props(styles.view, catalogHidden && styles.viewHidden)}
       >
-        <FieldsTab token={token} visible={visible && view === "catalog"} onShowStep={onShowStep} onOpenForm={onOpenForm} />
+        <FieldsTab
+          token={token}
+          visible={visible && view === "catalog"}
+          onShowStep={onShowStep}
+          onOpenForm={onOpenForm}
+          onOpenPlace={onOpenPlace}
+        />
       </div>
       <div
         id={subTabPanelDomId("fields", "matrix")}

@@ -160,7 +160,6 @@ describe("flag vocabulary", () => {
   it("gives each view flag one name on the strip, the Forms tab and the Fields tab", () => {
     expect(t("formEditor.required")).toBe("Required");
     expect(t("formsTab.legendRequired")).toBe(t("formEditor.required"));
-    expect(t("fieldCatalog.requiredLabel")).toBe(t("formEditor.required"));
     expect(t("formEditor.readonly")).toBe("Read-only");
     expect(t("formEditor.visible")).toBe("Asked");
   });

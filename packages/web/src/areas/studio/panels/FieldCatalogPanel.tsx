@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import {
   FIELD_KINDS,
@@ -27,7 +27,8 @@ import { DefaultValueEditor } from "./shared/DefaultValueEditor";
 import { fieldLocaleGaps, missingTranslationWarning, resolveDraftLocalizedText, seedLocalizedText } from "../draft/localized-text";
 import { flattenDraftFields } from "../draft/fields";
 import { firstWorkedStepId } from "../draft/performedBy.js";
-import { usePublishedFieldIds } from "../draft/publishedFields.js";
+import { usePublishedFieldIds, usePublishedOptionValues } from "../draft/publishedFields.js";
+import { applyChoiceName } from "../draft/choiceValue.js";
 import { countKeyRewrites } from "../draft/key-readers.js";
 import { writeFieldKey } from "../draft/fieldKey.js";
 import { writeFieldLabel } from "../draft/fieldLabel.js";
@@ -49,10 +50,11 @@ import {
   nextRewriteLine,
   removeControlId,
   rewriteLineFor,
+  showsChoices,
   type KeyCommitProblem,
   type RewriteLineState,
 } from "./fieldCatalogLogic.js";
-import { fieldCheckZone, namesFieldKey, type FieldCheckZone } from "./fieldCheckZone.js";
+import { fieldCheckZone, namesFieldKey, namesFieldTechnical, type FieldCheckZone } from "./fieldCheckZone.js";
 import { fieldKindLabel } from "../draft/field-type-labels";
 import {
   applyRequiredOverride,
@@ -61,59 +63,55 @@ import {
   clearConditionLabel,
   countTechnicalClearKeys,
   fieldRequiredOverrides,
-  fieldUsage,
   fieldVisibleOverrides,
-  type FieldUsageRow,
   needsTechnicalToggleConfirm,
   visibleClearSteps,
 } from "../draft/field-usage";
 import { previewViewFields } from "../draft/field-preview";
 import { ConditionInput } from "./shared/ConditionInput";
-import { readByRows } from "./readByRows";
+import { fill } from "./shared/optionText";
+import { readByRows, type ReadByTarget } from "./readByRows";
+import { askedOnRows, type AskedOnMark } from "./askedOnRows";
 import type { EditorIssue } from "../draft/issues";
 
 type DraftField = DraftOf<FieldDef>;
 type DraftDataSource = DraftOf<DataSourceDef>;
 type DraftOption = DraftOf<FieldOption>;
 
-/** Below this width the two halves fall under one another, in the reading
- * order the design states: definition, then effect. `PanelsScreen` stacks
- * its index rail at the same width, so the whole screen turns at once. */
-const NARROW = "@media (max-width: 64rem)";
+/** The word each Asked on mark prints, in the body face. */
+const MARK_KEY: Record<AskedOnMark, CatalogKey> = {
+  required: "formEditor.required",
+  readonly: "formEditor.readonly",
+  hidden: "fieldCard.hiddenMark",
+};
 
-/** The one motion the two halves carry (task 8.1). A write in the definition
- * half tints the steps that write reached, so the author sees the connection
- * between the halves rather than having to infer it. It fades out on its
- * own: the tint is a pointer, not a state, and a state would still be on
- * screen after the next change. The accent at low mix, so the row reads as
- * touched, never as wrong — the refusal tone belongs to a check. */
-const usageTint = stylex.keyframes({
-  from: { backgroundColor: `color-mix(in srgb, ${colors.accent} 18%, transparent)` },
-  to: { backgroundColor: "transparent" },
-});
-
-/** Every style this file's own markup renders. `fieldRow`, `panelHeading`
- * and `fieldRowLabel` each duplicate a shape `panels/DataSourcesPanel.tsx`
- * compiles for itself; each file owns its half. */
+/** Every style this file's own markup renders. The card follows the step
+ * page's reading column (`StepPage.tsx`'s `column`): one column, flush left,
+ * capped at 52rem. */
 const styles = stylex.create({
+  // The card: the field's name line, its inputs, its sections, then More and
+  // Remove field, top to bottom in one column.
+  card: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s2,
+    width: "100%",
+    maxWidth: "52rem",
+    minWidth: 0,
+  },
   panelHeading: {
-    marginBlockEnd: space.s3,
+    alignSelf: "stretch",
+    marginBlockEnd: space.s1,
     marginBlockStart: 0,
     marginInline: 0,
     paddingBottom: space.s2,
     borderBottomWidth: 2,
     borderBottomStyle: "solid",
     borderBottomColor: colors.divider,
-  },
-  fieldRow: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: space.s2,
+    overflowWrap: "anywhere",
   },
   // A field's own label: the label above its control, both flush left.
-  // Direct children of a `fieldRow` or a zone alone; the shared editors
-  // nest their own labels deeper and keep whatever they carry.
   fieldRowLabel: {
     display: "flex",
     flexDirection: "column",
@@ -131,79 +129,175 @@ const styles = stylex.create({
   studioMono: {
     fontFamily: fonts.mono,
   },
-  // The one row the design language calls out by name: three controls (a
-  // value, a label, remove) on one line. It wraps rather than overflowing
-  // (task 8.2): measured at 1280px, the two halves give each zone 486px and
-  // this row's three children asked for 530. A German label takes the
-  // Remove button wider still, so the line has to be allowed to break.
-  optionRow: {
+  // One section of the card. Every section but Kind stands under a 1px
+  // hairline (design.md D1).
+  section: {
     display: "flex",
-    flexWrap: "wrap",
-    alignItems: "baseline",
+    flexDirection: "column",
+    alignItems: "flex-start",
     gap: space.s2,
     width: "100%",
-  },
-  // `minWidth: 0` overrides an input's own intrinsic minimum, which flex
-  // otherwise honours, so the two inputs shrink with the row.
-  optionRowInput: {
-    flex: "1 1 8rem",
     minWidth: 0,
   },
-  // The usage list: hairline-divided register rows, flush left, the same
-  // rule the index rail's own rows take.
-  usageList: {
+  sectionRuled: {
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
+    marginBlockStart: space.s3,
+    paddingBlockStart: space.s3,
+  },
+  // The Title style (`DESIGN.md`'s Typography): 800, 0.85rem, uppercase,
+  // tracked 0.08em, in slate. `shell/global.css` gives every heading a face,
+  // a size and margins; the declarations here reset them.
+  sectionHeading: {
+    margin: 0,
+    fontFamily: fonts.body,
+    fontSize: "0.85rem",
+    fontWeight: 800,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: colors.textMuted,
+  },
+  // A section holding a check takes the refusal tone at its own heading, so
+  // an author scanning the card sees which section is wrong with nothing to
+  // open.
+  headingFailed: {
+    color: colors.refusal,
+  },
+  // More: a native disclosure, kept a block box, since a `<details>` makes a
+  // poor flex container. Its body below lays the parts out.
+  more: {
+    width: "100%",
+  },
+  // More's summary carries its heading inline, beside the disclosure marker.
+  moreSummary: {
+    cursor: "pointer",
+  },
+  moreHeadingInline: {
+    display: "inline",
+  },
+  // More's body: its parts in one column under the summary.
+  moreBody: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s3,
+    width: "100%",
+    paddingBlockStart: space.s3,
+  },
+  morePart: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s2,
+    width: "100%",
+    minWidth: 0,
+  },
+  // The Legend style (`DESIGN.md`'s Typography): a sub-heading inside a
+  // section.
+  subHeading: {
+    margin: 0,
+    fontFamily: fonts.body,
+    fontSize: 11,
+    fontWeight: 400,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: colors.textMuted,
+  },
+  // A register: hairline-divided rows, flush left.
+  register: {
     listStyle: "none",
     margin: 0,
     padding: 0,
     width: "100%",
   },
-  // Wraps for the same reason `optionRow` does: the row's own control
-  // carries a sentence, and its German reading is longer than its English
-  // one.
-  usageListItem: {
+  // One register row: what it names on the leading edge, its authoring
+  // commands at the trailing edge. Both wrap, since a German label runs up to
+  // forty percent longer than its English one.
+  registerRow: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "baseline",
+    columnGap: space.s3,
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.border,
+    paddingBlock: space.s2,
+    paddingInline: 0,
+  },
+  registerMain: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    columnGap: space.s3,
+    rowGap: space.s1,
+    minWidth: 0,
+    overflowWrap: "anywhere",
+  },
+  // The sentence under a row's name, on its own line, in slate.
+  registerSentence: {
+    flexBasis: "100%",
+    color: colors.textMuted,
+  },
+  registerCommands: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: space.s1,
+  },
+  // The authoring command (`DESIGN.md` Buttons): a ghost button in slate,
+  // mono at 11px. It composes over `btn btn-ghost`, whose accent it replaces.
+  // Under the pointer and while pressed its text turns to ink.
+  command: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: {
+      default: colors.textMuted,
+      ":hover": colors.text,
+      ":active": colors.text,
+    },
+    textAlign: "left",
+    overflowWrap: "anywhere",
+    backgroundColor: {
+      default: "transparent",
+      ":hover": colors.surfaceMuted,
+      ":active": `color-mix(in srgb, ${colors.text} 14%, transparent)`,
+    },
+  },
+  // A choice row: the name input, then Remove. It wraps rather than
+  // overflowing, for a German Remove.
+  choiceRow: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "baseline",
     gap: space.s2,
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: colors.border,
+    width: "100%",
     paddingBlock: space.s1,
-    paddingInline: 0,
   },
-  // A keyframe animation, not a transition: the row remounts on each write,
-  // and only an animation runs from the top on mount. Off under reduced
-  // motion.
-  usageListItemTinted: {
-    animationName: { default: usageTint, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: "1.2s",
-    animationTimingFunction: "ease-out",
+  // `minWidth: 0` overrides an input's own intrinsic minimum, which flex
+  // otherwise honours, so the input shrinks with the row.
+  choiceName: {
+    flex: "1 1 12rem",
+    minWidth: 0,
   },
-  usageListItemLabel: {
+  choiceValueRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    gap: space.s2,
+    width: "100%",
+    paddingBlock: space.s1,
+  },
+  choiceValueName: {
     flex: "1 1 8rem",
     minWidth: 0,
     overflowWrap: "anywhere",
   },
-  // A "Read by" entry: the place, then the sentence under it. The same
-  // hairline and inline flush as a usage row, stacked in two lines.
-  readByItem: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: space.s1,
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: colors.border,
-    paddingBlock: space.s1,
-    paddingInline: 0,
-    overflowWrap: "anywhere",
-  },
-  readBySentence: {
-    color: colors.textMuted,
+  choiceValueLabel: {
+    flex: "1 1 12rem",
   },
   // The preview is a native `<details>`: the browser tracks open/closed as
-  // DOM state, so no component state exists for it. Closed by default via
-  // the markup's own absent `open` attribute.
+  // DOM state, so no component state exists for it.
   fieldPreview: {
     width: "100%",
   },
@@ -239,90 +333,31 @@ const styles = stylex.create({
     paddingBlock: 2,
     paddingInline: space.s2,
   },
-  // The Fields view's two halves: what the field is, then where it acts
-  // (design.md, the chosen direction). With the index rail beside them the
-  // screen reads as three upright regions — list, definition, effect.
-  //
-  // `1fr 1fr` and no fixed width anywhere: a German heading runs up to forty
-  // percent longer than its English one, and a column measured off the
-  // English label clips it. `minmax(0, 1fr)` lets a long word wrap instead
-  // of pushing the track wider than its share. Below the breakpoint the
-  // halves stack, and the source order alone gives the reading order.
-  fieldCatalogHalves: {
-    display: "grid",
-    width: "100%",
-    gridTemplateColumns: { default: "minmax(0, 1fr) minmax(0, 1fr)", [NARROW]: "minmax(0, 1fr)" },
-    gap: space.s4,
-    alignItems: "start",
-  },
-  // The 2px rule between the halves is the structural weight, the same one
-  // the panels screen header draws: the halves are two major sections of
-  // one screen, not two rows of a register. Stacked, that rule is a top
-  // edge, not a left one.
-  fieldCatalogHalfSecond: {
-    paddingLeft: { default: space.s4, [NARROW]: 0 },
-    paddingTop: { default: 0, [NARROW]: space.s4 },
-    borderLeftWidth: { default: 2, [NARROW]: 0 },
-    borderLeftStyle: "solid",
-    borderLeftColor: colors.divider,
-    borderTopWidth: { default: 0, [NARROW]: 2 },
-    borderTopStyle: "solid",
-    borderTopColor: colors.divider,
-  },
-  fieldZone: {
-    width: "100%",
-  },
-  // Every zone but the first in its half: a 2px structural rule separates it
-  // from the zone before it. No rule renders above the first zone, and none
-  // renders after a zone that does not mount, so a Column mapping zone the
-  // field does not earn leaves its neighbour's edge alone.
-  fieldZoneBordered: {
-    borderTopWidth: 2,
-    borderTopStyle: "solid",
-    borderTopColor: colors.divider,
-    marginTop: space.s3,
-    paddingTop: space.s3,
-  },
-  fieldZoneHeading: {
-    marginBlockEnd: space.s2,
-    marginBlockStart: 0,
-    marginInline: 0,
-    fontSize: "0.9rem",
-    fontWeight: 800,
-  },
-  // A zone holding a check takes the refusal tone at its own heading, so an
-  // author scanning the two halves sees which zone is wrong with nothing to
-  // open.
-  fieldZoneHeadingFailed: {
-    color: colors.refusal,
-  },
-  // The check list inside a zone: flush left, no marker, the refusal tone
-  // the heading above it takes. Handed to `IssueItems`, so the checks rail's
-  // own list keeps whatever it has.
+  // The check list in a section: flush left, no marker, the refusal tone the
+  // heading above it takes. Handed to `IssueItems`, so the checks rail's own
+  // list keeps whatever it has.
   zoneIssueList: {
     listStyle: "none",
-    marginBlockEnd: space.s2,
-    marginBlockStart: 0,
+    marginBlock: 0,
     marginInline: 0,
     padding: 0,
     width: "100%",
     color: colors.refusal,
     fontSize: "0.9rem",
   },
-  // Remove field: below the same structural rule, de-emphasized (`.btn-ghost`)
-  // rather than one more `.btn-secondary` in the stack above it — it reads as
-  // the definition half's least frequent action.
-  fieldHalfRemove: {
+  // Remove field: below a hairline of its own, de-emphasized (`.btn-ghost`),
+  // the card's least frequent action.
+  removeRow: {
     width: "100%",
-    borderTopWidth: 2,
+    borderTopWidth: 1,
     borderTopStyle: "solid",
-    borderTopColor: colors.divider,
+    borderTopColor: colors.border,
     marginTop: space.s3,
     paddingTop: space.s3,
   },
-  // The effect half's empty state and the empty catalog's start state. Both
-  // say why they are empty and offer the way on, and both take the empty
-  // tone — neither is a failure.
+  // Asked on's empty state and the empty catalog's start state. Both say why
+  // they are empty and offer the way on, and both take the empty tone —
+  // neither is a failure.
   emptyState: {
     display: "flex",
     flexDirection: "column",
@@ -331,6 +366,9 @@ const styles = stylex.create({
   },
   studioEmpty: {
     color: colors.textMuted,
+    margin: 0,
+  },
+  startState: {
     paddingBlock: space.s4,
     paddingInline: 0,
   },
@@ -341,7 +379,7 @@ const styles = stylex.create({
     fontWeight: 800,
   },
   // The start state carries the screen's only prose, and body copy sits in
-  // one measure. The surrounding flex column already spaces it.
+  // one measure.
   fieldCatalogStartBody: {
     maxWidth: "60ch",
     padding: 0,
@@ -351,12 +389,15 @@ const styles = stylex.create({
     alignItems: "baseline",
     gap: space.s2,
     flexWrap: "wrap",
+    width: "100%",
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderBottomColor: colors.border,
     paddingBlock: space.s2,
     paddingInline: 0,
   },
+  // A column key is a value the engine matches, so it takes mono. The target
+  // picker prints field labels in the body face.
   studioColumnMappingRowSelect: {
     fontFamily: fonts.mono,
   },
@@ -396,10 +437,10 @@ const styles = stylex.create({
   },
   // The condition input's Developer view (`shared/ConditionInput.tsx`),
   // duplicated: an area's component never reads another component's style
-  // object. One look for every Developer view in the field editor.
+  // object. One look for every Developer view on the card.
   studioDevview: {
+    width: "100%",
     paddingBlock: space.s2,
-    marginBlock: space.s2,
     borderTopWidth: 1,
     borderTopStyle: "solid",
     borderTopColor: colors.border,
@@ -412,6 +453,14 @@ const styles = stylex.create({
     color: colors.textMuted,
   },
 });
+
+/** An authoring command's props: the `.btn` family plus the compiled style,
+ * joined in one `className`, since a `className` written after a spread of
+ * `stylex.props` would replace it. */
+function commandProps() {
+  const compiled = stylex.props(styles.command);
+  return { ...compiled, className: `btn btn-ghost ${compiled.className ?? ""}`.trim() };
+}
 
 /** The picker's own value for the plugin envelope — a kind name the engine's
  * table never carries, so it cannot collide with one. */
@@ -481,14 +530,13 @@ interface FieldKeyInputProps {
   /** The sentence on where the key comes from (`keyNoticeFor`), or none. */
   notice: string | undefined;
   /** Fires after a commit that wrote the draft, with its rewrite count.
-   * `FieldEditor` counts a definition-half write there and sets its rewrite
-   * line. */
+   * `FieldEditor` sets its rewrite line from it. */
   onCommitted: (rewrote: number) => void;
 }
 
 /**
- * The key input inside the Developer view of `FieldEditor`'s "What this field
- * asks", for the selected field at any nesting depth. It holds the typed text
+ * The key input inside the Developer view that closes the card's More, for
+ * the selected field at any nesting depth. It holds the typed text
  * locally and commits it on blur or Enter, in one write, so typing writes
  * nothing and a half-typed key never reaches the draft. Escape drops the
  * typed text. A refused commit keeps the text and shows its sentence under
@@ -686,36 +734,74 @@ export function MoveFieldControl({ fieldId, fields, contentLocale, baseLocale, o
   );
 }
 
-function usageStepLabel(usage: FieldUsageRow[], stepId: string): string {
-  const label = usage.find((u) => u.stepId === stepId)?.stepLabel;
-  return label && label !== "" ? label : t("steps.unnamedStep");
-}
-
 /**
- * One zone of either half: a heading, the checks that zone owns, then the
- * controls. The heading takes the refusal tone while the zone holds a check,
- * so an author scanning the halves sees which zone is wrong with nothing to
- * open.
+ * One section of the card: a heading in the Title style, the checks the
+ * section owns, then its controls. Every section but Kind stands under a 1px
+ * hairline. The heading takes the refusal tone while the section holds a
+ * check.
  */
-function Zone({
+function CardSection({
   heading,
   issues,
-  bordered = false,
+  ruled = true,
   children,
 }: {
   heading: string;
   issues: EditorIssue[];
-  /** Every zone but the first in its half: the 2px rule against the zone
-   * before it. The first zone in a half carries none. */
-  bordered?: boolean;
+  /** False for Kind alone, which follows the Name inputs with no rule. */
+  ruled?: boolean;
   children: ReactNode;
 }) {
+  const headingId = useId();
   const failed = issues.length > 0;
   return (
-    <div {...stylex.props(styles.fieldZone, bordered && styles.fieldZoneBordered)}>
-      <h4 {...stylex.props(styles.fieldZoneHeading, failed && styles.fieldZoneHeadingFailed)} data-checked={failed ? "failed" : undefined}>
+    <section aria-labelledby={headingId} {...stylex.props(styles.section, ruled && styles.sectionRuled)}>
+      <FlaggedHeading as="h4" id={headingId} failed={failed}>
         {heading}
-      </h4>
+      </FlaggedHeading>
+      <IssueItems issues={issues} style={styles.zoneIssueList} />
+      {children}
+    </section>
+  );
+}
+
+/** A heading that takes the refusal tone while `failed`. The flag arrives as
+ * a prop: the StyleX compiler evaluates a `stylex.props` argument's bindings,
+ * and a local computed from a call stops it. */
+function FlaggedHeading({
+  as: Tag,
+  id,
+  failed,
+  inline = false,
+  children,
+}: {
+  as: "h3" | "h4";
+  id?: string;
+  failed: boolean;
+  inline?: boolean;
+  children: ReactNode;
+}) {
+  const base = Tag === "h3" ? styles.panelHeading : styles.sectionHeading;
+  return (
+    <Tag
+      id={id}
+      {...stylex.props(base, inline && styles.moreHeadingInline, failed && styles.headingFailed)}
+      data-checked={failed ? "failed" : undefined}
+    >
+      {children}
+    </Tag>
+  );
+}
+
+/** One part of More: a sub-heading in the Legend style, its checks, then its
+ * controls. */
+function MorePart({ heading, issues, children }: { heading: string; issues: EditorIssue[]; children: ReactNode }) {
+  const failed = issues.length > 0;
+  return (
+    <div {...stylex.props(styles.morePart)}>
+      <h5 {...stylex.props(styles.subHeading, failed && styles.headingFailed)} data-checked={failed ? "failed" : undefined}>
+        {heading}
+      </h5>
       <IssueItems issues={issues} style={styles.zoneIssueList} />
       {children}
     </div>
@@ -726,162 +812,166 @@ interface FieldEditorProps {
   field: DraftField;
   dataSources: DraftDataSource[];
   lists: StudioDataList[] | undefined;
-  /** The step the effect half's empty state routes to (`firstWorkedStepId`),
-   * or `undefined` while no step a person works exists. */
+  /** The step Asked on's empty state routes to (`firstWorkedStepId`), or
+   * `undefined` while no step a person works exists. */
   routeStepId: string | undefined;
   onChange: (patch: Partial<DraftField>) => void;
   onRemove: () => void;
   onShowStep: (stepId: string) => void;
-  /** Opens the form editor for one step: the empty state's route alone. */
+  /** Opens the form editor for one step: an Asked on row's "Open the form"
+   * and the empty state's route. */
   onOpenForm: (stepId: string) => void;
-  /** The move's one write (`EntityTabs.tsx`'s `FieldsTab::moveField`),
-   * threaded through `FieldCatalogPanel`. Renders as the selected field's own
-   * move control, whatever its nesting depth. */
+  /** A Read by row's "Open" (design.md D4). */
+  onOpenPlace: (target: ReadByTarget) => void;
+  /** The move's one write (`EntityTabs.tsx`'s `FieldsTab::moveField`). */
   onMoveField: (fieldId: string, targetGroupId: string | undefined) => void;
-  /** Adds a field at the end of this group and selects it. Called only from
-   * the "Fields inside this group" zone, for a field whose `type` is
-   * `"group"`. `FieldCatalogPanel` hands its own `onAdd` prop straight
-   * through (design.md: "One add function serves the rail, the start state
-   * and the group zone"). */
+  /** Adds a field at the end of this group and selects it, from the "Fields
+   * inside this group" section of a group's card. */
   onAdd: (groupId: string) => void;
+  /** True while `FieldsTab` asks this card to open More: a Read by row of
+   * another field, or of this one, named this field's rule or default. */
+  openMore: boolean;
+  /** Tells `FieldsTab` the card opened More, so it clears the request and a
+   * later manual close holds. */
+  onMoreOpened: () => void;
 }
 
 /**
- * The editor for the SELECTED field alone, at any nesting depth, in two
- * halves under one heading: what the field is, then where it acts in the
- * process. Neither half sits behind a disclosure, and the view carries no
- * tab set.
+ * The card over the SELECTED field alone, at any nesting depth (design.md
+ * D1). It reads top to bottom: the name line, the Name and Description
+ * inputs, then Kind, Choices, Asked on, Read by, a group's "Fields inside this
+ * group", More, and Remove field.
  *
- * Every zone stays mounted while the field stays selected. Each builder holds
- * an incomplete row the draft does not carry, and the developer view holds a
- * half-typed config in component state; unmounting would drop both.
- *
- * A group field's own editor holds no editor for any of its children: the
- * "Fields inside this group" zone holds one control that adds a field and
- * selects it. Each child opens its own instance of this same component, so
- * one pair of halves exists per open editor regardless of nesting depth. Its
- * preview still draws every descendant.
+ * Every section stays mounted while the field stays selected. Each builder
+ * holds an incomplete row the draft does not carry, and the Developer view
+ * holds a half-typed config in component state; unmounting would drop both.
+ * `FieldCatalogPanel` keys the card on the field's id, so another field opens
+ * with none of that state.
  */
 function FieldEditor({
   field,
   dataSources,
   lists,
   routeStepId,
-  onChange: writeField,
+  onChange,
   onRemove,
   onShowStep,
   onOpenForm,
+  onOpenPlace,
   onMoveField,
   onAdd,
+  openMore,
+  onMoreOpened,
 }: FieldEditorProps) {
   const { draft, mutate, contentLocale, validation } = useDraft();
   const published = usePublishedFieldIds();
+  const publishedValues = usePublishedOptionValues();
 
   // How many expressions the last key change rewrote, while one rewrote any,
   // and how many writes rewrote one (`nextRewriteLine`).
-  // `FieldCatalogPanel` mounts this editor once per field id, so another
-  // field opens with none.
   const [rewriteLine, setRewriteLine] = useState<RewriteLineState>({ count: undefined, write: 0 });
   const noteRewrites = (rewrote: number) => setRewriteLine((state) => nextRewriteLine(state, rewrote));
 
-  // How many times the definition half has been written since this field was
-  // selected. It rides in the usage rows' React key, so each write remounts
-  // them and the tint animation runs again — a data attribute alone cannot
-  // restart a running animation.
-  const [definitionWrites, setDefinitionWrites] = useState(0);
-
-  /**
-   * Every write the DEFINITION half makes. It bumps the counter above, so the
-   * effect half's usage rows tint and the author sees which steps the change
-   * reached (`studio-app`: a change in the definition half tints the affected
-   * row in the effect half).
-   *
-   * The effect half's own writes bypass it. The column mapping calls
-   * `writeField` directly below, and the condition and requiredness controls
-   * write step views through `mutate`. A row must not tint at its own
-   * keystroke, only at the definition's.
-   */
-  const onChange = (patch: Partial<DraftField>) => {
-    setDefinitionWrites((n) => n + 1);
-    writeField(patch);
-  };
-
   const custom = isCustomType(field.type);
-  const hasOptions = (field.options?.length ?? 0) > 0;
+  const options = field.options ?? [];
+  const hasOptions = options.length > 0;
   const hasDataSource = field.dataSource !== undefined;
+  const baseLocale = draft.baseLocale ?? "en";
+  const fieldId = field.id;
+  const isGroup = field.type === "group";
+  const fieldKey = field.key ?? "";
 
-  const setOptions = (options: DraftOption[]) => onChange({ options, dataSource: options.length > 0 ? undefined : field.dataSource });
+  const setOptions = (next: DraftOption[]) => onChange({ options: next, dataSource: next.length > 0 ? undefined : field.dataSource });
+
+  // A choice's value is locked once the base version holds it. While the base
+  // version loads, or after its fetch failed, every non-empty value counts as
+  // locked, the safe side.
+  const isLocked = (option: DraftOption): boolean => {
+    const value = option.value ?? "";
+    if (value === "") return false;
+    if (publishedValues === undefined) return true;
+    return fieldId !== undefined && (publishedValues.get(fieldId)?.has(value) ?? false);
+  };
+  const anyLocked = options.some(isLocked);
+
+  /** A choice's name write: the label, the value that follows it, and the
+   * field's own default, in one draft change (`applyChoiceName`). */
+  const nameChoice = (index: number, label: DraftOption["label"]) => {
+    const option = options[index];
+    if (fieldId === undefined || option === undefined) return;
+    const locked = isLocked(option);
+    mutate((d) => {
+      const target = flattenDraftFields(d.fields).find((f) => f.id === fieldId);
+      if (target) applyChoiceName(target, index, label, baseLocale, locked);
+    });
+  };
+  const addChoice = () => setOptions([...options, { value: "", label: seedLocalizedText(contentLocale) }]);
+  const updateChoiceValue = (index: number, value: string) => setOptions(updateAt(options, index, { value }));
+  const removeChoice = (index: number) => setOptions(removeAt(options, index));
 
   const mappingRows = columnMappingRows(field, dataSources, lists);
   const columns = declaredColumns(field, dataSources, lists);
   const targets = mappableTargets(field, draft.fields ?? []);
   const unmapped = columns.find((c) => !mappingRows.some((r) => r.column === c));
 
-  // `writeField`, not `onChange`: a column mapping sits in the effect half, so
-  // its own edit must not tint the usage rows beside it.
   const writeMapping = (next: Record<string, string>) =>
-    writeField({ columnMapping: (Object.keys(next).length === 0 ? undefined : next) as DraftField["columnMapping"] });
-
+    onChange({ columnMapping: (Object.keys(next).length === 0 ? undefined : next) as DraftField["columnMapping"] });
   const setMapping = (column: string, target: string) => {
     const next = { ...((field.columnMapping ?? {}) as Record<string, string>) };
     next[column] = target;
     writeMapping(next);
   };
-
   const renameMapping = (from: string, to: string) => {
     const current = (field.columnMapping ?? {}) as Record<string, string>;
     writeMapping(Object.fromEntries(Object.entries(current).map(([k, v]) => (k === from ? [to, v] : [k, v]))));
   };
-
   const removeMapping = (column: string) => {
     const next = { ...((field.columnMapping ?? {}) as Record<string, string>) };
     delete next[column];
     writeMapping(next);
   };
-
   const addMapping = () => unmapped !== undefined && setMapping(unmapped, "");
 
-  const addOption = () => setOptions([...(field.options ?? []), { value: "", label: seedLocalizedText(contentLocale) }]);
-  const updateOption = (i: number, patch: Partial<DraftOption>) => setOptions(updateAt(field.options ?? [], i, patch));
-  const removeOption = (i: number) => setOptions(removeAt(field.options ?? [], i));
+  const fieldName = (f: DraftField) => resolveDraftLocalizedText(f.label, contentLocale, baseLocale) || t("panelsScreen.unnamedField");
+  const sourceName = (ds: DraftDataSource | undefined) => (ds?.key ? ds.key : t("panelsScreen.unnamedDataSource"));
+  const boundSource = hasDataSource ? dataSources.find((ds) => ds.id === field.dataSource) : undefined;
 
-  const baseLocale = draft.baseLocale ?? "en";
-  const fieldId = field.id;
   /** The label write the form editor shares (`writeFieldLabel`). A key the
    * label still derives follows it until the base version holds the field
    * (`fieldCatalogLogic.ts::isFieldKeyLocked`), and takes the expressions
-   * reading the old key along. A group's label goes through `writeGroupLabel`,
-   * so the key it derives rewrites the view entries naming the old one. */
+   * reading the old key along. */
   const updateLabel = (label: DraftField["label"]) => {
-    setDefinitionWrites((n) => n + 1);
     noteRewrites(writeLabelFromCatalog(draft, mutate, field, label, baseLocale, published));
   };
-  const keyNotice =
-    field.type === "group"
-      ? undefined
-      : keyNoticeFor(
-          field.key ?? "",
-          published === undefined ? undefined : fieldId !== undefined && published.has(fieldId),
-          keyFollowsLabel(draft, field),
-        );
-  const usage = fieldId ? fieldUsage(draft, fieldId, contentLocale, baseLocale) : [];
-  const isGroup = field.type === "group";
-  const fieldKey = field.key ?? "";
+  const keyNotice = isGroup
+    ? undefined
+    : keyNoticeFor(
+        fieldKey,
+        published === undefined ? undefined : fieldId !== undefined && published.has(fieldId),
+        keyFollowsLabel(draft, field),
+      );
+
+  const asked = useMemo(
+    () => (fieldId === undefined ? [] : askedOnRows(draft, fieldId, contentLocale)),
+    [draft, fieldId, contentLocale],
+  );
   const readBy = useMemo(
     () => (isGroup ? [] : readByRows(draft, fieldKey, contentLocale)),
     [draft, fieldKey, contentLocale, isGroup],
   );
+  const stepLabel = (stepId: string) => asked.find((row) => row.stepId === stepId)?.stepLabel ?? t("steps.unnamedStep");
+  const stepLabels = (stepIds: string[]) => stepIds.map(stepLabel).join(", ");
+
   const visibleState = fieldId ? fieldVisibleOverrides(draft, fieldId) : ({ kind: "none" } as const);
   const requiredState = fieldId ? fieldRequiredOverrides(draft, fieldId) : ({ kind: "none" } as const);
   const clearSteps = visibleClearSteps(visibleState);
   const preview = previewViewFields(field, contentLocale, baseLocale);
   // Two fields preview with no option list, and the row names which one. A
-  // bare person field declares no data source, so it takes its own wording
-  // rather than the data-source string (design.md Decision 8).
+  // bare person field declares no data source, so it takes its own wording.
   const previewNote: CatalogKey | undefined =
-    field.dataSource !== undefined
+    hasDataSource
       ? "fieldCatalog.previewResolvesAtRuntime"
-      : field.format === "person" && (field.options ?? []).length === 0
+      : field.format === "person" && options.length === 0
         ? "fieldCatalog.previewPersonResolvesAtRuntime"
         : undefined;
 
@@ -903,119 +993,296 @@ function FieldEditor({
     mutate((d) => applyRequiredOverride(d, fieldId, next));
   };
 
-  // Each zone owns the checks whose `loc` names it; a `loc` naming no zone
-  // this view draws stands at the top of the definition half, so no check
-  // goes unshown for want of a matching zone.
+  // Each section owns the checks whose `loc` names its zone (design.md D5).
+  // A `loc` naming no zone stands at the card's top, beside the name line, so
+  // no check goes unshown for want of a matching section.
   const fieldIssues = validation.issues.filter((i) => i.entityId === fieldId);
   const zoned = (zone: FieldCheckZone) => fieldIssues.filter((i) => fieldCheckZone(i.loc) === zone);
-  const unplaced = fieldIssues.filter((i) => fieldCheckZone(i.loc) === undefined);
-  // The key's Developer view opens while a check on the key stands, so the
-  // check stands beside its control. The author's own toggle holds otherwise.
+  // A check on an option or the source stands under Choices; a card with no
+  // Choices section stands it at the top with the rest.
+  const choicesShown = showsChoices(field);
+  const unplaced = fieldIssues.filter((i) => {
+    const zone = fieldCheckZone(i.loc);
+    return zone === undefined || (zone === "values" && !choicesShown);
+  });
+  const defaultIssues = zoned("default");
+  const validationIssues = zoned("validation");
+  const mappingIssues = zoned("columnMapping");
+  // A check on the key opens More and its Developer view, so the key input
+  // shows. A check on the Technical marker prints under Kind and opens More,
+  // where the checkbox stands. The author's own toggle holds otherwise.
   const keyChecked = zoned("asks").some((i) => namesFieldKey(i.loc));
+  const technicalCheckedIssue = zoned("kind").some((i) => namesFieldTechnical(i.loc));
+  const moreFailed = defaultIssues.length + validationIssues.length + mappingIssues.length > 0;
+  const moreChecked = moreFailed || keyChecked || technicalCheckedIssue;
+  const [moreOpen, setMoreOpen] = useState(false);
   const [keyViewOpen, setKeyViewOpen] = useState(false);
 
-  const requiredDisabled = technicalChecked || requiredState.kind === "none";
+  // A Read by row's "Open" on this field's rule or default. The card may be
+  // mounted already, so it reacts to the request rather than reading it once.
+  useEffect(() => {
+    if (!openMore) return;
+    setMoreOpen(true);
+    onMoreOpened();
+  }, [openMore, onMoreOpened]);
 
-  const addFieldToGroup = () => {
-    if (fieldId === undefined) return;
-    onAdd(fieldId);
-  };
+  const requiredDisabled = technicalChecked || requiredState.kind === "none";
+  const nameFailed = unplaced.length + zoned("asks").length > 0;
+  const label = resolveDraftLocalizedText(field.label, contentLocale, baseLocale) || t("panelsScreen.unnamedField");
+  const nameLineId = useId();
 
   return (
-    <div {...stylex.props(styles.fieldRow)}>
-      <div {...stylex.props(styles.fieldCatalogHalves)}>
-        <section aria-label={t("fieldCatalog.definitionHalfLabel")}>
-          <IssueItems issues={unplaced} style={styles.zoneIssueList} />
+    <article aria-labelledby={nameLineId} {...stylex.props(styles.card)}>
+      {/* The field's name line. The screen heading already reads "Field
+          catalog", and the label itself lives inside an editable input, which
+          no heading and no rail row spells out. An author working a 22-field
+          catalog would have nothing to read back but the selection mark. */}
+      <FlaggedHeading as="h3" id={nameLineId} failed={nameFailed}>
+        {label}
+      </FlaggedHeading>
+      <IssueItems issues={[...unplaced, ...zoned("asks")]} style={styles.zoneIssueList} />
 
-          <Zone heading={t("fieldCatalog.whatAsksHeading")} issues={zoned("asks")}>
-            <div {...stylex.props(styles.fieldLabelRow)}>
-              <label {...stylex.props(styles.fieldRowLabel, styles.fieldLabelRowLabel)}>
-                {t("fieldCatalog.labelLabel")}
-                <LocalizedTextInput
-                  id={fieldId === undefined ? undefined : fieldLabelInputId(fieldId)}
-                  value={field.label}
-                  onChange={updateLabel}
-                />
-              </label>
-              {/* Names only the active contentLocale's own gap: the
-                  content-locale switcher carries the draft-wide per-locale
-                  count. */}
-              <span {...stylex.props(styles.fieldTranslationBadge)}>
-                {contentLocale === baseLocale
-                  ? t("fieldCatalog.baseLocaleMark")
-                  : fieldLocaleGaps(field, contentLocale, baseLocale) === 0
-                    ? t("fieldCatalog.translationComplete")
-                    : t("fieldCatalog.translationGap").replace("{count}", String(fieldLocaleGaps(field, contentLocale, baseLocale)))}
-              </span>
-            </div>
-            {/* The region always stands; its text sits in a child keyed on the
-                write, so each rewrite replaces the text node and announces,
-                the same count again included. */}
-            <p role="status" aria-live="polite" {...stylex.props(styles.rewriteLine, rewriteLine.count !== undefined && styles.rewriteLineShown)}>
-              {rewriteLine.count !== undefined && <span key={rewriteLine.write}>{rewriteLineFor(rewriteLine.count)}</span>}
-            </p>
-            {missingTranslationWarning(field.label, contentLocale, draft.baseLocale) && (
-              <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>
+      <div {...stylex.props(styles.fieldLabelRow)}>
+        <label {...stylex.props(styles.fieldRowLabel, styles.fieldLabelRowLabel)}>
+          {t("fieldCard.nameLabel")}
+          <LocalizedTextInput id={fieldId === undefined ? undefined : fieldLabelInputId(fieldId)} value={field.label} onChange={updateLabel} />
+        </label>
+        {/* Names only the active contentLocale's own gap: the content-locale
+            switcher carries the draft-wide per-locale count. */}
+        <span {...stylex.props(styles.fieldTranslationBadge)}>
+          {contentLocale === baseLocale
+            ? t("fieldCatalog.baseLocaleMark")
+            : fieldLocaleGaps(field, contentLocale, baseLocale) === 0
+              ? t("fieldCatalog.translationComplete")
+              : t("fieldCatalog.translationGap").replace("{count}", String(fieldLocaleGaps(field, contentLocale, baseLocale)))}
+        </span>
+      </div>
+      {/* The region always stands; its text sits in a child keyed on the
+          write, so each rewrite replaces the text node and announces, the
+          same count again included. */}
+      <p role="status" aria-live="polite" {...stylex.props(styles.rewriteLine, rewriteLine.count !== undefined && styles.rewriteLineShown)}>
+        {rewriteLine.count !== undefined && <span key={rewriteLine.write}>{rewriteLineFor(rewriteLine.count)}</span>}
+      </p>
+      {missingTranslationWarning(field.label, contentLocale, draft.baseLocale) && (
+        <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(field.label, contentLocale, draft.baseLocale)}</p>
+      )}
+      <label {...stylex.props(styles.fieldRowLabel)}>
+        {t("fieldCatalog.descriptionLabel")}
+        <LocalizedTextInput value={field.description} onChange={(description) => onChange({ description })} />
+      </label>
+      {missingTranslationWarning(field.description, contentLocale, draft.baseLocale) && (
+        <p {...stylex.props(styles.studioWarning)}>{missingTranslationWarning(field.description, contentLocale, draft.baseLocale)}</p>
+      )}
+
+      <CardSection heading={t("fieldCard.kindHeading")} issues={zoned("kind")} ruled={false}>
+        <KindPicker field={field} onChange={onChange} />
+      </CardSection>
+
+      {choicesShown && (
+        <CardSection heading={t("fieldCard.choicesHeading")} issues={zoned("values")}>
+          {hasDataSource ? (
+            <>
+              <p {...stylex.props(styles.studioEmpty)}>{fill(t("fieldCard.choicesFromSource"), { source: sourceName(boundSource) })}</p>
+              <p {...stylex.props(styles.studioEmpty)}>{t("fieldCard.choicesFromSourceNote")}</p>
+            </>
+          ) : (
+            <>
+              {!hasOptions && <p {...stylex.props(styles.studioEmpty)}>{t("fieldCard.choicesEmpty")}</p>}
+              {hasOptions && (
+                <ul {...stylex.props(styles.register)}>
+                  {options.map((opt, i) => {
+                    const optionWarning = missingTranslationWarning(opt.label, contentLocale, draft.baseLocale);
+                    return (
+                      // A choice carries no identity of its own; its position is its.
+                      <li key={i}>
+                        <div {...stylex.props(styles.choiceRow)}>
+                          <LocalizedTextInput
+                            {...stylex.props(styles.choiceName)}
+                            ariaLabel={t("fieldCard.choiceNamePlaceholder")}
+                            placeholder={t("fieldCard.choiceNamePlaceholder")}
+                            value={opt.label}
+                            onChange={(next) => nameChoice(i, next)}
+                          />
+                          <button type="button" {...commandProps()} onClick={() => removeChoice(i)}>
+                            {t("fieldCard.removeChoice")}
+                          </button>
+                        </div>
+                        {optionWarning && <p {...stylex.props(styles.studioWarning)}>{optionWarning}</p>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <button type="button" {...commandProps()} onClick={addChoice}>
+                {t("fieldCard.addChoice")}
+              </button>
+              {hasOptions && (
+                <details {...stylex.props(styles.studioDevview)}>
+                  <summary {...stylex.props(styles.studioDevviewSummary)}>{t("fieldCatalog.developerView")}</summary>
+                  {options.map((opt, i) => (
+                    <div key={i} {...stylex.props(styles.choiceValueRow)}>
+                      <span {...stylex.props(styles.choiceValueName)}>
+                        {resolveDraftLocalizedText(opt.label, contentLocale, baseLocale) || t("fieldCard.unnamedChoice")}
+                      </span>
+                      <label {...stylex.props(styles.fieldRowLabel, styles.choiceValueLabel)}>
+                        {t("fieldCard.choiceValueLabel")}
+                        <input
+                          type="text"
+                          spellCheck={false}
+                          autoComplete="off"
+                          translate="no"
+                          {...stylex.props(styles.studioMono)}
+                          value={opt.value ?? ""}
+                          onChange={(e) => updateChoiceValue(i, e.target.value)}
+                        />
+                      </label>
+                    </div>
+                  ))}
+                  <p {...stylex.props(styles.studioNote)}>{t(anyLocked ? "fieldCard.choiceValuePublished" : "fieldCard.choiceValueFollows")}</p>
+                </details>
+              )}
+            </>
+          )}
+        </CardSection>
+      )}
+
+      <CardSection heading={t("fieldCard.askedOnHeading")} issues={[]}>
+        {asked.length === 0 ? (
+          // The empty tone, never the refusal tone: a field no step asks for
+          // yet is an unfinished draft, not a broken one. The route opens the
+          // form editor for the first step a person works, where this field
+          // stands in the palette.
+          <div {...stylex.props(styles.emptyState)}>
+            <p {...stylex.props(styles.studioEmpty)}>{t("fieldCatalog.usedInEmpty")}</p>
+            {routeStepId !== undefined && (
+              <button type="button" className="btn btn-secondary" onClick={() => onOpenForm(routeStepId)}>
+                {t("fieldCatalog.effectEmptyRoute")}
+              </button>
             )}
-            <label {...stylex.props(styles.fieldRowLabel)}>
-              {t("fieldCatalog.descriptionLabel")}
-              <LocalizedTextInput value={field.description} onChange={(description) => onChange({ description })} />
-            </label>
-            {missingTranslationWarning(field.description, contentLocale, draft.baseLocale) && (
+          </div>
+        ) : (
+          <>
+            <ul {...stylex.props(styles.register)}>
+              {asked.map((row) => (
+                <li key={row.stepId} {...stylex.props(styles.registerRow)}>
+                  <div {...stylex.props(styles.registerMain)}>
+                    <span>{row.stepLabel}</span>
+                    {row.marks.map((mark) => (
+                      <span key={mark}>{t(MARK_KEY[mark])}</span>
+                    ))}
+                    {row.sentence !== undefined && <span {...stylex.props(styles.registerSentence)}>{row.sentence}</span>}
+                  </div>
+                  <span {...stylex.props(styles.registerCommands)}>
+                    <button type="button" {...commandProps()} onClick={() => onOpenForm(row.stepId)}>
+                      {t("fieldCard.openForm")}
+                    </button>
+                    <button type="button" {...commandProps()} onClick={() => onShowStep(row.stepId)}>
+                      {t("fieldCatalog.showOnCanvas")}
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            {/* The catalog declares no `required` key of its own, so this
+                writes the view and never the field. A technical field is
+                written by the process, so it disables the checkbox. */}
+            {requiredState.kind !== "none" && (
+              <p {...stylex.props(styles.studioNote)}>{t("fieldCatalog.requiredScopeNote").replace("{steps}", stepLabels(requiredState.stepIds))}</p>
+            )}
+            {requiredState.kind === "divergent" && (
               <p {...stylex.props(styles.studioWarning)}>
-                {missingTranslationWarning(field.description, contentLocale, draft.baseLocale)}
+                {t("fieldCatalog.requiredDivergentNote").replace("{steps}", stepLabels(requiredState.differingStepIds))}
               </p>
             )}
-            <details
-              {...stylex.props(styles.studioDevview)}
-              open={keyViewOpen || keyChecked}
-              onToggle={(e) => setKeyViewOpen(e.currentTarget.open)}
-            >
-              <summary {...stylex.props(styles.studioDevviewSummary)}>{t("fieldCatalog.developerView")}</summary>
-              <FieldKeyInput
-                field={field}
-                notice={keyNotice}
-                onCommitted={(rewrote) => {
-                  setDefinitionWrites((n) => n + 1);
-                  noteRewrites(rewrote);
-                }}
-              />
-            </details>
-            {fieldId !== undefined && (
-              <MoveFieldControl
-                fieldId={fieldId}
-                fields={draft.fields ?? []}
-                contentLocale={contentLocale}
-                baseLocale={baseLocale}
-                onMoveField={onMoveField}
-              />
-            )}
-          </Zone>
-
-          <Zone heading={t("fieldCatalog.whatKindHeading")} issues={zoned("kind")} bordered>
-            <KindPicker field={field} onChange={onChange} />
             <label {...stylex.props(styles.fieldRowLabel, styles.checkboxLabel)}>
-              {t("fieldCatalog.technicalLabel")}
               <input
                 type="checkbox"
-                checked={technicalChecked}
-                disabled={isGroup}
-                onChange={(e) => toggleTechnical(e.target.checked)}
+                checked={requiredState.kind === "uniform" && requiredState.value}
+                disabled={requiredDisabled}
+                onChange={(e) => writeRequired(e.target.checked)}
               />
+              {t("fieldCard.requiredEverywhere")}
             </label>
-            {custom && (
-              <details {...stylex.props(styles.studioDevview)}>
-                <summary {...stylex.props(styles.studioDevviewSummary)}>{t("fieldCatalog.developerView")}</summary>
-                <PluginEnvelopeEditor
-                  label={t("fieldCatalog.customTypeLabel")}
-                  value={field.type as DraftOf<FieldDef>["type"] & object}
-                  onChange={(type) => onChange({ type })}
-                />
-              </details>
-            )}
-          </Zone>
+            {technicalChecked && <p {...stylex.props(styles.studioNote)}>{t("fieldCatalog.requiredTechnicalNote")}</p>}
 
-          <Zone heading={t("fieldCatalog.whereValuesHeading")} issues={zoned("values")} bordered>
+            {visibleState.kind !== "none" && (
+              <div {...stylex.props(styles.morePart)}>
+                <h5 {...stylex.props(styles.subHeading)}>{t("fieldCatalog.onlyAskWhenHeading")}</h5>
+                <p {...stylex.props(styles.studioNote)}>{t("fieldCatalog.conditionScopeNote").replace("{steps}", stepLabels(visibleState.stepIds))}</p>
+                {visibleState.kind === "divergent" && (
+                  <p {...stylex.props(styles.studioWarning)}>
+                    {t("fieldCatalog.conditionDivergentNote").replace("{steps}", stepLabels(visibleState.stepIds))}
+                  </p>
+                )}
+                {visibleState.kind === "divergent" && visibleState.literalStepIds.length > 0 && (
+                  <p {...stylex.props(styles.studioWarning)}>
+                    {t("fieldCatalog.conditionLiteralNote").replace("{steps}", stepLabels(visibleState.literalStepIds))}
+                  </p>
+                )}
+                <ConditionInput
+                  value={visibleState.kind === "uniform" ? visibleState.value : undefined}
+                  onChange={writeVisible}
+                  clearLabel={clearSteps ? clearConditionLabel(clearSteps.map(stepLabel)) : undefined}
+                  emptySentence={visibleState.kind === "divergent" ? t("condition.sentence.divergent") : undefined}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </CardSection>
+
+      {/* Every expression that reads the key, placed in the author's words.
+          A group holds no value of its own, so it has none. */}
+      {!isGroup && (
+        <CardSection heading={t("fieldCatalog.readByHeading")} issues={[]}>
+          {readBy.length === 0 ? (
+            <p {...stylex.props(styles.studioEmpty)}>{t("fieldCatalog.readByEmpty")}</p>
+          ) : (
+            <ul {...stylex.props(styles.register)}>
+              {readBy.map((row, i) => (
+                // Rows carry no identity of their own; draft order is theirs.
+                <li key={i} {...stylex.props(styles.registerRow)}>
+                  <div {...stylex.props(styles.registerMain)}>
+                    <span>{row.place}</span>
+                    {row.sentence !== undefined && <span {...stylex.props(styles.registerSentence)}>{row.sentence}</span>}
+                  </div>
+                  {row.target !== undefined && (
+                    <span {...stylex.props(styles.registerCommands)}>
+                      <button type="button" {...commandProps()} onClick={() => row.target && onOpenPlace(row.target)}>
+                        {t("fieldCard.openPlace")}
+                      </button>
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardSection>
+      )}
+
+      {/* The rail lists a group's children. This section holds one control,
+          which adds a field at the group's end and selects it. */}
+      {isGroup && (
+        <CardSection heading={t("fieldCatalog.groupChildrenHeading")} issues={[]}>
+          <button type="button" {...commandProps()} onClick={() => fieldId !== undefined && onAdd(fieldId)}>
+            {t("fieldCatalog.addSubField")}
+          </button>
+        </CardSection>
+      )}
+
+      <details
+        {...stylex.props(styles.more, styles.sectionRuled)}
+        open={moreOpen || moreChecked}
+        onToggle={(e) => setMoreOpen(e.currentTarget.open)}
+      >
+        <summary {...stylex.props(styles.moreSummary)}>
+          <FlaggedHeading as="h4" failed={moreFailed} inline>
+            {t("fieldCard.moreHeading")}
+          </FlaggedHeading>
+        </summary>
+        <div {...stylex.props(styles.moreBody)}>
+          <MorePart heading={t("fieldCatalog.whereValuesHeading")} issues={[]}>
             <label {...stylex.props(styles.fieldRowLabel)}>
               {t("fieldCatalog.dataSourceLabel")}
               <select
@@ -1023,277 +1290,122 @@ function FieldEditor({
                 disabled={hasOptions}
                 onChange={(e) => onChange({ dataSource: e.target.value === "" ? undefined : (e.target.value as DraftField["dataSource"]) })}
               >
-                <option value="">{t("fieldCatalog.noneOption")}</option>
+                <option value="">{t("fieldCard.noSourceOption")}</option>
                 {dataSources.map((ds) => (
                   <option key={ds.id} value={ds.id}>
-                    {ds.key ?? ds.id}
+                    {sourceName(ds)}
                   </option>
                 ))}
               </select>
             </label>
-            <div className="options-editor">
-              {(field.options ?? []).map((opt, i) => {
-                const optionWarning = missingTranslationWarning(opt.label, contentLocale, draft.baseLocale);
-                return (
-                  <Fragment key={i}>
-                    <div {...stylex.props(styles.optionRow)}>
-                      <input
-                        type="text"
-                        {...stylex.props(styles.optionRowInput)}
-                        placeholder={t("fieldCatalog.optionValuePlaceholder")}
-                        disabled={hasDataSource}
-                        value={opt.value ?? ""}
-                        onChange={(e) => updateOption(i, { value: e.target.value })}
-                      />
-                      <LocalizedTextInput
-                        {...stylex.props(styles.optionRowInput)}
-                        placeholder={t("fieldCatalog.optionLabelPlaceholder")}
-                        disabled={hasDataSource}
-                        value={opt.label}
-                        onChange={(label) => updateOption(i, { label })}
-                      />
-                      <button type="button" className="btn btn-secondary" onClick={() => removeOption(i)}>
-                        {t("fieldCatalog.removeOption")}
-                      </button>
-                    </div>
-                    {optionWarning && <p {...stylex.props(styles.studioWarning)}>{optionWarning}</p>}
-                  </Fragment>
-                );
-              })}
-              <button type="button" className="btn btn-secondary" onClick={addOption} disabled={hasDataSource}>
-                {t("fieldCatalog.addOption")}
-              </button>
-            </div>
-          </Zone>
+            {/* A column mapping writes into other fields, so it stands beside
+                the source it reads. Its absence draws no rule of its own. */}
+            {showsColumnMapping(field, dataSources) && (
+              <MorePart heading={t("columnMapping.heading")} issues={mappingIssues}>
+                {columns.length === 0 ? (
+                  <p {...stylex.props(styles.studioNote)}>{t("columnMapping.noColumns")}</p>
+                ) : (
+                  <>
+                    {mappingRows.map((row) => (
+                      <div {...stylex.props(styles.studioColumnMappingRow)} key={row.column}>
+                        <select
+                          {...stylex.props(styles.studioColumnMappingRowSelect)}
+                          aria-label={t("columnMapping.columnAria")}
+                          value={row.column}
+                          onChange={(e) => renameMapping(row.column, e.target.value)}
+                        >
+                          {row.stale && <option value={row.column}>{row.column}</option>}
+                          {columns.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                        <span aria-hidden="true">-&gt;</span>
+                        <select aria-label={t("columnMapping.targetAria")} value={row.target} onChange={(e) => setMapping(row.column, e.target.value)}>
+                          <option value="">{t("fieldCatalog.noneOption")}</option>
+                          {targets.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {fieldName(f)}
+                            </option>
+                          ))}
+                        </select>
+                        <button type="button" {...commandProps()} onClick={() => removeMapping(row.column)}>
+                          {t("columnMapping.removeRow")}
+                        </button>
+                        {row.stale && <p {...stylex.props(styles.studioWarning, styles.studioWarningInMappingRow)}>{t("columnMapping.staleColumn")}</p>}
+                      </div>
+                    ))}
+                    <button type="button" {...commandProps()} onClick={addMapping} disabled={unmapped === undefined}>
+                      {t("columnMapping.addRow")}
+                    </button>
+                  </>
+                )}
+              </MorePart>
+            )}
+          </MorePart>
 
-          <Zone heading={t("defaultValue.heading")} issues={zoned("default")} bordered>
+          <MorePart heading={t("defaultValue.heading")} issues={defaultIssues}>
             <DefaultValueEditor field={field} onChange={(next) => onChange({ default: next })} />
-          </Zone>
+          </MorePart>
 
-          <Zone heading={t("fieldCatalog.validationHeading")} issues={zoned("validation")} bordered>
-            <FieldValidationEditor field={field} validation={field.validation} onChange={(validation) => onChange({ validation })} />
-          </Zone>
+          <MorePart heading={t("fieldCatalog.validationHeading")} issues={validationIssues}>
+            <FieldValidationEditor field={field} validation={field.validation} onChange={(next) => onChange({ validation: next })} />
+          </MorePart>
 
-          {/* The rail indents a group's own children one level; a field two
-              levels down relocates to its own top-level row instead of
-              indenting further (`panel-rail.ts::flattenRailFields`). This
-              zone draws no child list of its own. Each child opens its own
-              instance of this component when the author selects its rail
-              entry. */}
-          {isGroup && (
-            <Zone heading={t("fieldCatalog.groupChildrenHeading")} issues={[]} bordered>
-              <button type="button" className="btn btn-secondary" onClick={addFieldToGroup}>
-                {t("fieldCatalog.addSubField")}
-              </button>
-            </Zone>
+          <label {...stylex.props(styles.fieldRowLabel, styles.checkboxLabel)}>
+            <input type="checkbox" checked={technicalChecked} disabled={isGroup} onChange={(e) => toggleTechnical(e.target.checked)} />
+            {t("fieldCard.technicalLabel")}
+          </label>
+
+          {fieldId !== undefined && (
+            <MoveFieldControl
+              fieldId={fieldId}
+              fields={draft.fields ?? []}
+              contentLocale={contentLocale}
+              baseLocale={baseLocale}
+              onMoveField={onMoveField}
+            />
           )}
 
           {preview && (
             <details {...stylex.props(styles.fieldPreview)}>
               <summary {...stylex.props(styles.fieldPreviewSummary)}>{t("fieldCatalog.previewHeading")}</summary>
               {previewNote !== undefined && <p {...stylex.props(styles.studioNote)}>{t(previewNote)}</p>}
-              {/* Sample controls take no keyboard or pointer interaction — every
+              {/* Sample controls take no keyboard or pointer interaction: every
                   synthesized entry is already forced `readonly`, and `inert`
-                  additionally takes the whole container out of the tab order
-                  and the accessibility tree. */}
+                  also takes the whole container out of the tab order and the
+                  accessibility tree. */}
               <div {...stylex.props(styles.fieldPreviewBody)} inert>
                 <FieldForm fields={preview.fields} values={preview.values} onChange={() => {}} locale={contentLocale} />
               </div>
             </details>
           )}
 
-          <div {...stylex.props(styles.fieldHalfRemove)}>
-            <button
-              type="button"
-              id={fieldId === undefined ? undefined : removeControlId(fieldId)}
-              className="btn btn-ghost"
-              onClick={onRemove}
-            >
-              {t("fieldCatalog.removeField")}
-            </button>
-          </div>
-        </section>
-
-        <section {...stylex.props(styles.fieldCatalogHalfSecond)} aria-label={t("fieldCatalog.effectHalfLabel")}>
-          <Zone heading={t("fieldCatalog.usedInHeading")} issues={[]}>
-            {usage.length === 0 ? (
-              // The empty tone, never the refusal tone: a field no step asks
-              // for yet is an unfinished draft, not a broken one. The route
-              // opens the form editor for the first step a person works,
-              // where this field stands in the palette.
-              <div {...stylex.props(styles.emptyState)}>
-                <p {...stylex.props(styles.studioEmpty)}>{t("fieldCatalog.usedInEmpty")}</p>
-                {routeStepId !== undefined && (
-                  <button type="button" className="btn btn-secondary" onClick={() => onOpenForm(routeStepId)}>
-                    {t("fieldCatalog.effectEmptyRoute")}
-                  </button>
-                )}
-              </div>
-            ) : (
-              <ul {...stylex.props(styles.usageList)}>
-                {usage.map((row) => (
-                  // The key carries the write counter, so a definition change
-                  // remounts the row and its tint animation runs from the top.
-                  <li
-                    key={`${row.stepId}:${definitionWrites}`}
-                    {...stylex.props(styles.usageListItem, definitionWrites > 0 && styles.usageListItemTinted)}
-                    data-tinted={definitionWrites > 0 ? "true" : undefined}
-                  >
-                    <span {...stylex.props(styles.usageListItemLabel)}>{row.stepLabel || t("steps.unnamedStep")}</span>
-                    <span {...stylex.props(styles.studioMono)}>{row.modes.join(", ")}</span>
-                    <button type="button" className="btn btn-secondary" onClick={() => onShowStep(row.stepId)}>
-                      {t("fieldCatalog.showOnCanvas")}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Zone>
-
-          {/* Every expression that reads the key, placed in the author's
-              words. A group holds no value of its own, so it has none. */}
-          {!isGroup && (
-            <Zone heading={t("fieldCatalog.readByHeading")} issues={[]} bordered>
-              {readBy.length === 0 ? (
-                <p {...stylex.props(styles.studioEmpty)}>{t("fieldCatalog.readByEmpty")}</p>
-              ) : (
-                <ul {...stylex.props(styles.usageList)}>
-                  {readBy.map((row, i) => (
-                    // Rows carry no identity of their own; draft order is theirs.
-                    <li key={i} {...stylex.props(styles.readByItem)}>
-                      <span>{row.place}</span>
-                      {row.sentence !== undefined && <span {...stylex.props(styles.readBySentence)}>{row.sentence}</span>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Zone>
-          )}
-
-          <Zone heading={t("fieldCatalog.onlyAskWhenHeading")} issues={[]} bordered>
-            {visibleState.kind === "none" ? (
-              <p {...stylex.props(styles.studioNote)}>{t("fieldCatalog.conditionNoSteps")}</p>
-            ) : (
-              <>
-                <p {...stylex.props(styles.studioNote)}>
-                  {t("fieldCatalog.conditionScopeNote").replace(
-                    "{steps}",
-                    visibleState.stepIds.map((id) => usageStepLabel(usage, id)).join(", "),
-                  )}
-                </p>
-                {visibleState.kind === "divergent" && (
-                  <p {...stylex.props(styles.studioWarning)}>
-                    {t("fieldCatalog.conditionDivergentNote").replace(
-                      "{steps}",
-                      visibleState.stepIds.map((id) => usageStepLabel(usage, id)).join(", "),
-                    )}
-                  </p>
-                )}
-                {visibleState.kind === "divergent" && visibleState.literalStepIds.length > 0 && (
-                  <p {...stylex.props(styles.studioWarning)}>
-                    {t("fieldCatalog.conditionLiteralNote").replace(
-                      "{steps}",
-                      visibleState.literalStepIds.map((id) => usageStepLabel(usage, id)).join(", "),
-                    )}
-                  </p>
-                )}
-                <ConditionInput
-                  value={visibleState.kind === "uniform" ? visibleState.value : undefined}
-                  onChange={writeVisible}
-                  clearLabel={clearSteps ? clearConditionLabel(clearSteps.map((id) => usageStepLabel(usage, id))) : undefined}
-                  emptySentence={visibleState.kind === "divergent" ? t("condition.sentence.divergent") : undefined}
-                />
-              </>
-            )}
-          </Zone>
-
-          {/* The catalog declares no `required` key of its own, so this writes
-              the view and never the field. Two states disable it: a technical
-              field is written by the process, and a field no step view
-              references has nothing to write. */}
-          <Zone heading={t("fieldCatalog.askForThisHeading")} issues={[]} bordered>
-            {requiredState.kind !== "none" && (
-              <p {...stylex.props(styles.studioNote)}>
-                {t("fieldCatalog.requiredScopeNote").replace(
-                  "{steps}",
-                  requiredState.stepIds.map((id) => usageStepLabel(usage, id)).join(", "),
-                )}
-              </p>
-            )}
-            {requiredState.kind === "divergent" && (
-              <p {...stylex.props(styles.studioWarning)}>
-                {t("fieldCatalog.requiredDivergentNote").replace(
-                  "{steps}",
-                  requiredState.differingStepIds.map((id) => usageStepLabel(usage, id)).join(", "),
-                )}
-              </p>
-            )}
-            <label {...stylex.props(styles.fieldRowLabel, styles.checkboxLabel)}>
-              {t("fieldCatalog.requiredLabel")}
-              <input
-                type="checkbox"
-                checked={requiredState.kind === "uniform" && requiredState.value}
-                disabled={requiredDisabled}
-                onChange={(e) => writeRequired(e.target.checked)}
+          <details
+            {...stylex.props(styles.studioDevview)}
+            open={keyViewOpen || keyChecked}
+            onToggle={(e) => setKeyViewOpen(e.currentTarget.open)}
+          >
+            <summary {...stylex.props(styles.studioDevviewSummary)}>{t("fieldCatalog.developerView")}</summary>
+            <FieldKeyInput field={field} notice={keyNotice} onCommitted={noteRewrites} />
+            {custom && (
+              <PluginEnvelopeEditor
+                label={t("fieldCatalog.customTypeLabel")}
+                value={field.type as DraftOf<FieldDef>["type"] & object}
+                onChange={(type) => onChange({ type })}
               />
-            </label>
-            {requiredState.kind === "none" && <p {...stylex.props(styles.studioNote)}>{t("fieldCatalog.requiredNoSteps")}</p>}
-            {technicalChecked && <p {...stylex.props(styles.studioNote)}>{t("fieldCatalog.requiredTechnicalNote")}</p>}
-          </Zone>
+            )}
+          </details>
+        </div>
+      </details>
 
-          {/* A column mapping writes into other fields, so it is effect, not
-              definition. Its absence draws no rule of its own. */}
-          {showsColumnMapping(field, dataSources) && (
-            <Zone heading={t("columnMapping.heading")} issues={zoned("columnMapping")} bordered>
-              {columns.length === 0 ? (
-                <p {...stylex.props(styles.studioNote)}>{t("columnMapping.noColumns")}</p>
-              ) : (
-                <>
-                  {mappingRows.map((row) => (
-                    <div {...stylex.props(styles.studioColumnMappingRow)} key={row.column}>
-                      <select
-                        {...stylex.props(styles.studioColumnMappingRowSelect)}
-                        aria-label={t("columnMapping.columnAria")}
-                        value={row.column}
-                        onChange={(e) => renameMapping(row.column, e.target.value)}
-                      >
-                        {row.stale && <option value={row.column}>{row.column}</option>}
-                        {columns.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                      <span aria-hidden="true">-&gt;</span>
-                      <select
-                        {...stylex.props(styles.studioColumnMappingRowSelect)}
-                        aria-label={t("columnMapping.targetAria")}
-                        value={row.target}
-                        onChange={(e) => setMapping(row.column, e.target.value)}
-                      >
-                        <option value="">{t("fieldCatalog.noneOption")}</option>
-                        {targets.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.key === "" || f.key === undefined ? f.id : f.key}
-                          </option>
-                        ))}
-                      </select>
-                      <button type="button" className="btn btn-secondary" onClick={() => removeMapping(row.column)}>
-                        {t("columnMapping.removeRow")}
-                      </button>
-                      {row.stale && <p {...stylex.props(styles.studioWarning, styles.studioWarningInMappingRow)}>{t("columnMapping.staleColumn")}</p>}
-                    </div>
-                  ))}
-                  <button type="button" className="btn btn-secondary" onClick={addMapping} disabled={unmapped === undefined}>
-                    {t("columnMapping.addRow")}
-                  </button>
-                </>
-              )}
-            </Zone>
-          )}
-        </section>
+      <div {...stylex.props(styles.removeRow)}>
+        <button type="button" id={fieldId === undefined ? undefined : removeControlId(fieldId)} className="btn btn-ghost" onClick={onRemove}>
+          {t("fieldCatalog.removeField")}
+        </button>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -1308,16 +1420,35 @@ interface Props {
    * `FieldsTab::requestRemove`), which removes it at once or confirms first. */
   onRemove: (fieldId: string) => void;
   onShowStep: (stepId: string) => void;
-  /** Opens the form editor for one step: the effect half's empty-state
-   * route (`studio-app`). */
+  /** Opens the form editor for one step: an Asked on row's "Open the form"
+   * and the empty state's route (`studio-app`). */
   onOpenForm: (stepId: string) => void;
+  /** A Read by row's "Open" (`FieldsTab::openPlace`, design.md D4). */
+  onOpenPlace: (target: ReadByTarget) => void;
   /** The move's one write (`EntityTabs.tsx`'s `FieldsTab::moveField`),
-   * forwarded to `FieldEditor` as its own `onMoveField`. */
+   * forwarded to the card as its own `onMoveField`. */
   onMoveField: (fieldId: string, targetGroupId: string | undefined) => void;
+  /** The field whose card opens More by itself (`FieldsTab`'s `openMoreFor`). */
+  openMoreFor?: string;
+  /** Called once the card opened More for `openMoreFor`. */
+  onMoreOpened?: () => void;
 }
 
-export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowStep, onOpenForm, onMoveField }: Props) {
-  const { draft, mutate, contentLocale } = useDraft();
+const NOOP = () => {};
+
+export function FieldCatalogPanel({
+  token,
+  selectedId,
+  onAdd,
+  onRemove,
+  onShowStep,
+  onOpenForm,
+  onOpenPlace,
+  onMoveField,
+  openMoreFor,
+  onMoreOpened = NOOP,
+}: Props) {
+  const { draft, mutate } = useDraft();
   const fields = draft.fields ?? [];
   const dataSources = draft.dataSources ?? [];
   // The same hook `DataSourcesPanel` reads, so the key picker beside this one
@@ -1334,15 +1465,15 @@ export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowSt
     updateInDraftArray(mutate, (d) => flattenDraftFields(d.fields).find((f) => f.id === fieldId), patch);
   };
 
-  // The start state replaces both halves, since neither has a field to
-  // describe. It takes the empty tone: a draft with no field yet is a new
-  // draft, not a broken one. Its control is the same call the rail's Add
-  // entry makes, so the two cannot mint different fields.
+  // The start state replaces the card, since it has no field to describe. It
+  // takes the empty tone: a draft with no field yet is a new draft, not a
+  // broken one. Its control is the same call the rail's Add entry makes, so
+  // the two cannot mint different fields.
   if (field === undefined) {
     return (
-      <div className="field-catalog-panel">
+      <div {...stylex.props(styles.card)}>
         <h3 {...stylex.props(styles.panelHeading)}>{t("fieldCatalog.heading")}</h3>
-        <div {...stylex.props(styles.emptyState)}>
+        <div {...stylex.props(styles.emptyState, styles.startState)}>
           <h4 {...stylex.props(styles.fieldCatalogStartHeading)}>{t("fieldCatalog.startHeading")}</h4>
           <p {...stylex.props(styles.studioEmpty, styles.fieldCatalogStartBody)}>{t("fieldCatalog.startBody")}</p>
           <button type="button" id={ADD_FIRST_FIELD_ID} className="btn btn-primary" onClick={() => onAdd()}>
@@ -1354,17 +1485,11 @@ export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowSt
   }
 
   return (
-    <div className="field-catalog-panel">
-      {/* The field, not the panel. The screen heading one line above already
-          reads "Field catalog", and repeating it left the edited field named
-          nowhere as text — its label lives inside an editable input, which no
-          heading and no rail row spells out. An author working a 22-field
-          catalog had nothing to read back but the selection mark. */}
-      <h3 {...stylex.props(styles.panelHeading)}>{resolveDraftLocalizedText(field.label, contentLocale, draft.baseLocale ?? "en") || t("panelsScreen.unnamedField")}</h3>
-      {/* Remounts on a field switch: that resets everything the editor holds
-          in component state — each builder's incomplete row, the developer
-          view's half-typed config — the same way the selection change
-          already resets the rest. */}
+    <>
+      {/* Keyed on the field: a field switch resets everything the card holds
+          in component state, each builder's incomplete row and the Developer
+          view's half-typed config, the same way the selection change already
+          resets the rest. */}
       <FieldEditor
         key={field.id}
         field={field}
@@ -1378,12 +1503,15 @@ export function FieldCatalogPanel({ token, selectedId, onAdd, onRemove, onShowSt
         }}
         onShowStep={onShowStep}
         onOpenForm={onOpenForm}
+        onOpenPlace={onOpenPlace}
         onMoveField={onMoveField}
         onAdd={onAdd}
+        openMore={openMoreFor !== undefined && openMoreFor === field.id}
+        onMoreOpened={onMoreOpened}
       />
       <button type="button" className="btn btn-secondary" onClick={() => onAdd()}>
         {t("fieldCatalog.addField")}
       </button>
-    </div>
+    </>
   );
 }

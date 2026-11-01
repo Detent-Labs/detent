@@ -1196,8 +1196,10 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
             </div>,
           )}
 
-          {/* The Fields tab: the catalog and the field matrix, two views
-              under one sub-row. */}
+          {/* The Fields tab: the catalog, the field matrix and the data
+              sources, three views under one sub-row. A Read by row's "Open"
+              reaches a way out or a step on the Steps tab, and a form in the
+              form editor (design.md D4). */}
           {tabPanel(
             "fields",
             <FieldsTabViews
@@ -1207,6 +1209,15 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
               visible={!jsonOpen && openTab === "fields"}
               onShowStep={(target) => navigate({ name: "edit", processId, stepId: target })}
               onOpenForm={(target) => openFormEditor(target, "steps")}
+              onOpenPlace={(place) =>
+                place.kind === "form"
+                  ? openFormEditor(place.stepId, "steps")
+                  : openTabFromRow(
+                      place.kind === "wayOut"
+                        ? { tab: "steps", stepId: place.stepId, pathId: place.pathId }
+                        : { tab: "steps", stepId: place.stepId },
+                    )
+              }
             />,
           )}
           {/* The Forms tab: one plate per step that declares a view
@@ -1234,9 +1245,9 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
               onOpenIssue={(issue) => openTabFromRow(checkTarget(issue, steps))}
             />,
           )}
-          {/* The Settings tab: the process's own settings, its data
-              sources, its contract and its access lists, four views under
-              one sub-row. */}
+          {/* The Settings tab: the process's own settings, its contract and
+              its access lists, three views under one sub-row. The data
+              sources stand on the Fields tab. */}
           {tabPanel(
             "settings",
             <SettingsTab

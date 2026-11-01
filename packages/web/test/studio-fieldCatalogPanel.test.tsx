@@ -28,8 +28,10 @@ import {
   moveControlId,
   removeControlId,
   rewriteLineFor,
+  showsChoices,
 } from "../src/areas/studio/panels/fieldCatalogLogic.js";
-import { PublishedFieldIdsContext } from "../src/areas/studio/draft/publishedFields.js";
+import { PublishedFieldIdsContext, PublishedOptionValuesContext } from "../src/areas/studio/draft/publishedFields.js";
+import type { ReadByTarget } from "../src/areas/studio/panels/readByRows.js";
 
 const NOOP = () => {};
 
@@ -46,10 +48,9 @@ const grp = (id: string, key: string, children: DraftField[]): DraftField =>
   ({ id, key, label: { en: key }, type: "group", fields: children }) as unknown as DraftField;
 
 /**
- * `MoveFieldControl`'s own value/disabled wiring (final-review Minor 2): the
- * deleted per-row rail picker pinned these three states, and
- * `studio-fieldCatalogLogic.test.ts::moveTargetsFor` covers only the data
- * behind the control, not the rendered `<select>` itself.
+ * `MoveFieldControl`'s own value/disabled wiring: `studio-fieldCatalogLogic.test.ts
+ * ::moveTargetsFor` covers only the data behind the control, not the rendered
+ * `<select>` itself.
  */
 describe("MoveFieldControl", () => {
   it("selects a nested field's current group", () => {
@@ -113,225 +114,30 @@ function contextValue(draft: Draft, issues: EditorIssue[] = []): DraftContextVal
   };
 }
 
+interface RenderOptions {
+  issues?: EditorIssue[];
+  /** The base version's field ids; `new Set()` stands for a draft with none. */
+  published?: ReadonlySet<string> | undefined;
+  /** The base version's choice values per field id. */
+  publishedValues?: ReadonlyMap<string, ReadonlySet<string>> | undefined;
+  onOpenPlace?: (target: ReadByTarget) => void;
+}
+
 /**
- * `FieldEditor` draws the selected field's own two halves at any nesting
- * depth, a nested field the same way as a top-level one (`studio-app`: "A
- * nested field takes the same two halves"). Only a selected `group` field's
- * own editor adds the "Fields inside this group" zone (`studio-app`: "Only a
- * group field holds the sixth zone"); a group's child renders in its own
- * instance of this same component, with its own move control, never inside
- * its parent's. `FieldCatalogPanel` reads `useDraft()` directly, so each test
- * below supplies `DraftContext.Provider`, the way `studio-formsTab.test.tsx`
- * already does.
+ * The panel over `selectedId`, in a hand-built context: a live
+ * `DraftProvider` resolves its fetches async and never settles under
+ * `renderToStaticMarkup`. A static render fires no event, so a press is
+ * pinned at the source where a test needs one.
  */
-describe("FieldCatalogPanel", () => {
-  it("renders a nested field's own move control, Technical checkbox and effect-half zones", () => {
-    const draft: Draft = {
-      baseLocale: "en",
-      fields: [grp("field_g", "g", [fld("field_c", "c")])] as unknown as Draft["fields"],
-    };
-    const html = renderToStaticMarkup(
-      <DraftContext.Provider value={contextValue(draft)}>
-        <FieldCatalogPanel
-          token="test-token"
-          selectedId="field_c"
-          onAdd={NOOP}
-          onRemove={NOOP}
-          onShowStep={NOOP}
-          onOpenForm={NOOP}
-          onMoveField={NOOP}
-        />
-      </DraftContext.Provider>,
-    );
-
-    expect(html).toContain(`id="${moveControlId("field_c")}"`);
-    expect(html).toContain(`id="${fieldLabelInputId("field_c")}"`);
-
-    // Narrowed to the Technical checkbox's own <label>...</label>, since the
-    // "Ask for this" checkbox elsewhere in the same markup is legitimately
-    // disabled for a field no step view references.
-    const technicalAt = html.indexOf("Technical");
-    expect(technicalAt).toBeGreaterThan(-1);
-    const technicalLabel = html.slice(html.lastIndexOf("<label", technicalAt), html.indexOf("</label>", technicalAt));
-    expect(technicalLabel).toContain('type="checkbox"');
-    expect(technicalLabel).not.toContain('disabled=""');
-
-    expect(html).toContain("Default value");
-    expect(html).toContain("How it will look");
-    expect(html).toContain("Used in");
-  });
-
-  it("renders a selected group's own zone, with no move control for its child", () => {
-    const draft: Draft = {
-      baseLocale: "en",
-      fields: [grp("field_g", "g", [fld("field_c", "c")])] as unknown as Draft["fields"],
-    };
-    const html = renderToStaticMarkup(
-      <DraftContext.Provider value={contextValue(draft)}>
-        <FieldCatalogPanel
-          token="test-token"
-          selectedId="field_g"
-          onAdd={NOOP}
-          onRemove={NOOP}
-          onShowStep={NOOP}
-          onOpenForm={NOOP}
-          onMoveField={NOOP}
-        />
-      </DraftContext.Provider>,
-    );
-
-    expect(html).toContain("Fields inside this group");
-    expect(html).toContain("+ Add field to this group");
-    expect(html).not.toContain(`id="${moveControlId("field_c")}"`);
-
-    // The zone stands directly after "Validation": the next zone heading after
-    // "Validation" is its own, and the group's preview follows it.
-    const validationAt = html.indexOf(">Validation<");
-    const zoneAt = html.indexOf(">Fields inside this group<");
-    expect(validationAt).toBeGreaterThan(-1);
-    expect(html.indexOf("<h4", validationAt)).toBe(html.lastIndexOf("<h4", zoneAt));
-    expect(zoneAt).toBeLessThan(html.indexOf(">How it will look<"));
-  });
-
-  it("renders no group zone for a selected top-level field", () => {
-    const draft: Draft = {
-      baseLocale: "en",
-      fields: [fld("field_a", "a")] as unknown as Draft["fields"],
-    };
-    const html = renderToStaticMarkup(
-      <DraftContext.Provider value={contextValue(draft)}>
-        <FieldCatalogPanel
-          token="test-token"
-          selectedId="field_a"
-          onAdd={NOOP}
-          onRemove={NOOP}
-          onShowStep={NOOP}
-          onOpenForm={NOOP}
-          onMoveField={NOOP}
-        />
-      </DraftContext.Provider>,
-    );
-
-    expect(html).not.toContain("Fields inside this group");
-    expect(html).toContain(`id="${fieldLabelInputId("field_a")}"`);
-  });
-
-  // `FieldsTab` points the removal dialog's trigger ref at Remove field by
-  // this id, so a declined removal hands focus back to that control.
-  it("puts the field's own remove id on Remove field", () => {
-    const draft: Draft = {
-      baseLocale: "en",
-      fields: [grp("field_g", "g", [fld("field_c", "c")])] as unknown as Draft["fields"],
-    };
-    const html = renderToStaticMarkup(
-      <DraftContext.Provider value={contextValue(draft)}>
-        <FieldCatalogPanel
-          token="test-token"
-          selectedId="field_c"
-          onAdd={NOOP}
-          onRemove={NOOP}
-          onShowStep={NOOP}
-          onOpenForm={NOOP}
-          onMoveField={NOOP}
-        />
-      </DraftContext.Provider>,
-    );
-
-    const remove = buttonElements(html).find((b) => b.includes(`id="${removeControlId("field_c")}"`));
-    expect(remove).toBeDefined();
-    expect(remove).toEndWith(">Remove field</button>");
-  });
-
-  // A removal that leaves the entity rail with no entry hands focus to this
-  // control, by this id (`fieldCatalogLogic.ts::focusAfterRemove`).
-  it("puts the stable first-field id on the start state's Add the first field", () => {
-    const draft: Draft = { baseLocale: "en", fields: [] as unknown as Draft["fields"] };
-    const html = renderToStaticMarkup(
-      <DraftContext.Provider value={contextValue(draft)}>
-        <FieldCatalogPanel
-          token="test-token"
-          selectedId={undefined}
-          onAdd={NOOP}
-          onRemove={NOOP}
-          onShowStep={NOOP}
-          onOpenForm={NOOP}
-          onMoveField={NOOP}
-        />
-      </DraftContext.Provider>,
-    );
-
-    const addFirst = buttonElements(html).find((b) => b.includes(`id="${ADD_FIRST_FIELD_ID}"`));
-    expect(addFirst).toBeDefined();
-    expect(addFirst).toEndWith(">Add the first field</button>");
-  });
-
-  // A kind switch rewrote `resolution` out of `group` and left its `fields` in
-  // place. Only a group's editor holds the zone, so the child's rail entry is
-  // its one route in. The panel finds that child through `flattenDraftFields`,
-  // whatever its parent's `type`.
-  it("renders the own editor of a field whose parent is no group", () => {
-    const draft: Draft = {
-      baseLocale: "en",
-      fields: [{ ...fld("field_r", "resolution"), fields: [fld("field_c", "discrepancy_note")] }] as unknown as Draft["fields"],
-    };
-    const html = renderToStaticMarkup(
-      <DraftContext.Provider value={contextValue(draft)}>
-        <FieldCatalogPanel
-          token="test-token"
-          selectedId="field_c"
-          onAdd={NOOP}
-          onRemove={NOOP}
-          onShowStep={NOOP}
-          onOpenForm={NOOP}
-          onMoveField={NOOP}
-        />
-      </DraftContext.Provider>,
-    );
-
-    expect(html).toContain(`id="${moveControlId("field_c")}"`);
-    expect(html).toContain(`id="${fieldLabelInputId("field_c")}"`);
-  });
-
-  // `FieldsTab` passes `undefined` while no field carries an id, since the rail
-  // lists no entry for an id-less field. Without the lookup's guard, the
-  // id-less field would match that `undefined` and open an editor whose every
-  // write `updateField` drops.
-  it("renders the start state for a catalog whose only field carries no id", () => {
-    const draft: Draft = {
-      baseLocale: "en",
-      fields: [{ key: "unsaved", type: "string" }] as unknown as Draft["fields"],
-    };
-    const html = renderToStaticMarkup(
-      <DraftContext.Provider value={contextValue(draft)}>
-        <FieldCatalogPanel
-          token="test-token"
-          selectedId={undefined}
-          onAdd={NOOP}
-          onRemove={NOOP}
-          onShowStep={NOOP}
-          onOpenForm={NOOP}
-          onMoveField={NOOP}
-        />
-      </DraftContext.Provider>,
-    );
-
-    expect(html).toContain("This process collects nothing yet");
-    expect(html).not.toContain("studio-field-label-");
-  });
-
-  // `studio-app`: "A group's child row keeps its own list". The key check on a
-  // nested field stands in that field's own "What this field asks" zone, whose
-  // heading carries `data-checked`, and the group's editor carries none.
-  it("stands a nested field's check in its own zone, and none in its group's editor", () => {
-    const draft: Draft = {
-      baseLocale: "en",
-      fields: [grp("field_g", "g", [fld("field_c", "c")])] as unknown as Draft["fields"],
-    };
-    const issues: EditorIssue[] = [
-      { entityType: "field", entityId: "field_c", loc: "fields[0].fields[0].key", source: "structural", message: "x" },
-    ];
-    const render = (selectedId: string) =>
-      renderToStaticMarkup(
+function renderPanel(draft: Draft, selectedId: string | undefined, options: RenderOptions = {}): string {
+  const { issues = [], onOpenPlace = NOOP } = options;
+  // An explicit `undefined` stands for a base version still loading, so only
+  // an absent key takes the default.
+  const published = "published" in options ? options.published : new Set<string>();
+  const publishedValues = "publishedValues" in options ? options.publishedValues : new Map<string, ReadonlySet<string>>();
+  return renderToStaticMarkup(
+    <PublishedFieldIdsContext.Provider value={published}>
+      <PublishedOptionValuesContext.Provider value={publishedValues}>
         <DraftContext.Provider value={contextValue(draft, issues)}>
           <FieldCatalogPanel
             token="test-token"
@@ -340,16 +146,465 @@ describe("FieldCatalogPanel", () => {
             onRemove={NOOP}
             onShowStep={NOOP}
             onOpenForm={NOOP}
+            onOpenPlace={onOpenPlace}
             onMoveField={NOOP}
           />
-        </DraftContext.Provider>,
-      );
+        </DraftContext.Provider>
+      </PublishedOptionValuesContext.Provider>
+    </PublishedFieldIdsContext.Provider>,
+  );
+}
 
-    const child = render("field_c");
-    expect(child.split('data-checked="failed"').length - 1).toBe(1);
-    expect(child).toMatch(/data-checked="failed"[^>]*>What this field asks</);
+/** Every `<h4>` heading's text, in document order. */
+const headings = (html: string): string[] => [...html.matchAll(/<h4[^>]*>([^<]*)<\/h4>/g)].map((m) => m[1]!);
 
-    expect(render("field_g")).not.toContain("data-checked");
+/** The markup of one section, from its heading to the next `<h4>`. */
+function sectionOf(html: string, heading: string): string {
+  const at = html.indexOf(`>${heading}</h4>`);
+  expect(at).toBeGreaterThan(-1);
+  const next = html.indexOf("<h4", at);
+  return html.slice(at, next === -1 ? undefined : next);
+}
+
+/** The opening tag of the `<details>` More draws. */
+function moreDetails(html: string): string {
+  const at = html.lastIndexOf("<details", html.indexOf(">More</h4>"));
+  return html.slice(at, html.indexOf(">", at) + 1);
+}
+
+/** More's markup, from its summary to the Remove field row after it. */
+function moreBody(html: string): string {
+  const at = html.indexOf(">More</h4>");
+  return html.slice(at, html.indexOf(`id="${removeControlId("field_a")}"`));
+}
+
+const cel = (src: string) => ({ lang: "cel" as const, src });
+
+const step = (id: string, label: string, view: unknown[] = [], extra: object = {}) => ({
+  id,
+  key: id,
+  label: { en: label },
+  type: "task",
+  view: { fields: view },
+  ...extra,
+});
+
+const draftOf = (fields: DraftField[], steps: object[] = [], extra: object = {}): Draft =>
+  ({
+    baseLocale: "en",
+    fields,
+    workflow: { initialStep: (steps[0] as { id?: string } | undefined)?.id ?? "step_a", steps },
+    ...extra,
+  }) as unknown as Draft;
+
+// `studio-app`: "The Fields view draws one card in sections".
+describe("the field card's sections", () => {
+  it("reads the name line, the Name input, then Kind, Choices, Asked on, Read by and More, in that order", () => {
+    const html = renderPanel(draftOf([fld("field_a", "a", { label: { en: "Amount" } })]), "field_a");
+
+    expect(headings(html)).toEqual(["Kind", "Choices", "Asked on", "Read by", "More"]);
+    const nameLine = html.indexOf(">Amount</h3>");
+    const nameInput = html.indexOf(`id="${fieldLabelInputId("field_a")}"`);
+    expect(nameLine).toBeGreaterThan(-1);
+    expect(nameLine).toBeLessThan(nameInput);
+    expect(html.slice(nameLine, nameInput)).not.toContain("<h4");
+    expect(html.slice(nameLine, nameInput)).toContain(">Name<");
+  });
+
+  it("draws no half, no zone heading and no retired label", () => {
+    const html = renderPanel(draftOf([fld("field_a", "a")]), "field_a");
+
+    for (const retired of ["What this field asks", "What kind of field", "Used in", "Ask for this", "What this field is", "Where it acts"]) {
+      expect(html).not.toContain(retired);
+    }
+  });
+
+  it("rules every section after Kind with a hairline, and Kind with none", () => {
+    const html = renderPanel(draftOf([fld("field_a", "a")]), "field_a");
+    const sectionTag = (heading: string) => {
+      const at = html.lastIndexOf("<section", html.indexOf(`>${heading}</h4>`));
+      return html.slice(at, html.indexOf(">", at) + 1);
+    };
+
+    expect(sectionTag("Kind")).not.toContain("sectionRuled");
+    for (const heading of ["Choices", "Asked on", "Read by"]) expect(sectionTag(heading)).toContain("sectionRuled");
+    expect(moreDetails(html)).toContain("sectionRuled");
+  });
+
+  it("closes the card with Remove field, under a hairline of its own", () => {
+    const html = renderPanel(draftOf([grp("field_g", "g", [fld("field_c", "c")])]), "field_c");
+    const card = html.slice(0, html.indexOf("</article>"));
+    const remove = buttonElements(card).at(-1);
+
+    expect(remove).toContain(`id="${removeControlId("field_c")}"`);
+    expect(remove).toEndWith(">Remove field</button>");
+    expect(card.slice(card.lastIndexOf("<div", card.indexOf(removeControlId("field_c"))))).toContain("removeRow");
+  });
+
+  it("shows a group's \"Fields inside this group\" directly before More, and no Read by", () => {
+    const html = renderPanel(draftOf([grp("field_g", "g", [fld("field_c", "c")])]), "field_g");
+
+    expect(headings(html)).toEqual(["Kind", "Asked on", "Fields inside this group", "More"]);
+    expect(sectionOf(html, "Fields inside this group")).toContain(">+ Add field to this group</button>");
+    expect(html).not.toContain(`id="${moveControlId("field_c")}"`);
+  });
+
+  it("draws no \"Fields inside this group\" for a field that is no group", () => {
+    expect(renderPanel(draftOf([fld("field_a", "a")]), "field_a")).not.toContain("Fields inside this group");
+  });
+
+  it("draws a nested field's own card, with its own move control and its label input", () => {
+    const html = renderPanel(draftOf([grp("field_g", "g", [fld("field_c", "c")])]), "field_c");
+
+    expect(html).toContain(`id="${moveControlId("field_c")}"`);
+    expect(html).toContain(`id="${fieldLabelInputId("field_c")}"`);
+    expect(html).toContain("Default value");
+    expect(html).toContain("How it will look");
+  });
+
+  // A kind switch rewrote `resolution` out of `group` and left its `fields` in
+  // place. The panel finds that child through `flattenDraftFields`, whatever
+  // its parent's `type`.
+  it("draws the card of a field whose parent is no group", () => {
+    const draft = draftOf([{ ...fld("field_r", "resolution"), fields: [fld("field_c", "discrepancy_note")] } as unknown as DraftField]);
+    const html = renderPanel(draft, "field_c");
+
+    expect(html).toContain(`id="${moveControlId("field_c")}"`);
+    expect(html).toContain(`id="${fieldLabelInputId("field_c")}"`);
+  });
+
+  it("puts the stable first-field id on the start state's Add the first field", () => {
+    const html = renderPanel(draftOf([]), undefined);
+    const addFirst = buttonElements(html).find((b) => b.includes(`id="${ADD_FIRST_FIELD_ID}"`));
+
+    expect(addFirst).toBeDefined();
+    expect(addFirst).toEndWith(">Add the first field</button>");
+    expect(html).not.toContain("<article");
+  });
+
+  // `FieldsTab` passes `undefined` while no field carries an id. Without the
+  // lookup's guard, the id-less field would match that `undefined`.
+  it("draws the start state for a catalog whose only field carries no id", () => {
+    const html = renderPanel(draftOf([{ key: "unsaved", type: "string" } as unknown as DraftField]), undefined);
+
+    expect(html).toContain("This process collects nothing yet");
+    expect(html).not.toContain("studio-field-label-");
+  });
+});
+
+// `studio-app`: "The Choices section shows for a field that can take choices".
+describe("the Choices section", () => {
+  it("shows for a text field, with the free-typing sentence and the add command", () => {
+    const choices = sectionOf(renderPanel(draftOf([fld("field_a", "a")]), "field_a"), "Choices");
+
+    expect(choices).toContain("No choice yet, so a participant types freely. Add one to offer a list instead.");
+    expect(choices).toContain(">+ Add a choice</button>");
+  });
+
+  it("stays out for a number field and for a date field", () => {
+    expect(headings(renderPanel(draftOf([fld("field_a", "a", { type: "number" })]), "field_a"))).not.toContain("Choices");
+    expect(headings(renderPanel(draftOf([fld("field_a", "a", { format: "date" })]), "field_a"))).not.toContain("Choices");
+  });
+
+  it("decides by the control, the format and what the field already carries", () => {
+    expect(showsChoices({ type: "string" })).toBe(true);
+    expect(showsChoices({ type: "list" })).toBe(true);
+    expect(showsChoices({ type: "list", format: "person" })).toBe(false);
+    expect(showsChoices({ type: "string", format: "email", control: "radio" })).toBe(true);
+    expect(showsChoices({ type: "string", format: "email", options: [{ value: "a", label: { en: "A" } }] } as never)).toBe(true);
+    expect(showsChoices({ type: "string", format: "date", dataSource: "ds_1" } as never)).toBe(true);
+    expect(showsChoices({ type: "boolean" })).toBe(false);
+    expect(showsChoices({ type: "group" })).toBe(false);
+  });
+});
+
+// `studio-app`: "A choice reads by its name alone".
+describe("a choice row", () => {
+  const status = () =>
+    fld("field_a", "status", {
+      options: [
+        { value: "open", label: { en: "Open" } },
+        { value: "closed", label: { en: "Closed" } },
+      ],
+    });
+  /** The Choices section's markup before its Developer view. */
+  const rows = (html: string) => {
+    const choices = sectionOf(html, "Choices");
+    return choices.slice(0, choices.indexOf("<details"));
+  };
+  /** The Choices section's Developer view. */
+  const developerView = (html: string) => {
+    const choices = sectionOf(html, "Choices");
+    return choices.slice(choices.indexOf("<details"), choices.indexOf("</details>") + "</details>".length);
+  };
+
+  it("holds one name input and a Remove command per choice, and no value outside the Developer view", () => {
+    const html = renderPanel(draftOf([status()]), "field_a");
+    const listed = rows(html);
+
+    expect(listed.match(/<li/g)).toHaveLength(2);
+    expect(listed.match(/<input/g)).toHaveLength(2);
+    expect(listed).toContain('value="Open"');
+    expect(listed).toContain('value="Closed"');
+    expect(buttonElements(listed).filter((b) => b.endsWith(">Remove</button>"))).toHaveLength(2);
+    expect(listed).not.toContain('value="open"');
+    expect(listed).not.toContain('value="closed"');
+    expect(listed).toContain(">+ Add a choice</button>");
+  });
+
+  it("prints the authoring commands in the authoring command style", () => {
+    const remove = buttonElements(rows(renderPanel(draftOf([status()]), "field_a"))).find((b) => b.endsWith(">Remove</button>"));
+
+    expect(remove).toContain('class="btn btn-ghost command"');
+  });
+
+  it("keeps the stored values in a closed Developer view, in mono inputs captioned Stored value", () => {
+    const view = developerView(renderPanel(draftOf([status()]), "field_a"));
+
+    expect(view).toMatch(/^<details(?![^>]*\sopen)/);
+    expect(view).toContain(">Developer view</summary>");
+    expect(view.match(/>Stored value</g)).toHaveLength(2);
+    expect(view).toMatch(/<input[^>]*class="studioMono"[^>]*value="open"/);
+    expect(view).toMatch(/<input[^>]*class="studioMono"[^>]*value="closed"/);
+  });
+
+  it("says the value follows the name while no choice is published", () => {
+    expect(developerView(renderPanel(draftOf([status()]), "field_a"))).toContain("The value follows the name until the first publish.");
+  });
+
+  it("says the name no longer sets the values once the base version holds a choice", () => {
+    const html = renderPanel(draftOf([status()]), "field_a", { publishedValues: new Map([["field_a", new Set(["open"])]]) });
+
+    expect(developerView(html)).toContain("This field is in a published version. The name no longer sets its values.");
+  });
+
+  it("counts every stored value as locked while the base version loads", () => {
+    const html = renderPanel(draftOf([status()]), "field_a", { publishedValues: undefined });
+
+    expect(developerView(html)).toContain("This field is in a published version. The name no longer sets its values.");
+  });
+
+  it("writes a name through applyChoiceName, the lock read per choice", () => {
+    const source = readFileSync(new URL("../src/areas/studio/panels/FieldCatalogPanel.tsx", import.meta.url).pathname, "utf8");
+    const write = source.slice(source.indexOf("const nameChoice = "), source.indexOf("const addChoice = "));
+
+    expect(write).toContain("const locked = isLocked(option);");
+    expect(write).toContain("applyChoiceName(target, index, label, baseLocale, locked)");
+    expect(source).toContain('setOptions([...options, { value: "", label: seedLocalizedText(contentLocale) }])');
+  });
+});
+
+// `studio-app`: "A field bound to a source states where its choices come from".
+describe("a field bound to a data source", () => {
+  const draft = draftOf([fld("field_a", "a", { dataSource: "ds_1" })], [], {
+    dataSources: [
+      { id: "ds_1", key: "Cost centres", type: "db.list", config: {} },
+      { id: "ds_2", key: "", type: "db.list", config: {} },
+    ],
+  });
+
+  it("names its source, and draws no choice row and no add command", () => {
+    const choices = sectionOf(renderPanel(draft, "field_a"), "Choices");
+
+    expect(choices).toContain("The choices come from Cost centres.");
+    expect(choices).toContain("Pick another source under More.");
+    expect(choices).not.toContain("<input");
+    expect(choices).not.toContain("+ Add a choice");
+  });
+
+  // `studio-app`: "The source picker names each source".
+  it("offers each source by name in More's picker, and no id", () => {
+    const more = moreBody(renderPanel(draft, "field_a"));
+    const picker = more.slice(more.indexOf(">Values come from"), more.indexOf("</select>"));
+    const optionTexts = [...picker.matchAll(/<option[^>]*>([^<]*)<\/option>/g)].map((m) => m[1]);
+
+    expect(optionTexts).toEqual(["Nowhere: this field lists its own choices", "Cost centres", "(unnamed source)"]);
+  });
+});
+
+// `studio-app`: "Asked on lists each step's marks as words" and its siblings.
+describe("the Asked on section", () => {
+  const amount = () => fld("field_a", "amount", { label: { en: "Amount" }, type: "number" });
+
+  it("prints each step's marks as words, and no flag key", () => {
+    const html = renderPanel(
+      draftOf(
+        [amount()],
+        [
+          step("step_r", "Review", [{ ref: "field_a", required: true }]),
+          step("step_p", "Approve", [{ ref: "field_a", readonly: true }]),
+          step("step_h", "Archive", [{ ref: "field_a", visible: false }]),
+        ],
+      ),
+      "field_a",
+    );
+    const asked = sectionOf(html, "Asked on");
+    const rowOf = (label: string) => asked.slice(asked.indexOf(`>${label}<`), asked.indexOf("</li>", asked.indexOf(`>${label}<`)));
+
+    expect(rowOf("Review")).toContain(">Required<");
+    expect(rowOf("Approve")).toContain(">Read-only<");
+    expect(rowOf("Archive")).toContain(">Not asked<");
+    expect(asked).not.toContain(">required<");
+    expect(asked).not.toContain(">readonly<");
+    expect(asked).not.toContain("studioMono");
+  });
+
+  it("reads a step's own condition as a sentence, and prints no mark for a conditional requiredness", () => {
+    const html = renderPanel(
+      draftOf(
+        [amount()],
+        [
+          step("step_r", "Review", [{ ref: "field_a", visible: cel("data.amount > 0.0") }]),
+          step("step_p", "Approve", [{ ref: "field_a", required: cel("data.amount > 0.0") }]),
+        ],
+      ),
+      "field_a",
+    );
+    const asked = sectionOf(html, "Asked on");
+    const register = asked.slice(asked.indexOf("<ul"), asked.indexOf("</ul>"));
+
+    expect(register).toContain(">Amount is greater than 0.<");
+    expect(register.match(/greater than/g)).toHaveLength(1);
+    expect(register).not.toContain(">Required<");
+  });
+
+  it("closes each row with Open the form and Show on the map", () => {
+    const html = renderPanel(draftOf([amount()], [step("step_r", "Review", [{ ref: "field_a" }])]), "field_a");
+    const row = sectionOf(html, "Asked on");
+    const commands = buttonElements(row.slice(row.indexOf("<li"), row.indexOf("</li>")));
+
+    expect(commands.map((b) => b.replace(/<[^>]*>/g, ""))).toEqual(["Open the form", "Show on the map"]);
+    for (const b of commands) expect(b).toContain('class="btn btn-ghost command"');
+  });
+
+  it("stands the requiredness checkbox and Only ask this when under the rows", () => {
+    const html = renderPanel(draftOf([amount()], [step("step_r", "Review", [{ ref: "field_a" }])]), "field_a");
+    const asked = sectionOf(html, "Asked on");
+
+    expect(asked.indexOf("</ul>")).toBeLessThan(asked.indexOf("Required on every step that asks for it"));
+    expect(asked.indexOf("Required on every step that asks for it")).toBeLessThan(asked.indexOf(">Only ask this when<"));
+  });
+
+  it("shows the empty state, with no checkbox and no condition, while no step asks for the field", () => {
+    const html = renderPanel(draftOf([amount()], [step("step_r", "Review")]), "field_a");
+    const asked = sectionOf(html, "Asked on");
+
+    expect(asked).toContain(">No step asks for this field yet.<");
+    expect(asked).not.toContain("Required on every step");
+    expect(asked).not.toContain("Only ask this when");
+    expect(asked).not.toContain('type="checkbox"');
+  });
+
+  it("disables the requiredness checkbox for a technical field", () => {
+    const html = renderPanel(draftOf([fld("field_a", "a", { technical: true })], [step("step_r", "Review", [{ ref: "field_a" }])]), "field_a");
+    const asked = sectionOf(html, "Asked on");
+    const at = asked.indexOf("Required on every step that asks for it");
+    const label = asked.slice(asked.lastIndexOf("<label", at), at);
+
+    expect(label).toContain('disabled=""');
+  });
+});
+
+// `studio-app`: "More folds the rest of the card" and "A field's checks stand
+// at the zone each one belongs to".
+describe("More", () => {
+  const issue = (loc: string, entityId = "field_a"): EditorIssue => ({ entityType: "field", entityId, loc, source: "structural", message: `check on ${loc}` });
+
+  it("stands closed with no check, and holds its seven parts in order", () => {
+    const html = renderPanel(draftOf([fld("field_a", "a")]), "field_a");
+    const more = moreBody(html);
+    const order = [
+      ">Where values come from<",
+      ">Default value<",
+      ">Validation<",
+      ">Technical: the process fills this in by itself",
+      ">Move this field to",
+      ">How it will look<",
+      'class="studioDevviewSummary">Developer view<',
+    ].map((part) => more.indexOf(part));
+
+    expect(moreDetails(html)).not.toMatch(/\sopen/);
+    expect(order.every((at) => at > -1)).toBe(true);
+    expect([...order].sort((x, y) => x - y)).toEqual(order);
+    expect(more.indexOf(">Key<")).toBeGreaterThan(more.indexOf('class="studioDevviewSummary">Developer view<'));
+  });
+
+  it("opens by itself while a validation check stands, and shows the check under Validation", () => {
+    const html = renderPanel(draftOf([fld("field_a", "a")]), "field_a", { issues: [issue("fields[0].validation.pattern")] });
+    const more = moreBody(html);
+
+    expect(moreDetails(html)).toContain('open=""');
+    expect(html).toMatch(/data-checked="failed"[^>]*>More<\/h4>/);
+    expect(more.indexOf("check on fields[0].validation.pattern")).toBeGreaterThan(more.indexOf(">Validation<"));
+  });
+
+  it("opens with its Developer view while a key check stands, and prints the check beside the name line", () => {
+    const html = renderPanel(draftOf([fld("field_a", "a")]), "field_a", { issues: [issue("fields[0].key")] });
+    const keyDetails = html.slice(html.lastIndexOf("<details", html.indexOf(">Key<")), html.indexOf(">", html.lastIndexOf("<details", html.indexOf(">Key<"))) + 1);
+
+    expect(moreDetails(html)).toContain('open=""');
+    expect(keyDetails).toContain('open=""');
+    expect(html.indexOf("check on fields[0].key")).toBeLessThan(html.indexOf(`id="${fieldLabelInputId("field_a")}"`));
+    expect(html).toMatch(/data-checked="failed"[^>]*>a<\/h3>/);
+  });
+
+  it("prints a Technical check under Kind and opens More", () => {
+    const html = renderPanel(draftOf([fld("field_a", "a")]), "field_a", { issues: [issue("fields[0].technical")] });
+
+    expect(sectionOf(html, "Kind")).toContain("check on fields[0].technical");
+    expect(moreDetails(html)).toContain('open=""');
+  });
+
+  it("stands a check it cannot place at the card's top", () => {
+    const html = renderPanel(draftOf([fld("field_a", "a")]), "field_a", { issues: [issue("fields[0].somethingElse")] });
+
+    expect(html.indexOf("check on fields[0].somethingElse")).toBeLessThan(html.indexOf(`id="${fieldLabelInputId("field_a")}"`));
+  });
+
+  it("stands an option check at the top of a card that draws no Choices section", () => {
+    const html = renderPanel(draftOf([fld("field_a", "a", { type: "number" })]), "field_a", { issues: [issue("fields[0].options[0].value")] });
+
+    expect(headings(html)).not.toContain("Choices");
+    expect(html.indexOf("check on fields[0].options[0].value")).toBeLessThan(html.indexOf(`id="${fieldLabelInputId("field_a")}"`));
+  });
+
+  // `studio-app`: "A group's child row keeps its own list".
+  it("stands a nested field's check in its own card, and none in its group's card", () => {
+    const draft = draftOf([grp("field_g", "g", [fld("field_c", "c")])]);
+    const issues = [issue("fields[0].fields[0].key", "field_c")];
+
+    expect(renderPanel(draft, "field_c", { issues })).toContain("check on fields[0].fields[0].key");
+    expect(renderPanel(draft, "field_g", { issues })).not.toContain("data-checked");
+  });
+
+  it("holds the Technical checkbox, enabled for a nested field and disabled for a group", () => {
+    const technical = (html: string) => {
+      const at = html.indexOf("Technical: the process fills this in by itself");
+      return html.slice(html.lastIndexOf("<label", at), at);
+    };
+    const draft = draftOf([grp("field_g", "g", [fld("field_c", "c")])]);
+
+    expect(technical(renderPanel(draft, "field_c"))).toContain('type="checkbox"');
+    expect(technical(renderPanel(draft, "field_c"))).not.toContain('disabled=""');
+    expect(technical(renderPanel(draft, "field_g"))).toContain('disabled=""');
+  });
+
+  it("opens itself on FieldsTab's request in an effect, and clears the request", () => {
+    const source = readFileSync(new URL("../src/areas/studio/panels/FieldCatalogPanel.tsx", import.meta.url).pathname, "utf8");
+    const effect = source.slice(source.indexOf("useEffect(() => {\n    if (!openMore) return;"), source.indexOf("}, [openMore, onMoreOpened]);"));
+
+    expect(effect).toContain("setMoreOpen(true);");
+    expect(effect).toContain("onMoreOpened();");
+    expect(source).toContain("open={moreOpen || moreChecked}");
+    expect(source).toContain("onToggle={(e) => setMoreOpen(e.currentTarget.open)}");
+  });
+
+  it("prints a column mapping's target by its label", () => {
+    const source = readFileSync(new URL("../src/areas/studio/panels/FieldCatalogPanel.tsx", import.meta.url).pathname, "utf8");
+    const target = source.slice(source.indexOf('aria-label={t("columnMapping.targetAria")}'), source.indexOf("</select>", source.indexOf('aria-label={t("columnMapping.targetAria")}')));
+
+    expect(target).toContain("{fieldName(f)}");
+    expect(target).not.toContain("f.key");
   });
 });
 
@@ -359,37 +614,13 @@ describe("FieldCatalogPanel", () => {
  * the condition input reads no single source, yet "this always matches" would
  * be false for those steps.
  */
-describe("the Fields tab's \"Only ask this when\" row", () => {
+describe("the Asked on section's \"Only ask this when\"", () => {
   const stepsWith = (a: unknown, b: unknown): Draft =>
-    ({
-      baseLocale: "en",
-      fields: [fld("field_a", "a")],
-      workflow: {
-        initialStep: "step_a",
-        steps: [
-          { id: "step_a", key: "sa", label: { en: "A" }, type: "task", view: { fields: [{ ref: "field_a", visible: a }] } },
-          { id: "step_b", key: "sb", label: { en: "B" }, type: "task", view: { fields: [{ ref: "field_a", visible: b }] } },
-        ],
-      },
-    }) as unknown as Draft;
-  const render = (draft: Draft) =>
-    renderToStaticMarkup(
-      <DraftContext.Provider value={contextValue(draft)}>
-        <FieldCatalogPanel
-          token="test-token"
-          selectedId="field_a"
-          onAdd={NOOP}
-          onRemove={NOOP}
-          onShowStep={NOOP}
-          onOpenForm={NOOP}
-          onMoveField={NOOP}
-        />
-      </DraftContext.Provider>,
-    );
+    draftOf([fld("field_a", "a")], [step("step_a", "A", [{ ref: "field_a", visible: a }]), step("step_b", "B", [{ ref: "field_a", visible: b }])]);
   const DIVERGENT = "The steps hold different conditions. Build one here to set it on every step.";
 
   it("says the steps hold different conditions, and not that it always matches", () => {
-    const html = render(stepsWith({ lang: "cel", src: "data.a == \"x\"" }, { lang: "cel", src: "data.a == \"y\"" }));
+    const html = renderPanel(stepsWith(cel('data.a == "x"'), cel('data.a == "y"')), "field_a");
 
     expect(html).toContain("These steps currently disagree");
     expect(html).toContain(DIVERGENT);
@@ -397,14 +628,14 @@ describe("the Fields tab's \"Only ask this when\" row", () => {
   });
 
   it("says the same when one step holds a literal beside an expression", () => {
-    const html = render(stepsWith(false, { lang: "cel", src: "data.a == \"x\"" }));
+    const html = renderPanel(stepsWith(false, cel('data.a == "x"')), "field_a");
 
     expect(html).toContain(DIVERGENT);
     expect(html).not.toContain("this always matches");
   });
 
   it("keeps the empty sentence where every step holds no condition", () => {
-    const html = render(stepsWith(undefined, undefined));
+    const html = renderPanel(stepsWith(undefined, undefined), "field_a");
 
     expect(html).toContain("No condition yet: this always matches.");
     expect(html).not.toContain(DIVERGENT);
@@ -423,8 +654,6 @@ function applyingMutate(draft: Draft): { mutate: Mutate; calls: () => number } {
     calls: () => calls,
   };
 }
-
-const cel = (src: string) => ({ lang: "cel" as const, src });
 
 type Guard = { lang: "cel"; src: string };
 
@@ -473,7 +702,6 @@ describe("a label change in the field catalog", () => {
     const update = source.slice(source.indexOf("const updateLabel = "), source.indexOf("const keyNotice ="));
 
     expect(update).toContain("writeLabelFromCatalog(draft, mutate, field, label, baseLocale, published)");
-    expect(update).toContain("setDefinitionWrites((n) => n + 1)");
     expect(update).not.toContain("onChange(");
   });
 
@@ -707,21 +935,7 @@ function renderKeyEditor(
   published: ReadonlySet<string> | undefined,
   issues: EditorIssue[] = [],
 ): string {
-  return renderToStaticMarkup(
-    <PublishedFieldIdsContext.Provider value={published}>
-      <DraftContext.Provider value={contextValue(draft, issues)}>
-        <FieldCatalogPanel
-          token="test-token"
-          selectedId={selectedId}
-          onAdd={NOOP}
-          onRemove={NOOP}
-          onShowStep={NOOP}
-          onOpenForm={NOOP}
-          onMoveField={NOOP}
-        />
-      </DraftContext.Provider>
-    </PublishedFieldIdsContext.Provider>,
-  );
+  return renderPanel(draft, selectedId, { published, issues });
 }
 
 /** The `<input>` element that carries the field's key, whole. */
@@ -821,7 +1035,7 @@ describe("keyNoticeFor", () => {
 });
 
 describe("the field editor's Developer view and key input", () => {
-  it("holds the key input behind a closed Developer view, after the description and before the move control", () => {
+  it("holds the key input behind a closed Developer view, last in More, after the move control", () => {
     const html = renderKeyEditor(draftWithReaders([]), "field_amount", new Set());
     const detailsAt = html.lastIndexOf("<details", html.indexOf(">Key<"));
     const inputAt = html.indexOf(keyInput(html));
@@ -829,8 +1043,9 @@ describe("the field editor's Developer view and key input", () => {
     expect(keyDetails(html)).not.toContain("open");
     expect(html.slice(detailsAt, inputAt)).toContain(">Developer view</summary>");
     expect(html.indexOf("</details>", detailsAt)).toBeGreaterThan(inputAt);
-    expect(html.indexOf(">Description")).toBeLessThan(detailsAt);
-    expect(html.indexOf(`id="${moveControlId("field_amount")}"`)).toBeGreaterThan(html.indexOf("</details>", detailsAt));
+    expect(html.indexOf(">More</h4>")).toBeLessThan(detailsAt);
+    expect(html.indexOf(`id="${moveControlId("field_amount")}"`)).toBeLessThan(detailsAt);
+    expect(html.indexOf(`id="${removeControlId("field_amount")}"`)).toBeGreaterThan(html.indexOf("</details>", detailsAt));
   });
 
   it("holds a group's key input behind the Developer view too", () => {
@@ -942,36 +1157,20 @@ describe("the sentence in a field's Developer view", () => {
 });
 
 /**
- * The effect half's empty-state route (`studio-app`: "The effect half states
- * its own empty state"). It opens the form editor for the first step a person
- * works, `firstWorkedStepId` (`studio-performedBy.test.ts` covers the pick),
- * and stands absent where no such step exists. A static render fires no
- * click, so the press's target is pinned at the source: the route calls
- * `onOpenForm` with that step, while the used-in rows keep `onShowStep`.
+ * Asked on's empty-state route (`studio-app`: "The effect half states its own
+ * empty state"). It opens the form editor for the first step a person works,
+ * `firstWorkedStepId` (`studio-performedBy.test.ts` covers the pick), and
+ * stands absent where no such step exists. A static render fires no click, so
+ * the press's target is pinned at the source.
  */
-describe("the effect half's route to a step's form", () => {
+describe("Asked on's route to a step's form", () => {
   const ROUTE = "Put this field on a step";
-  const step = (id: string, extra: object = {}) => ({ id, key: id, label: { en: id }, type: "task", ...extra });
-  const draftOf = (initialStep: string, steps: object[]): Draft =>
+  const task = (id: string, extra: object = {}) => ({ id, key: id, label: { en: id }, type: "task", ...extra });
+  const routeDraft = (initialStep: string, steps: object[]): Draft =>
     ({ baseLocale: "en", fields: [fld("field_a", "a")], workflow: { initialStep, steps } }) as unknown as Draft;
-  const render = (draft: Draft) =>
-    renderToStaticMarkup(
-      <DraftContext.Provider value={contextValue(draft)}>
-        <FieldCatalogPanel
-          token="test-token"
-          selectedId="field_a"
-          onAdd={NOOP}
-          onRemove={NOOP}
-          onShowStep={NOOP}
-          onOpenForm={NOOP}
-          onMoveField={NOOP}
-        />
-      </DraftContext.Provider>,
-    );
-  const source = readFileSync(new URL("../src/areas/studio/panels/FieldCatalogPanel.tsx", import.meta.url).pathname, "utf8");
 
   it("opens the form of the first step a person works", () => {
-    const html = render(draftOf("step_a", [step("step_a"), step("step_b", { terminal: true })]));
+    const html = renderPanel(routeDraft("step_a", [task("step_a"), task("step_b", { terminal: true })]), "field_a");
     const emptyAt = source.indexOf('t("fieldCatalog.usedInEmpty")');
     const emptyState = source.slice(emptyAt, source.indexOf('t("fieldCatalog.effectEmptyRoute")', emptyAt));
 
@@ -982,22 +1181,29 @@ describe("the effect half's route to a step's form", () => {
   });
 
   it("skips an initial step that calls another process", () => {
-    const html = render(draftOf("step_a", [step("step_a", { type: "subprocess" }), step("step_b")]));
+    const html = renderPanel(routeDraft("step_a", [task("step_a", { type: "subprocess" }), task("step_b")]), "field_a");
 
     expect(html).toContain(`>${ROUTE}</button>`);
   });
 
   it("offers no route where no step is one a person works", () => {
-    const html = render(draftOf("step_a", [step("step_a", { type: "subprocess" }), step("step_b", { terminal: true })]));
+    const html = renderPanel(routeDraft("step_a", [task("step_a", { type: "subprocess" }), task("step_b", { terminal: true })]), "field_a");
 
     expect(html).toContain("No step asks for this field yet.");
     expect(html).not.toContain(ROUTE);
   });
+
+  it("wires each row's commands to the form editor and the map", () => {
+    const rows = source.slice(source.indexOf("{asked.map((row) => ("), source.indexOf("</ul>", source.indexOf("{asked.map((row) => (")));
+
+    expect(rows).toContain("onClick={() => onOpenForm(row.stepId)}");
+    expect(rows).toContain("onClick={() => onShowStep(row.stepId)}");
+  });
 });
 
-// `studio-app`: "The field editor lists what reads the field" and "Read by
-// stands second in the effect half".
-describe("the field editor's \"Read by\" zone", () => {
+// `studio-app`: "The field editor lists what reads the field" and "A Read by
+// row opens the place it names".
+describe("the Read by section", () => {
   const amount = (extra: object = {}) => fld("field_amount", "amount", { label: { en: "Amount" }, type: "number", ...extra });
   const reviewStep = (guards: string[]) => ({
     id: "step_review",
@@ -1006,7 +1212,7 @@ describe("the field editor's \"Read by\" zone", () => {
     type: "task",
     paths: guards.map((src, i) => ({ id: `path_${i}`, key: `p${i}`, label: "Approve", to: "step_book", trigger: "automatic", priority: i, guard: cel(src) })),
   });
-  const draftOf = (fields: DraftField[], guards: string[]): Draft =>
+  const guardDraft = (fields: DraftField[], guards: string[]): Draft =>
     ({
       baseLocale: "en",
       fields,
@@ -1015,45 +1221,39 @@ describe("the field editor's \"Read by\" zone", () => {
         steps: [reviewStep(guards), { id: "step_book", key: "book", label: { en: "Book" }, type: "task" }],
       },
     }) as unknown as Draft;
-  const render = (draft: Draft, selectedId = "field_amount") =>
-    renderToStaticMarkup(
-      <DraftContext.Provider value={contextValue(draft)}>
-        <FieldCatalogPanel
-          token="test-token"
-          selectedId={selectedId}
-          onAdd={NOOP}
-          onRemove={NOOP}
-          onShowStep={NOOP}
-          onOpenForm={NOOP}
-          onMoveField={NOOP}
-        />
-      </DraftContext.Provider>,
-    );
-  /** The zone's markup, from its heading to the next zone's heading. */
-  const zone = (html: string): string => {
-    const at = html.indexOf(">Read by<");
-    expect(at).toBeGreaterThan(-1);
-    return html.slice(at, html.indexOf("<h4", at));
-  };
-  const effectHalf = (html: string) => html.slice(html.indexOf('aria-label="Where it acts in the process"'));
+  const section = (html: string) => sectionOf(html, "Read by");
 
-  it("reads a guard as its way out and its sentence", () => {
-    const html = zone(render(draftOf([amount()], ["data.amount > 1000.0"])));
+  it("reads a guard as its way out and its sentence, with an Open command", () => {
+    const html = section(renderPanel(guardDraft([amount()], ["data.amount > 1000.0"]), "field_amount"));
 
-    expect(html).toContain("<li");
     expect(html).toContain(">On Review: way out Approve → Book<");
     expect(html).toContain(">Amount is greater than 1,000.<");
+    const open = buttonElements(html);
+    expect(open).toHaveLength(1);
+    expect(open[0]).toEndWith(">Open</button>");
+    expect(open[0]).toContain('class="btn btn-ghost command"');
+  });
+
+  it("draws no Open on a fallback row", () => {
+    const html = section(renderPanel(draftWithReaders(["data.amount > 1.0"]), "field_amount"));
+
+    expect(html).toContain(">Another rule in this process<");
+    expect(buttonElements(html)).toHaveLength(0);
+  });
+
+  it("hands the row's own target to onOpenPlace", () => {
+    expect(source).toContain("onClick={() => row.target && onOpenPlace(row.target)}");
   });
 
   it("says so where nothing reads the field", () => {
-    const html = zone(render(draftOf([amount()], [])));
+    const html = section(renderPanel(guardDraft([amount()], []), "field_amount"));
 
     expect(html).toContain(">No condition reads this field.<");
     expect(html).not.toContain("<li");
   });
 
   it("prints no CEL and no key over three readers", () => {
-    const html = zone(render(draftOf([amount()], ["data.amount > 1000.0", "data.amount < 5.0", "data.amount == 7.0"])));
+    const html = section(renderPanel(guardDraft([amount()], ["data.amount > 1000.0", "data.amount < 5.0", "data.amount == 7.0"]), "field_amount"));
 
     expect(html.match(/<li/g)?.length).toBe(3);
     expect(html).not.toContain("data.");
@@ -1061,18 +1261,10 @@ describe("the field editor's \"Read by\" zone", () => {
     expect(html).not.toContain("field_amount");
   });
 
-  it("stands second in the effect half, after \"Used in\"", () => {
-    const half = effectHalf(render(draftOf([amount()], [])));
-    const headings = [...half.matchAll(/<h4[^>]*>([^<]*)<\/h4>/g)].map((m) => m[1]);
+  it("stands after Asked on", () => {
+    const order = headings(renderPanel(guardDraft([amount()], []), "field_amount"));
 
-    expect(headings.slice(0, 4)).toEqual(["Used in", "Read by", "Only ask this when", "Ask for this"]);
-  });
-
-  it("stands nowhere in a group's effect half", () => {
-    const html = render(draftOf([grp("field_g", "g", [amount()])], ["data.g == 1.0"]), "field_g");
-
-    expect(html).toContain(">Used in<");
-    expect(html).not.toContain(">Read by<");
+    expect(order.indexOf("Read by")).toBe(order.indexOf("Asked on") + 1);
   });
 
   it("memoizes its rows on the draft, the key and the locale", () => {
