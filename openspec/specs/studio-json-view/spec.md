@@ -40,9 +40,10 @@ surface SHALL be reachable while a tab stands open.
 The header bar menu's JSON entry SHALL name its own state. An author reads
 from it whether the entry opens the JSON surface or leaves it.
 
-`DraftToolbar` (save/publish/discard) and the content-locale switcher change no
-draft body. Both SHALL stay visible and usable whichever of the two stands
-open.
+`useDraftToolbarActions` (save, publish, discard) changes no draft body. Its
+controls SHALL stay usable whichever of the two stands open. The content-locale
+switcher stands on the Settings tab, so it hides with that tab. The JSON surface
+prints every language at once and reads no content locale.
 
 #### Scenario: Switching to the JSON surface shows the current draft
 
@@ -57,12 +58,20 @@ open.
   currently holds
 - **AND** that state carries any JSON edit already applied
 
+<!-- antislop: allow negation-habit -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 #### Scenario: The header bar carries no surface pair
 
 - **WHEN** the developer reads the header bar's row without opening its `⋮`
   menu
 - **THEN** no Structure control and no JSON control stand there directly
 - **AND** opening the `⋮` menu is what reaches the JSON entry
+
+#### Scenario: The draft's commands stay over the JSON surface
+
+- **WHEN** the JSON surface stands open
+- **THEN** Publish stands in the header bar, and Discard draft in its `⋮` menu
+- **AND** no content-locale control stands in the header bar
 
 ### Requirement: Applying valid JSON replaces the draft body
 

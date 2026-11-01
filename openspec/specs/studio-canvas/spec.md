@@ -1738,138 +1738,98 @@ SHALL close on the release that ends such a drag.
 - **THEN** the menu stays open until the release
 - **AND** the step lands at the drop point
 
-### Requirement: A process-identity header bar shows draft and publish status
+### Requirement: The header bar holds back, name, state, Test, Publish and the menu
 
-The process surface SHALL carry a header bar above the tab row. The bar SHALL
-print the process name and the key in the mono face. It SHALL carry the
-draft's revision badge and dirty state. It SHALL carry the version and hash
-after a publish. `EditorArea` computes all of these as controlled props. It
-already lifts `saveState` the same way.
+The process surface SHALL carry a header bar above the tab row, directly under
+the shared header. No row SHALL stand between the two while no banner stands.
 
-The header bar SHALL carry a last-saved time. That time is client-only state.
-`EditorArea` sets it on every successful save.
+The bar SHALL hold, in order, a back control, the process name and the draft's
+state. The Test control, the Publish control and the `⋮` menu trail them. The
+back control reads "← Processes". Its accessible name SHALL read "Back to
+processes".
 
-The header bar SHALL carry the content-locale badge the `studio-app`
-capability's content-locale-switcher requirement governs. It SHALL have no
-Structure control and no JSON control of its own. That pair no longer stands.
-The JSON surface opens from this same bar's `⋮` menu instead, per
-`studio-process-tabs`.
+#### Scenario: A clean draft's bar holds six things
 
-<!-- Why: "Discard draft" below is the literal button label `DraftToolbar` renders, not a synonym choice against "remove" elsewhere in this file. -->
-<!-- antislop: allow synonym-rotation -->
-The header bar SHALL carry a `⋮` overflow menu. The menu SHALL hold no Save,
-no Discard draft and no Publish action. The studio's area nav carries those
-three. `DraftToolbar` SHALL keep computing when each action is available and
-what each one does. The area nav calls that logic and holds none of its own.
+- **WHEN** an author opens a saved draft of a published process
+- **THEN** the bar reads the back control, the name, the state, Test, Publish
+  and the `⋮` menu
+- **AND** no key, revision, hash or locale code prints in the bar
 
-The menu SHALL hold its remaining controls under two headings. The first,
-"Process, saved with the draft", SHALL hold the editable process key, the
-base-locale control and the add-locale control. The `studio-app` capability's
-base-locale requirement governs the second of those three. The add-locale
-control keeps the behavior it carries today, and no capability declares it
-yet. The
-first heading SHALL NOT offer an action-registry selector or any other
-session-only control. Nothing in the studio ever loads a live `Registry` a
-registry-resolution check could run against.
+#### Scenario: The back control keeps the leave guard
 
-That first heading SHALL also hold a "Manage assignment groups for this
-process" link. The link SHALL open the admin area's Groups screen: the
-`admin-app` capability's `/groups` route.
+- **WHEN** an author presses the back control on a dirty draft
+- **THEN** the leave prompt asks first, as it did from the screen nav
 
-<!-- Why: "parameter" below names a URL query parameter, not a synonym choice against the performed-by control's own entries. -->
-<!-- antislop: allow synonym-rotation -->
-It SHALL carry the open process's id as a query parameter. That parameter
-pre-filters the Groups screen to global groups plus groups already scoped to
-this process.
+### Requirement: The header bar's process name fits its text
 
-The link SHALL appear once a process is open, for any signed-in actor. It
-SHALL appear whether or not that actor holds `system:admin`. It SHALL appear
-whatever tab the row holds open.
+The process name SHALL size to its own text, up to a cap. Its issue sentence stays
+beside it. Its missing translation warning SHALL stand below the bar, so the bar
+keeps one row. While the name has no entry in the edited language, its placeholder
+SHALL read the base-language name. The name input SHALL carry an accessible name.
 
-Following it without `system:admin` SHALL lead to one of two outcomes. The
-same admin-area-entry gate every other admin route already crosses decides
-which (`shell/areas.ts::mayEnter`). An actor can hold `system:datalists`, or
-another role `mayEnter` accepts for the admin area, without holding
-`system:admin`. That actor SHALL reach the admin area's own `MissingRole`
-empty state. That is the state any `system:admin`-gated route gives a caller
-without the role.
+#### Scenario: A long name keeps the commands on the row
 
-An actor who holds no admin-area-entry role at all SHALL never reach the admin
-area's own code. The shell blocks entry before `AdminArea` mounts, and gives
-its generic `area.forbidden` message instead.
+- **WHEN** an author types a 60-character name at 1440 wide
+- **THEN** Test, Publish and the `⋮` trigger keep their line
 
-The link SHALL carry no group data of its own. It SHALL trigger no request to
-a `/admin/groups*` route: it is navigation only, so Studio duplicates no group
-CRUD.
+### Requirement: The header bar keeps no command logic
 
-The menu's second heading, "Views", SHALL hold navigation to other views of
-this process. `studio-process-tabs` states that heading's own contents.
+`useDraftToolbarActions` SHALL compute when each command is available and what it
+does. The bar SHALL keep no copy of that logic.
 
-The header bar's summary fields SHALL stay a read-only pass-through of state
-`EditorArea` owns. Those fields are the process name, the revision badge, the
-dirty state, and the published version and hash. None of them carries logic of
-its own.
+#### Scenario: The bar calls the one hook
 
-#### Scenario: The header bar shows an unsaved draft's state
+- **WHEN** an author presses Save or Publish
+- **THEN** the call runs the logic `useDraftToolbarActions` holds
+
+### Requirement: The header bar prints no machine value
+
+The bar SHALL print no key, no process id, no revision and no hash. It SHALL
+print a locale only in the "Editing" note `studio-app` states.
+
+#### Scenario: The note is the one locale site
+
+- **WHEN** an author edits a draft in another language
+- **THEN** the "Editing" note is the one place the bar names a language
+- **AND** the name's missing translation warning stands below the bar
+- **AND** the name's placeholder reads the base-language name
+
+### Requirement: The header bar's state says what holds for the draft
+
+The state SHALL read "Unsaved changes" while the draft differs from its last
+save. It SHALL read "Saved at" and a time after a save in this session. It SHALL
+read "Saved" otherwise. Where a published version exists, the state SHALL add
+that version and the word "published". The version SHALL print in the mono face.
+
+The state SHALL announce a change politely to a screen reader. That announcement
+moves no focus. Only the Save rule in `studio-process-tabs` sends focus to it.
+
+#### Scenario: A dirty draft's bar names its state
 
 - **WHEN** the draft carries unsaved changes
-- **THEN** the header bar prints the process name, the draft's revision badge,
-  and a dirty indicator
+- **THEN** the bar prints "Unsaved changes" in the refusal tone
 
-#### Scenario: The header bar shows a just-published version
+#### Scenario: A save names its time
 
-- **WHEN** a publish succeeds
-- **THEN** the header bar prints the published version and its hash prefix
+- **WHEN** a save succeeds
+- **THEN** the state reads "Saved at" and the time of that save
 
-#### Scenario: The overflow menu invokes DraftToolbar's own save
+#### Scenario: A published process names its version
 
-- **WHEN** an author looks for Save in the `⋮` menu
-- **THEN** the menu holds none
-- **AND** the studio's area nav carries the Save control, which calls
-  `DraftToolbar`'s existing save
+- **WHEN** an author opens a saved draft whose base version is 1
+- **THEN** the state reads "Saved" and "v1 published"
 
-#### Scenario: The overflow menu separates persisted settings from session-only settings
+#### Scenario: A process with no published version prints no version
 
-- **WHEN** an author opens the `⋮` menu
-- **THEN** the process key, the base-locale control and the add-locale control
-  stand under "Process, saved with the draft"
-- **AND** no action-registry selector and no other session-only control stands
-  anywhere in the menu
-
-#### Scenario: The menu links to Groups filtered to the open process
-
-- **WHEN** an author opens the `⋮` menu and picks "Manage assignment groups
-  for this process"
-- **THEN** the admin area's Groups screen opens, holding global groups plus
-  groups already scoped to the open process
-
-#### Scenario: Following the link with admin-area entry but not the admin role
-
-- **WHEN** an actor who holds `system:datalists` but lacks `system:admin`
-  follows the link
-- **THEN** the admin area gives its own `MissingRole` empty state instead of
-  the Groups screen
-
-#### Scenario: Following the link with no admin-area-entry role at all
-
-- **WHEN** an actor who holds neither `system:admin` nor `system:datalists`
-  follows the link
-- **THEN** the shell blocks entry to the admin area before it mounts
-- **AND** it gives the generic `area.forbidden` message instead of the Groups
-  screen
-
-#### Scenario: The link renders regardless of the open surface
-
-- **WHEN** an author holds the Paths tab open, not the Canvas tab
-- **THEN** the "Manage assignment groups for this process" link still stands
-  in the `⋮` menu
+- **WHEN** an author opens a draft with no base version
+- **THEN** the state prints no version
 
 ### Requirement: The header bar's process key auto-derives from the process label
 
 <!-- "produce" names key derivation's output; "create" elsewhere names a gesture adding a step or path. -->
 <!-- antislop: allow synonym-rotation -->
-The header bar's `⋮` menu holds a "Process, saved with the draft" group.
-That group's key field SHALL auto-fill from the process label as the
+The Settings tab's Developer view holds the process key field.
+That field SHALL auto-fill from the process label as the
 developer types. This holds while the draft's key is empty. It also holds
 while the key still matches what derivation would produce from the label's
 prior value.
@@ -3215,9 +3175,11 @@ sequence reaches that path, and the canvas draws a pointer-only control.
 
 ### Requirement: The process-identity header bar renders from compiled styles
 
+<!-- antislop: allow sentence-length -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 `panels/ProcessHeaderBar.tsx` renders the process-identity header bar,
-per this capability's own "A process-identity header bar shows draft
-and publish status" requirement. The header bar SHALL render from
+per this capability's own "The header bar holds back, name, state, Test,
+Publish and the menu" requirement. The header bar SHALL render from
 compiled component styles. Its two dialogs are each a different
 capability's own concern. Only the header bar itself is this
 requirement's scope.
@@ -3225,8 +3187,7 @@ requirement's scope.
 #### Scenario: The header bar keeps its look
 
 - **WHEN** a browser renders the process-identity header bar
-- **THEN** its computed layout, spacing, color and border equal the
-  values the deleted stylesheet declared
+- **THEN** its layout, spacing, color and border come from compiled styles
 
 ### Requirement: The inspector's Paths and Timers tabs render from compiled styles
 
@@ -3307,19 +3268,19 @@ step's one-line explanation.
 `screens/` collapses its edit screen and its panels screen into one process
 surface component. That component's own layout SHALL compile from typed
 StyleX style objects. The layout covers the header bar, the tab row and the
-tab body. The rendered result SHALL match the previous stylesheet declaration
-for declaration.
+tab body. The header bar's own requirement states its layout.
 
 #### Scenario: The edit screen keeps its look
 
 - **WHEN** a browser opens the process surface
-- **THEN** its computed layout equals the value the deleted stylesheet
-  declared
+- **THEN** its layout comes from compiled styles
 
 #### Scenario: The group-rename label still renders correctly, unmigrated
 
 <!-- This scenario's title predates the change that ended the state it names; the title stays so a later delta reads this as one scenario evolving. -->
 - **WHEN** the canvas draws a group's rename label
+<!-- antislop: allow negation-habit -->
+<!-- Base wording stays verbatim in a MODIFIED block. -->
 - **THEN** it carries no literal `canvas-group-name` class
 - **AND** its computed style, including its `cursor: grab` affordance, equals
   the value the deleted stylesheet declared
