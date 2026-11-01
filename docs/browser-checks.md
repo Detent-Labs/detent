@@ -4710,7 +4710,7 @@ database, then sign in as `demo-superuser@example.test`, password
    3px rule in `rgb(226, 90, 64)` light and `rgb(255, 151, 131)` dark.
 2. Open the Steps tab and choose "Submit the Exit Notification" in the steps
    rail. In that step page's "Ways out" section, choose "Happens by itself"
-   for the first way out's trigger. Under "Only when", choose "+ Add row"
+   for the first way out's trigger. Under "Only if", choose "+ Add row"
    and leave the row's value empty. Pass: the row's dashed border reads the
    same two colors as the first step.
 3. Press Show in the publish dialog's Changes row, which lists the path the
@@ -4754,7 +4754,7 @@ Step 2 reads the new row through this one:
 
 ```js
 async (page) => {
-  const row = page.getByRole("group", { name: "Only when" }).getByRole("listitem").first();
+  const row = page.getByRole("group", { name: "Only if" }).getByRole("listitem").first();
   const result = {};
   for (const scheme of ["light", "dark"]) {
     await page.emulateMedia({ colorScheme: scheme });
@@ -6027,7 +6027,7 @@ approval". Choose "Happens by itself" for its trigger. Build one row under "Only
 when": `quantity` greater than 5. Choose "A person chooses" for the trigger
 again.
 
-Pass: the "Only when" heading and the row stay on screen.
+Pass: the "Only if" heading and the row stay on screen.
 
 Pass: no `priority` input shows.
 
@@ -6069,7 +6069,7 @@ Pass: the row shows every "visible" box ticked. The command no longer shows.
 #### An unfinished edit keeps the stored condition (E2-6)
 
 Open a draft of `purchase_requisition` and the Steps tab. Select "Draft
-Requisition" and open its path "Submit for approval". Under "Only when", build
+Requisition" and open its path "Submit for approval". Under "Only if", build
 one row: `Quantity`, `>` and `5`. Then pick `Unit Price` as that row's operand.
 
 Pass: the row turns dashed and shows its incomplete flag.
@@ -6092,7 +6092,7 @@ Pass: the readout under the rows still shows the rule from before the edit.
 
 #### An integer and a negative number read back as rows (E2-10)
 
-Open a draft of `it_offboarding`. In any path's "Only when", add a row on the
+Open a draft of `it_offboarding`. In any path's "Only if", add a row on the
 integer field "Backup retention in months". Pick `>` and type `3`. Add a second
 row on the same field with `<` and `-5`. Open another tab, then return to the
 Steps tab and the same path.
@@ -6137,7 +6137,7 @@ Open Studio at `/studio` and a draft of `purchase_requisition`.
 #### The rows read back as a sentence
 
 Open the Steps tab and select "Draft Requisition". In the path "Submit for
-approval", open "Only when". Build one row: `Quantity`, "is greater than" and
+approval", open "Only if". Build one row: `Quantity`, "is greater than" and
 `5`. Press "+ Add row" and build a second: `Unit Price`, "is at most" and `100`.
 
 Pass: the operator select lists words, and no `>` or `<=` symbol shows.
@@ -6178,7 +6178,7 @@ it reads "The person's roles".
 
 #### Source that does not parse opens the Developer view
 
-On the Steps tab, open any path's Developer view under "Only when". Type
+On the Steps tab, open any path's Developer view under "Only if". Type
 `data.quantity >` and nothing after it. Press Save. Reload the page. Open
 the same path.
 

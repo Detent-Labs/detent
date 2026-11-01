@@ -7,8 +7,9 @@ import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
 import { DraftContext, type DraftContextValue, type Mutate } from "../src/areas/studio/draft/store.js";
+import { parseChildProcessJson } from "../src/areas/studio/draft/io.js";
 import { updateInDraftArray } from "../src/areas/studio/draft/draft-array-crud.js";
-import { StepPage } from "../src/areas/studio/panels/StepPage.js";
+import { ChildLoadError, StepPage } from "../src/areas/studio/panels/StepPage.js";
 import { RemoveStepDialog } from "../src/areas/studio/panels/RemoveStepDialog.js";
 import type { StepRemovalReach } from "../src/areas/studio/draft/stepRemoval.js";
 
@@ -918,5 +919,48 @@ describe("The removal dialog", () => {
     expect(html).toContain('aria-labelledby="remove-step-confirm-heading"');
     expect(html).toContain('id="remove-step-confirm-heading"');
     expect(html).toContain('aria-describedby="remove-step-confirm-facts remove-step-confirm-notes"');
+  });
+});
+
+describe("the warning callout", () => {
+  const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
+  const block = /\n  warning: \{([^}]*)\}/.exec(source)?.[1] ?? "";
+
+  it("draws a 3px rule in the advisory role beside refusal text", () => {
+    expect(block).toContain("borderLeftWidth: 3");
+    expect(block).toContain("borderLeftColor: colors.advisory");
+    expect(block).toMatch(/\n    color: colors\.refusal,/);
+  });
+
+  it("is the style both missing-translation warnings read", () => {
+    expect(source.match(/<p \{\.\.\.stylex\.props\(styles\.warning\)\}>\{missingTranslationWarning/g)).toHaveLength(2);
+  });
+});
+
+describe("a failed child file load", () => {
+  it("prints the message of a file with no process definition in it, as an alert", () => {
+    let message = "";
+    try {
+      parseChildProcessJson("{}");
+    } catch (e) {
+      message = e instanceof Error ? e.message : "";
+    }
+    expect(message).not.toBe("");
+
+    const html = renderToStaticMarkup(<ChildLoadError message={message} />);
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("<p");
+  });
+
+  it("is the element the page prints for its load error", () => {
+    const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
+    expect(source).toContain("{childLoadError && <ChildLoadError message={childLoadError} />}");
+  });
+});
+
+describe("the removal dialog's step name", () => {
+  it("reads the shared step text map, so steps sharing a label read apart", () => {
+    const source = readFileSync(SRC + "panels/StepPage.tsx", "utf8");
+    expect(source).toContain("stepTextMap(draft.workflow?.steps ?? [], contentLocale, baseLocale).get(step.id)");
   });
 });

@@ -1,12 +1,12 @@
 import * as stylex from "@stylexjs/stylex";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GripVertical } from "lucide-react";
 import { colors, focus, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
 import type { StepKind } from "../draft/createStep.js";
 import { stepText } from "./shared/optionText.js";
-import { railRowIssues, STEPS_RAIL_ADD_FIRST_ID, STEPS_RAIL_CURRENT_ID } from "./stepRailRow.js";
+import { railRowIssues, scrollCurrentRowIntoView, STEPS_RAIL_ADD_FIRST_ID, STEPS_RAIL_CURRENT_ID } from "./stepRailRow.js";
 
 /** The width below which the Steps tab stands one column, so the rail gives
  * up its own and caps its height instead of pushing the step page a screen
@@ -231,6 +231,12 @@ export function StepsRail({ currentStepId, onSelectStep, onMove, onAddStep }: Pr
   // this: the delta spec's live-region assertion covers the keyboard
   // scenario alone.
   const [announcement, setAnnouncement] = useState("");
+
+  // A step that moves under a Fix, the walk or the canvas may stand past the
+  // rail's capped height below 64rem.
+  useEffect(() => {
+    scrollCurrentRowIntoView(document);
+  }, [currentStepId]);
 
   const endDrag = () => {
     setDragIndex(undefined);

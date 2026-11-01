@@ -105,5 +105,7 @@ export function wayOutHeading(
     const plainTail = plain !== undefined ? heading("", plain) : undefined;
     if (plainTail !== undefined && label.endsWith(plainTail)) return label.slice(0, -plainTail.length) + tail;
   }
-  return heading(named ?? t("paths.unnamedPath"), target ?? t("paths.noTargetYet"));
+  // An empty target waits for a pick. A target the draft no longer holds is gone.
+  const missing = path.to ? t("paths.targetGone") : t("paths.noTargetYet");
+  return heading(named ?? t("paths.unnamedPath"), target ?? missing);
 }

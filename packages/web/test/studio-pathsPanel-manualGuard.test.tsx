@@ -10,7 +10,7 @@ import { PathsPanel } from "../src/areas/studio/panels/PathsPanel.js";
 
 /**
  * `studio-condition-builder`: "A way out's row shows a "How it is taken"
- * control" and "A way out's guard stands under "Only when" for either trigger".
+ * control" and "A way out's guard stands under "Only if" for either trigger".
  * A manual path shows its guard editor and no `priority` input; an automatic
  * path keeps both. `studio-step-page`: "A way out reads as a sentence and
  * keeps its key in its own Developer view". The context is hand-built, as in
@@ -93,8 +93,8 @@ function insideLabel(html: string, text: string): boolean {
 describe("a manual path with a guard", () => {
   const html = render({ trigger: "manual", guard: GUARD });
 
-  it("shows the guard's builder rows under the Only when heading", () => {
-    expect(html).toContain("Only when");
+  it("shows the guard's builder rows under the Only if heading", () => {
+    expect(html).toContain("Only if");
     // The builder row: an operand picker holding the guard's field, selected.
     expect(html).toMatch(/<option value="data\.amount" selected="">/);
   });
@@ -118,7 +118,7 @@ describe("a manual path with no guard", () => {
   it("still offers the guard editor", () => {
     const html = render({ trigger: "manual" });
 
-    expect(html).toContain("Only when");
+    expect(html).toContain("Only if");
     expect(html).toContain("Leave it empty to always offer this way out.");
     expect(html).not.toMatch(PRIORITY_INPUT);
   });
@@ -128,7 +128,7 @@ describe("an automatic path", () => {
   const html = render({ trigger: "automatic", priority: 1, guard: GUARD });
 
   it("shows the priority input beside the guard", () => {
-    expect(html).toContain("Only when");
+    expect(html).toContain("Only if");
     expect(html).toMatch(PRIORITY_INPUT);
     expect(html).toContain("Leave it empty on the one way out taken when nothing else matches.");
   });
@@ -183,16 +183,16 @@ describe("a way out's heading sentence", () => {
     expect(heading).not.toContain("intake");
   });
 
-  it("says no step is chosen yet where the way out leads nowhere", () => {
+  it("says no step is chosen yet where the way out leads nowhere, and removed where its step is gone", () => {
     expect(rowHeading(render({ to: undefined }))).toBe("Approve → (no step yet)");
-    expect(rowHeading(render({ to: "step_gone" }))).toBe("Approve → (no step yet)");
+    expect(rowHeading(render({ to: "step_gone" }))).toBe("Approve → (step removed)");
   });
 });
 
 describe("a way out's key", () => {
   const html = render({});
   // The row's own disclosure closes the row. The guard's Developer view, over
-  // its CEL, stands before it inside "Only when".
+  // its CEL, stands before it inside "Only if".
   const details = html.lastIndexOf("<details");
 
   it("stands inside the row's own Developer view, closed until opened", () => {
@@ -331,5 +331,38 @@ describe("a default way-out label", () => {
   it("names its target once in the heading", () => {
     const html = renderSteps(steps, [{ id: "path_1", key: "p", label: "Prüfung → Capture", to: "step_2" }]);
     expect(rowHeading(html)).toBe("Prüfung → Capture");
+  });
+});
+
+describe("a way out whose target the draft no longer holds", () => {
+  const html = renderSteps(STEPS, [{ id: "path_1", key: "p", label: "Send", to: "step_gone" }]);
+
+  it("reads removed in the heading", () => {
+    expect(rowHeading(html)).toBe("Send → (step removed)");
+  });
+
+  it("holds the target as a disabled option the select displays", () => {
+    const options = selectAfter(html, ">Leads to<");
+    expect(options).toContainEqual(["step_gone", "(step removed)"]);
+    expect(html).toMatch(/<option value="step_gone" disabled="" selected="">\(step removed\)<\/option>/);
+  });
+
+  it("offers no removed option in the new way out's select", () => {
+    expect(selectAfter(html, ">Where the new way out leads<").map(([value]) => value)).not.toContain("step_gone");
+  });
+});
+
+describe("a way out with no target yet", () => {
+  const html = renderSteps(STEPS, [{ id: "path_1", key: "p", label: "Send" }]);
+
+  it("keeps the no-step-yet heading and holds no removed option", () => {
+    expect(rowHeading(html)).toBe("Send → (no step yet)");
+    expect(html).not.toContain("(step removed)");
+  });
+});
+
+describe("a way out whose target exists", () => {
+  it("holds no removed option", () => {
+    expect(render({})).not.toContain("(step removed)");
   });
 });

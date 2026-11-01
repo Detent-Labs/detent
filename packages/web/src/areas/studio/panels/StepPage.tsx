@@ -43,7 +43,7 @@ import {
   type SectionSummary,
 } from "./stepSummaries.js";
 import { stepRemovalReach } from "../draft/stepRemoval.js";
-import { fill, stepText } from "./shared/optionText.js";
+import { fill, stepText, stepTextMap } from "./shared/optionText.js";
 import type { EditorIssue } from "../draft/issues.js";
 
 type DraftStep = DraftOf<Step>;
@@ -173,20 +173,16 @@ const styles = stylex.create({
     paddingBlock: 2,
     paddingInline: 7,
   },
-  // The rule derives from the message's own tone, not the accent:
-  // `design-language.md` keeps the accent a stamp rather than a paint, and a
-  // component reads a semantic role rather than a ramp step.
-  //
-  // It is a structural rule at 2px, the weight that separates one subject
-  // from another, since a warning stands apart from the prose beside it and
-  // is no row of a register. `design-language.md` declares those two weights
-  // and nothing between them, and neither ever softens into a tint — so the
-  // refusal role stands at full strength rather than mixed toward the ground.
+  // A warning callout: refusal text beside a 3px rule in the advisory role
+  // (`DESIGN.md`, Warning Callout). A component reads a semantic role rather
+  // than a ramp step, and the accent stays a stamp rather than a paint. The
+  // rule never softens into a tint. The missing-translation warnings under the
+  // name and description share it.
   warning: {
     color: colors.refusal,
-    borderLeftWidth: 2,
+    borderLeftWidth: 3,
     borderLeftStyle: "solid",
-    borderLeftColor: colors.refusal,
+    borderLeftColor: colors.advisory,
     paddingLeft: space.s2,
     marginBlock: 0,
   },
@@ -586,6 +582,15 @@ interface Props {
   processes: readonly ProcessSummary[];
 }
 
+/** A called process's file that failed to load. */
+export function ChildLoadError({ message }: { message: string }) {
+  return (
+    <p {...stylex.props(styles.errorText)} role="alert">
+      {message}
+    </p>
+  );
+}
+
 /**
  * The Steps tab's wide page (`studio-step-page`). One step, in one column: a
  * masthead, the sections its kind declares folded into an accordion, and the
@@ -881,7 +886,7 @@ export function StepPage({
                   <input type="file" accept="application/json" onChange={(e) => loadChildFile(step.id, e.target.files?.[0])} />
                 </>
               )}
-              {childLoadError && <p {...stylex.props(styles.errorText)}>{childLoadError}</p>}
+              {childLoadError && <ChildLoadError message={childLoadError} />}
             </fieldset>
           </>
         );
@@ -1017,7 +1022,11 @@ export function StepPage({
     );
   };
 
-  const label = stepText(step, contentLocale, baseLocale);
+  // The removal dialog names the step as every step select does, so two steps
+  // that share a label read apart.
+  const label =
+    (step.id === undefined ? undefined : stepTextMap(draft.workflow?.steps ?? [], contentLocale, baseLocale).get(step.id)) ??
+    stepText(step, contentLocale, baseLocale);
 
   return (
     <div {...stylex.props(styles.page)}>

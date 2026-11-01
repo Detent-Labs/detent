@@ -279,6 +279,13 @@ export function PathsPanel({
               <option value="" disabled>
                 {t("paths.selectTargetStep")}
               </option>
+              {/* A target the draft no longer holds shows as a disabled choice,
+                  so the select displays it; picking any step writes. */}
+              {path.to && !stepTexts.has(path.to) && (
+                <option value={path.to} disabled>
+                  {t("paths.targetGone")}
+                </option>
+              )}
               {stepOptions}
             </StudioSelect>
           </label>

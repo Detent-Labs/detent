@@ -22,7 +22,7 @@ import { stepEntityIds } from "../draft/panel-rail.js";
 import { seedLocalizedText } from "../draft/localized-text";
 import { getDraft, listProcesses } from "../api/client.js";
 import { useFetchOnce } from "../panels/shared/useFetchOnce.js";
-import { stepText } from "../panels/shared/optionText.js";
+import { stepTextMap } from "../panels/shared/optionText.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
 import { DEFAULT_TAB, FIELDS_VIEWS, SETTINGS_VIEWS, type ProcessTab, type Route, type TabView } from "../routing.js";
 import { checkTarget, formEditorReturnTab, placeAction, processTabCounts, STEP_PAGE_NAME_ID, surfaceTab, type CheckTarget, type FixRequest } from "../draft/process-tabs.js";
@@ -689,6 +689,9 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   const pageIndex = railOrder.findIndex((s) => s.id !== undefined && s.id === pageStepId);
   const pageStep = pageIndex >= 0 ? railOrder[pageIndex] : undefined;
 
+  // The one text per step every select, the walk and the narrowing label read.
+  const stepTexts = stepTextMap(steps, contentLocale, baseLocale);
+
   /** One end of the walk, already resolved to a label so the page reads no
    * locale for it. `undefined` at either end of the rail's order, which is
    * what refuses that control's press. */
@@ -697,7 +700,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     if (neighbour?.id === undefined) return undefined;
     return {
       id: neighbour.id,
-      label: stepText(neighbour, contentLocale, baseLocale),
+      label: stepTexts.get(neighbour.id) ?? "",
     };
   };
 
@@ -986,13 +989,10 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // than showing an empty list nobody can widen back by pressing a badge.
   const checksNarrowStep = checksStepId === undefined ? undefined : steps.find((s) => s.id === checksStepId);
   const checksNarrowedTo =
-    checksNarrowStep === undefined
+    checksNarrowStep?.id === undefined
       ? undefined
       : {
-          label:
-            resolveDraftLocalizedText(checksNarrowStep.label, contentLocale, baseLocale) ||
-            checksNarrowStep.key ||
-            t("steps.unnamedStep"),
+          label: stepTexts.get(checksNarrowStep.id) ?? t("steps.unnamedStep"),
           entityIds: stepEntityIds(checksNarrowStep),
         };
 

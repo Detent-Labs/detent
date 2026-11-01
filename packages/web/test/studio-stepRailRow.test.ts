@@ -2,6 +2,7 @@
  * What a steps-rail row's issue badge reads (`panels/stepRailRow.ts`),
  * tested as a pure function — no DOM, no rendering.
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
 import type { Step } from "workflow-engine/schema";
 import type { DraftOf } from "../src/areas/studio/draft/types.js";
@@ -10,8 +11,10 @@ import {
   focusAfterStepRemove,
   focusAfterWalk,
   railRowIssues,
+  scrollCurrentRowIntoView,
   STEPS_RAIL_ADD_FIRST_ID,
   STEPS_RAIL_CURRENT_ID,
+  STEPS_RAIL_SCROLL,
   STEP_WALK_NEXT_ID,
   STEP_WALK_PREVIOUS_ID,
 } from "../src/areas/studio/panels/stepRailRow.js";
@@ -97,5 +100,44 @@ describe("focusAfterWalk", () => {
 
   it("names two different ids", () => {
     expect(STEP_WALK_PREVIOUS_ID).not.toBe(STEP_WALK_NEXT_ID);
+  });
+});
+
+describe("scrollCurrentRowIntoView", () => {
+  it("scrolls the current row by the least distance", () => {
+    const calls: unknown[] = [];
+    const row = { scrollIntoView: (options: unknown) => calls.push(options) };
+    const asked: string[] = [];
+    const doc = { getElementById: (id: string) => (asked.push(id), row as unknown as HTMLElement) };
+
+    expect(scrollCurrentRowIntoView(doc)).toBe(true);
+    expect(asked).toEqual([STEPS_RAIL_CURRENT_ID]);
+    expect(calls).toEqual([{ block: "nearest" }]);
+    expect(STEPS_RAIL_SCROLL).toEqual({ block: "nearest" });
+  });
+
+  it("does nothing where no row is current", () => {
+    expect(scrollCurrentRowIntoView({ getElementById: () => null })).toBe(false);
+  });
+});
+
+describe("the steps rail's scroll effect", () => {
+  it("runs again whenever the current step changes", () => {
+    const source = readFileSync(new URL("../src/areas/studio/panels/StepsRail.tsx", import.meta.url), "utf8");
+    const effect = /useEffect\(\(\) => \{\s*scrollCurrentRowIntoView\(document\);\s*\}, \[([^\]]*)\]\);/.exec(source);
+
+    expect(effect).not.toBeNull();
+    expect(effect![1]!.trim()).toBe("currentStepId");
+  });
+});
+
+describe("the step texts the walk and the narrowing label read", () => {
+  const source = readFileSync(new URL("../src/areas/studio/screens/EditScreen.tsx", import.meta.url), "utf8");
+
+  it("come from one stepTextMap, with no key in the label", () => {
+    expect(source).toContain("const stepTexts = stepTextMap(steps, contentLocale, baseLocale);");
+    expect(source).toContain("label: stepTexts.get(neighbour.id)");
+    expect(source).toContain("label: stepTexts.get(checksNarrowStep.id)");
+    expect(source).not.toContain("checksNarrowStep.key");
   });
 });

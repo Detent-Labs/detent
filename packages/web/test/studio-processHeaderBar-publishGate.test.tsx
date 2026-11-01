@@ -61,6 +61,7 @@ const noActions: DraftToolbarActions = {
   saving: false,
   publishing: false,
   error: null,
+  errorDetail: null,
   pendingDialog: null,
   resolveDialog: () => {},
   save: () => {},
@@ -157,6 +158,16 @@ describe("ProcessHeaderBar's failure region", () => {
     expect(html).toContain("You don&#x27;t have permission to do that.");
     // The violating input: the shape this change replaced.
     expect(html).not.toContain('<p class="studio-error">');
+  });
+
+  it("keeps the server's text outside the banner's alert, in a closed Developer view", () => {
+    const html = renderHeader({ actions: { error: "Publishing stopped.", errorDetail: "kind\nloc: raw" } });
+
+    const banner = html.slice(html.indexOf("errorBanner"), html.indexOf("</div>", html.indexOf("errorBanner")));
+    expect(banner).toContain("Publishing stopped.");
+    expect(banner).not.toContain("loc: raw");
+    expect(html).toContain("loc: raw");
+    expect(html).toContain("Developer view");
   });
 
   it("puts the banner outside the header element, so it is not one more flex item", () => {
@@ -289,7 +300,7 @@ describe("The publish dialog", () => {
 
     expect(html).toContain("Open issues");
     expect(html).toContain(">0<");
-    expect(html).not.toContain("The engine refuses this publish");
+    expect(html).not.toContain("This draft cannot go out yet");
   });
 
   it("names the open issue count and the refusal on a draft carrying a blocker", () => {
@@ -297,14 +308,14 @@ describe("The publish dialog", () => {
 
     expect(html).toContain("Open issues");
     expect(html).toContain(">1<");
-    expect(html).toContain("The engine refuses this publish until somebody fixes a blocking issue.");
+    expect(html).toContain("This draft cannot go out yet. Open Checks and fix what it marks Must fix.");
   });
 
   it("counts an advisory issue without naming a refusal", () => {
     const html = renderHeader({ issues: [issue("view")], actions: { pendingDialog: "publish" } });
 
     expect(html).toContain(">1<");
-    expect(html).not.toContain("The engine refuses this publish");
+    expect(html).not.toContain("This draft cannot go out yet");
   });
 
   it("states the unsaved-changes sentence only when the draft is dirty", () => {
@@ -330,6 +341,24 @@ describe("The publish dialog", () => {
 
     expect(html).toContain("<dialog");
     expect(html).toContain("refused");
+  });
+
+  it("keeps the server's text in a closed Developer view beside the alert", () => {
+    const detail = "schema-validation\nworkflow.steps[0]: bad";
+    const html = renderHeader({ actions: { pendingDialog: "publish", error: "Publishing stopped.", errorDetail: detail } });
+
+    const alert = html.slice(html.indexOf('role="alert"'), html.indexOf("</p>", html.indexOf('role="alert"')));
+    expect(alert).toContain("Publishing stopped.");
+    expect(alert).not.toContain("workflow.steps[0]: bad");
+    expect(html).toContain("workflow.steps[0]: bad");
+    expect(html.match(/<details/g)).toHaveLength(2);
+    expect(html).not.toMatch(/<details[^>]*\sopen/);
+  });
+
+  it("prints no Developer view for a refusal with no detail", () => {
+    const html = renderHeader({ actions: { pendingDialog: "publish", error: "refused" } });
+
+    expect(html.match(/<details/g)).toHaveLength(1);
   });
 });
 

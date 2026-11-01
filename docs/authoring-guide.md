@@ -749,7 +749,7 @@ A manual path waits for a person. The example gives `review` three of them:
 
 A manual path can carry a guard too. The participant sees its button only
 while the guard holds. A manual path with an empty guard always shows its
-button. The step page offers the "Only when" editor for both kinds of path.
+button. The step page offers the "Only if" editor for both kinds of path.
 
 An automatic path fires by itself when its guard matches, except on a
 subprocess step. A guard is a CEL expression. Two or more automatic paths on

@@ -317,7 +317,10 @@ describe("the design language's own numbers", () => {
 
   it("keeps to the two rule weights and nothing between them", () => {
     for (const file of GUIDED) {
-      const off = [...stripComments(read(file)).matchAll(/border[A-Za-z]*Width: (\d+)/g)]
+      // The warning callout's 3px advisory rule is the one weight the design
+      // language declares beside the two (`DESIGN.md`, Warning Callout).
+      const source = stripComments(read(file)).replace(/\n  warning: \{[^}]*borderLeftColor: colors\.advisory[^}]*\}/, "");
+      const off = [...source.matchAll(/border[A-Za-z]*Width: (\d+)/g)]
         .map((m) => Number(m[1]))
         .filter((px) => px > 2);
 

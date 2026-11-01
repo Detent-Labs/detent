@@ -8,6 +8,7 @@ import { test, expect } from "./fixtures.js";
 
 const DRAFT_NAME = "E2E draft";
 const REFUSAL = "Refused by the smoke suite.";
+const FALLBACK = "Something in this process does not pass a check. The Developer view below names it.";
 
 /** Opens the suite's draft from the studio's process list and opens the publish dialog on it. */
 async function openPublishDialog(page: Page): Promise<Locator> {
@@ -34,7 +35,13 @@ test("a refused publish shows its reason inside the dialog", async ({ page }) =>
   const dialog = await openPublishDialog(page);
   await dialog.getByRole("button", { name: "Publish", exact: true }).click();
 
-  await expect(dialog.getByRole("alert")).toContainText(REFUSAL);
+  // A refusal with no location reads the fallback sentence; the server's text waits in a closed Developer view.
+  await expect(dialog.getByRole("alert")).toContainText(FALLBACK);
+  await expect(dialog.getByRole("alert")).not.toContainText(REFUSAL);
+  const detail = dialog.locator("details").filter({ hasText: REFUSAL });
+  await expect(detail).not.toHaveAttribute("open", "");
+  await detail.getByText("Developer view").click();
+  await expect(detail.getByText(REFUSAL)).toBeVisible();
   await expect(dialog).toBeVisible();
   await expect(page.locator('[role="alert"]:not(dialog [role="alert"])').filter({ visible: true })).toHaveCount(0);
 });

@@ -122,10 +122,14 @@ describe("wayOutHeading", () => {
     expect(wayOutHeading(way(undefined, "step_b"), texts)).toBe("(unnamed way out) → Done");
   });
 
-  it("reads no target, or one the map lacks, as no step yet", () => {
+  it("reads no target as no step yet", () => {
     expect(wayOutHeading(way("Send"), texts)).toBe("Send → (no step yet)");
     expect(wayOutHeading(way("Send", ""), texts)).toBe("Send → (no step yet)");
-    expect(wayOutHeading(way("Send", "step_gone"), texts)).toBe("Send → (no step yet)");
+  });
+
+  it("reads a target the map lacks as removed", () => {
+    expect(wayOutHeading(way("Send", "step_gone"), texts)).toBe("Send → (step removed)");
+    expect(wayOutHeading(way(undefined, "step_gone"), texts)).toBe("(unnamed way out) → (step removed)");
   });
 
   it("prints a target text holding placeholders literally", () => {
@@ -159,6 +163,6 @@ describe("wayOutHeading", () => {
   it("still names the target when the label ends with another step or no arrow", () => {
     expect(wayOutHeading(way("Prüfung → Capture", "step_b"), texts)).toBe("Prüfung → Capture → Done");
     expect(wayOutHeading(way("Done", "step_b"), texts)).toBe("Done → Done");
-    expect(wayOutHeading(way("Go → Done", "step_gone"), texts)).toBe("Go → Done → (no step yet)");
+    expect(wayOutHeading(way("Go → Done", "step_gone"), texts)).toBe("Go → Done → (step removed)");
   });
 });

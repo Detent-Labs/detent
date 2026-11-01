@@ -3,7 +3,8 @@ import { useDraft } from "../draft/store.js";
 import { saveDraft, getDraft, deleteDraft, publishDraft } from "../api/client.js";
 import { applySaveResult, applyReload, type DraftSaveState } from "../screens/draftSaveLogic.js";
 import { isDraftDirty } from "../screens/draftToolbarState.js";
-import { describeCaughtError } from "../errors.js";
+import { StudioClientError } from "../api/client.js";
+import { describeCaughtError, describePublishRefusal } from "../errors.js";
 import { useFail } from "../../../shell/useFail.js";
 import type { Draft } from "../draft/types.js";
 import type { PublishResult } from "../api/types.js";
@@ -62,6 +63,9 @@ export interface DraftToolbarActions {
   saving: boolean;
   publishing: boolean;
   error: string | null;
+  /** The server's own text for a refused publish, for a closed Developer view
+   * beside `error`. It clears wherever `error` clears. */
+  errorDetail: string | null;
   /** Set by `publish()` or the menu's `discard()`, cleared when the developer resolves
    * the dialog or the act succeeds. A refused request leaves it set, so the
    * reason renders inside the open dialog rather than behind it. */
@@ -114,12 +118,21 @@ export function useDraftToolbarActions({
   const [error, setError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [pendingDialog, setPendingDialog] = useState<PendingDialog>(null);
-  const fail = useFail(onUnauthorized, (e) => setError(describeCaughtError(e)));
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const clearError = () => {
+    setError(null);
+    setErrorDetail(null);
+  };
+  const fail = useFail(onUnauthorized, (e) => {
+    const refusal = e instanceof StudioClientError ? describePublishRefusal(e.error, draft) : undefined;
+    setError(refusal ? refusal.text : describeCaughtError(e));
+    setErrorDetail(refusal ? refusal.detail : null);
+  });
 
   const withUnauthorized = async (action: () => Promise<void>) => {
     try {
       await action();
-      setError(null);
+      clearError();
     } catch (e) {
       fail(e);
     }
@@ -163,7 +176,7 @@ export function useDraftToolbarActions({
     // A dialog reports its own refusal alone. Without this, a failure from an
     // earlier action renders inside a dialog that has sent nothing yet, and
     // reads as a refusal of the act the developer is about to confirm.
-    setError(null);
+    clearError();
     setPendingDialog("publish");
   };
 
@@ -217,7 +230,7 @@ export function useDraftToolbarActions({
    * sent and the draft stays open, unchanged").
    */
   const discard = () => {
-    setError(null);
+    clearError();
     setPendingDialog("discard");
   };
 
@@ -249,6 +262,7 @@ export function useDraftToolbarActions({
     saving,
     publishing,
     error,
+    errorDetail,
     pendingDialog,
     resolveDialog,
     save: () => void save(),

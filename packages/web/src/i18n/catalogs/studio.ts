@@ -46,7 +46,7 @@ export const en = {
   "draftToolbar.publishDialogNextVersion": "Next version",
   "draftToolbar.publishDialogUnsaved": "This draft has unsaved changes. Publishing saves them first.",
   "draftToolbar.publishDialogOpenIssues": "Open issues",
-  "draftToolbar.publishDialogBlocked": "The engine refuses this publish until somebody fixes a blocking issue.",
+  "draftToolbar.publishDialogBlocked": "This draft cannot go out yet. Open Checks and fix what it marks Must fix.",
   "draftToolbar.publishDialogImmutable": "A published version can never change. To correct it, publish a new one.",
   // The publish dialog's Changes row (`studio-publish`): one sentence per
   // state of the base-version fetch, then a disclosure over the change list.
@@ -291,6 +291,7 @@ export const en = {
   "paths.rowHeading": "{path} → {step}",
   "paths.unnamedPath": "(unnamed way out)",
   "paths.noTargetYet": "(no step yet)",
+  "paths.targetGone": "(step removed)",
   "paths.developerView": "Developer view",
 
   "timers.empty": "No time limit.",
@@ -430,7 +431,7 @@ export const en = {
   "condition.joinerHint": "How the rows combine. Click to flip.",
   "condition.unparseable": "This does not parse as CEL, so the builder cannot open it.",
   "condition.developerView": "Developer view",
-  "condition.onlyWhenHeading": "Only when",
+  "condition.onlyWhenHeading": "Only if",
   // The operator select's words, one per operator.
   "condition.op.eq": "is",
   "condition.op.ne": "is not",
@@ -1031,6 +1032,10 @@ export const en = {
   "checks.fallback.field": "Something on “{field}” does not pass a check. On the Checks tab, this check's Developer view names it.",
   "checks.fallback.source": "Something on “{source}” does not pass a check. On the Checks tab, this check's Developer view names it.",
   "checks.fallback.process": "Something in this process does not pass a check. On the Checks tab, this check's Developer view names it.",
+  "checks.publishRefused": "Publishing stopped. Fix these, then publish again:",
+  "checks.publishRefusedCrossProcess":
+    "Publishing stopped: this process depends on another process in a way the server refused. The Developer view below names both.",
+  "checks.publishRefusedFallback": "Something in this process does not pass a check. The Developer view below names it.",
 
   "jsonView.label": "Draft body (JSON)",
   "jsonView.apply": "Apply",

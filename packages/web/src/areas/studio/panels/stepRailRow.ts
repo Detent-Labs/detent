@@ -24,6 +24,18 @@ export function railRowIssues(issues: readonly EditorIssue[], step: DraftStep): 
  * so one fixed id names it. */
 export const STEPS_RAIL_CURRENT_ID = "studio-steps-rail-current";
 
+/** How the rail brings the current row into view: by the least distance, so a
+ * row already whole in the rail's view does not move the page. */
+export const STEPS_RAIL_SCROLL: ScrollIntoViewOptions = { block: "nearest" };
+
+/** Scrolls the current row into view. Returns whether a row stood to scroll. */
+export function scrollCurrentRowIntoView(doc: Pick<Document, "getElementById">): boolean {
+  const row = doc.getElementById(STEPS_RAIL_CURRENT_ID);
+  if (row === null) return false;
+  row.scrollIntoView(STEPS_RAIL_SCROLL);
+  return true;
+}
+
 /** The DOM id of the rail's first add control, the one `ADD_CONTROLS` lists
  * first. */
 export const STEPS_RAIL_ADD_FIRST_ID = "studio-steps-rail-add-first";
