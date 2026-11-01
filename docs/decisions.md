@@ -930,7 +930,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   the tension sits in `DESIGN.md` itself.
 - **`.btn-ghost` text falls under 4.5:1 on its own washes.** The draft
   confirmation dialog's Cancel carries it
-  (`packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx:588`). Its accent
+  (`packages/web/src/areas/studio/panels/ProcessHeaderBar.tsx:562`). Its accent
   text reads 3.90:1 hovered and 3.44:1 pressed in light, and 4.15:1 pressed in
   dark. `destructive-buttons-show-the-accent` cleared the same shortfall for
   `.btn-destructive` with `--color-accent-on-muted`, and this one wants the
@@ -990,7 +990,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   them on 2026-09-14. The step page's `hint` sets written text at 0.8rem
   (`panels/StepPage.tsx:164`). A condition row's remove glyph sets 1.1rem
   (`panels/shared/ConditionBuilder.tsx:63`). The header bar's name sets 1rem,
-  where the Headline role asks 1.25rem (`panels/ProcessHeaderBar.tsx:39`).
+  where the Headline role asks 1.25rem (`panels/ProcessHeaderBar.tsx:60`).
   - Four more flags on the step page mark mono machine values at 0.8rem.
     The Hierarchy in `DESIGN.md` allows that size for them.
   - Risk (Low): type drifts outside the roles `DESIGN.md` names.
@@ -1044,7 +1044,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   user presses Tab up to 52 times to cross the rail.
 - **FIELDS-7: the Fields tab's headings and checks lack structure.** The
   outline jumps from the header bar's `h1` to the field's `h3`. They sit at
-  `panels/ProcessHeaderBar.tsx:793` and `panels/FieldCatalogPanel.tsx:1205`,
+  `panels/ProcessHeaderBar.tsx:895` and `panels/FieldCatalogPanel.tsx:1205`,
   with zone headings at `h4` (`:599`). A zone's check list (`:602`) sits above
   its controls, and neither `aria-invalid` nor `aria-describedby` ties a check
   to its control. The zone heading marks a check by colour alone (`:267`,
@@ -1459,7 +1459,7 @@ tags are local to this section. Paths under `panels/` and `screens/` start at
   draws `missingTranslationWarning` beside a 2px refusal rule, its `warning`
   block (`panels/StepPage.tsx:149`). Three other sites draw the same message
   beside the 3px advisory rule. Those are the header bar's `warning` block
-  (`panels/ProcessHeaderBar.tsx:63`) and the field catalog's `studioWarning`
+  (`panels/ProcessHeaderBar.tsx:88`) and the field catalog's `studioWarning`
   (`panels/FieldCatalogPanel.tsx:334`). The form editor's `studioWarning`
   (`screens/FormEditorScreen.tsx:122`) is the third.
   - Two more 3px rules mix refusal at 55%. The checks rail draws one in
