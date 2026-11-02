@@ -887,7 +887,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
   2026-09-14. The IT Offboarding draft's first path had a condition row.
   - The "Only if" fieldset keeps the default `min-inline-size: min-content`
     (`panels/PathsPanel.tsx:332`). The row's field select takes its longest
-    option's width, 647px (`panels/shared/ConditionBuilder.tsx:310`). The
+    option's width, 647px (`panels/shared/ConditionBuilder.tsx:313`). The
     fieldset then ends at x=1028, past the Path to section's edge at x=863.
   - The On exit section covers the row's last 107px, its remove control
     included. At 1600px the row fits.
@@ -900,17 +900,17 @@ recorded rather than fixed. The RAIL tags are local to this section.
 - **STEP-2: the guard's label wraps the whole condition builder.** One
   `<label>` holds the guard text and the builder (`panels/PathsPanel.tsx:348`).
   - Before a row exists, "+ Add row" is that label's first labelable control
-    (`panels/shared/ConditionBuilder.tsx:547`). Measured 2026-09-14, a click on
+    (`panels/shared/ConditionBuilder.tsx:540`). Measured 2026-09-14, a click on
     the label's own text added a row. The button's accessible name then reads
     every word inside the label, from "guard" to "Developer view".
   - An empty row's hint links to no control. The value input has no
-    `aria-describedby` pointing at it (`:237`).
+    `aria-describedby` pointing at it (`:238`).
   - Risk (Medium): a stray click adds a row, and a screen reader hears a name
     without the visible words (WCAG 2.5.3 and 1.3.1).
 - **STEP-3: three literal sizes sit off the type ramp.** The detector flagged
   them on 2026-09-14. The step page's `hint` sets written text at 0.8rem
   (`panels/StepPage.tsx:164`). A condition row's remove glyph sets 1.1rem
-  (`panels/shared/ConditionBuilder.tsx:149`). The header bar's name sets 1rem,
+  (`panels/shared/ConditionBuilder.tsx:150`). The header bar's name sets 1rem,
   where the Headline role asks 1.25rem (`panels/ProcessHeaderBar.tsx:60`).
   - Four more flags on the step page mark mono machine values at 0.8rem.
     The Hierarchy in `DESIGN.md` allows that size for them.
