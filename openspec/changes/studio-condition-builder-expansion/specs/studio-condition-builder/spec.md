@@ -394,9 +394,9 @@ A number SHALL use a native number input, and a `format: "date"` or `format: "da
 
 A row may name an operand and have no value. The builder SHALL then keep the
 row visible and marked incomplete, and leave it out of the written
-expression. A group with no complete row counts as incomplete too, marked
-the same way with its own flag. The builder SHALL never emit a fragment that
-fails to parse.
+expression. A group with no complete row counts as incomplete too, and takes
+the same dashed border. The builder SHALL never emit a fragment that fails to
+parse.
 
 When rows exist and none contributes, the builder SHALL write nothing, and the stored expression stands. Removing a row, inside a group or not, is the one action that can remove that expression. A removal that leaves no complete row SHALL remove the condition, the same as clearing the text input. A removal at a site whose draft has no condition SHALL leave the draft as it was.
 
@@ -442,10 +442,7 @@ While no row contributes, the sentence SHALL read the condition the draft holds.
 
 - **WHEN** a guard reads `data.amount > 1000.0`
 - **AND** an author adds a group and leaves its one row without a value
-<!-- antislop: allow passive-voice -->
-<!-- Why: the bullet quotes the flag's own text. -->
-- **THEN** the group shows the flag "Needs a finished row before it is
-  written."
+- **THEN** the group draws the dashed incomplete border
 - **AND** the guard still reads `data.amount > 1000.0`
 
 #### Scenario: Removing the last row inside a group removes the condition

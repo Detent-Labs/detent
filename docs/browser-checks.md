@@ -7530,15 +7530,15 @@ light, then to dark (`prefers-color-scheme`).
   "how the group's rows combine", with "any of these" and "all of these".
   Its rows stand indented under a 2px left rule, with "+ Add row to this
   group" under them.
-- **Unfinished group**: a group with no finished row.
-  <!-- antislop: allow passive-voice -->
-  <!-- Why: the line quotes the flag's own text. -->
-  It carries the flag "Needs a finished row before it is written." and the
-  dashed border.
+- **Unfinished group**: a group with no finished row. It draws the dashed
+  border. The group has no flag of its own, and its unfinished row's flag
+  says what to do.
 - **Field-compared date row**: a date field's row. Press "Compare with a field
   instead", then pick another date field. The command now reads "Type a value
   instead". Press it, and the literal editor comes back empty.
-- **List row**: a row on the person's roles with "does not include".
+- **List row**: a row on the person's roles with "does not include" and the
+  value "manager". The sentence reads "“manager” is not one of the person's
+  roles."
 - **A lone group reads back flat**: remove every row but one group of two
   finished rows, then reload the page. The rows stand flat, with no group
   head, joined by the group's word.

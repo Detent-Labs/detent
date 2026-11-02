@@ -189,11 +189,9 @@ the next read flattens it. No warning: the meaning is the same.
 
 ### D4. Completeness, holds and removals
 
-<!-- antislop: allow passive-voice -->
-<!-- Why: the paragraph quotes the flag's own text. -->
 A group with no complete leaf is incomplete. It stays visible, marked as an
-unfinished row is. It carries its own flag: "Needs a finished row before it
-is written." The stored condition holds, as it does for an unfinished row.
+unfinished row is. Its dashed border marks it; the inner row's flag says what
+to do. The stored condition holds, as it does for an unfinished row.
 
 `commitDecision` keeps its three answers. The row count it compares is the
 number of leaves plus the number of groups, from a `rowCount` helper. A
@@ -267,13 +265,21 @@ They compose, with no boolean prop switching a mode
 (`vercel-composition-patterns`, `architecture-avoid-boolean-props`):
 
 - `ComparisonRow`: operand select, operator select, value side, the swap
-  command, the incomplete flag, the remove control. The same component draws
-  a leaf at the top level and inside a group.
+  command, the incomplete flag, the remove control. Over a field value the
+  flag asks for a field, and over a literal for a value. The same component
+  draws a leaf at the top level and inside a group.
 - `GroupRow`: the head, the indented list of `ComparisonRow` and raw rows,
-  and "+ Add row to this group". The head holds the group's joiner select,
-  the incomplete flag and the remove control. It leads with the gutter
-  joiner when the group is not first.
+  and "+ Add row to this group". The head holds the group's joiner select
+  and the remove control. It leads with the gutter joiner when the group is
+  not first.
 - `ValueEditor`: the literal editor, as today.
+
+On an operand switch, the row keeps its operator and value if both fit. They
+fit when the new operand offers that operator and shares the old one's CEL
+type, format and option set. Otherwise the switch resets both. A field value stays only when the new operand still
+lists that field among its candidates, so `data.a > data.b` never becomes
+`data.b > data.b`. The pure helper `retargetRow` in `conditionLogic.ts` holds
+the rule.
 
 Markup: the top `<ol>` as today. A group is one `<li>` holding a `<div>`
 head and a nested `<ol>`. The nested list takes a 16px indent and a 2px left
@@ -327,8 +333,8 @@ it reaches the builder.
 - [A right-side member path the picker would not offer, such as a context
   operand] → It reads as a raw row. The guard keeps its text.
 - [The group head adds controls to a row list the owner wants plain] → One
-  select and one flag per group. No box inside a box, and the inner list
-  shares the row style.
+  select per group. An unfinished group draws a dashed border. No box inside
+  a box, and the inner list shares the row style.
 
 ## Migration Plan
 

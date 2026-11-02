@@ -37,12 +37,5 @@
         "reason": "monoInput copied verbatim from StepPage.tsx's existing mono-face declaration for the key field (design.md, studio-path-row-field-order task brief)"
       }
     ]
-  },
-  "hook": {
-    "enabled": true,
-    "limits": {
-      "maxFindings": 5,
-      "maxChars": 8000
-    }
   }
 }

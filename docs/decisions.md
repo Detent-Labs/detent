@@ -893,6 +893,10 @@ recorded rather than fixed. The RAIL tags are local to this section.
     included. At 1600px the row fits.
   - Risk (Medium): a pointer cannot reach the row's remove control at 1280px,
     and the dashed box runs under another section.
+  - Measured again on 2026-11-02, after `studio-condition-builder-expansion`.
+    At 1280px the operand select renders about 380px wide, and the row no
+    longer overflows its column. In the 806px step column the × remove
+    control wraps onto its own line at 1280px and at 1440px.
 - **STEP-2: the guard's label wraps the whole condition builder.** One
   `<label>` holds the guard text and the builder (`panels/PathsPanel.tsx:348`).
   - Before a row exists, "+ Add row" is that label's first labelable control
@@ -2103,7 +2107,8 @@ come from those two reports.
   `data.quantity * data.unit_price >= 10000.0`. Risk (Low): the row names its
   place and says nothing about the rule.
 
-  Upgrade entry: change 16's expansion of the sentence reader.
+  Upgrade entry: the arithmetic rows deferral under "Open from
+  studio-condition-builder-expansion" below.
 - **FIELDCARD-27: both entity rails carry the accessible name "Editors".** The
   Catalog view's rail and the Where values come from view's rail share it.
   Risk (Low): a screen reader user cannot tell the two apart.
@@ -2376,8 +2381,8 @@ points below to later changes. The AUTOSAVE tag is local to this section.
 ## Open from studio-condition-builder-expansion (needs its own OpenSpec change)
 
 The change gave the condition builder groups, field values and date order. It
-left the six points below to later changes. The CEL input covers each of them
-until a builder row does.
+left the ten points below to later changes. The CEL input covers the first
+four until a builder row does.
 
 - **An emptiness check.** "Is empty" and "has a value" have no row. An
   unwritten field raises, so `data.x == ""` matches nothing when nobody wrote
@@ -2393,6 +2398,43 @@ until a builder row does.
 - **Folding the rule builder onto the condition builder.** The rule builder
   keeps its own model, and it is now the narrower of the two. Refused
   simplification 11 below names the fold.
+- **A picker over the known roles for `actor.roles`.** The value is free text
+  today. A typo publishes a guard that never matches.
+- **Moving an existing row into a group.** A new group starts with a fresh
+  row. To put an existing row inside, an author removes it and builds it again.
+- **Arithmetic rows.** A guard such as
+  `data.quantity * data.unit_price >= 10000.0` has no row. It reads as a
+  hand-written rule, the case FIELDCARD-26 above records.
+- **A literal of the wrong type.** A literal whose JavaScript type does not fit
+  the operand still reads as a row. On a date, `data.d > 5` reads "D is after
+  5". The next authoring action writes `data.d > "5"`, and the publish check
+  rejects it.
+
+The critique and the audit of 2026-11-02 left the observations below. Each one
+waits for an owner ruling or for the change it names.
+
+- **The Map clamps a long grouped sentence at six lines.** A cut at a clause
+  boundary, with the full text in the accessible name, is `studio-canvas`
+  work.
+- **The add commands take two styles.** At the top level "+ Add row" and
+  "+ Add group" keep the ghost accent. Inside a group, "+ Add row to this
+  group" takes the slate authoring command.
+- **A group added to an empty builder reads back flat.** Its one finished row
+  writes bare, so the next read shows a plain row.
+- **Each keystroke commits to the draft.** A value input writes through the
+  autosave on every key.
+- **The × remove control wraps alone at 1280px and at 1024px.** It stands on
+  a line of its own under the row's other controls.
+- **Row 0 has no gutter.** Its controls sit left of the later rows' controls,
+  which follow the joiner.
+- **The value placeholder reads 4.12:1 in light and 3.60:1 in dark.**
+- **The incomplete flag has no `aria-describedby` link.** A screen reader
+  hears the row's controls without it.
+- **Rows repeat the names field, operator and value.** SENTENCE-9 above
+  records it.
+- **The operand switch keeps a pair between operands of one shape alone.**
+  Arrowing from a number field through a text field and back still resets the
+  operator and the value.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
@@ -2454,7 +2496,9 @@ audit of 2026-09-10.
     and 84 deletions over the two files, then 267 combined lines. The default
     operand has no counterpart on a path guard. Since
     `studio-condition-builder-expansion`, both builders compare against a
-    field. The fold stays open in that change's entry above. [`packages/web/src/areas/studio/panels/shared/RuleInput.tsx`
+    field. The merge stays refused. Folding the rule builder's model onto the
+    condition builder's is a separate deferral, recorded in that change's
+    entry above. [`packages/web/src/areas/studio/panels/shared/RuleInput.tsx`
     and `ConditionInput.tsx` beside it]
 12. **Finding 22, `Intl.NumberFormat` for `formatDuration`.** Rejected
     2026-08-16. The test file
