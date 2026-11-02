@@ -28,8 +28,11 @@ export const en = {
 
   // The confirmations that stand in `panels/confirmations.tsx`.
   "leaveDialog.heading": "Leave this draft?",
-  "leaveDialog.body": "Your unsaved changes go with it. The saved draft stays.",
+  "leaveDialog.headingJson": "Leave without applying?",
+  "leaveDialog.body": "Detent could not save your latest changes, so they go with it. The saved draft stays.",
+  "leaveDialog.bodyJson": "The JSON you have not applied goes with it. The saved draft stays.",
   "leaveDialog.confirm": "Leave without saving",
+  "leaveDialog.confirmJson": "Leave without applying",
   "arrangeDialog.heading": "Arrange every step?",
   "arrangeDialog.body": "Every step moves to a new place, and each path loses the bends placed on it.",
   "arrangeDialog.confirm": "Arrange",
@@ -53,10 +56,10 @@ export const en = {
   "templateReplaceDialog.body": "A template keeps no earlier version, so the old one goes. Processes already created from it stay as they are.",
   "templateReplaceDialog.confirm": "Replace template",
 
-  "draftToolbar.save": "Save",
   "draftToolbar.saving": "Saving…",
   "draftToolbar.discard": "Discard draft",
   "draftToolbar.conflictMessage": "This draft was changed elsewhere.",
+  "draftToolbar.conflictMessageDirty": "This draft was changed elsewhere. Reload loads the stored draft and drops your unsaved changes.",
   "draftToolbar.conflictReload": "Reload",
   "draftToolbar.publish": "Publish",
   "draftToolbar.publishing": "Publishing…",
@@ -74,9 +77,9 @@ export const en = {
   "draftToolbar.dialogLanguages": "Languages",
   "draftToolbar.publishDialogHeading": "Publish this draft?",
   "draftToolbar.publishDialogNextVersion": "Next version",
-  "draftToolbar.publishDialogUnsaved": "This draft has unsaved changes. Publishing saves them first.",
   "draftToolbar.publishDialogOpenIssues": "Open issues",
   "draftToolbar.publishDialogBlocked": "This draft cannot go out yet. Open Checks and fix what it marks Must fix.",
+  "draftToolbar.publishDialogJsonUnapplied": "The JSON you have not applied is not part of this publish.",
   "draftToolbar.publishDialogImmutable": "A published version can never change. To correct it, publish a new one.",
   // The publish dialog's Changes row (`studio-publish`): one sentence per
   // state of the base-version fetch, then a disclosure over the change list.
@@ -92,11 +95,50 @@ export const en = {
   "draftToolbar.discardDialogHeading": "Discard this draft?",
   "draftToolbar.discardDialogLastSaved": "Last saved",
   "draftToolbar.discardDialogKeepsPublished": "The published versions stay. Only the unpublished draft goes.",
+  // The banner after a failed save. One says Detent keeps trying, the other waits.
+  "draftToolbar.saveFailedRetrying": "Your latest changes stay in this tab, unsaved. Detent keeps trying.",
+  "draftToolbar.saveFailedRefused":
+    "Your latest changes stay in this tab, unsaved. The server refused them, so trying again may not help. To keep them, copy the text from the JSON surface.",
+  "draftToolbar.saveFailedStamp": "Not saved",
+  "draftToolbar.publishDialogSaveFailed": "Detent cannot publish yet, because your latest changes have not saved. Cancel and press Try again.",
+  "draftToolbar.saveFailedTryAgain": "Try again",
+  // The point a restore keeps. `keptPointName` clips `{name}`.
+  "savePoints.keptName": "Before restoring “{name}”",
+  // The discard dialog's note, beside the one that keeps the published versions.
+  "draftToolbar.discardDialogSavePoints": "Its save points go with it.",
 
-  // The notice under the header bar that offers the work a 401 kept in the
-  // tab (`panels/RestoreNotice.tsx`). `t` takes no values, so the message
-  // names no time.
-  "restoreNotice.message": "Your session ended while this draft had unsaved changes. Detent kept them in this browser tab.",
+  // The Settings tab's Save points view (`panels/SavePointsPanel.tsx`). `{name}` is
+  // the author's own text, `{kept}` the name of the point a restore kept, `{limit}`
+  // the bound the server states.
+  "savePoints.help": "A save point keeps the draft as it stands now, so you can come back to it.",
+  "savePoints.nameLabel": "Name this save point",
+  "savePoints.create": "Save this point",
+  "savePoints.nameRequired": "Give this save point a name.",
+  "savePoints.createUnsaved": "This save point cannot hold your latest changes until they save. Try again above.",
+  "savePoints.created": "Saved “{name}”.",
+  "savePoints.restored": "Restored “{name}”. Your work before it stands as “{kept}”.",
+  "savePoints.empty": "No save points yet.",
+  "savePoints.loading": "Loading save points…",
+  "savePoints.loadFailed": "The save points did not load.",
+  "savePoints.tryAgain": "Try again",
+  "savePoints.atBound": "This draft holds {limit} save points. Remove one to name another or to restore one.",
+  "savePoints.restore": "Restore",
+  "savePoints.remove": "Remove",
+  "savePoints.restoreRow": "Restore “{name}”",
+  "savePoints.removeRow": "Remove “{name}”",
+  "savePoints.restoreHeading": "Restore “{name}”?",
+  "savePoints.restoreNote": "The draft goes back to this point. Your work as it stands now becomes a save point, so you can come back to it.",
+  "savePoints.restoreUnsaved": "Detent cannot restore yet, because your latest changes have not saved. Cancel and press Try again, then restore.",
+  "savePoints.removeHeading": "Remove “{name}”?",
+  "savePoints.removeNote": "This save point goes for good. The draft stays as it is.",
+  "savePoints.removed": "Removed “{name}”.",
+  "savePoints.savedByTerm": "Saved by",
+  "savePoints.savedTerm": "Saved",
+
+  // The notice under the header bar that offers the work a 401 or a browser
+  // Back kept in the tab (`panels/RestoreNotice.tsx`). `t` takes no values, so
+  // the message names no time and no cause.
+  "restoreNotice.message": "Detent kept unsaved changes to this draft in this browser tab.",
   "restoreNotice.restore": "Restore unsaved changes",
   "restoreNotice.discard": "Discard them",
 
@@ -379,8 +421,8 @@ export const en = {
   "formEditor.markCondition": "Condition",
   "formEditor.noteKind": "Note",
   "formEditor.stepNotFound": "This step no longer exists in the draft.",
-  "formEditor.loadFailed": "The form editor could not load. Your draft is unchanged: go back, save it, then reload the page.",
-  "formEditor.navigateAwayKeepsChanges": "Every change is already in the draft. The header bar saves and publishes it, and its ⋮ menu discards it.",
+  "formEditor.loadFailed": "The form editor could not load. Your draft is unchanged: go back, then reload the page.",
+  "formEditor.navigateAwayKeepsChanges": "Every change is already in the draft, and the draft saves itself. The header bar publishes it, and its ⋮ menu discards it.",
   "formEditor.paletteLabel": "Catalog fields not on this form",
   "formEditor.paletteHeading": "Available fields",
   "formEditor.paletteEmpty": "Every catalog field is on this form.",
@@ -591,6 +633,7 @@ export const en = {
   "settings.process": "Process",
   "settings.contract": "What it takes in and gives back",
   "settings.access": "Access",
+  "settings.points": "Save points",
   "settings.baseLocale": "Base language",
   "settings.contentLocale": "Language you are editing",
   "settings.cancellable": "A case can be cancelled while it runs",
@@ -668,7 +711,6 @@ export const en = {
   "panelsScreen.fieldRemoved": "{field} removed.",
   "panelsScreen.fieldRemovedWithOne": "{field} removed, with the one field inside it.",
   "panelsScreen.fieldRemovedWithMany": "{field} removed, with the {count} fields inside it.",
-  "panelsScreen.keepsChanges": "This screen keeps every change. Save from the toolbar to persist it.",
 
   "fieldMatrix.heading": "Field matrix",
   "fieldMatrix.scrollRegionLabel": "Field matrix grid",
@@ -888,6 +930,7 @@ export const en = {
   "headerBar.nameLabel": "Process name",
   "headerBar.unsaved": "Unsaved changes",
   "headerBar.saved": "Saved",
+  "headerBar.savedJustNow": "Saved just now",
   "headerBar.findingPrefix": "Stale reference in",
   "headerBar.findingCarriedBy": "carried by",
   "headerBar.findingLiveElsewhere": "live instance(s) elsewhere",
@@ -907,12 +950,16 @@ export const en = {
   "headerBar.versionPublished": "{version} published",
   "headerBar.test": "Test",
   "headerBar.menuGroupDraft": "Draft",
+  "headerBar.savePoints": "Save points",
   // Beside the state while the content locale differs from the base language
   // (`studio-app`). `{language}` is the language's English name.
   "headerBar.editingNote": "Editing {language}",
 
-  // The Player screen. Its own strings are still mostly inline English; this
-  // one is a catalog key because it is an accessible name.
+  // The Player screen. Its own strings are still mostly inline English. The
+  // two create buttons name their runs (`studio-player`); the tab label is an
+  // accessible name.
+  "player.testDraft": "Test this draft",
+  "player.startCase": "Start a case from the published version",
   "player.formTabsLabel": "Form tabs",
   "player.formTabOpenedOne": "Opened the {tab} tab. 1 field still needs an entry.",
   "player.formTabOpenedMany": "Opened the {tab} tab. {count} fields still need an entry.",

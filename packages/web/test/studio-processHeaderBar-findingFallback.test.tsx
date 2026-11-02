@@ -68,7 +68,9 @@ function renderHeader(findings: PublishFinding[]): string {
         lastSavedAt={undefined}
         publishResult={publishResult}
         conflict={false}
-        actions={{ saving: false, publishing: false, discarding: false, error: null, errorDetail: null, pendingDialog: null, resolveDialog: () => {}, save: () => {}, discard: () => {}, publish: () => {}, reload: () => {}, reportError: () => {} }}
+        noticeStands={false}
+        jsonUnapplied={false}
+        actions={{ saving: false, publishing: false, discarding: false, error: null, errorDetail: null, pendingDialog: null, resolveDialog: () => {}, saveFailed: null, retry: () => {}, flush: () => Promise.resolve({ saved: false }), drop: () => {}, createSavePoint: () => Promise.resolve({ kind: "unsaved" }), restoreSavePoint: () => Promise.resolve({ kind: "unsaved" }), removeSavePoint: () => Promise.resolve({ kind: "done", value: undefined }), discard: () => {}, publish: () => undefined, reload: () => {}, reportError: () => {} }}
         canPublish={true}
         baseVersion={null}
         validation={validation}
@@ -82,6 +84,7 @@ function renderHeader(findings: PublishFinding[]): string {
         onToggleJson={() => {}}
         onVersions={() => {}}
         onPlayer={() => {}}
+        onSavePoints={() => {}}
       />
     </DraftContext.Provider>,
   );

@@ -41,7 +41,8 @@ interface RestoreNoticeProps {
   disabled?: boolean;
 }
 
-/** Offers the unsaved work a 401 kept in this tab (`draft/draftStash.ts`).
+/** Offers the unsaved work a 401 or a browser Back kept in this tab
+ * (`draft/draftStash.ts`).
  * `ProcessSurface` owns the stash and unmounts this after either button. */
 export function RestoreNotice({ onRestore, onDiscard, disabled = false }: RestoreNoticeProps) {
   return (

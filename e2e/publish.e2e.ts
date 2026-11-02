@@ -66,7 +66,8 @@ test("a publish adds a version", async ({ page }) => {
   await dialog.getByRole("button", { name: "Publish", exact: true }).click();
 
   await expect(dialog).toBeHidden();
-  await expect(page.getByText(/v2 published/)).toBeVisible();
+  // The first: the hidden status beside the state line says it too.
+  await expect(page.getByText(/v2 published/).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Versions", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Versions" })).toBeVisible();

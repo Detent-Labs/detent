@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { FileJson, History, MoreVertical, Play, Trash2 } from "lucide-react";
+import { Bookmark, FileJson, History, MoreVertical, Play, Trash2 } from "lucide-react";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
@@ -26,7 +26,16 @@ import { DiscardDraftDialog } from "./DiscardDraftDialog.js";
 import { localeOptionLabel } from "./shared/ContentLocaleSwitcher.js";
 import { PublishChanges } from "./PublishChanges.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
-import { editingLocaleNote, formatSavedTime, headerStateLine, nextVersionLabel, publishAvailability, saveFocusTarget } from "../screens/draftToolbarState.js";
+import {
+  editingLocaleNote,
+  headerStateLine,
+  nextVersionLabel,
+  publishAvailability,
+  publishConfirmWord,
+  saveFocusTarget,
+  savedJustNowLeft,
+  stateAnnouncement,
+} from "../screens/draftToolbarState.js";
 import type { DraftToolbarActions } from "./DraftToolbar.js";
 import type { ValidationResult } from "../draft/validation.js";
 import type { PublishResult } from "../api/types.js";
@@ -45,7 +54,7 @@ const styles = stylex.create({
     borderBottomColor: colors.divider,
     marginBottom: space.s3,
   },
-  // Back, name, issue sentence, state, Save, the note and the Versions
+  // Back, name, issue sentence, state, the note and the Versions
   // offer. It takes the row's free space from a zero basis and wraps inside
   // itself, so a control appearing here moves nothing in the trailing cluster.
   // The minimum basis keeps the name readable: where the row cannot give the
@@ -108,13 +117,42 @@ const styles = stylex.create({
     borderLeftColor: colors.advisory,
     paddingLeft: space.s2,
   },
-  // The state line's own ground is the muted tone. Dirty words and a fresh
+  // The state line's own ground is the muted tone. Unsaved words and a fresh
   // version each pick their own (`studio-canvas`, `studio-publish`).
   stateLine: {
     color: colors.textMuted,
   },
-  stateDirty: {
+  stateWords: {
+    display: "inline-block",
+  },
+  // From the first change on, the words hold the width of "Saved just now" in their
+  // own face, so it and "Saving…" trade places without moving what follows them. A
+  // draft at rest takes no minimum, so "Saved" leaves no hole. The width comes from
+  // `data-held-width`, printed with no height and hidden from every reader. It stands
+  // ahead of the words: an inline-block's baseline is its last line box's, so a block
+  // after them would lift them off the version's baseline.
+  stateWordsHeld: {
+    "::before": {
+      content: "attr(data-held-width)",
+      display: "block",
+      height: 0,
+      overflow: "hidden",
+      visibility: "hidden",
+    },
+  },
+  stateUnsaved: {
     color: colors.refusal,
+  },
+  stateAnnouncer: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clip: "rect(0, 0, 0, 0)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
   },
   stateJustPublished: {
     color: colors.text,
@@ -381,7 +419,14 @@ interface PublishConfirmDialogProps {
   draft: Draft;
   contentLocale: string;
   nextVersion: string;
-  dirty: boolean;
+  /** A change has not landed, so the confirm ignores a press. */
+  waiting: boolean;
+  /** A save is running, so the confirm reads "Saving…". */
+  saving: boolean;
+  /** A failed save holds the confirm, and the dialog says why. */
+  saveFailed: boolean;
+  /** The JSON surface holds text this publish leaves out. */
+  jsonUnapplied: boolean;
   openIssues: number;
   blocked: boolean;
   /** The Publish control that opened this dialog, for the focus return. */
@@ -412,7 +457,10 @@ function PublishConfirmDialog({
   contentLocale,
   revision,
   nextVersion,
-  dirty,
+  waiting,
+  saving,
+  saveFailed,
+  jsonUnapplied,
   openIssues,
   blocked,
   error,
@@ -423,6 +471,7 @@ function PublishConfirmDialog({
   onConfirm,
 }: PublishConfirmDialogProps) {
   const languages = collectUsedLocales(draft);
+  const word = publishConfirmWord({ waiting, saving, saveFailed, publishing: busy });
 
   return (
     <StudioDialog
@@ -430,8 +479,14 @@ function PublishConfirmDialog({
       triggerRef={triggerRef}
       onCancel={onCancel}
       busy={busy}
-      confirm={<PrimaryConfirm onClick={onConfirm}>{busy ? t("draftToolbar.publishing") : t("draftToolbar.publish")}</PrimaryConfirm>}
-      refusal={error !== null && <DialogRefusal detail={errorDetail}>{error}</DialogRefusal>}
+      confirm={
+        <PrimaryConfirm onClick={onConfirm} waiting={waiting}>
+          {word === "saving" ? t("draftToolbar.saving") : word === "publishing" ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
+        </PrimaryConfirm>
+      }
+      refusal={
+        saveFailed ? <DialogRefusal>{t("draftToolbar.publishDialogSaveFailed")}</DialogRefusal> : error !== null && <DialogRefusal detail={errorDetail}>{error}</DialogRefusal>
+      }
     >
       <DialogFacts>
         <DialogFact term={t("draftToolbar.dialogProcess")}>{processLabel}</DialogFact>
@@ -452,7 +507,7 @@ function PublishConfirmDialog({
         <PublishChanges processId={processId} token={token} baseVersion={baseVersion} draft={draft} contentLocale={contentLocale} />
       </DialogFacts>
       {blocked && <DialogWarning>{t("draftToolbar.publishDialogBlocked")}</DialogWarning>}
-      {dirty && <DialogNote>{t("draftToolbar.publishDialogUnsaved")}</DialogNote>}
+      {jsonUnapplied && <DialogNote>{t("draftToolbar.publishDialogJsonUnapplied")}</DialogNote>}
       <DialogNote>{t("draftToolbar.publishDialogImmutable")}</DialogNote>
       <DialogDeveloperView>
         {draft.key && <DialogMonoFact term={t("draftToolbar.dialogKey")}>{draft.key}</DialogMonoFact>}
@@ -465,51 +520,100 @@ function PublishConfirmDialog({
 
 /**
  * The header bar's state (studio-canvas: "The header bar's state says what
- * holds for the draft"). `headerStateLine` picks the parts. One `role="status"`
- * span prints them, so a screen reader hears "Saved" when Save vanishes. Every
- * control beside the state stands after this span, never inside it.
+ * holds for the draft"). `headerStateLine` picks the parts. The visible line is no
+ * live region, so a save stays quiet for an author typing. A hidden `role="status"`
+ * beside it speaks three moments and otherwise stays empty: entering `unsaved`, a
+ * saved state after it, and the version after a publish.
  *
- * `tabIndex={-1}` lets the focus land here when a save's answer removes the
- * button that held it. Nothing else moves the focus here.
+ * `tabIndex={-1}` lets the focus land here when a save's answer removes Try again
+ * while it holds the focus. Nothing else moves the focus here.
  */
 function DraftStateLine({
   ref,
   dirty,
+  failed,
+  conflict,
+  noticeStands,
+  jsonUnapplied,
   lastSavedAt,
   baseVersion,
   justPublished,
 }: {
   ref: RefObject<HTMLSpanElement | null>;
   dirty: boolean;
+  failed: boolean;
+  conflict: boolean;
+  noticeStands: boolean;
+  jsonUnapplied: boolean;
   lastSavedAt: Date | undefined;
   baseVersion: number | null;
   justPublished: boolean;
 }) {
-  const line = headerStateLine(dirty, lastSavedAt && formatSavedTime(lastSavedAt), baseVersion);
+  // The line's one re-render with nothing else moving: "Saved just now" turns
+  // "Saved at" at the minute. Each save arms it once.
+  const [, passMinute] = useState(0);
+  useEffect(() => {
+    const left = savedJustNowLeft(lastSavedAt, Date.now());
+    if (left === undefined) return;
+    // One past the mark: a timer can fire a millisecond early, and the line would stay.
+    const timer = setTimeout(() => passMinute((minutes) => minutes + 1), left + 1);
+    return () => clearTimeout(timer);
+  }, [lastSavedAt]);
+
+  const line = headerStateLine({ dirty, failed, conflict, noticeStands, jsonUnapplied, lastSavedAt, now: Date.now(), baseVersion });
+  // Only "Saved" reads as no change yet. The words keep their minimum once it has gone.
+  const [changedOnce, setChangedOnce] = useState(false);
+  if (line.state !== "saved" && !changedOnce) setChangedOnce(true);
   const words =
     line.state === "unsaved"
       ? t("headerBar.unsaved")
-      : line.state === "savedAt"
-        ? t("headerBar.savedAt").replace("{time}", () => line.time ?? "")
-        : t("headerBar.saved");
+      : line.state === "saving"
+        ? t("draftToolbar.saving")
+        : line.state === "savedJustNow"
+          ? t("headerBar.savedJustNow")
+          : line.state === "savedAt"
+            ? t("headerBar.savedAt").replace("{time}", () => line.time ?? "")
+            : t("headerBar.saved");
+
+  const [announcement, setAnnouncement] = useState("");
+  const heardUnsaved = useRef(false);
+  useEffect(() => {
+    const { heard, say } = stateAnnouncement(heardUnsaved.current, line.state);
+    heardUnsaved.current = heard;
+    setAnnouncement(say === "unsaved" ? t("headerBar.unsaved") : say === "saved" ? t("headerBar.saved") : "");
+  }, [line.state]);
+  useEffect(() => {
+    if (justPublished && line.version !== undefined) setAnnouncement(t("headerBar.versionPublished").replace("{version}", () => line.version ?? ""));
+  }, [justPublished, line.version]);
+
   // One catalog sentence around a mono version.
   const [beforeVersion, afterVersion] = t("headerBar.versionPublished").split("{version}");
   return (
-    <span ref={ref} role="status" tabIndex={-1} {...stylex.props(styles.stateLine)}>
-      <span {...stylex.props(dirty && styles.stateDirty)}>{words}</span>
-      {line.version !== undefined && (
-        <>
-          {" · "}
-          <span {...stylex.props(justPublished && styles.stateJustPublished)}>
-            {beforeVersion}
-            <span {...stylex.props(styles.stateVersion)} translate="no">
-              {line.version}
+    <>
+      <span ref={ref} tabIndex={-1} {...stylex.props(styles.stateLine)}>
+        <span
+          {...stylex.props(styles.stateWords, changedOnce && styles.stateWordsHeld, line.state === "unsaved" && styles.stateUnsaved)}
+          data-held-width={changedOnce ? t("headerBar.savedJustNow") : undefined}
+        >
+          {words}
+        </span>
+        {line.version !== undefined && (
+          <>
+            {" · "}
+            <span {...stylex.props(justPublished && styles.stateJustPublished)}>
+              {beforeVersion}
+              <span {...stylex.props(styles.stateVersion)} translate="no">
+                {line.version}
+              </span>
+              {afterVersion}
             </span>
-            {afterVersion}
-          </span>
-        </>
-      )}
-    </span>
+          </>
+        )}
+      </span>
+      <span role="status" {...stylex.props(styles.stateAnnouncer)}>
+        {announcement}
+      </span>
+    </>
   );
 }
 
@@ -525,9 +629,13 @@ interface Props {
    * the closed `⋮` menu: a closed menu must never hide the one moment a
    * conflict most needs attention. */
   conflict: boolean;
+  /** The restore notice stands, so a change waits for the author's answer. */
+  noticeStands: boolean;
+  /** The JSON surface holds text no Apply has put in the draft. */
+  jsonUnapplied: boolean;
   /** `useDraftToolbarActions`'s own return value, lifted by the caller the
    * same way `saveState` already is. The header bar reads it fully now: the
-   * failure state for the banner below, and `save`/`discard`/`publish`/
+   * failure state for the banners below, and `retry`/`discard`/`publish`/
    * `pendingDialog`/`resolveDialog` for the controls and the two dialogs. */
   actions: DraftToolbarActions;
   /** Gates the Publish control and names the reason when unavailable
@@ -561,6 +669,8 @@ interface Props {
   onBack: () => void;
   /** Opens the Settings tab's Process view, from the "Editing" note. */
   onOpenSettings: () => void;
+  /** Opens the Settings tab's Save points view and puts the focus in it. */
+  onSavePoints: () => void;
   /** Flips the JSON surface. `ProcessTabRow` keeps its own `jsonOpen` prop —
    * this menu derives the same fact from `structureActive` (`= !jsonOpen`)
    * instead of taking a second, redundant copy. */
@@ -577,19 +687,21 @@ interface Props {
  * `⋮` trigger. No key, id, revision or hash prints here: those stand in the
  * Settings tab's Developer view.
  *
- * Save stands beside the state while the draft is dirty (`studio-process-tabs`).
- * While a save runs it reads "Saving…" and carries `aria-disabled` with a press
- * guard, so the button keeps the focus. A native `disabled` would blur it. When
- * the answer removes the button, the focus moves to the state line, not the
- * body. A ref set by the press limits that to this case.
+ * The bar has no Save, since the draft saves itself. A failed save's banner under
+ * the bar holds Try again (`studio-process-tabs`). While a save runs it carries
+ * `aria-disabled` with a press guard, so the button keeps the focus. A native
+ * `disabled` would blur it. It reads "Saving…" only after a press, so a timed retry
+ * leaves its width and its words alone. When the answer removes the button, the
+ * focus moves to the state line, not the body. A ref its focus sets limits that to
+ * this case.
  *
  * The Versions offer stands while `justPublished` does. The "Editing" note stands
  * while `editingLocaleNote` names a language. Both are controls after the state,
  * and neither moves the trailing cluster.
  *
  * The `⋮` menu carries two groups. "Views" holds the JSON surface toggle, Versions
- * and Player, navigation to other views of this process. "Draft" holds Discard
- * draft. The menu stays reachable whichever surface is active. The process
+ * and Player, navigation to other views of this process. "Draft" holds Save points
+ * and Discard draft. The menu stays reachable whichever surface is active. The process
  * settings stand on the Settings tab. The studio's area nav carries no draft
  * control: the Checks tab's own count reports that state instead.
  *
@@ -599,17 +711,17 @@ interface Props {
  * the trigger, the one thing a keyboard-only dismissal must do that an
  * outside click has no equivalent for.
  *
- * Save, Discard draft and Publish are wired to the same `actions`
+ * Try again, Discard draft and Publish are wired to the same `actions`
  * (`useDraftToolbarActions`, called once by `EditScreen.tsx`) the error
- * banner below already reads. Both confirmation dialogs render here too. Publish
+ * banners below already read. Both confirmation dialogs render here too. Publish
  * returns the focus to its own control. Discard draft's entry unmounts when the
  * menu closes, so its dialog returns the focus to the `⋮` trigger. Publish names
  * the process, the next version, the open issue count and the changes since the
  * base version, and its Developer view holds the key, the id and the revision.
  * Discard names the process and the last-saved time.
  *
- * A publish's findings, the action error and the save-conflict banner all render
- * after the header row as block siblings. A closed menu must never hide the one
+ * A publish's findings, the action error, the failed save and the save-conflict
+ * banner all render after the header row as block siblings. A closed menu must never hide the one
  * moment a conflict most needs attention.
  *
  * The process label's own `LocalizedTextInput` stays in the header row's own
@@ -623,6 +735,8 @@ export function ProcessHeaderBar({
   lastSavedAt,
   publishResult,
   conflict,
+  noticeStands,
+  jsonUnapplied,
   actions,
   canPublish,
   baseVersion,
@@ -634,6 +748,7 @@ export function ProcessHeaderBar({
   justPublished,
   onBack,
   onOpenSettings,
+  onSavePoints,
   onToggleJson,
   onVersions,
   onPlayer,
@@ -644,8 +759,13 @@ export function ProcessHeaderBar({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const publishTriggerRef = useRef<HTMLButtonElement>(null);
   const stateLineRef = useRef<HTMLSpanElement>(null);
-  // Set by a press on Save, cleared once that save answers.
-  const savePressedRef = useRef(false);
+  const reloadRef = useRef<HTMLButtonElement>(null);
+  // Whether Try again holds the focus. A timed retry can heal under a resting
+  // keyboard user, so a press would not cover it.
+  const tryAgainHeld = useRef(false);
+  // A press runs its save in the same commit, so this falls with that save's answer.
+  const [tryAgainPressed, setTryAgainPressed] = useState(false);
+  if (tryAgainPressed && !actions.saving) setTryAgainPressed(false);
 
   // The blocking verdict the publish dialog states, from the same groups the
   // area nav's Checks control reads. The `view` group holds the studio's own
@@ -674,15 +794,15 @@ export function ProcessHeaderBar({
     };
   }, [menuOpen]);
 
-  // A save's answer can unmount the button that holds the focus, which drops the
+  // A save's answer can unmount Try again while it holds the focus, which drops the
   // focus to the body. `saveFocusTarget` rules on it once the save has answered.
+  const tryAgainGone = actions.saveFailed === null;
   useEffect(() => {
     if (actions.saving) return;
-    const pressed = savePressedRef.current;
-    savePressedRef.current = false;
-    const target = saveFocusTarget({ pressed, clean: !isDirty, focusOnBody: document.activeElement === document.body });
+    const target = saveFocusTarget({ heldControl: tryAgainHeld.current, controlGone: tryAgainGone, focusOnBody: document.activeElement === document.body });
+    if (tryAgainGone) tryAgainHeld.current = false;
     if (target === "stateLine") stateLineRef.current?.focus();
-  }, [actions.saving, isDirty]);
+  }, [actions.saving, isDirty, tryAgainGone]);
 
   // The menu is a conditional render, so its entry unmounts in the commit that
   // closes it, and a dialog's focus return to that entry would reach nothing.
@@ -755,24 +875,14 @@ export function ProcessHeaderBar({
         <DraftStateLine
           ref={stateLineRef}
           dirty={isDirty}
+          failed={actions.saveFailed !== null}
+          conflict={conflict}
+          noticeStands={noticeStands}
+          jsonUnapplied={jsonUnapplied}
           lastSavedAt={lastSavedAt}
           baseVersion={baseVersion}
           justPublished={justPublished}
         />
-        {isDirty && (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            aria-disabled={actions.saving ? true : undefined}
-            onClick={() => {
-              if (actions.saving) return;
-              savePressedRef.current = true;
-              actions.save();
-            }}
-          >
-            {actions.saving ? t("draftToolbar.saving") : t("draftToolbar.save")}
-          </button>
-        )}
         {editingLanguage !== undefined && (
           <button type="button" className="btn btn-ghost" onClick={onOpenSettings}>
             {t("headerBar.editingNote").replace("{language}", () => editingLanguage)}
@@ -807,7 +917,9 @@ export function ProcessHeaderBar({
             blocked={blocked}
             noStepYet={validation.noStepYet}
             publishing={actions.publishing}
-            onPublish={actions.publish}
+            onPublish={() => {
+              if (actions.publish() === "conflict") reloadRef.current?.focus();
+            }}
             triggerRef={publishTriggerRef}
           />
         </div>
@@ -828,7 +940,7 @@ export function ProcessHeaderBar({
             <div {...stylex.props(styles.headerBarMenuPanel)}>
               {/* Views: navigation to other views of this process, never a
                   draft-body mutation, so it stays reachable whichever surface is
-                  active. Draft holds Discard draft. Save and Publish stand in
+                  active. Draft holds Save points and Discard draft. Publish stands in
                   this row instead, and the process settings on the Settings tab
                   (`studio-process-tabs`). The panel holds command buttons alone
                   but implements no arrow-key navigation, so it carries no
@@ -867,6 +979,15 @@ export function ProcessHeaderBar({
                 <span {...stylex.props(styles.headerBarMenuLabel)}>{t("headerBar.menuGroupDraft")}</span>
                 <button
                   type="button"
+                  className={`btn btn-secondary ${headerBarMenuLinkProps.className}`}
+                  style={headerBarMenuLinkProps.style}
+                  onClick={() => runMenuAction(onSavePoints)}
+                >
+                  <Bookmark size={18} strokeWidth={1.75} aria-hidden="true" />
+                  {t("headerBar.savePoints")}
+                </button>
+                <button
+                  type="button"
                   className={`btn btn-secondary btn-destructive ${headerBarMenuLinkProps.className}`}
                   style={headerBarMenuLinkProps.style}
                   onClick={() => runMenuAction(actions.discard)}
@@ -890,13 +1011,16 @@ export function ProcessHeaderBar({
           contentLocale={contentLocale}
           revision={revision}
           nextVersion={nextVersionLabel(baseVersion)}
-          dirty={isDirty}
+          waiting={isDirty || actions.saving}
+          saving={actions.saving}
+          saveFailed={actions.saveFailed !== null}
+          jsonUnapplied={jsonUnapplied}
           openIssues={validation.issues.length}
           blocked={blocked}
           triggerRef={publishTriggerRef}
           error={actions.error}
           errorDetail={actions.errorDetail}
-          busy={actions.saving || actions.publishing}
+          busy={actions.publishing}
           onCancel={() => actions.resolveDialog(false)}
           onConfirm={() => actions.resolveDialog(true)}
         />
@@ -907,7 +1031,7 @@ export function ProcessHeaderBar({
           lastSavedAt={lastSavedAt}
           triggerRef={triggerRef}
           refusal={actions.error === null ? null : { message: actions.error, detail: actions.errorDetail }}
-          busy={actions.discarding}
+          busy={actions.discarding || actions.saving}
           onCancel={() => actions.resolveDialog(false)}
           onConfirm={() => actions.resolveDialog(true)}
         />
@@ -953,11 +1077,42 @@ export function ProcessHeaderBar({
           {actions.errorDetail !== null && <RefusalDetail detail={actions.errorDetail} />}
         </>
       )}
+      {/* The alert holds the sentence alone. Try again's words flip after a press, and
+          an alert around them would read the whole banner out each time. */}
+      {!dialogOpen && actions.saveFailed !== null && (
+        <>
+          <div {...stylex.props(styles.errorBanner)}>
+            <span {...stylex.props(styles.errorBannerStamp)}>{t("draftToolbar.saveFailedStamp")}</span>
+            <span {...stylex.props(styles.errorBannerMessage)} role="alert">
+              {t(actions.saveFailed.retryable ? "draftToolbar.saveFailedRetrying" : "draftToolbar.saveFailedRefused")}
+            </span>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              aria-disabled={actions.saving ? true : undefined}
+              onFocus={() => {
+                tryAgainHeld.current = true;
+              }}
+              onBlur={() => {
+                tryAgainHeld.current = false;
+              }}
+              onClick={() => {
+                if (actions.saving) return;
+                setTryAgainPressed(true);
+                actions.retry();
+              }}
+            >
+              {tryAgainPressed ? t("draftToolbar.saving") : t("draftToolbar.saveFailedTryAgain")}
+            </button>
+          </div>
+          <RefusalDetail detail={actions.saveFailed.detail} />
+        </>
+      )}
       {!dialogOpen && conflict && (
         <div {...stylex.props(styles.errorBanner)} role="alert">
           <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
-          <span {...stylex.props(styles.errorBannerMessage)}>{t("draftToolbar.conflictMessage")}</span>
-          <button type="button" className="btn btn-secondary" onClick={actions.reload}>
+          <span {...stylex.props(styles.errorBannerMessage)}>{t(isDirty ? "draftToolbar.conflictMessageDirty" : "draftToolbar.conflictMessage")}</span>
+          <button ref={reloadRef} type="button" className="btn btn-secondary" onClick={actions.reload}>
             {t("draftToolbar.conflictReload")}
           </button>
         </div>

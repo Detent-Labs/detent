@@ -61,8 +61,8 @@ describe("seedFormValues", () => {
 });
 
 /**
- * draft-play-instance-marker, tasks 8.1/8.3: `PlayerScreen`'s "Create test
- * instance" and "Create new instance" actions share this same
+ * draft-play-instance-marker, tasks 8.1/8.3: `PlayerScreen`'s "Test this draft"
+ * and "Start a case from the published version" actions share this same
  * create-then-load flow, differing only in which creation route the caller
  * injects. `renderToStaticMarkup` (this repo's own convention, per
  * `studio-draftProvider-chainingFetch.test.ts`) never fires a click, so the

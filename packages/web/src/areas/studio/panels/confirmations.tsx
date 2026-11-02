@@ -18,15 +18,16 @@ interface ConfirmationProps {
   onConfirm: () => void;
 }
 
-export function LeaveDraftDialog({ triggerRef, onCancel, onConfirm }: ConfirmationProps) {
+/** `jsonUnapplied` names what goes when the exit drops text no Apply put in the draft. A tab press answers it too and stays inside the draft, so its words leave no draft. */
+export function LeaveDraftDialog({ triggerRef, onCancel, onConfirm, jsonUnapplied = false }: ConfirmationProps & { jsonUnapplied?: boolean }) {
   return (
     <StudioDialog
-      heading={t("leaveDialog.heading")}
+      heading={t(jsonUnapplied ? "leaveDialog.headingJson" : "leaveDialog.heading")}
       triggerRef={triggerRef}
       onCancel={onCancel}
-      confirm={<DestructiveConfirm onClick={onConfirm}>{t("leaveDialog.confirm")}</DestructiveConfirm>}
+      confirm={<DestructiveConfirm onClick={onConfirm}>{t(jsonUnapplied ? "leaveDialog.confirmJson" : "leaveDialog.confirm")}</DestructiveConfirm>}
     >
-      <DialogNote>{t("leaveDialog.body")}</DialogNote>
+      <DialogNote>{t(jsonUnapplied ? "leaveDialog.bodyJson" : "leaveDialog.body")}</DialogNote>
     </StudioDialog>
   );
 }

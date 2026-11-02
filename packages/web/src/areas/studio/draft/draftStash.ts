@@ -2,8 +2,9 @@ import { canonicalize } from "workflow-engine/schema/canonical-json";
 import type { Draft } from "./types.js";
 
 /**
- * The unsaved work of one draft, kept in the tab when a request answers 401
- * (`studio-app`: "A session that ends with unsaved changes keeps the draft").
+ * The unsaved work of one draft, kept in the tab when a request answers 401 or a
+ * browser Back leaves a save that failed (`studio-app`: "A session that ends with
+ * unsaved changes keeps the draft").
  * The revision is the one the work was built on, so a restore saved against a
  * moved draft answers 409.
  */

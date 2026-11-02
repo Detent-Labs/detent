@@ -14,6 +14,7 @@ import { MigrationPlanScreen } from "./screens/MigrationPlanScreen.js";
 import { ToolsScreen } from "./screens/ToolsScreen.js";
 import { TemplatesScreen } from "./screens/TemplatesScreen.js";
 import { LeaveDraftDialog } from "./panels/confirmations.js";
+import type { DraftExit } from "./panels/DraftToolbar.js";
 import { activeControl } from "./panels/shared/dialogFocus.js";
 import type { AreaRootProps } from "../../shell/App.js";
 
@@ -79,37 +80,69 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
   const { route, navigate } = useAreaRoute<Route>("studio", localPath, matchRoute, routePath, go);
   const may = (roles: readonly string[]) => roles.some((role) => session.roles.includes(role));
 
-  // Whether the open draft carries unsaved changes, reported up from
+  // Whether the open draft holds a change that has not landed, reported up from
   // `ProcessSurface` via `EditScreen`'s `onDirtyChange` prop. A ref, not
   // `useState`: nothing here renders differently based on dirtiness, it is
   // read only inside event handlers.
   const dirtyRef = useRef(false);
+  // Whether the JSON surface holds text no Apply has put in the draft, reported
+  // through `onUnappliedJsonChange`. No save can carry it, so it asks with no flush.
+  const unappliedRef = useRef(false);
+  // What an exit calls on the open draft, reported through `onFlushChange`.
+  const flushRef = useRef<DraftExit | undefined>(undefined);
   // The studio's area nav reserves no element for a draft control any more.
-  // Save, Test and Publish render directly in the header bar, inside
+  // Test and Publish render directly in the header bar, inside
   // `EditScreen`'s own tree, and the Checks tab's own count reports the state
   // the old area-nav Checks control used to carry (`studio-process-tabs`).
   useEffect(() => {
-    if (route.name !== "edit") dirtyRef.current = false;
+    if (route.name !== "edit") {
+      dirtyRef.current = false;
+      unappliedRef.current = false;
+    }
   }, [route.name]);
 
   // The exit `LeaveDraftDialog` asks about, while the dialog stays open, and the
   // control that held the focus when the exit was asked for.
   const [leaving, setLeaving] = useState<(() => void) | undefined>(undefined);
+  // The dialog asks about unapplied JSON alone, so its confirm drops no change the
+  // draft holds: the unmount still saves that.
+  const [leaveForJson, setLeaveForJson] = useState(false);
   const leaveTrigger = useRef<HTMLElement | null>(null);
-  // A browser Back or Forward under the open dialog settles the question.
+  // The exit waiting on a save. One slot: the last exit asked wins, so two presses
+  // cannot run two exits.
+  const pendingLeave = useRef<(() => void) | undefined>(undefined);
+  // A browser Back or Forward under the open dialog settles the question, and
+  // moving on during the wait settles the exit.
   useEffect(() => {
     setLeaving(undefined);
+    pendingLeave.current = undefined;
   }, [localPath]);
 
-  // The one question before leaving an open, unsaved draft. A clean draft, or
-  // any screen but the edit screen, leaves `dirtyRef` false and asks nothing.
+  // An exit from an open draft saves first, and asks only if that fails. A clean
+  // draft, or any screen but the edit screen, leaves both refs false and asks
+  // nothing. They stay first: `onDiscarded` lowers them before it navigates, and a
+  // flush there would write to a draft the author just deleted. Unapplied JSON asks
+  // before any flush, since a save that lands says nothing about that text.
   const askLeave = (proceed: () => void) => {
-    if (!dirtyRef.current) {
+    if (!dirtyRef.current && !unappliedRef.current) {
       proceed();
       return;
     }
     leaveTrigger.current = activeControl();
-    setLeaving(() => proceed);
+    setLeaveForJson(unappliedRef.current);
+    if (unappliedRef.current) {
+      pendingLeave.current = undefined;
+      setLeaving(() => proceed);
+      return;
+    }
+    pendingLeave.current = proceed;
+    void flushRef.current?.flush().then((result) => {
+      const exit = pendingLeave.current;
+      pendingLeave.current = undefined;
+      if (exit === undefined) return;
+      if (result.saved) exit();
+      else setLeaving(() => exit);
+    });
   };
 
   // Each exit from the draft goes through `askLeave`: in-area navigation, an
@@ -132,7 +165,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
   // step between entries of the page, which raises `popstate` instead.
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (dirtyRef.current) e.preventDefault();
+      if (dirtyRef.current || unappliedRef.current) e.preventDefault();
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
@@ -210,8 +243,10 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
         <div>
           <LeaveDraftDialog
             triggerRef={leaveTrigger}
+            jsonUnapplied={leaveForJson}
             onCancel={() => setLeaving(undefined)}
             onConfirm={() => {
+              if (!leaveForJson) flushRef.current?.drop();
               setLeaving(undefined);
               leaving();
             }}
@@ -221,9 +256,12 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
       {!may(required) && <MissingRole roles={required} />}
       {may(required) && (
         <>
-          {route.name === "processes" && <ProcessesScreen token={session.token} roles={session.roles} navigate={navigate} onUnauthorized={onUnauthorized} />}
+          {route.name === "processes" && <ProcessesScreen token={session.token} actorId={session.actorId} roles={session.roles} navigate={navigate} onUnauthorized={onUnauthorized} />}
           {route.name === "edit" && (
+            // One instance per process: an unmount acts on its own process's last
+            // commit, and a history jump between two drafts crosses none.
             <EditScreen
+              key={route.processId}
               processId={route.processId}
               formStepId={route.formStepId}
               tab={route.tab}
@@ -238,6 +276,13 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
               onDirtyChange={(d) => {
                 dirtyRef.current = d;
               }}
+              onUnappliedJsonChange={(unapplied) => {
+                unappliedRef.current = unapplied;
+              }}
+              onFlushChange={(exit) => {
+                flushRef.current = exit;
+              }}
+              holdSaves={leaving !== undefined}
             />
           )}
           {route.name === "versions" && (

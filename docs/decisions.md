@@ -424,19 +424,6 @@ word. `ROADMAP.md` carries stage-by-stage status.
   that requirement back out. Deferred 2026-09-02: the sweep touches four areas
   and every one of their capability specs, and the measured defect sat on the
   publish path.
-- **The header reads "Unsaved changes" after a `PUT` that answered 200.**
-  Observed on the studio edit screen. The path looks correct on the page: a
-  defined save result makes `doSave` call `onSavedBodyChange(draft)`,
-  `EditScreen.tsx` clones that body into `savedBody`, and `dirtyNow` compares
-  the two by serializing both. So either something re-dirties the draft after
-  the save, or the save returned nothing, and both readings need a
-  reproduction. It is a dirty-state failure in `ProcessSurface`, not a publish
-  failure: it shares no cause with the three defects
-  `studio-publish-gate-and-report` fixed, and no file with them but
-  `EditScreen.tsx`. Deferred 2026-09-02, at a cost of one wasted `PUT`: a
-  permanently dirty draft makes the publish dialog always state its
-  unsaved-changes sentence and always save first, which gives no wrong
-  result.
 - **A Name column on the admin area's Users screen.** A brainstorming session
   settled the shape on 2026-08-23: a dedicated Name column before Email,
   display only, with no editor on the screen. The API side is already done.
@@ -1935,14 +1922,6 @@ HEADER tag is local to this section.
 
   Upgrade entry: add a published check to the `shouldAutoDeriveKey` call in
   `panels/ProcessHeaderBar.tsx`, reading the base version it already holds.
-- **HEADER-4: Test lands on a Player whose two buttons differ.** The Player's
-  filled create button runs the published version and its outlined one runs the
-  draft. Nothing on the bar says which Test will run. Risk (Low): an author
-  expects Test to run the draft and starts a case on the published version. The
-  Player's two buttons stay open.
-
-  Upgrade entry: name the two runs on the Player's buttons, or let Test open
-  the draft run. The handler is `onPlayer` in `panels/ProcessHeaderBar.tsx`.
 - **HEADER-5: a publish with no changes promises the next version.** The dialog
   names the next version, closes silently and mints nothing. The dialog's
   Changes row already says so. Risk (Low): an author reads "Next version" as a
@@ -2280,6 +2259,121 @@ to later changes. The DIALOG tag is local to this section.
 
   Upgrade entry: a `reach.isInitial`-style fact on the selection and one catalog
   sentence.
+
+## Open from studio-draft-autosave-and-save-points (needs its own OpenSpec change)
+
+The change made the draft save itself and added save points. It left the
+points below to later changes. The AUTOSAVE tag is local to this section.
+
+- **AUTOSAVE-1: a lost answer, then a hand-revert, leaves the server ahead of the
+  screen.** A save commits and its answer is lost, on the network or behind a
+  gateway's 502, 503 or 504. A restore's lost answer no longer belongs here: it
+  reads the stored draft and adopts it. The author then
+  types the text back to the last saved version. The draft reads clean, so the
+  state line reads saved and an exit asks nothing, while the stored draft holds
+  the lost text. Publish would mint that text. Risk (Medium): an author publishes
+  a body the screen no longer shows.
+
+  Upgrade entry: when the draft turns clean while `unconfirmed` holds a pair,
+  read the stored draft once and adopt or resend. The effect is in
+  `panels/DraftToolbar.tsx`, the comparison in `screens/draftAutosaveLogic.ts`.
+  The next change the author makes heals it.
+- **AUTOSAVE-2: a 401 under a standing restore notice drops the change made
+  under it.** The stash has one slot, and the kept copy stays. The change typed
+  after the notice appeared goes, by design. Risk (Low): the kept copy is the
+  larger piece of work, and the lost change is a few edits.
+
+  Upgrade entry: a second slot in `draft/draftStash.ts`, or a merge of the two
+  copies. The rule is `stashOnUnauthorized` in `screens/EditScreen.tsx`.
+- **AUTOSAVE-3: a browser Back during a backoff keeps a copy only in the tab.**
+  The unmount writes the stash to the tab's `sessionStorage`. Closing that tab
+  loses the copy. Risk (Low): the author who closes the tab after a Back during
+  a failing network loses the change.
+
+  Upgrade entry: write the copy to `localStorage` under the actor's key, in
+  `draft/draftStash.ts`, and expire it.
+- **AUTOSAVE-4: a restore offers no preview.** The design left out a diff of a
+  save point against the draft. Risk (Low): the restore keeps the current work
+  as a point, so a wrong restore is reversible. An author still restores to
+  learn what the point holds.
+
+  Upgrade entry: a diff through `describeChanges` in the restore dialog of
+  `panels/SavePointsPanel.tsx`.
+- **AUTOSAVE-5: Try again loses its focus landing where `blur` fires on removal.**
+  The focus rule reads a ref that Try again's `blur` clears. A browser that fires
+  `blur` when a focused button leaves the page clears the ref first, and the
+  state line then takes no focus. Only Chromium was measured. Risk (Low): a
+  keyboard user in another browser loses their place after a healed retry.
+
+  Upgrade entry: clear the ref on `blur` only while the control still stands in
+  the document, in `panels/ProcessHeaderBar.tsx`.
+- **AUTOSAVE-6: a browser Back or a 401 drops unapplied JSON with no question.**
+  Unapplied text asks at every exit `askLeave` guards. A browser Back bypasses
+  that rule, and a dead session asks nothing, so the text goes. The stash holds a
+  draft and no raw text. Risk (Low): the author loses typed JSON that no Apply
+  took, after the state line read "Unsaved changes" throughout.
+
+  Upgrade entry: a text slot in `draft/draftStash.ts`, offered when the JSON
+  surface next opens. The report is `onUnappliedJsonChange` in
+  `screens/EditScreen.tsx`.
+- **AUTOSAVE-7: the Player prints a healthy run in the refusal box.** A run that
+  started correctly stands in `studioConflict`, a 2px box in refusal text. Risk
+  (Medium): the last thing an author sees after a good test reads as a failure.
+
+  Upgrade entry: a plain line with the step name and a status stamp, in
+  `screens/PlayerScreen.tsx`.
+- **AUTOSAVE-8: the Player prints raw instance ids and "Instance access".** The
+  run's line holds the instance id and step key, and the frame's legend reads
+  "Instance access". Neither stands in a Developer view. Risk (Low): an author
+  meets machine words the rest of the studio keeps from them.
+
+  Upgrade entry: move the id and Open by id into a Developer view, in
+  `screens/PlayerScreen.tsx`, and take the words from the catalog.
+- **AUTOSAVE-9: the Player stands three filled primaries together.** Test this
+  draft, Claim and Submit all fill once a run is open. Risk (Low): starting a run
+  and working one carry equal weight on one screen.
+
+  Upgrade entry: keep Claim or Submit as the one primary after a create, and step
+  Test this draft down to secondary, in `screens/PlayerScreen.tsx`.
+- **AUTOSAVE-10: the focus falls to the body after a Player create.** Both create
+  buttons take a native `disabled` during their request, which drops the focus.
+  Risk (Medium): a keyboard user restarts from the top after each new run.
+
+  Upgrade entry: move the focus to the new run's status line on arrival, in
+  `screens/PlayerScreen.tsx`.
+- **AUTOSAVE-11: a new Player run says nothing.** A create replaces the open run
+  with no status line, and the record pane looks the same. Risk (Medium): a screen
+  reader hears nothing, and a sighted author sees only an id change.
+
+  Upgrade entry: a `role="status"` line naming the new run, in
+  `screens/PlayerScreen.tsx`.
+- **AUTOSAVE-12: Test takes a second press to start anything.** The header bar's
+  Test opens the Player, and Test this draft then starts the run. Design D11 kept
+  this, since a test instance is a real instance whose actions run. Risk (Low): one
+  more press on the most common way to try a draft.
+
+  Upgrade entry: let `onPlayer` in `screens/EditScreen.tsx` ask for a run, and let
+  the Player open with it.
+- **AUTOSAVE-13: Start a case names no version.** The outlined button makes a real
+  case in one press, and a never-published draft gets no reason beside it. Risk
+  (Medium): real participants see a case the author took for a test.
+
+  Upgrade entry: "Start a case from v2" in `player.startCase`, with an unavailable
+  state and a reason where no version stands, in `screens/PlayerScreen.tsx`.
+- **AUTOSAVE-14: Ctrl+S falls to the browser's save dialog.** The process surface
+  binds no save key, so an author from another tool gets the browser's page dialog.
+  Risk (Low): a stray dialog, and no work is at stake.
+
+  Upgrade entry: a `keydown` handler that calls `preventDefault` and `flush`, on the
+  screen in `screens/EditScreen.tsx`. It should state "Saved" where nothing waits.
+- **AUTOSAVE-15: the JSON surface holds the body and no layout.** The refused save's
+  banner sends an author there to copy their work. The copy loses unsaved step
+  positions, since the layout stands outside the body. Risk (Low): the definition
+  survives, and a step sits where it last saved.
+
+  Upgrade entry: a read-only layout block beside the text in `panels/JsonView.tsx`,
+  or a banner sentence that names the loss, in the catalog's
+  `draftToolbar.saveFailedRefused`.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

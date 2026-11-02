@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import type { Draft } from "../draft/types";
@@ -49,6 +49,9 @@ interface JsonViewProps {
   onApply: (draft: Draft) => void;
   /** The sentence of the check whose Fix opened this surface, if one did. */
   note?: string;
+  /** Whether the text differs from what the draft took last. One identity, so it
+   * reports once per change. An unmount reports false: the text goes with the surface. */
+  onUnappliedChange?: (unapplied: boolean) => void;
 }
 
 /**
@@ -56,11 +59,18 @@ interface JsonViewProps {
  * `text` is seeded once from `draft` on mount (no resync effect) — switching
  * away from this surface unmounts it, so switching back always remounts
  * fresh from the current draft. Typing has no effect on the draft until
- * Apply succeeds.
+ * Apply succeeds. Until then the text is unsaved work, in no draft and no save, so
+ * the surface reports it upward (`studio-json-view`).
  */
-export function JsonView({ draft, onApply, note }: JsonViewProps) {
+export function JsonView({ draft, onApply, note, onUnappliedChange }: JsonViewProps) {
   const [text, setText] = useState(() => formatDraftText(draft));
   const [error, setError] = useState<string | null>(null);
+  const [seed, setSeed] = useState(text);
+  const unapplied = text !== seed;
+  useEffect(() => {
+    onUnappliedChange?.(unapplied);
+    return () => onUnappliedChange?.(false);
+  }, [unapplied]);
 
   const apply = () => {
     const parsed = parseDraftText(text);
@@ -69,6 +79,7 @@ export function JsonView({ draft, onApply, note }: JsonViewProps) {
       return;
     }
     setError(null);
+    setSeed(text);
     onApply(parsed.draft);
   };
 

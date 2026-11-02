@@ -81,10 +81,10 @@ describe("what the surface no longer carries", () => {
 
   it("gives the header bar menu the Views and Draft groups, with Discard draft and no Save or Publish", () => {
     const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
-    // Save and Publish stand in the header row itself, so the "clear of"
+    // Publish stands in the header row itself, so the "clear of"
     // assertion reads the menu's own slice. A whole-file search would find them.
     // The slice ends where the confirmation dialogs begin, not at </header>:
-    // PublishConfirmDialog's own `busy={actions.saving || actions.publishing}`
+    // PublishConfirmDialog's own `busy={actions.publishing}`
     // prop sits between the menu and </header>, and "actions.publishing"
     // contains "actions.publish" as a substring.
     const menuAt = code.indexOf("styles.headerBarMenu)} ref={menuRef}");
@@ -93,7 +93,7 @@ describe("what the surface no longer carries", () => {
 
     expect(menuAt).toBeGreaterThan(-1);
     expect(dialogsAt).toBeGreaterThan(-1);
-    expect(menu).not.toContain("actions.save");
+    expect(code).not.toContain("actions.save(");
     expect(menu).not.toContain("actions.publish");
     expect(menu).toContain("runMenuAction(actions.discard)");
     expect(menu).toContain("btn btn-secondary btn-destructive");
@@ -104,7 +104,6 @@ describe("what the surface no longer carries", () => {
     expect(menu).not.toContain("AddLocaleControl");
     expect(menu).not.toContain("headerBar.manageGroups");
     // They render in the header row's own top-level code.
-    expect(code).toContain("actions.save");
     expect(code).toContain("actions.publish");
   });
 
@@ -134,23 +133,24 @@ describe("what the surface no longer carries", () => {
     expect(run.indexOf("setMenuOpen(false)")).toBeLessThan(run.indexOf("action()"));
   });
 
-  it("reads the discard request's pending flag into the discard dialog's busy", () => {
+  it("reads the discard request's pending flag and a running save into the discard dialog's busy", () => {
     const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
     const dialog = code.slice(code.indexOf("<DiscardDraftDialog"));
 
-    expect(dialog).toContain("busy={actions.discarding}");
+    expect(dialog).toContain("busy={actions.discarding || actions.saving}");
   });
 
   // `studio-draftToolbarState.test.ts` tests the rule. This pins its wiring: the
   // inputs the effect hands over, and the wait for the save's answer.
-  it("wires Save's press and the focus on the body into saveFocusTarget", () => {
+  it("wires Try again's focus, its removal and the focus on the body into saveFocusTarget", () => {
     const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
     const effect = code.slice(code.indexOf("useEffect(() => {\n    if (actions.saving) return;"), code.indexOf("const runMenuAction"));
 
-    expect(code).toContain("savePressedRef.current = true");
-    expect(effect).toContain("saveFocusTarget({ pressed, clean: !isDirty, focusOnBody: document.activeElement === document.body })");
+    expect(code).toContain("tryAgainHeld.current = true");
+    expect(code).toContain("tryAgainHeld.current = false");
+    expect(effect).toContain("saveFocusTarget({ heldControl: tryAgainHeld.current, controlGone: tryAgainGone, focusOnBody: document.activeElement === document.body })");
     expect(effect).toContain('target === "stateLine"');
-    expect(effect).toContain("[actions.saving, isDirty]");
+    expect(effect).toContain("[actions.saving, isDirty, tryAgainGone]");
   });
 
   it("sizes the process name to its text, up to the cap", () => {
@@ -270,7 +270,7 @@ describe("the Fix control's landing", () => {
 
   it("leaves the JSON surface on any tab press, and drops the check's sentence with it", () => {
     const code = body();
-    const press = slice(code, "onOpen={(target) => {", "jsonOpen={jsonOpen}");
+    const press = slice(code, "onOpen={(target) =>", "jsonOpen={jsonOpen}");
 
     expect(press).toContain("setJsonOpen(false);");
     expect(press).toContain("setJsonNote(undefined);");
@@ -279,7 +279,7 @@ describe("the Fix control's landing", () => {
   });
 
   it("drops the check's sentence when the menu entry toggles the surface", () => {
-    const toggle = slice(body(), "onToggleJson={() => {", "onVersions=");
+    const toggle = slice(body(), "onToggleJson={() =>", "onVersions=");
 
     expect(toggle).toContain("setJsonNote(undefined);");
   });

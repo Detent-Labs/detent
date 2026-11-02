@@ -1,21 +1,37 @@
 /**
  * The **one dialog form** flows (spa-accessibility): the keyboard hold, the
- * focus return, the backdrop, and the leave prompt, on the suite's draft. Each
- * flow edits the process name and never saves, so the draft that
- * publish.e2e.ts publishes afterwards stays as it was.
+ * focus return, the backdrop, and the leave prompt, on the suite's draft. A draft
+ * saves itself, so each flow that edits it stubs the `PUT`: nothing reaches the
+ * server, and the draft that publish.e2e.ts publishes afterwards stays as it was.
+ * The canvas removal really saves, so it runs on the draft for flows that write.
  */
-import type { Locator, Page } from "@playwright/test";
+import type { Locator, Page, Route } from "@playwright/test";
 import { test, expect } from "./fixtures.js";
 
 const DRAFT_NAME = "E2E draft";
+const WRITES_DRAFT_NAME = "E2E writes";
 
-/** Opens the suite's draft from the studio's process list and types into its name, leaving it dirty. */
+/** Answers every `PUT` of a draft by `answer`, so nothing reaches the server. */
+async function stubDraftSave(page: Page, answer: (route: Route) => Promise<void>): Promise<void> {
+  await page.route("**/drafts/*", async (route) => {
+    if (route.request().method() !== "PUT") return route.fallback();
+    await answer(route);
+  });
+}
+
+/** Answers as the server does when a save lands. */
+function landed(route: Route): Promise<void> {
+  const sent = route.request().postDataJSON() as { body: unknown; layout: unknown; revision: number };
+  return route.fulfill({ json: { body: sent.body, layout: sent.layout, revision: sent.revision + 1 } });
+}
+
+/** Opens the suite's draft from the studio's process list and types into its name, leaving a change that has not landed. */
 async function openDirtyDraft(page: Page): Promise<void> {
   await page.goto("/studio");
   await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
   const name = page.getByRole("textbox", { name: "Process name" });
   await name.fill(`${DRAFT_NAME} edited`);
-  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
+  await expect(page.getByText("Saving…", { exact: true })).toBeVisible();
 }
 
 /** Whether a control inside the dialog holds the focus. The dialog itself and the body do not count. */
@@ -24,6 +40,7 @@ async function focusOnControl(dialog: Locator): Promise<boolean> {
 }
 
 test("a dialog holds the keyboard, ignores the backdrop and returns the focus", async ({ page }) => {
+  await stubDraftSave(page, landed);
   await openDirtyDraft(page);
   const publish = page.getByRole("button", { name: "Publish", exact: true });
   await publish.focus();
@@ -73,7 +90,8 @@ test("a dialog holds the keyboard, ignores the backdrop and returns the focus", 
   await expect(publish).toBeFocused();
 });
 
-test("the back control on a dirty draft asks before it leaves", async ({ page }) => {
+test("the back control asks before it leaves when the save fails", async ({ page }) => {
+  await stubDraftSave(page, (route) => route.fulfill({ status: 500, json: { error: { type: "internal", message: "Stubbed by the smoke suite." } } }));
   await openDirtyDraft(page);
   const back = page.getByRole("button", { name: "Back to processes" });
   await back.click();
@@ -119,16 +137,16 @@ test("a long dialog opened by keyboard in a tab panel opens with its heading in 
 
 test("the canvas bar's remove controls ask first and name what goes", async ({ page }) => {
   await page.goto("/studio");
-  await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
+  await page.getByRole("link", { name: WRITES_DRAFT_NAME, exact: true }).click();
   await page.getByRole("tab", { name: "Map" }).click();
-  const first = page.locator(".canvas-node").filter({ hasText: "On the Shelf" });
-  const second = page.locator(".canvas-node").filter({ hasText: "Issued" });
+  const first = page.locator(".canvas-node").filter({ hasText: "Spare One" });
+  const second = page.locator(".canvas-node").filter({ hasText: "Spare Two" });
 
   // One step takes the step page's dialog. A decline keeps it and returns the focus.
   await second.click();
   const removeOne = page.getByRole("button", { name: "Remove step", exact: true });
   await removeOne.click();
-  const one = page.getByRole("dialog", { name: "Remove “Issued”?" });
+  const one = page.getByRole("dialog", { name: "Remove “Spare Two”?" });
   await expect(one.getByRole("button", { name: "Remove the step", exact: true })).toBeVisible();
   await one.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(one).toBeHidden();
@@ -140,7 +158,7 @@ test("the canvas bar's remove controls ask first and name what goes", async ({ p
   const removeBoth = page.getByRole("button", { name: "Remove steps", exact: true });
   await removeBoth.click();
   const both = page.getByRole("dialog", { name: "Remove 2 steps?" });
-  await expect(both.getByRole("listitem")).toHaveText(["On the Shelf", "Issued"]);
+  await expect(both.getByRole("listitem")).toHaveText(["Spare One", "Spare Two"]);
   await both.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(both).toBeHidden();
   await expect(removeBoth).toBeFocused();

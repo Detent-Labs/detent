@@ -1756,8 +1756,8 @@ processes".
 
 #### Scenario: The back control keeps the leave guard
 
-- **WHEN** an author presses the back control on a dirty draft
-- **THEN** the leave prompt asks first, as it did from the screen nav
+- **WHEN** an author presses the back control while a change has not landed
+- **THEN** that change saves first, and the leave dialog asks only if the save fails
 
 ### Requirement: The header bar's process name fits its text
 
@@ -1778,7 +1778,7 @@ does. The bar SHALL keep no copy of that logic.
 
 #### Scenario: The bar calls the one hook
 
-- **WHEN** an author presses Save or Publish
+- **WHEN** an author presses Publish or Try again
 - **THEN** the call runs the logic `useDraftToolbarActions` holds
 
 ### Requirement: The header bar prints no machine value
@@ -1795,23 +1795,50 @@ print a locale only in the "Editing" note `studio-app` states.
 
 ### Requirement: The header bar's state says what holds for the draft
 
-The state SHALL read "Unsaved changes" while the draft differs from its last
-save. It SHALL read "Saved at" and a time after a save in this session. It SHALL
-read "Saved" otherwise. Where a published version exists, the state SHALL add
-that version and the word "published". The version SHALL print in the mono face.
+The state SHALL read "Saving…" from a change until its save answers. It SHALL read
+"Saved just now" for the first minute after a save in this session. It SHALL then read
+"Saved at" and a time. It SHALL read "Saved" where no save has run in this session.
 
-The state SHALL announce a change politely to a screen reader. That announcement
-moves no focus. Only the Save rule in `studio-process-tabs` sends focus to it.
+It SHALL read "Unsaved changes", in the refusal tone, in four cases. A save has
+failed. A conflict stands over a dirty draft. A restore notice holds a change back. The
+JSON surface holds text no Apply has taken.
+
+Where a published version exists, the state SHALL add that version and the word
+"published". The version SHALL print in the mono face.
+
+A save point restore is a stored write, so it counts as a save for these readings.
+
+The visible state SHALL be no live region, so a save stays quiet for an author typing.
+A polite status beside it SHALL announce three moments. They are "Unsaved changes" on
+entering that state, "Saved" on leaving it, and the version after a publish. That
+announcement moves no focus. Only the Try again rule in `studio-process-tabs` sends
+focus to the state.
+
+#### Scenario: The words stand on the version's baseline
+
+- **WHEN** the state reads "Saving…", "Saved just now" or "Unsaved changes" beside a version
+- **THEN** the words' text top matches the version's
 
 #### Scenario: A dirty draft's bar names its state
 
-- **WHEN** the draft carries unsaved changes
+- **WHEN** a save has failed and the draft carries the change
 - **THEN** the bar prints "Unsaved changes" in the refusal tone
 
 #### Scenario: A save names its time
 
 - **WHEN** a save succeeds
-- **THEN** the state reads "Saved at" and the time of that save
+- **THEN** the state reads "Saved just now"
+- **AND** it reads "Saved at" and the time of that save a minute later
+
+#### Scenario: A restore names its time
+
+- **WHEN** a save point restore lands
+- **THEN** the state reads "Saved just now"
+
+#### Scenario: Unapplied JSON reads as unsaved
+
+- **WHEN** the JSON surface holds text no Apply has taken, over a clean draft
+- **THEN** the bar prints "Unsaved changes" in the refusal tone
 
 #### Scenario: A published process names its version
 
@@ -1822,6 +1849,16 @@ moves no focus. Only the Save rule in `studio-process-tabs` sends focus to it.
 
 - **WHEN** an author opens a draft with no base version
 - **THEN** the state prints no version
+
+#### Scenario: A change reads as saving
+
+- **WHEN** an author changes the draft
+- **THEN** the state reads "Saving…" in the muted tone until the save answers
+
+#### Scenario: A save stays silent for a screen reader
+
+- **WHEN** an author types and an automatic save succeeds
+- **THEN** the polite status announces nothing
 
 ### Requirement: The header bar's process key auto-derives from the process label
 

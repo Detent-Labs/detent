@@ -120,7 +120,7 @@ describe("the open view's sub-state of the edit route", () => {
       fields: ["catalog", "matrix", "sources"],
       forms: [],
       checks: [],
-      settings: ["process", "contract", "access"],
+      settings: ["process", "contract", "access", "points"],
     });
   });
 
@@ -135,7 +135,15 @@ describe("the open view's sub-state of the edit route", () => {
       }
     }
     // An empty `TAB_VIEWS` would pass the loop above with nothing checked.
-    expect(seen).toBe(6);
+    expect(seen).toBe(7);
+  });
+
+  it("opens the Save points view on /edit/settings/points and drops it from another tab", () => {
+    const points: Route = { name: "edit", processId: "proc_1", tab: "settings", view: "points" };
+
+    expect(matchRoute("/processes/proc_1/edit/settings/points")).toEqual(points);
+    expect(routePath(points)).toBe("/processes/proc_1/edit/settings/points");
+    expect(matchRoute("/processes/proc_1/edit/fields/points")).toEqual({ name: "edit", processId: "proc_1", tab: "fields" });
   });
 
   it("drops a view the tab does not hold and keeps the tab", () => {

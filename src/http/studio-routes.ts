@@ -47,6 +47,14 @@ import {
   type Draft,
   type DraftSummary,
 } from "../engine/drafts.js";
+import {
+  listSavePoints,
+  createSavePoint,
+  restoreSavePoint,
+  deleteSavePoint,
+  MAX_SAVE_POINTS,
+  type SavePointSummary,
+} from "../engine/draft-save-points.js";
 import { createProcessInstance } from "../runtime/api.js";
 import { getTemplate, listTemplates, saveTemplate, deleteTemplate } from "../engine/templates.js";
 import { publishBody, createDefinitionStore } from "../engine/definitions.js";
@@ -62,6 +70,7 @@ import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies
 import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
 import type { ZodTypeAny } from "zod";
 import type { ActorResolver } from "../auth/resolve.js";
+import type { Actor } from "../cel/eval.js";
 import { requireRole, requirePermission, can, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE, ADMIN_ROLE, CREATE_ROLE } from "../auth/authorize.js";
 import { displayNamesForUserIds } from "../auth/users.js";
 import { addAccessPrincipal, deleteAccessPrincipal, getAccessLists, processesMatchingAccessList, matchesAccessList, requireDeveloperListOrAdmin, requirePublishListAccess, type AccessKind } from "../auth/process-access.js";
@@ -225,6 +234,84 @@ export async function handleDeleteDraft(processId: string, req: Request, resolve
       return { status: 204, body: null };
     },
   );
+}
+
+/** The gate `handleGetDraft` applies, shared by the four save point routes. */
+function draftGate(processId: string, db: SQL): (actor: Actor) => Promise<void> {
+  return async (actor) => {
+    if (await hasNoDraftAndNoPublishedVersion(processId as ProcessId, db)) {
+      requireAuthoring(actor);
+    } else {
+      if (!actor.roles.includes(ADMIN_ROLE)) requireAuthoring(actor);
+      await requireDeveloperListOrAdmin(actor, processId as ProcessId, db);
+    }
+  };
+}
+
+/** One `GET /drafts/:processId/save-points` entry: the engine's summary plus the creating account's resolved name, `null` when no local account carries `createdBy`. */
+export type SavePointListEntry = SavePointSummary & { createdByDisplayName: string | null };
+
+/** Newest first, no body or layout. `limit` states the bound so the studio holds no copy of it. */
+export async function handleListSavePoints(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, draftGate(processId, db), async () => {
+    const points = await listSavePoints(processId as ProcessId, db);
+    const names = await displayNamesForUserIds([...new Set(points.map((p) => p.createdBy))], db);
+    const items: SavePointListEntry[] = points.map((p) => ({ ...p, createdByDisplayName: names.get(p.createdBy) ?? null }));
+    return { status: 200, body: { items, limit: MAX_SAVE_POINTS } };
+  });
+}
+
+/**
+ * The request carries a name and a revision, never a body or layout: the
+ * engine copies the persisted draft. The engine validates both fields, so a
+ * missing key reaches it as `undefined` and answers 400 there.
+ */
+export async function handleCreateSavePoint(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, draftGate(processId, db), async (actor) => {
+    const parsed = ((await readJson(req)) ?? {}) as { name?: unknown; revision?: unknown };
+    const created = await createSavePoint(
+      processId as ProcessId,
+      { name: parsed.name as string, revision: parsed.revision as number, createdBy: actor.id },
+      db,
+    );
+    if (!created) return notFound(`no draft: ${processId}`);
+    return { status: 201, body: created };
+  });
+}
+
+/** Keeps the current work as a save point named `keepName`, then writes the point onto the draft. Answers the saved draft. */
+export async function handleRestoreSavePoint(
+  processId: string,
+  savePointId: string,
+  req: Request,
+  resolver: ActorResolver,
+  db: SQL,
+): Promise<HttpResult> {
+  return route(req, resolver, db, draftGate(processId, db), async (actor) => {
+    const parsed = ((await readJson(req)) ?? {}) as { revision?: unknown; keepName?: unknown };
+    const restored = await restoreSavePoint(
+      processId as ProcessId,
+      savePointId,
+      { revision: parsed.revision as number, keepName: parsed.keepName as string, restoredBy: actor.id },
+      db,
+    );
+    if (!restored) return notFound(`no draft or save point: ${processId} ${savePointId}`);
+    return { status: 200, body: restored };
+  });
+}
+
+export async function handleDeleteSavePoint(
+  processId: string,
+  savePointId: string,
+  req: Request,
+  resolver: ActorResolver,
+  db: SQL,
+): Promise<HttpResult> {
+  return route(req, resolver, db, draftGate(processId, db), async () => {
+    const removed = await deleteSavePoint(processId as ProcessId, savePointId, db);
+    if (!removed) return notFound(`no save point: ${processId} ${savePointId}`);
+    return { status: 204, body: null };
+  });
 }
 
 /**

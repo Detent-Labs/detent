@@ -269,7 +269,7 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
 
     Specs: `definition-contract`, `runtime-api`, `cel-expressions`.
 
-64. **Studio UI overhaul: CHANGES 1 TO 14 DONE, REST NOT STARTED.** Decided 2026-10-30 in a design
+64. **Studio UI overhaul: CHANGES 1 TO 15 DONE, REST NOT STARTED.** Decided 2026-10-30 in a design
     session with the owner. The concept reworks how an author handles steps
     and fields in the studio. The owner weights that authoring loop above
     canvas gestures, navigation chrome and safety prompts. The canvas is the
@@ -327,7 +327,8 @@ Specs: `development-toolchain`, `devcontainer-preflight`, `worktree-isolation`,
         `confirm()` prompts, the dialog presentation gaps, the keyboard trap.
     14. `studio-header-two-rows`. Needs: 9. Resolves: m1, m2. Shipped
         2026-11-01.
-    15. `studio-draft-autosave-and-save-points`. Needs: 14. Resolves: D6.
+    15. `studio-draft-autosave-and-save-points`. Needs: 14. Resolves: D6,
+        HEADER-4. Shipped 2026-11-02.
     16. `studio-condition-builder-expansion`. Needs: 4. Resolves: the
         condition builder deferrals of stage 27b.
 

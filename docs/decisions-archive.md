@@ -1425,3 +1425,35 @@ system that resulted; this file explains why it took that shape.
   Upgrade entry: pass `visible` into `StepPage` and clear `removing` and
   `pendingKind` in the render that hides it, as `EntityTabs.tsx` does for
   `pendingRemoval`.
+
+## Closed by `studio-draft-autosave-and-save-points`
+- **HEADER-4: Test lands on a Player whose two buttons differ.** The Player's
+  filled create button runs the published version and its outlined one runs the
+  draft. Nothing on the bar says which Test will run. Risk (Low): an author
+  expects Test to run the draft and starts a case on the published version. The
+  Player's two buttons stay open.
+
+  Upgrade entry: name the two runs on the Player's buttons, or let Test open
+  the draft run. The handler is `onPlayer` in `panels/ProcessHeaderBar.tsx`.
+
+  Closed by `studio-draft-autosave-and-save-points`: the Player's filled
+  button reads "Test this draft" and leads the row. The outlined one reads
+  "Start a case from the published version".
+
+- **The header reads "Unsaved changes" after a `PUT` that answered 200.**
+  Observed on the studio edit screen. The path looks correct on the page: a
+  defined save result makes `doSave` call `onSavedBodyChange(draft)`,
+  `EditScreen.tsx` clones that body into `savedBody`, and `dirtyNow` compares
+  the two by serializing both. So either something re-dirties the draft after
+  the save, or the save returned nothing, and both readings need a
+  reproduction. It is a dirty-state failure in `ProcessSurface`, not a publish
+  failure: it shares no cause with the three defects
+  `studio-publish-gate-and-report` fixed, and no file with them but
+  `EditScreen.tsx`. Deferred 2026-09-02, at a cost of one wasted `PUT`: a
+  permanently dirty draft makes the publish dialog always state its
+  unsaved-changes sentence and always save first, which gives no wrong
+  result.
+
+  Closed by `studio-draft-autosave-and-save-points`: the e2e settle flow is
+  green. A label, a drag, an Arrange and a JSON apply save exactly 4 times, and
+  5 idle seconds add none. No write re-dirties the draft after an answer.

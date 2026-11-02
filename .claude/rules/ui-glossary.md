@@ -41,15 +41,16 @@ bar, the tab row, then one tab body.
 | Term | Names | Lives in |
 |---|---|---|
 | process surface | the one screen a draft opens on: the tab row and the body under it | `screens/EditScreen.tsx` |
-| header bar | the process-identity row: back control, name, state line, Test, Publish and the `⋮` menu. Save stands beside the state line while the draft is dirty | `panels/ProcessHeaderBar.tsx` |
-| state line | the header bar's one status text: Unsaved changes, Saved or Saved at a time, then the published version | `panels/ProcessHeaderBar.tsx` (`DraftStateLine`) |
-| restore notice | the notice under the header bar that offers a stored copy of unsaved work after a session ended. It stands over the form editor too | `panels/RestoreNotice.tsx` |
+| header bar | the process-identity row: back control, name, state line, Test, Publish and the `⋮` menu. It has no Save control, since the draft saves itself | `panels/ProcessHeaderBar.tsx` |
+| state line | the header bar's one status text, the whole autosave interface. It reads Unsaved changes, Saving…, Saved just now, Saved at a time or Saved, then the published version. Only Unsaved changes prints in the refusal tone | `panels/ProcessHeaderBar.tsx` (`DraftStateLine`) |
+| save point | a named copy of the draft that an author makes by hand and can come back to. A restore keeps the work it replaces as a second save point. A save point is no version. A publish leaves the points alone, and they go with a discarded draft. Never *snapshot*, *checkpoint* or *backup* | `panels/SavePointsPanel.tsx`, `src/engine/draft-save-points.ts` |
+| restore notice | the notice under the header bar that offers a stored copy of unsaved work. A session end or a browser Back kept it in the tab. It stands over the form editor too | `panels/RestoreNotice.tsx` |
 | tab row | the row of six tabs over the body | `panels/ProcessTabRow.tsx` |
 | edge fade | the fade at an edge of the tab row with more tabs past it | `panels/ProcessTabRow.tsx` |
 | tab | one of the six. The authoring order runs Map, Steps, Fields, Forms, Checks and Settings | `routing.ts` |
-| sub-row | the strip of a tab's views under the tab row. The Fields tab's reads Catalog, Where fields appear and Where values come from. The Settings tab's reads Process, What it takes in and gives back, and Access | `panels/SubRow.tsx` |
+| sub-row | the strip of a tab's views under the tab row. The Fields tab's reads Catalog, Where fields appear and Where values come from. The Settings tab's reads Process, What it takes in and gives back, Access and Save points | `panels/SubRow.tsx` |
 | structure surface | the six tab bodies together, the JSON surface's one alternative | `EditScreen.tsx`; gated by `structureActive`, a prop of `panels/ProcessHeaderBar.tsx` |
-| JSON surface | the raw definition view, the structure surface's one alternative. A press on any tab leaves it. A Fix that opens it prints the check's sentence above the input | `panels/JsonView.tsx` |
+| JSON surface | the raw definition view, the structure surface's one alternative. A press on any tab leaves it. A Fix that opens it prints the check's sentence above the input. Text no Apply has taken counts as unsaved work. The state line then reads Unsaved changes, and each way off asks first | `panels/JsonView.tsx` |
 | dialog | the studio's one modal form: a heading, facts, notes, then a sticky footer with the confirm and Cancel. Every confirmation, choice and preview in the studio area stands in one | `panels/shared/StudioDialog.tsx` |
 
 The open tab stands in the address, at `/studio/processes/:id/edit/:tab`. An
@@ -66,15 +67,18 @@ A hidden field matrix draws the last draft it drew while visible. The commit
 that reveals the view draws the live draft. Typing on the Catalog view
 therefore costs the hidden matrix nothing.
 
-Test, Publish and the `⋮` trigger trail the header bar. Save stands beside the
-state line, and only while the draft is dirty. `panels/ProcessHeaderBar.tsx`
-renders all of them. The *draft toolbar* retired: `DraftToolbar.tsx` no longer
-mounts, and only its `useDraftToolbarActions` hook survives.
+Test, Publish and the `⋮` trigger trail the header bar. The state line has no
+Save beside it: the hook `useDraftToolbarActions` saves the draft after a
+typing pause. After a failed save, a banner offers Try again, the one
+save control. `panels/ProcessHeaderBar.tsx` renders all of them. The *draft
+toolbar* retired: `DraftToolbar.tsx` no longer mounts, and only that hook
+survives.
 
 <!-- antislop: allow synonym-rotation -->
 <!-- Why: "Discard draft" and the card's "Remove field" are two control labels the UI prints. -->
 The `⋮` menu holds two groups. Views carries the JSON surface, Versions and
-Player. Draft carries Discard draft.
+Player. Draft carries Save points and Discard draft. Save points opens the
+Settings tab's Save points view.
 
 The content-locale switcher stands on the Settings tab's Process view, under
 its label "Language you are editing". The header bar names a locale only when
@@ -109,7 +113,7 @@ Every other term below belongs to one tab.
 | field card | the Catalog view's editor over the selected field. Its sections run: the name line, Name and Description, Kind, Choices, Asked on, Read by, More. A group field adds Fields inside this group. Remove field closes the card, under its own hairline | `panels/FieldCatalogPanel.tsx` |
 | card section | one headed block of the field card, under a Title-style heading and a hairline. Kind has no hairline | `panels/FieldCatalogPanel.tsx` (`CardSection`) |
 | field matrix | the Fields tab's Where fields appear view: a grid of every field against every step | `panels/FieldMatrixPanel.tsx`, `panels/FieldMatrixGrid.tsx` |
-| Settings tab | the tab holding the process-wide settings in three views. The Process view holds the base language, the content-locale switcher and the add-locale control. It also holds the cancellable setting, the collaboration defaults and a Developer view. After a publish, that Developer view adds the version and the definition hash | `panels/SettingsTab.tsx`, `panels/ProcessSettingsPanel.tsx` |
+| Settings tab | the tab holding the process-wide settings in four views. The Process view holds the base language, the content-locale switcher and the add-locale control. It also holds the cancellable setting, the collaboration defaults and a Developer view. After a publish, that Developer view adds the version and the definition hash | `panels/SettingsTab.tsx`, `panels/ProcessSettingsPanel.tsx` |
 | data sources | the Fields tab's Where values come from view, over the process's data source definitions | `panels/DataSourcesPanel.tsx`, mounted by `panels/EntityTabs.tsx::DataSourcesTab` inside `panels/FieldsTabViews.tsx` |
 | contract | the Settings tab's What it takes in and gives back view, over the `ProcessContract`: input fields, output fields, outcomes | `panels/ContractPanel.tsx` inside `panels/SettingsTab.tsx` |
 | change list | the folded register of entity rows the Publish dialog and the Versions screen both draw over `describeChanges`'s output | `panels/ChangeList.tsx`, `panels/PublishChanges.tsx` |
@@ -125,6 +129,7 @@ Every other term below belongs to one tab.
 | severity word | the check row's kicker: Must fix or Worth a look | `panels/ChecksRail.tsx` |
 | Fix | the check row's one act, a secondary button, landing on the place that owns the check | `panels/ChecksRail.tsx` |
 | Access view | the Settings tab's view over the process's Developer, Owner and Reader access lists | `panels/AccessPanel.tsx` inside `panels/SettingsTab.tsx` |
+| Save points view | the Settings tab's view over the draft's save points. One name input and one button stand over a register of named points. Each row carries Restore and Remove. The address is `/edit/settings/points` | `panels/SavePointsPanel.tsx` inside `panels/SettingsTab.tsx` |
 
 On the field card, More's Developer view holds the key input and the plugin
 envelope. Choices' holds the stored values. Four Developer views open by
@@ -212,7 +217,7 @@ once an instance is open.
 | Term | Names | Lives in |
 |---|---|---|
 | player | the routed screen that drives one instance for preview | `screens/PlayerScreen.tsx` |
-| instance access | the `<fieldset>` above the panes: create a new instance, or open one by id | `PlayerScreen.tsx` |
+| instance access | the `<fieldset>` above the panes: the two start buttons, or open one by id | `PlayerScreen.tsx` |
 | form pane | the left pane: the status line, the step form, the claim controls, the path buttons | `PlayerScreen.tsx` |
 | step form | the field-by-field renderer both the player and the app area's Task screen mount | `FieldForm`, `packages/form-ui` |
 | path buttons | the manual-path submit controls below the step form | `PathButtons`, `packages/form-ui` |

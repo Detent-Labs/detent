@@ -1065,15 +1065,41 @@ creates them on Studio's **Templates** screen, from a published version of a
 process.
 
 Studio's own header bar carries **Test**, **Publish** and a **⋮** menu. They
-stand there whatever you have open. **Save** appears beside the draft's state
-while you hold unsaved changes. The menu holds **Discard draft**.
+stand there whatever you have open. The header bar has no Save button: Studio
+saves the draft for you.
+
+The draft's state stands beside its name. It reads **Saving…** while a change
+waits for the save, and **Saved just now** once the save lands. After a
+minute it reads **Saved at** and the time. It reads **Unsaved changes** in
+four cases.
+
+- A save failed. A banner says Studio keeps your changes in the tab, and
+  **Try again** sends them at once. If the server refused them, trying again may
+  not help. To keep them, choose **JSON** in the `⋮` menu and copy the text. Until
+  that save lands, **Save this point**, **Restore** and **Publish** each wait and
+  say so.
+- Somebody else changed the draft. A banner says so, and **Reload** loads the
+  stored draft. Reload drops the changes you made since your last save, so copy
+  any you want to keep first.
+- A notice offers a copy of earlier unsaved work. Studio saves nothing until
+  you answer the notice.
+- You typed JSON that you have not applied. See the JSON passage below.
+
+Studio saves about a second after you stop typing. Opening a draft saves
+nothing. Publish waits for the save before it publishes. When you leave the
+draft, Studio saves first and moves on. If that save fails, a dialog asks
+before you lose the change.
+
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: "Discard draft" and the Save points view's "Remove" are two control labels the UI prints. -->
+The menu holds **Save points** and **Discard draft**.
 
 A draft opens on one screen. A tab row over the body holds six tabs: Map,
 Steps, Fields, Forms, Checks and Settings. Map draws the process on a canvas.
-Fields holds two views, **Catalog** and **Where fields appear**. Settings
-holds four: **Process**, **Where values come from**, **What it takes in and
-gives back** and **Access**. The Access view manages who holds standing on
-the process, a `process-access-roles` concern outside what this guide teaches.
+Fields holds three views: **Catalog**, **Where fields appear** and **Where
+values come from**. Settings holds four: **Process**, **What it takes in and
+gives back**, **Access** and **Save points**. The Access view manages who
+holds standing on the process, a `process-access-roles` concern outside what this guide teaches.
 
 On the Map, double-click a step to open it on the Steps tab. Double-click a
 way out to open its step with **Ways out** unfolded. To add a way out, drag
@@ -1094,6 +1120,28 @@ The `⋮` menu holds three entries under Views. The **JSON** entry prints the
 same draft as raw text. That helps when you want to read the whole body at
 once. The **Versions** and **Player** entries open their own screens.
 
+Text you type on the JSON surface reaches the draft only when you press
+**Apply**. Until then the header bar reads "Unsaved changes". Each way off the
+surface asks first, because the text goes with it. The Publish dialog says that
+the text stays out of that publish.
+
+#### Save points
+
+Autosave keeps the latest state of the draft. It keeps no earlier one. A save
+point keeps an earlier one. Open the **Save points** view on the Settings tab,
+or choose **Save points** in the `⋮` menu. Name the point, and press **Save this
+point**. Name one before a risky change, such as a large rewrite.
+
+Each row shows the name, who saved it and when. **Restore** puts a point back
+as the draft. Studio first keeps your current work as a new point, named
+"Before restoring" and the old name. A point that already carries such a name
+hands it on, so two rows can share one. A restore is therefore reversible: restore
+that new point. **Remove** deletes a point for good.
+
+A draft holds fifty save points. At that bound, remove one to name another or
+to restore one. A save point is no version. Publishing leaves the points alone,
+and discarding the draft takes them with it.
+
 ### 2. Define the field catalog
 
 Open the **Fields** tab and declare every field the process needs. Do this
@@ -1109,7 +1157,7 @@ that reads it, and the studio says how many. A label change before the first
 publish does the same.
 
 Does a field take its options from somewhere else? Declare that source on
-the **Settings** tab, in its **Where values come from** view. Then point the
+the **Fields** tab, in its **Where values come from** view. Then point the
 field at it.
 
 ### 3. Add the steps
@@ -1195,8 +1243,9 @@ own column count, and it answers no click. Under the fields it draws one
 control per manual path, so you read the buttons a participant will press.
 
 The editor writes into the draft as you work. It has no Save button of its
-own: the header bar's Save and Publish still govern what persists. Discard
-draft, in the `⋮` menu, drops the whole draft.
+own, and the header bar has none. Studio saves the draft for you, and Publish
+governs what you release. Discard draft, in the `⋮` menu, drops the whole
+draft.
 
 An end step usually shows a readonly summary. A step early in the process
 usually demands the fields it collects.
@@ -1330,9 +1379,16 @@ Skip this step when nothing calls your process.
 
 ### 9. Run it in the Player
 
-The Player runs your draft. Open it with **Test** in the header bar. Fill in
-the forms as a participant would, and walk the process to an end step. Walk it
-again down a different path.
+The Player runs your draft. Open it with **Test** in the header bar. It opens
+with two buttons. **Test this draft** is the filled one. It starts a case on
+your draft. Studio saves the draft before the Player opens.
+
+The outlined button, **Start a case from the published version**, starts a
+case on the version you published last.
+
+Fill in the forms as a participant would, and walk the process to an end step.
+Walk it again down a different path. A test case is a real case, and its
+actions run.
 
 Find the mistakes here, where a fix costs one change. After you publish, a fix
 costs a new version and a migration.

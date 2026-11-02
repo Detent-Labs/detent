@@ -1,5 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
+import { readRestorable, stashDraft, type DraftStash } from "../src/areas/studio/draft/draftStash.js";
+import type { Draft } from "../src/areas/studio/draft/types.js";
+import { AUTOSAVE_DEBOUNCE_MS, autosaveWait } from "../src/areas/studio/screens/draftAutosaveLogic.js";
+import { headerStateLine } from "../src/areas/studio/screens/draftToolbarState.js";
 
 /**
  * `EditScreen.tsx` wires the unsaved-draft stash at several places, and no
@@ -14,19 +18,23 @@ import { describe, expect, it } from "bun:test";
  * requests on the screen never reach `onUnauthorized`. The wrapper writes the
  * stash only while the draft is dirty, so a clean draft stores nothing.
  *
- * The stash goes stale in two places. A successful save and a discarded draft
- * each call `dropStash()`, and the discard does it before `navigate`, which
- * unmounts the screen. `RestoreNotice` renders while a stash exists, the form
+ * The copy goes when the author answers the notice or discards the draft, and the
+ * discard does it before `navigate`, which unmounts the screen. A save leaves it
+ * standing, since a flush can save under the notice, and `followStash` moves its
+ * revision to the answer's. `RestoreNotice` renders while a stash exists, the form
  * editor's address included: the editor stands under the tab row, so either
  * button's focus move to the open tab finds one. A gate on `formStepId` would
  * hide the notice over the editor. Its two buttons call `askRestore` and
- * `discardStash`. `askRestore` asks first over unsaved work and runs
- * `runRestore`, whose focus move waits for the commit that unmounts the dialog.
+ * `discardStash`. `askRestore` asks first over a change made since the draft
+ * opened, saved or not, and runs `runRestore`, whose focus move waits for the commit that unmounts the dialog.
  * Both buttons wait while a save or publish runs (`requestRunning`),
  * because a restore during a save would let the save's answer overwrite the
  * stored revision. The outer
  * `EditScreen` loads the draft before any draft exists, so it keeps the raw
  * callback.
+ *
+ * While a copy stands, a 401 keeps it: the store has one slot, and the copy holds
+ * the larger work.
  *
  * A source test in the idiom `studio-leave-guard.test.ts` uses: no harness in
  * this package can click a control or trigger a 401, so the wiring is guarded
@@ -98,7 +106,12 @@ function scan(source: string): string[] {
     if (wired !== "stashOnUnauthorized") violations.push("useDraftToolbarActions onUnauthorized is not stashOnUnauthorized");
 
     const saved = propArrowBody(options, "onSaved");
-    if (saved === undefined || !CALL.test(saved)) violations.push("onSaved does not call dropStash");
+    if (saved === undefined || CALL.test(saved)) violations.push("onSaved deletes the copy");
+    if (saved === undefined || !/\bfollowStash\(revision\)/.test(saved)) violations.push("onSaved does not move the copy's revision");
+
+    if (!/\bfollowStash\(record\.revision\)/.test(propArrowBody(options, "onRestored") ?? "")) violations.push("onRestored does not move the copy's revision");
+
+    if (!/\bnoticeStands:\s*stash !== undefined/.test(options)) violations.push("the notice does not hold the saves");
 
     // The discard unmounts the screen through `navigate`, so the drop comes first.
     const discarded = propArrowBody(options, "onDiscarded") ?? "";
@@ -138,17 +151,39 @@ function scan(source: string): string[] {
     }
   }
 
-  // A restore asks only over unsaved work, and a clean draft restores at once.
+  // A save under the notice moves the copy's revision, in storage and in state, and
+  // the notice's restore then asks first. Nothing else moves it.
+  const follow = /\bconst\s+followStash\s*=\s*\(revision: number\)\s*=>\s*\{/.exec(code);
+  const followBody = follow ? braced(code, follow.index + follow[0].length - 1) : undefined;
+  if (followBody === undefined) violations.push("followStash not found");
+  else {
+    if (!/\bif\s*\(stash === undefined\)\s*return;/.test(followBody)) violations.push("followStash writes a copy nothing kept");
+    if (!/\bconst moved = \{ \.\.\.stash, revision \};/.test(followBody)) violations.push("followStash does not keep the copy's body and layout");
+    if (!/\bstashDraft\(tabStorage\(\), actorId, processId, moved\)/.test(followBody)) violations.push("followStash does not reach storage");
+    if (!/\bsetStash\(moved\)/.test(followBody)) violations.push("followStash does not reach state");
+    if (!/\bsetSavedUnderNotice\(true\)/.test(followBody)) violations.push("followStash does not mark the saved change");
+  }
+
+  const discarded = /\bconst\s+discardStash\s*=\s*\(\)\s*=>\s*\{/.exec(code);
+  if (!CALL.test((discarded && braced(code, discarded.index + discarded[0].length - 1)) ?? "")) violations.push("discardStash keeps the copy");
+
+  // A restore asks over a change made since the draft opened, and otherwise restores at once.
   const ask = /\bconst\s+askRestore\s*=\s*\(\)\s*=>\s*\{/.exec(code);
   const askBody = ask ? braced(code, ask.index + ask[0].length - 1)?.replace(/\s+/g, " ") : undefined;
-  if (askBody === undefined || !/\bif \(dirtyNow\) \{ restoreTrigger\.current = activeControl\(\); setRestoreAsked\(true\); \} else \{ runRestore\(\); \}/.test(askBody)) {
-    violations.push("askRestore does not ask only while dirtyNow");
+  if (askBody === undefined || !/\bif \(dirtyNow \|\| savedUnderNotice\) \{ restoreTrigger\.current = activeControl\(\); setRestoreAsked\(true\); \} else \{ runRestore\(\); \}/.test(askBody)) {
+    violations.push("askRestore does not ask only over a change since the draft opened");
   }
   // The page behind an open dialog stands inert until the commit that unmounts
   // it, so the landing is a pending focus. A confirm clears the ref the frame
   // would otherwise focus.
   const run = /\bconst\s+runRestore\s*=\s*\(\)\s*=>\s*\{/.exec(code);
   const runBody = run ? braced(code, run.index + run[0].length - 1) : undefined;
+  // A restore puts the copy in the editor at the copy's revision, and deletes it.
+  if (runBody !== undefined) {
+    if (!/\breplace\(stash\.body\)/.test(runBody)) violations.push("runRestore does not put the copy's body in the editor");
+    if (!/\brevision: stash\.revision, layout: stash\.layout\b/.test(runBody)) violations.push("runRestore does not keep the copy's revision and layout");
+    if (!CALL.test(runBody)) violations.push("runRestore keeps the copy");
+  }
   if (runBody === undefined || !/\bsetPendingFocus\(\{ tab: openTab \}\)/.test(runBody)) violations.push("runRestore does not land through setPendingFocus");
   const dialog = openingTag(code, "RestoreOverChangesDialog");
   if (dialog === undefined) violations.push("RestoreOverChangesDialog is not rendered");
@@ -156,14 +191,15 @@ function scan(source: string): string[] {
     violations.push("the restore confirm does not clear its trigger and run the restore");
   }
 
-  // A clean draft has no work to keep, so the 401 stores nothing for it.
+  // A clean draft has no work to keep, so the 401 stores nothing for it. A copy that
+  // stands keeps its place.
   const wrapper = /\bconst\s+stashOnUnauthorized\s*=\s*\(\)\s*=>\s*\{/.exec(code);
   const wrapperBody = wrapper ? braced(code, wrapper.index + wrapper[0].length - 1) : undefined;
   if (wrapperBody === undefined) violations.push("stashOnUnauthorized not found");
   else {
     const write = wrapperBody.search(/\bstashDraft\s*\(/);
-    if (write < 0 || !/\bif\s*\(\s*dirtyNow\s*\)\s*\{?\s*$/.test(wrapperBody.slice(0, write))) {
-      violations.push("stashOnUnauthorized does not write the stash only while dirtyNow");
+    if (write < 0 || !/\bif\s*\(\s*dirtyNow && stash === undefined\s*\)\s*\{?\s*$/.test(wrapperBody.slice(0, write))) {
+      violations.push("stashOnUnauthorized does not write the stash only while dirty with no copy");
     }
   }
 
@@ -210,9 +246,9 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
     expect(propValue(access!.tag, "onUnauthorized")).toBe("onUnauthorized");
   });
 
-  it("a successful save that keeps the stash is flagged", () => {
-    const kept = mutate(real, /(\bonSaved\s*:\s*\(\)\s*=>\s*\{[^}]*?)dropStash\(\);/, "$1");
-    expect(scan(kept)).toEqual(["onSaved does not call dropStash"]);
+  it("a successful save that deletes the copy is flagged, since an automatic save would delete it behind the author's back", () => {
+    const deleted = mutate(real, /(\bonSaved\s*:\s*\(revision\)\s*=>\s*\{)/, "$1 dropStash();");
+    expect(scan(deleted)).toEqual(["onSaved deletes the copy"]);
   });
 
   it("a discarded draft that keeps the stash is flagged", () => {
@@ -223,7 +259,7 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
   it("a discarded draft that drops the stash after navigate is flagged", () => {
     const late = mutate(
       real,
-      /(\bonDiscarded\s*:\s*\(\)\s*=>\s*\{\s*)dropStash\(\);(\s*onDirtyChange\?\.\(false\);\s*navigate\(\{ name: "processes" \}\);)/,
+      /(\bonDiscarded\s*:\s*\(\)\s*=>\s*\{\s*)dropStash\(\);(\s*onDirtyChange\?\.\(false\);\s*onUnappliedJsonChange\?\.\(false\);\s*navigate\(\{ name: "processes" \}\);)/,
       "$1$2\ndropStash();",
     );
     expect(scan(late)).toEqual(["onDiscarded does not call dropStash before navigate"]);
@@ -271,10 +307,10 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
   });
 
   it("a restore that asks with no unsaved work, or never asks, is flagged", () => {
-    const inverted = mutate(real, /\bif \(dirtyNow\) (\{\s*restoreTrigger)/, "if (!dirtyNow) $1");
-    expect(scan(inverted)).toEqual(["askRestore does not ask only while dirtyNow"]);
+    const inverted = mutate(real, /\bif \(dirtyNow \|\| savedUnderNotice\) (\{\s*restoreTrigger)/, "if (!dirtyNow) $1");
+    expect(scan(inverted)).toEqual(["askRestore does not ask only over a change since the draft opened"]);
     const never = mutate(real, /setRestoreAsked\(true\);/, "runRestore();");
-    expect(scan(never)).toEqual(["askRestore does not ask only while dirtyNow"]);
+    expect(scan(never)).toEqual(["askRestore does not ask only over a change since the draft opened"]);
   });
 
   it("a restore that moves the focus behind the open dialog is flagged", () => {
@@ -288,16 +324,16 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
   });
 
   it("a 401 that stashes a clean draft is flagged", () => {
-    const always = mutate(real, /\bif \(dirtyNow\) (stashDraft\()/, "$1");
-    expect(scan(always)).toEqual(["stashOnUnauthorized does not write the stash only while dirtyNow"]);
-    const inverted = mutate(real, /\bif \(dirtyNow\) (stashDraft\()/, "if (!dirtyNow) $1");
-    expect(scan(inverted)).toEqual(["stashOnUnauthorized does not write the stash only while dirtyNow"]);
+    const always = mutate(real, /\bif \(dirtyNow && stash === undefined\) (stashDraft\()/, "$1");
+    expect(scan(always)).toEqual(["stashOnUnauthorized does not write the stash only while dirty with no copy"]);
+    const inverted = mutate(real, /\bif \(dirtyNow && stash === undefined\) (stashDraft\()/, "if (!dirtyNow && stash === undefined) $1");
+    expect(scan(inverted)).toEqual(["stashOnUnauthorized does not write the stash only while dirty with no copy"]);
   });
 
   it("a stash call in a comment is not the dirty gate", () => {
-    const always = mutate(real, /\bif \(dirtyNow\) (stashDraft\()/, "$1");
-    const commented = mutate(always, /(\bconst stashOnUnauthorized = \(\) => \{)/, "$1\n// if (dirtyNow) stashDraft(\n");
-    expect(scan(commented)).toEqual(["stashOnUnauthorized does not write the stash only while dirtyNow"]);
+    const always = mutate(real, /\bif \(dirtyNow && stash === undefined\) (stashDraft\()/, "$1");
+    const commented = mutate(always, /(\bconst stashOnUnauthorized = \(\) => \{)/, "$1\n// if (dirtyNow && stash === undefined) stashDraft(\n");
+    expect(scan(commented)).toEqual(["stashOnUnauthorized does not write the stash only while dirty with no copy"]);
   });
 
   it("an outer EditScreen load that wraps onUnauthorized is flagged", () => {
@@ -333,5 +369,127 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
 
   it("an extra prop on the RestoreNotice is not a violation", () => {
     expect(scan(mutate(real, /<RestoreNotice/, "<RestoreNotice\n  extra={1}"))).toEqual([]);
+  });
+});
+
+function memoryStorage() {
+  const map = new Map<string, string>();
+  return {
+    getItem: (key: string) => map.get(key) ?? null,
+    setItem: (key: string, value: string) => void map.set(key, value),
+    removeItem: (key: string) => void map.delete(key),
+  };
+}
+
+const COPY: DraftStash = { body: { label: { en: "Kept" } } as unknown as Draft, layout: { a: 1 }, revision: 3 };
+const LOADED = { body: { label: { en: "Stored" } }, layout: {} };
+const FOR_WAIT = { dirty: true, saving: false, conflict: false, failure: undefined, changedSinceFailure: false, dirtyFor: 0 };
+
+/** Each scenario of `studio-app`'s "A kept copy waits for the author's answer". */
+describe("A kept copy waits for the author's answer", () => {
+  it("The same actor can restore after logging in again", () => {
+    const storage = memoryStorage();
+    stashDraft(storage, "actor", "proc", COPY);
+    expect(readRestorable(storage, "actor", "proc", LOADED)).toEqual(COPY);
+    expect(scan(mutate(real, /replace\(stash\.body\);/, ""))).toEqual(["runRestore does not put the copy's body in the editor"]);
+  });
+
+  it("A copy equal to the loaded draft shows no notice", () => {
+    const storage = memoryStorage();
+    stashDraft(storage, "actor", "proc", COPY);
+    expect(readRestorable(storage, "actor", "proc", { body: COPY.body, layout: COPY.layout })).toBeUndefined();
+  });
+
+  it("Restoring over newer changes asks first", () => {
+    expect(scan(mutate(real, /\bif \(dirtyNow \|\| savedUnderNotice\) \{/, "if (savedUnderNotice) {"))).toEqual(["askRestore does not ask only over a change since the draft opened"]);
+  });
+
+  it("Restoring after this tab saved asks first", () => {
+    expect(scan(mutate(real, /\bif \(dirtyNow \|\| savedUnderNotice\) \{/, "if (dirtyNow) {"))).toEqual(["askRestore does not ask only over a change since the draft opened"]);
+    expect(scan(mutate(real, /setSavedUnderNotice\(true\);/, ""))).toEqual(["followStash does not mark the saved change"]);
+  });
+
+  it("A restored draft saved against a moved revision conflicts", () => {
+    const moved = mutate(real, /revision: stash\.revision, layout: stash\.layout\b/, "layout: stash.layout");
+    expect(scan(moved)).toEqual(["runRestore does not keep the copy's revision and layout"]);
+  });
+
+  it("Another actor sees no notice", () => {
+    const storage = memoryStorage();
+    stashDraft(storage, "actor", "proc", COPY);
+    expect(readRestorable(storage, "other", "proc", LOADED)).toBeUndefined();
+  });
+
+  it("Restoring deletes the copy", () => {
+    expect(scan(mutate(real, /(layout: stash\.layout \}\)\);\s*)dropStash\(\);/, "$1"))).toEqual(["runRestore keeps the copy"]);
+  });
+
+  it("Choosing \"Discard them\" deletes the copy", () => {
+    expect(scan(mutate(real, /(const discardStash = \(\) => \{\s*if \(requestRunning\) return;\s*)dropStash\(\);/, "$1"))).toEqual(["discardStash keeps the copy"]);
+  });
+
+  it("Discarding the draft deletes the copy", () => {
+    expect(scan(mutate(real, /(onDiscarded\s*:\s*\(\)\s*=>\s*\{\s*)dropStash\(\);/, "$1"))).toEqual(["onDiscarded does not call dropStash before navigate"]);
+  });
+
+  it("The notice waits for a running save", () => {
+    expect(scan(mutate(real, /\s+disabled=\{requestRunning\}/, ""))).toEqual(["RestoreNotice disabled is not requestRunning"]);
+  });
+});
+
+/** Each scenario of `studio-app`'s "A standing notice holds the automatic saves". */
+describe("The process list's discard deletes the kept copy", () => {
+  const list = stripComments(readFileSync(new URL("../src/areas/studio/screens/ProcessesScreen.tsx", import.meta.url).pathname, "utf8"));
+  const rootFile = stripComments(readFileSync(new URL("../src/areas/studio/root.tsx", import.meta.url).pathname, "utf8"));
+  const clears = (code: string) => /await deleteDraft\(processId, token\);\s*clearStash\(tabStorage\(\), actorId, processId\);/.test(code);
+  const passes = (code: string) => /<ProcessesScreen\b[^>]*\bactorId=\{session\.actorId\}/.test(code);
+
+  it("clears the copy right after the delete answers, under the session's actor", () => {
+    expect(clears(list)).toBe(true);
+    expect(passes(rootFile)).toBe(true);
+  });
+
+  it("a discard that leaves the copy is flagged", () => {
+    expect(clears(list.replace("clearStash(tabStorage(), actorId, processId);", ""))).toBe(false);
+  });
+
+  it("a clear ahead of the delete is flagged, since a refused delete keeps the draft", () => {
+    expect(clears(list.replace(/await deleteDraft\(processId, token\);\s*clearStash\(tabStorage\(\), actorId, processId\);/, "clearStash(tabStorage(), actorId, processId);\nawait deleteDraft(processId, token);"))).toBe(false);
+  });
+
+  it("a process list with no actor is flagged", () => {
+    expect(passes(rootFile.replace("actorId={session.actorId} roles", "roles"))).toBe(false);
+  });
+});
+
+describe("A standing notice holds the automatic saves", () => {
+  it("A change under the notice sends nothing", () => {
+    expect(autosaveWait({ ...FOR_WAIT, held: true, flushAsked: false })).toBeUndefined();
+    expect(scan(mutate(real, /noticeStands: stash !== undefined/, "noticeStands: false"))).toEqual(["the notice does not hold the saves"]);
+    const line = headerStateLine({ dirty: true, failed: false, conflict: false, noticeStands: true, jsonUnapplied: false, lastSavedAt: undefined, now: 0, baseVersion: null });
+    expect(line.state).toBe("unsaved");
+  });
+
+  it("Answering the notice lets the saves run", () => {
+    expect(autosaveWait({ ...FOR_WAIT, held: false, flushAsked: false })).toBe(AUTOSAVE_DEBOUNCE_MS);
+  });
+
+  it("An exit under the notice keeps the copy", () => {
+    expect(autosaveWait({ ...FOR_WAIT, held: true, flushAsked: true })).toBe(0);
+    expect(scan(mutate(real, /(\bonSaved\s*:\s*\(revision\)\s*=>\s*\{)/, "$1 dropStash();"))).toEqual(["onSaved deletes the copy"]);
+  });
+
+  it("A copy restores after an exit under the notice", () => {
+    expect(scan(mutate(real, /followStash\(revision\);/, ""))).toEqual(["onSaved does not move the copy's revision"]);
+    expect(scan(mutate(real, /followStash\(record\.revision\);/, ""))).toEqual(["onRestored does not move the copy's revision"]);
+    expect(scan(mutate(real, /stashDraft\(tabStorage\(\), actorId, processId, moved\);/, ""))).toEqual(["followStash does not reach storage"]);
+    expect(scan(mutate(real, /setStash\(moved\);/, ""))).toEqual(["followStash does not reach state"]);
+    expect(scan(mutate(real, /const moved = \{ \.\.\.stash, revision \};/, "const moved = { body: draft, layout: saveState.layout, revision };"))).toEqual(["followStash does not keep the copy's body and layout"]);
+    expect(scan(mutate(real, /if \(stash === undefined\) return;\s*(const moved)/, "$1"))).toEqual(["followStash writes a copy nothing kept"]);
+  });
+
+  it("A 401 under the notice keeps the copy", () => {
+    const over = mutate(real, /\bif \(dirtyNow && stash === undefined\) (stashDraft\()/, "if (dirtyNow) $1");
+    expect(scan(over)).toEqual(["stashOnUnauthorized does not write the stash only while dirty with no copy"]);
   });
 });
