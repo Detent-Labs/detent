@@ -354,19 +354,21 @@ function readMembership(node: CelNode, byPath: Map<string, Operand>, op: "in" | 
   return { kind: "cmp", operand: path, op, value: { kind: "literal", value } };
 }
 
+const comparesFields = (o: Operand) => o.group === "fields" || o.group === "child";
+
 /**
  * The field and called-process operands a row on `operandPath` can compare
  * against: the same CEL type and the same `format` (an absent format matches
- * an absent one alone), the operand itself left out. A list operand takes
- * none, since `in` takes a literal.
+ * an absent one alone), the operand itself left out. A row on a context
+ * operand takes none, and so does a list operand, since `in` takes a literal.
  */
 export function fieldValueCandidates(operandPath: string, operands: Operand[]): Operand[] {
   const operand = operands.find((o) => o.path === operandPath);
-  if (!operand || operand.celType === "list<string>") return [];
+  if (!operand || !comparesFields(operand) || operand.celType === "list<string>") return [];
   return operands.filter(
     (o) =>
       o.path !== operandPath &&
-      (o.group === "fields" || o.group === "child") &&
+      comparesFields(o) &&
       o.celType === operand.celType &&
       o.format === operand.format,
   );
@@ -567,6 +569,11 @@ export function withoutRow(condition: Condition, at: RowAt): Condition {
       ? condition.rows.map((r, i) => (i === at.row ? { ...target, rows } : r))
       : condition.rows.filter((_, i) => i !== at.row),
   };
+}
+
+/** The condition with a fresh group after its rows. */
+export function withGroup(condition: Condition, operands: Operand[]): Condition {
+  return { ...condition, rows: [...condition.rows, newGroup(condition.joiner, operands)] };
 }
 
 /** One complete leaf as CEL, a raw row's text as it stands. */

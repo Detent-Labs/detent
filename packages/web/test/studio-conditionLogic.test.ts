@@ -949,6 +949,18 @@ describe("a row compares against another field", () => {
     expect(fromCel("data.status == instance.status", operands)!.rows).toEqual([{ kind: "raw", src: "data.status == instance.status" }]);
   });
 
+  it("leaves a context operand on the left a raw row", () => {
+    const operands = catalog([labeled("note", "Note", "string")]);
+    expect(fromCel("instance.status == data.note", operands)!.rows).toEqual([{ kind: "raw", src: "instance.status == data.note" }]);
+  });
+
+  it("offers a context operand no candidate, and never a context operand as one", () => {
+    const operands = catalog([labeled("note", "Note", "string"), labeled("city", "City", "string")]);
+    expect(operands.some((o) => o.path === "instance.status" && o.celType === "string")).toBe(true);
+    expect(fieldValueCandidates("instance.status", operands)).toEqual([]);
+    expect(fieldValueCandidates("data.note", operands).map((o) => o.path)).toEqual(["data.city"]);
+  });
+
   it("leaves a right side of another CEL type, an unknown field and the operand itself a raw row", () => {
     const operands = catalog([labeled("amount", "Amount", "number"), labeled("note", "Note", "string")]);
     for (const src of ["data.amount == data.note", "data.amount == data.gone", "data.amount == data.amount"]) {

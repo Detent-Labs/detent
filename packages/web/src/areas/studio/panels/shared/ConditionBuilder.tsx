@@ -9,10 +9,10 @@ import {
   fieldValueCandidates,
   inputTypeFor,
   isComplete,
-  newGroup,
   newLeaf,
   operatorsFor,
   operatorWord,
+  withGroup,
   withoutRow,
   type CmpOp,
   type Condition,
@@ -38,9 +38,9 @@ const styles = stylex.create({
   // note's idiom.
   groupRows: {
     paddingInlineStart: space.s4,
-    borderLeftWidth: 2,
-    borderLeftStyle: "solid",
-    borderLeftColor: colors.border,
+    borderInlineStartWidth: 2,
+    borderInlineStartStyle: "solid",
+    borderInlineStartColor: colors.border,
   },
   conditionRow: {
     display: "flex",
@@ -478,9 +478,9 @@ export function removeControlIndex(rows: Row[], at: RowAt): number {
 }
 
 /**
- * The rows, joined by the condition's one operator, and a group per level of
- * the other. The joiner sits in the gutter between rows rather than as a
- * per-row control: one level carries exactly one.
+ * The rows, joined by the condition's one operator. Each row is a leaf or a
+ * group joined by the other operator. The joiner sits in the gutter between
+ * rows rather than as a per-row control: one level carries exactly one.
  *
  * A row the author has not finished stays visible and marked. It is builder
  * state, not body state — `toCel` leaves it out, so a half-written
@@ -550,7 +550,7 @@ export function ConditionBuilder({ condition, operands, onChange, describedBy }:
       <button
         type="button"
         className="btn btn-ghost"
-        onClick={() => setRows([...condition.rows, newGroup(condition.joiner, operands)])}
+        onClick={() => onChange(withGroup(condition, operands))}
         disabled={!operands.length}
       >
         {t("condition.groupRow.add")}

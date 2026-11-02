@@ -10,12 +10,12 @@
 import { describe, expect, it } from "bun:test";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { readFileSync } from "node:fs";
 import { ComparisonRow, ConditionBuilder, GroupRow } from "../src/areas/studio/panels/shared/ConditionBuilder.js";
 import {
   newGroup,
   rowCount,
   toCel,
+  withGroup,
   withoutRow,
   type Condition,
   type GroupRow as GroupRowModel,
@@ -27,12 +27,13 @@ const AMOUNT: Operand = { path: "data.amount", label: "Amount", celType: "double
 const LIMIT: Operand = { path: "data.limit", label: "Limit", celType: "double", declaredType: "number", group: "fields" };
 const COUNT: Operand = { path: "data.count", label: "Count", celType: "int", declaredType: "number", format: "integer", group: "fields" };
 const NOTE: Operand = { path: "data.note", label: "Note", celType: "string", group: "fields" };
+const CITY: Operand = { path: "data.city", label: "City", celType: "string", group: "fields" };
 const DUE: Operand = { path: "data.due", label: "Due", celType: "string", format: "date", group: "fields" };
 const START: Operand = { path: "data.start", label: "Start", celType: "string", format: "date", group: "fields" };
 const STARTS_AT: Operand = { path: "data.starts_at", label: "Starts at", celType: "string", format: "datetime", group: "fields" };
 const STATUS: Operand = { path: "instance.status", label: "The case's status", celType: "string", group: "case" };
 const ROLES: Operand = { path: "actor.roles", label: "The person's roles", celType: "list<string>", group: "person" };
-const ALL = [AMOUNT, LIMIT, COUNT, NOTE, DUE, START, STARTS_AT, STATUS, ROLES];
+const ALL = [AMOUNT, LIMIT, COUNT, NOTE, CITY, DUE, START, STARTS_AT, STATUS, ROLES];
 const byPath = new Map(ALL.map((o) => [o.path, o]));
 
 const leaf = (operand: string, op: "==" | ">" | "<", value: string | number | undefined): Leaf => ({
@@ -131,6 +132,13 @@ describe("a group row", () => {
     expect(html).toMatch(/condition-add[^>]*>\+ Add row<\/button><button[^>]*>\+ Add group<\/button>/);
   });
 
+  it("draws a raw row inside a group as the hand-written sentence", () => {
+    const inner = renderToStaticMarkup(<ol>{groupRow(group("||", [leaf("data.amount", ">", 1), { kind: "raw", src: "data.tier == 'gold' && data.eu" }]))}</ol>);
+    const nested = inner.slice(inner.indexOf("<ol", 4));
+    expect(nested).toMatch(/<li[^>]*><span[^>]*>or<\/span><span[^>]*>A hand-written rule\. The Developer view holds its text\.<\/span><button[^>]*aria-label="Remove row"/);
+    expect(inner).not.toContain("gold");
+  });
+
   it("flags a group with no finished row, and the row in it", () => {
     const unfinished = render({ joiner: "&&", rows: [group("||", [leaf("data.amount", ">", undefined)])] });
     expect(unfinished).toContain("Needs a finished row before it is written.");
@@ -148,9 +156,11 @@ describe("a new group", () => {
     expect(nested).toContain("Needs a value before it is written.");
   });
 
-  it("is what + Add group adds, on the condition's joiner", () => {
-    const source = readFileSync(new URL("../src/areas/studio/panels/shared/ConditionBuilder.tsx", import.meta.url), "utf-8");
-    expect(source).toContain("newGroup(condition.joiner, operands)");
+  it("is what + Add group adds, after the rows, on the condition's opposite joiner", () => {
+    const first = leaf("data.amount", ">", 1);
+    const next = withGroup({ joiner: "&&", rows: [first] }, ALL);
+    expect(next).toEqual({ joiner: "&&", rows: [first, group("||", [leaf("data.amount", "==", undefined)])] });
+    expect(withGroup({ joiner: "||", rows: [] }, ALL).rows).toEqual([group("&&", [leaf("data.amount", "==", undefined)])]);
   });
 
   it("adds a fresh row inside on + Add row to this group", () => {
@@ -243,8 +253,16 @@ describe("the value swap command", () => {
   });
 
   it("offers no command on an operand with no candidate", () => {
-    expect(markup(leaf("data.note", "==", "x") as Extract<Leaf, { kind: "cmp" }>)).not.toContain("Compare with a field instead");
     expect(markup(leaf("data.count", ">", 3) as Extract<Leaf, { kind: "cmp" }>)).not.toContain("Compare with a field instead");
+  });
+
+  it("offers no command on a context operand's row", () => {
+    expect(markup(leaf("instance.status", "==", "running") as Extract<Leaf, { kind: "cmp" }>)).not.toContain("Compare with a field instead");
+  });
+
+  it("lists no context operand in a text row's picker", () => {
+    const picker = selectLabelled(markup(fieldRow("data.note", "==", "")), "field to compare with");
+    expect(optionTexts(picker)).toEqual(["(select a field)", "City"]);
   });
 
   it("empties the value on either swap", () => {
