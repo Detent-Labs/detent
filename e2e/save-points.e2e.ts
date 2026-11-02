@@ -225,7 +225,7 @@ test("a failed save stops naming and restoring, says so at the act, and the sent
   await page.getByRole("button", { name: "Restore “Alpha”", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Restore “Alpha”?" });
   await dialog.getByRole("button", { name: "Restore", exact: true }).click();
-  const restoreStopped = dialog.getByRole("alert").filter({ hasText: "Detent cannot restore yet, because your latest changes have not saved. Try again above, then restore." });
+  const restoreStopped = dialog.getByRole("alert").filter({ hasText: "Detent cannot restore yet, because your latest changes have not saved. Cancel and press Try again, then restore." });
   await expect(restoreStopped).toBeVisible();
   expect(acts.count()).toBe(0);
 

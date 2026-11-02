@@ -148,7 +148,7 @@ describe("a restore's outcome", () => {
   it("keeps the dialog open and says why when a failed save stops it", () => {
     expect(restoreLanding({ kind: "unsaved" }, "A")).toEqual({
       dialog: "stay",
-      refusal: "Detent cannot restore yet, because your latest changes have not saved. Try again above, then restore.",
+      refusal: "Detent cannot restore yet, because your latest changes have not saved. Cancel and press Try again, then restore.",
       refetch: false,
       focusInputAfter: false,
     });

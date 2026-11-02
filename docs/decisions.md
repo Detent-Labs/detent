@@ -2366,6 +2366,14 @@ points below to later changes. The AUTOSAVE tag is local to this section.
 
   Upgrade entry: a `keydown` handler that calls `preventDefault` and `flush`, on the
   screen in `screens/EditScreen.tsx`. It should state "Saved" where nothing waits.
+- **AUTOSAVE-15: the JSON surface holds the body and no layout.** The refused save's
+  banner sends an author there to copy their work. The copy loses unsaved step
+  positions, since the layout stands outside the body. Risk (Low): the definition
+  survives, and a step sits where it last saved.
+
+  Upgrade entry: a read-only layout block beside the text in `panels/JsonView.tsx`,
+  or a banner sentence that names the loss, in the catalog's
+  `draftToolbar.saveFailedRefused`.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

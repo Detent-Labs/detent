@@ -467,7 +467,7 @@ The focus SHALL return to that row's Restore.
 #### Scenario: A failed save stops the Restore dialog
 
 - **WHEN** an author confirms a restore and the waiting change's save answers 500
-- **THEN** the dialog stays open and prints "Detent cannot restore yet, because your latest changes have not saved. Try again above, then restore."
+- **THEN** the dialog stays open and prints "Detent cannot restore yet, because your latest changes have not saved. Cancel and press Try again, then restore."
 - **AND** no restore request leaves
 - **AND** the sentence leaves when a timed retry succeeds
 

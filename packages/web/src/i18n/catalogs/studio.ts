@@ -128,7 +128,7 @@ export const en = {
   "savePoints.removeRow": "Remove “{name}”",
   "savePoints.restoreHeading": "Restore “{name}”?",
   "savePoints.restoreNote": "The draft goes back to this point. Your work as it stands now becomes a save point, so you can come back to it.",
-  "savePoints.restoreUnsaved": "Detent cannot restore yet, because your latest changes have not saved. Try again above, then restore.",
+  "savePoints.restoreUnsaved": "Detent cannot restore yet, because your latest changes have not saved. Cancel and press Try again, then restore.",
   "savePoints.removeHeading": "Remove “{name}”?",
   "savePoints.removeNote": "This save point goes for good. The draft stays as it is.",
   "savePoints.removed": "Removed “{name}”.",

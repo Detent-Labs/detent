@@ -155,9 +155,9 @@ stays outlined in the accent and never turns red.
 The authoring command is a studio ghost button in slate, mono at 11px. A
 form card's open control and the form tab strip's controls take it. So do
 the change list's commands, the form editor's move controls and a placed
-field's own remove control. A group card's `Remove ({count})` control
-stays exempt. See `DESIGN.md`'s Buttons section for the hover and press
-detail.
+field's own remove control. A save point row's Restore and Remove take it
+too. A group card's `Remove ({count})` control stays exempt. See
+`DESIGN.md`'s Buttons section for the hover and press detail.
 
 **The register row**, each app-area screen's own `taskList`/`taskRow`
 style pair (`TasksScreen.tsx` and its siblings). Three columns: a stamp,
