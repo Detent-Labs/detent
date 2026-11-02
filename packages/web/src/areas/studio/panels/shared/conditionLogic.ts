@@ -374,6 +374,39 @@ export function fieldValueCandidates(operandPath: string, operands: Operand[]): 
   );
 }
 
+/** Two option sets match on the same values in the same order. An absent set
+ * matches an absent or empty one. */
+function sameOptions(a: OperandOption[] | undefined, b: OperandOption[] | undefined): boolean {
+  const left = a ?? [];
+  const right = b ?? [];
+  return left.length === right.length && left.every((o, i) => o.value === right[i]!.value);
+}
+
+/**
+ * A comparison moved onto the operand at `nextPath`. The operator and the
+ * value stay when the new operand offers that operator and shares the old
+ * one's CEL type, format and option set. A field value stays only when the new
+ * operand still offers that field as a candidate, so `data.a > data.b` moved
+ * onto `data.b` never writes `data.b > data.b`. Anything else resets to the new
+ * operand's first operator and an empty literal.
+ */
+export function retargetRow(row: Extract<Leaf, { kind: "cmp" }>, nextPath: string, operands: Operand[]): Extract<Leaf, { kind: "cmp" }> {
+  const from = operands.find((o) => o.path === row.operand);
+  const to = operands.find((o) => o.path === nextPath);
+  const empty: RowValue = { kind: "literal", value: undefined };
+  const fits =
+    from !== undefined &&
+    to !== undefined &&
+    from.celType === to.celType &&
+    from.format === to.format &&
+    sameOptions(from.options, to.options) &&
+    operatorsFor(to.celType, to.format).includes(row.op);
+  if (!fits) return { kind: "cmp", operand: nextPath, op: operatorsFor(to?.celType ?? "string", to?.format)[0]!, value: empty };
+  const { value } = row;
+  const keeps = value.kind === "literal" || fieldValueCandidates(nextPath, operands).some((o) => o.path === value.path);
+  return { kind: "cmp", operand: nextPath, op: row.op, value: keeps ? value : empty };
+}
+
 /** One leaf: a comparison the builder can show, else a raw row. A comparison
  * on an operator its operand does not offer stays raw, so a row's select never
  * holds an operator it cannot list. */
@@ -436,7 +469,9 @@ function readRow(node: CelNode, operands: Operand[], byPath: Map<string, Operand
 }
 
 /** Flatten the left-associative chain of one operator; a nested other operator
- * survives whole. Exported for `ruleLogic.ts`'s reuse. */
+ * survives whole. Exported for `ruleLogic.ts`'s reuse. Unlike `chainOf`, it
+ * walks the left spine alone: a right operand on the same operator stays one
+ * member. */
 export function conjuncts(node: CelNode, joiner: string): CelNode[] {
   if (node.op !== joiner || !Array.isArray(node.args) || node.args.length !== 2) return [node];
   const [left, right] = node.args as [unknown, unknown];

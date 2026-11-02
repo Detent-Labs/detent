@@ -187,7 +187,6 @@ describe("condition builder vocabulary", () => {
       ["condition.clause.allOf", "all of {clauses}"],
       ["condition.join.andAfterGroup", "{left}, and {right}"],
       ["condition.join.orAfterGroup", "{left}, or {right}"],
-      ["condition.groupRow.incomplete", "Needs a finished row before it is written."],
     ]);
   });
 });

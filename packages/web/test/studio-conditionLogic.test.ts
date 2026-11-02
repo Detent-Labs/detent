@@ -13,6 +13,7 @@ import {
   operandSignature,
   operatorWord,
   readerSentence,
+  retargetRow,
   operatorsFor,
   rowCount,
   summarizeCondition,
@@ -887,7 +888,6 @@ describe("a group holds rows of its own, one level deep", () => {
     const condition = fromCel(stored, operands)!;
     const next: Condition = { ...condition, rows: [...condition.rows, newGroup(condition.joiner, operands)] };
     expect(toCel(next, operands)).toBe(stored);
-    expect(t("condition.groupRow.incomplete")).toBe("Needs a finished row before it is written.");
   });
 
   it("counts the leaves and the groups", () => {
@@ -1211,5 +1211,65 @@ describe("the clauses", () => {
   it("prints a date-time literal whose offset no date can hold as its stored text", () => {
     expect(read('data.starts_at == "2026-01-01T00:00+24:00"')).toBe("Starts at is 2026-01-01T00:00+24:00.");
     expect(read('data.starts_at == "2026-01-01T00:00+99:99"')).toBe("Starts at is 2026-01-01T00:00+99:99.");
+  });
+});
+
+describe("an operand switch keeps what still fits", () => {
+  const num = (key: string): Operand => ({ path: `data.${key}`, label: key, celType: "double", declaredType: "number", group: "fields" });
+  const text = (key: string, extra: Partial<Operand> = {}): Operand => ({ path: `data.${key}`, label: key, celType: "string", group: "fields", ...extra });
+  const opts = (...values: string[]) => values.map((value) => ({ value, label: value.toUpperCase() }));
+  const AMOUNT = num("amount");
+  const LIMIT = num("limit");
+  const BUDGET = num("budget");
+  const NOTE = text("note");
+  const DUE = text("due", { format: "date" });
+  const START = text("start", { format: "date" });
+  const STARTS_AT = text("starts_at", { format: "datetime" });
+  const TIER = text("tier", { options: opts("gold", "silver") });
+  const LEVEL = text("level", { options: opts("gold", "silver") });
+  const RANK = text("rank", { options: opts("gold", "bronze") });
+  const ORDER = text("order", { options: opts("silver", "gold") });
+  const operands = [AMOUNT, LIMIT, BUDGET, NOTE, DUE, START, STARTS_AT, TIER, LEVEL, RANK, ORDER];
+  const empty = lit(undefined);
+  const row = (operand: string, op: CmpOp, value: RowValue) => cmpRow(operand, op, value) as Extract<Leaf, { kind: "cmp" }>;
+
+  it("keeps the operator and the literal on an operand of the same type, format and options", () => {
+    expect(retargetRow(row("data.amount", ">", lit(1000)), "data.limit", operands)).toEqual(row("data.limit", ">", lit(1000)));
+    expect(retargetRow(row("data.due", "<", lit("2026-12-31")), "data.start", operands)).toEqual(row("data.start", "<", lit("2026-12-31")));
+    expect(retargetRow(row("data.tier", "!=", lit("gold")), "data.level", operands)).toEqual(row("data.level", "!=", lit("gold")));
+    expect(retargetRow(row("data.note", "==", lit("x")), "data.note", operands)).toEqual(row("data.note", "==", lit("x")));
+  });
+
+  it("resets both on an operand of another CEL type", () => {
+    expect(retargetRow(row("data.amount", ">", lit(1000)), "data.note", operands)).toEqual(row("data.note", "==", empty));
+    expect(retargetRow(row("data.note", "!=", lit("x")), "data.amount", operands)).toEqual(row("data.amount", "==", empty));
+  });
+
+  it("resets both on an operand of another format", () => {
+    expect(retargetRow(row("data.due", "==", lit("2026-12-31")), "data.note", operands)).toEqual(row("data.note", "==", empty));
+    expect(retargetRow(row("data.due", "<", lit("2026-12-31")), "data.starts_at", operands)).toEqual(row("data.starts_at", "==", empty));
+  });
+
+  it("resets both when the option sets differ in a value, in order, or in presence", () => {
+    expect(retargetRow(row("data.tier", "!=", lit("gold")), "data.rank", operands)).toEqual(row("data.rank", "==", empty));
+    expect(retargetRow(row("data.tier", "!=", lit("gold")), "data.order", operands)).toEqual(row("data.order", "==", empty));
+    expect(retargetRow(row("data.tier", "!=", lit("gold")), "data.note", operands)).toEqual(row("data.note", "==", empty));
+    expect(retargetRow(row("data.note", "!=", lit("gold")), "data.tier", operands)).toEqual(row("data.tier", "==", empty));
+  });
+
+  it("resets both when no operand is picked", () => {
+    expect(retargetRow(row("data.amount", ">", lit(1000)), "", operands)).toEqual(row("", "==", empty));
+  });
+
+  it("keeps a field value the new operand still offers as a candidate", () => {
+    expect(retargetRow(row("data.amount", ">", { kind: "field", path: "data.budget" }), "data.limit", operands)).toEqual(
+      row("data.limit", ">", { kind: "field", path: "data.budget" }),
+    );
+  });
+
+  it("resets a field value the new operand does not offer, so data.a > data.b never becomes data.b > data.b", () => {
+    const next = retargetRow(row("data.amount", ">", { kind: "field", path: "data.budget" }), "data.budget", operands);
+    expect(next).toEqual(row("data.budget", ">", empty));
+    expect(toCel({ joiner: "&&", rows: [next] }, operands)).toBeUndefined();
   });
 });

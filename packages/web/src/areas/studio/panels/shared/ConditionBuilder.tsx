@@ -12,6 +12,7 @@ import {
   newLeaf,
   operatorsFor,
   operatorWord,
+  retargetRow,
   withGroup,
   withoutRow,
   type CmpOp,
@@ -281,14 +282,16 @@ interface LeafProps {
 }
 
 /** One leaf's `<li>`: the gutter, the leaf's own controls, its incomplete flag
- * and its remove control. */
+ * and its remove control. The flag asks for a field over a field value and
+ * for a value otherwise. */
 function LeafItem({ leaf, byPath, gutter, xstyle, onRemove, children }: Pick<LeafProps, "byPath" | "gutter" | "xstyle" | "onRemove"> & { leaf: Leaf; children: ReactNode }) {
   const complete = isComplete(leaf, byPath);
+  const flag = leaf.kind === "cmp" && leaf.value.kind === "field" ? t("condition.incompleteField") : t("condition.incomplete");
   return (
     <li {...stylex.props(styles.conditionRow, xstyle, !complete && styles.conditionRowIncomplete)}>
       {gutter}
       {children}
-      {!complete && <span {...stylex.props(styles.conditionFlag)}>{t("condition.incomplete")}</span>}
+      {!complete && <span {...stylex.props(styles.conditionFlag)}>{flag}</span>}
       <RemoveControl label={t("condition.removeRow")} onRemove={onRemove} />
     </li>
   );
@@ -311,17 +314,7 @@ export function ComparisonRow({ row, operands, byPath, gutter, xstyle, onChange,
         {...stylex.props(styles.conditionControl)}
         aria-label={t("condition.operandLabel")}
         value={row.operand}
-        onChange={(e) => {
-          const next = byPath.get(e.target.value);
-          // The operand's type governs the operators and the value, so a
-          // switch resets both rather than keeping a stale pair.
-          onChange({
-            kind: "cmp",
-            operand: e.target.value,
-            op: operatorsFor(next?.celType ?? "string", next?.format)[0]!,
-            value: { kind: "literal", value: undefined },
-          });
-        }}
+        onChange={(e) => onChange(retargetRow(row, e.target.value, operands))}
       >
         <option value="">{t("condition.selectOperand")}</option>
         <OperandOptions operands={operands} />
@@ -395,9 +388,10 @@ function LeafRow({ leaf, ...props }: LeafProps & { leaf: Leaf }) {
 
 /**
  * A group: the head, the group's own rows indented under it, and the command
- * that adds a row inside. The head holds the group's joiner select, the
- * group's incomplete flag and its remove control. Inside the group the gutter
- * prints the joiner as a word: the head's select is the one way to set it.
+ * that adds a row inside. The head holds the group's joiner select and its
+ * remove control. An incomplete group takes the dashed border, and its rows'
+ * own flags say what to do. Inside the group the gutter prints the joiner as a
+ * word: the head's select is the one way to set it.
  *
  * `onRemove` takes the inner row's index, or none for the whole group.
  */
@@ -430,7 +424,6 @@ export function GroupRow({
           <option value="||">{t("condition.groupRow.any")}</option>
           <option value="&&">{t("condition.groupRow.all")}</option>
         </select>
-        {!complete && <span {...stylex.props(styles.conditionFlag)}>{t("condition.groupRow.incomplete")}</span>}
         <RemoveControl label={t("condition.groupRow.remove")} onRemove={() => onRemove()} />
       </div>
       <ol {...stylex.props(styles.conditionRows, styles.groupRows)}>

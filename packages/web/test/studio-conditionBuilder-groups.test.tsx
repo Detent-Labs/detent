@@ -139,11 +139,12 @@ describe("a group row", () => {
     expect(inner).not.toContain("gold");
   });
 
-  it("flags a group with no finished row, and the row in it", () => {
+  it("marks a group with no finished row by its dashed border, and the row in it carries the flag", () => {
     const unfinished = render({ joiner: "&&", rows: [group("||", [leaf("data.amount", ">", undefined)])] });
-    expect(unfinished).toContain("Needs a finished row before it is written.");
-    expect(unfinished).toContain("Needs a value before it is written.");
-    expect(html).not.toContain("Needs a finished row before it is written.");
+    expect(unfinished).toMatch(/<li class="groupRow conditionRowIncomplete">/);
+    expect(html).not.toContain("groupRow conditionRowIncomplete");
+    expect([...unfinished.matchAll(/Needs a value before it is written\./g)].length).toBe(1);
+    expect(unfinished).not.toContain("Needs a finished row");
   });
 });
 
@@ -282,5 +283,36 @@ describe("the value swap command", () => {
     (find(tree, byLabel("field to compare with")).props.onChange as (e: unknown) => void)({ target: { value: "data.start" } });
     expect(next).toEqual(fieldRow("data.due", ">", "data.start"));
     expect(toCel({ joiner: "&&", rows: [next!] }, ALL)).toBe("data.due > data.start");
+  });
+
+  it("flags an unfinished field value as needing a field, and an unfinished literal as needing a value", () => {
+    const field = markup(fieldRow("data.amount", ">", ""));
+    expect(field).toContain("Needs a field before it is written.");
+    expect(field).not.toContain("Needs a value before it is written.");
+    const literal = markup(leaf("data.amount", ">", undefined) as Extract<Leaf, { kind: "cmp" }>);
+    expect(literal).toContain("Needs a value before it is written.");
+    expect(literal).not.toContain("Needs a field before it is written.");
+  });
+});
+
+describe("the operand select", () => {
+  const pick = (row: Extract<Leaf, { kind: "cmp" }>, path: string) => {
+    let next: Leaf | undefined;
+    const tree = ComparisonRow({ row, operands: ALL, byPath, onChange: (l) => (next = l), onRemove: () => {} });
+    (find(tree, byLabel("field")).props.onChange as (e: unknown) => void)({ target: { value: path } });
+    return next;
+  };
+
+  it("keeps the operator and the value on an operand of the same shape", () => {
+    expect(pick(leaf("data.amount", ">", 1000) as Extract<Leaf, { kind: "cmp" }>, "data.limit")).toEqual(leaf("data.limit", ">", 1000));
+  });
+
+  it("resets both on an operand of another type", () => {
+    expect(pick(leaf("data.amount", ">", 1000) as Extract<Leaf, { kind: "cmp" }>, "data.note")).toEqual(leaf("data.note", "==", undefined));
+  });
+
+  it("resets a field value onto the field it named", () => {
+    const row = { kind: "cmp", operand: "data.amount", op: ">", value: { kind: "field", path: "data.limit" } } as Extract<Leaf, { kind: "cmp" }>;
+    expect(pick(row, "data.limit")).toEqual(leaf("data.limit", ">", undefined));
   });
 });

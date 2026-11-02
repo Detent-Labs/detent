@@ -495,7 +495,7 @@ export const en = {
   "condition.no": "no",
   "condition.rawRow": "Written by hand. Edit it as CEL.",
   "condition.incomplete": "Needs a value before it is written.",
-  "condition.groupRow.incomplete": "Needs a finished row before it is written.",
+  "condition.incompleteField": "Needs a field before it is written.",
   "condition.groupRow.add": "+ Add group",
   "condition.groupRow.addRow": "+ Add row to this group",
   "condition.groupRow.remove": "Remove group",
