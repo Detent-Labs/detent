@@ -50,7 +50,7 @@ bar, the tab row, then one tab body.
 | tab | one of the six. The authoring order runs Map, Steps, Fields, Forms, Checks and Settings | `routing.ts` |
 | sub-row | the strip of a tab's views under the tab row. The Fields tab's reads Catalog, Where fields appear and Where values come from. The Settings tab's reads Process, What it takes in and gives back, Access and Save points | `panels/SubRow.tsx` |
 | structure surface | the six tab bodies together, the JSON surface's one alternative | `EditScreen.tsx`; gated by `structureActive`, a prop of `panels/ProcessHeaderBar.tsx` |
-| JSON surface | the raw definition view, the structure surface's one alternative. A press on any tab leaves it. A Fix that opens it prints the check's sentence above the input | `panels/JsonView.tsx` |
+| JSON surface | the raw definition view, the structure surface's one alternative. A press on any tab leaves it. A Fix that opens it prints the check's sentence above the input. Text no Apply has taken counts as unsaved work. The state line then reads Unsaved changes, and each way off asks first | `panels/JsonView.tsx` |
 | dialog | the studio's one modal form: a heading, facts, notes, then a sticky footer with the confirm and Cancel. Every confirmation, choice and preview in the studio area stands in one | `panels/shared/StudioDialog.tsx` |
 
 The open tab stands in the address, at `/studio/processes/:id/edit/:tab`. An

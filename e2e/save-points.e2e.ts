@@ -163,3 +163,70 @@ test("the bound takes the input, keeps Remove, and a remove brings the input bac
   await expect(sentence).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Restore “Alpha”", exact: true })).not.toHaveAttribute("aria-disabled", "true");
 });
+
+/** Lets one request of each act through to the server and loses its answer, or sends nothing at all. */
+async function loseAnswer(page: Page, path: RegExp, reach: boolean): Promise<void> {
+  let done = false;
+  await page.route("**/drafts/**", async (route) => {
+    if (done || route.request().method() !== "POST" || !path.test(new URL(route.request().url()).pathname)) return route.fallback();
+    done = true;
+    if (reach) await route.fetch();
+    await route.abort("connectionreset");
+  });
+}
+
+function countListReads(page: Page): { count: () => number } {
+  let reads = 0;
+  page.on("request", (request) => {
+    if (request.method() === "GET" && new URL(request.url()).pathname.endsWith("/save-points")) reads += 1;
+  });
+  return { count: () => reads };
+}
+
+test("lost answers: a create shows its row, and a restore that landed adopts the stored draft", async ({ page }) => {
+  await page.goto("/studio");
+  await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Process name" })).toHaveValue(DRAFT_NAME);
+  const original = await (await fieldName(page)).inputValue();
+  await openSavePoints(page);
+  const input = page.getByRole("textbox", { name: "Name this save point" });
+
+  // The create commits and its answer goes: the sentence stands, and the row shows.
+  await loseAnswer(page, /\/save-points$/, true);
+  await input.fill("Lost create");
+  await page.getByRole("button", { name: "Save this point", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Could not reach the server." })).toBeVisible();
+  const restore = page.getByRole("button", { name: "Restore “Lost create”", exact: true });
+  await expect(restore).toBeVisible();
+  await expect(input).toHaveValue("Lost create");
+  await input.fill("");
+
+  await (await fieldName(page)).fill(`${original} after the point`);
+  await expect(stateLine(page, "Saved just now")).toBeVisible();
+  await openSavePoints(page);
+
+  // A restore that never arrived stays in its dialog, and the list reads again.
+  const reads = countListReads(page);
+  await loseAnswer(page, /\/restore$/, false);
+  await restore.click();
+  const dialog = page.getByRole("dialog", { name: "Restore “Lost create”?" });
+  await dialog.getByRole("button", { name: "Restore", exact: true }).click();
+  await expect(dialog.getByText("Could not reach the server.")).toBeVisible();
+  await expect.poll(reads.count).toBe(1);
+  await expect(page.getByRole("button", { name: "Reload", exact: true })).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(await fieldName(page)).toHaveValue(`${original} after the point`);
+  await openSavePoints(page);
+  await expect.poll(reads.count).toBe(2);
+
+  // A restore that committed behind the lost answer lands as done, and nothing conflicts.
+  await page.unrouteAll();
+  await loseAnswer(page, /\/restore$/, true);
+  await restore.click();
+  await dialog.getByRole("button", { name: "Restore", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(/^Restored “Lost create”\./)).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "Before restoring “Lost create”" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reload", exact: true })).toHaveCount(0);
+  await expect(await fieldName(page)).toHaveValue(original);
+});

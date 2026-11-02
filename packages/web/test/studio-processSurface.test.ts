@@ -270,7 +270,7 @@ describe("the Fix control's landing", () => {
 
   it("leaves the JSON surface on any tab press, and drops the check's sentence with it", () => {
     const code = body();
-    const press = slice(code, "onOpen={(target) => {", "jsonOpen={jsonOpen}");
+    const press = slice(code, "onOpen={(target) =>", "jsonOpen={jsonOpen}");
 
     expect(press).toContain("setJsonOpen(false);");
     expect(press).toContain("setJsonNote(undefined);");
@@ -279,7 +279,7 @@ describe("the Fix control's landing", () => {
   });
 
   it("drops the check's sentence when the menu entry toggles the surface", () => {
-    const toggle = slice(body(), "onToggleJson={() => {", "onVersions=");
+    const toggle = slice(body(), "onToggleJson={() =>", "onVersions=");
 
     expect(toggle).toContain("setJsonNote(undefined);");
   });

@@ -17,7 +17,7 @@ import { FieldsTabViews } from "../panels/FieldsTabViews.js";
 import { SettingsTab } from "../panels/SettingsTab.js";
 import { FormsTab } from "../panels/FormsTab.js";
 import { RestoreNotice } from "../panels/RestoreNotice.js";
-import { ArrangeDialog, RemoveStepsDialog, RestoreOverChangesDialog } from "../panels/confirmations.js";
+import { ArrangeDialog, LeaveDraftDialog, RemoveStepsDialog, RestoreOverChangesDialog } from "../panels/confirmations.js";
 import { RemoveStepDialog } from "../panels/RemoveStepDialog.js";
 import { stepRemovalReach } from "../draft/stepRemoval.js";
 import { activeControl } from "../panels/shared/dialogFocus.js";
@@ -314,6 +314,9 @@ interface EditScreenProps {
    * callback prop into a ref"). It stays true while a save runs, so an exit waits
    * for the answer even after the author took the text back by hand. */
   onDirtyChange?: (dirty: boolean) => void;
+  /** Reports whether the JSON surface holds text no Apply has put in the draft, so
+   * an exit and a tab close ask about it. No save can carry that text. */
+  onUnappliedJsonChange?: (unapplied: boolean) => void;
   /** Reports what an exit from this screen calls: `flush` saves first, and `drop`
    * gives the work up under a confirmed leave dialog. */
   onFlushChange?: (exit: DraftExit | undefined) => void;
@@ -351,6 +354,7 @@ interface ProcessSurfaceProps {
   actorId: string;
   onUnauthorized: () => void;
   onDirtyChange?: (dirty: boolean) => void;
+  onUnappliedJsonChange?: (unapplied: boolean) => void;
   onFlushChange?: (exit: DraftExit | undefined) => void;
   holdSaves?: boolean;
 }
@@ -382,7 +386,7 @@ function focusTabButton(tab: ProcessTab): void {
  * component state, the data sources panel fetched its list keys on mount, and
  * the field matrix holds its selected cell.
  */
-function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, actorId, onUnauthorized, onDirtyChange, onFlushChange, holdSaves }: ProcessSurfaceProps) {
+function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, actorId, onUnauthorized, onDirtyChange, onUnappliedJsonChange, onFlushChange, holdSaves }: ProcessSurfaceProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
@@ -419,6 +423,19 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // The sentence of the check whose Fix opened the JSON surface. It clears when
   // the surface leaves, by the menu entry or by a tab press.
   const [jsonNote, setJsonNote] = useState<string | undefined>(undefined);
+  // Whether the surface holds text no Apply has put in the draft. It reads as
+  // unsaved work, and leaving the surface drops it, so each way off it asks first.
+  const [jsonUnapplied, setJsonUnapplied] = useState(false);
+  const [jsonLeave, setJsonLeave] = useState<(() => void) | undefined>(undefined);
+  const jsonLeaveTrigger = useRef<HTMLElement | null>(null);
+  const leaveJsonSurface = (proceed: () => void) => {
+    if (!jsonUnapplied) {
+      proceed();
+      return;
+    }
+    jsonLeaveTrigger.current = activeControl();
+    setJsonLeave(() => proceed);
+  };
   // The tab that opened the form editor: the editor stands in its body, and
   // leaving returns there (`studio-forms-overview`, `studio-form-editor`).
   // The editor's address carries no tab of its own, and this surface stays
@@ -494,7 +511,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     actions.drop();
     onUnauthorized();
   };
-  // The stash a past 401 left for this actor and process, read once on
+  // The stash a past 401 or browser Back left for this actor and process, read once on
   // mount against the loaded record. The initializer clears a stash equal to
   // that record; a second run in development clears nothing more.
   const [stash, setStash] = useState(() => readRestorable(tabStorage(), actorId, processId, { body: draft, layout: saveState.layout }));
@@ -1000,6 +1017,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     onDiscarded: () => {
       dropStash();
       onDirtyChange?.(false);
+      onUnappliedJsonChange?.(false);
       navigate({ name: "processes" });
     },
     onUnauthorized: stashOnUnauthorized,
@@ -1013,6 +1031,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     // The draft changed, so the Versions offer goes. The selection drops what went,
     // or the canvas bar would count a step the draft no longer holds.
     onRestored: (record) => {
+      setLastSavedAt(new Date());
       followStash(record.revision);
       setJustPublished(false);
       setSelectedStepIds((selected) => selectionAfterRestore(selected, record.body));
@@ -1033,6 +1052,10 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     onDirtyChange?.(changeNotLanded);
     return () => onDirtyChange?.(false);
   }, [changeNotLanded]);
+  useEffect(() => {
+    onUnappliedJsonChange?.(jsonUnapplied);
+    return () => onUnappliedJsonChange?.(false);
+  }, [jsonUnapplied]);
   // Both keep one identity, so this reports once a mount.
   const { flush, drop } = actions;
   useEffect(() => {
@@ -1134,12 +1157,13 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
    * form editor too. `openSettings` is no model, since it keeps the JSON surface open
    * and lands on the first view. The view takes the focus.
    */
-  const openSavePoints = () => {
-    setJsonOpen(false);
-    setJsonNote(undefined);
-    goToTab("settings", "points");
-    setSavePointsFocus((count) => count + 1);
-  };
+  const openSavePoints = () =>
+    leaveJsonSurface(() => {
+      setJsonOpen(false);
+      setJsonNote(undefined);
+      goToTab("settings", "points");
+      setSavePointsFocus((count) => count + 1);
+    });
   /** Leaves the form editor for the tab it stands in. */
   const leaveFormEditor = () => leaveFormEditorFor(formEditorReturnTab(formOrigin));
   /** The breadcrumb's step crumb: the step's own page on the Steps tab. */
@@ -1228,6 +1252,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
           publishResult={publishResult}
           conflict={saveState.conflict}
           noticeStands={stash !== undefined}
+          jsonUnapplied={jsonUnapplied}
           actions={actions}
           canPublish={canPublish}
           baseVersion={changesBaseVersion}
@@ -1240,10 +1265,12 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
           onBack={() => navigate({ name: "processes" })}
           onOpenSettings={openSettings}
           onSavePoints={openSavePoints}
-          onToggleJson={() => {
-            setJsonOpen((open) => !open);
-            setJsonNote(undefined);
-          }}
+          onToggleJson={() =>
+            leaveJsonSurface(() => {
+              setJsonOpen((open) => !open);
+              setJsonNote(undefined);
+            })
+          }
           onVersions={() => navigate({ name: "versions", processId })}
           onPlayer={() => navigate({ name: "play", processId })}
         />
@@ -1273,18 +1300,31 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
           />
         )}
         {selectionRemovalAsked && selectionRemovalDialog()}
+        {jsonLeave !== undefined && (
+          <LeaveDraftDialog
+            triggerRef={jsonLeaveTrigger}
+            jsonUnapplied
+            onCancel={() => setJsonLeave(undefined)}
+            onConfirm={() => {
+              setJsonLeave(undefined);
+              jsonLeave();
+            }}
+          />
+        )}
         <div {...stylex.props(styles.surface)}>
           <ProcessTabRow
             open={openTab}
             counts={counts}
             checksBlocked={checksBlocked}
-            onOpen={(target) => {
+            onOpen={(target) =>
               // A press on any tab leaves the JSON surface for that tab.
-              setJsonOpen(false);
-              setJsonNote(undefined);
-              if (formStepId === undefined) goToTab(target);
-              else leaveFormEditorFor(target);
-            }}
+              leaveJsonSurface(() => {
+                setJsonOpen(false);
+                setJsonNote(undefined);
+                if (formStepId === undefined) goToTab(target);
+                else leaveFormEditorFor(target);
+              })
+            }
             jsonOpen={jsonOpen}
           />
           {/* The JSON surface stands in place of every tab body, never beside
@@ -1300,6 +1340,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                 replace(next);
               }}
               note={jsonNote}
+              onUnappliedChange={setJsonUnapplied}
             />
           )}
 
@@ -1463,7 +1504,7 @@ type EditLoadState =
   | { kind: "error"; message: string }
   | { kind: "loaded"; record: DraftRecord };
 
-export function EditScreen({ processId, formStepId, tab, view, stepId, token, roles, go, navigate, actorId, onUnauthorized, onDirtyChange, onFlushChange, holdSaves }: EditScreenProps) {
+export function EditScreen({ processId, formStepId, tab, view, stepId, token, roles, go, navigate, actorId, onUnauthorized, onDirtyChange, onUnappliedJsonChange, onFlushChange, holdSaves }: EditScreenProps) {
   const [state, setState] = useState<EditLoadState>({ kind: "loading" });
   const fail = useFail(onUnauthorized, (e) => setState({ kind: "error", message: describeCaughtError(e) }));
 
@@ -1538,6 +1579,7 @@ export function EditScreen({ processId, formStepId, tab, view, stepId, token, ro
         actorId={actorId}
         onUnauthorized={onUnauthorized}
         onDirtyChange={onDirtyChange}
+        onUnappliedJsonChange={onUnappliedJsonChange}
         onFlushChange={onFlushChange}
         holdSaves={holdSaves}
       />

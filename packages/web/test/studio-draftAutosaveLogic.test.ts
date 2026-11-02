@@ -14,6 +14,7 @@ import {
   nextDirtySince,
   nextFailure,
   nextUnconfirmed,
+  restoreLanded,
   savePointFailure,
   selectionAfterRestore,
   unmountPlan,
@@ -154,7 +155,10 @@ describe("classifySaveFailure", () => {
 
   it("a 5xx is retryable and answered", () => {
     expect(classifySaveFailure(httpError(500))).toEqual({ retryable: true, lost: false });
-    expect(classifySaveFailure(httpError(503))).toEqual({ retryable: true, lost: false });
+  });
+
+  it("a gateway's answer is retryable and may hide a commit behind it", () => {
+    for (const status of [502, 503, 504]) expect(classifySaveFailure(httpError(status))).toEqual({ retryable: true, lost: true });
   });
 
   it("any other 4xx waits", () => {
@@ -370,6 +374,25 @@ describe("savePointFailure lands each row of D10's table", () => {
       expect(outcome.kind === "refused" && outcome.message.length > 0).toBe(true);
       expect(savePointFailure(act, networkError()).kind).toBe("refused");
     }
+  });
+});
+
+describe("a restore's lost answer", () => {
+  it("marks a network failure and a gateway's answer as lost", () => {
+    expect(savePointFailure("restore", networkError())).toMatchObject({ kind: "refused", lost: true });
+    expect(savePointFailure("create", httpError(504))).toMatchObject({ kind: "refused", lost: true });
+  });
+
+  it("marks an answered refusal as nothing more", () => {
+    expect(savePointFailure("restore", httpError(500))).not.toHaveProperty("lost");
+    expect(savePointFailure("create", httpError(400))).not.toHaveProperty("lost");
+  });
+
+  it("lands only where the stored revision has passed the flushed one", () => {
+    expect(restoreLanded({ revision: 8 }, 7)).toBe(true);
+    expect(restoreLanded({ revision: 7 }, 7)).toBe(false);
+    expect(restoreLanded({ revision: 6 }, 7)).toBe(false);
+    expect(restoreLanded(undefined, 7)).toBe(false);
   });
 });
 

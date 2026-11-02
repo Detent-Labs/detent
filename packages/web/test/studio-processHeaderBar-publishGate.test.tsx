@@ -119,6 +119,7 @@ function renderHeader(over: {
   publishResult?: PublishResult;
   justPublished?: boolean;
   structureActive?: boolean;
+  jsonUnapplied?: boolean;
   contentLocale?: string;
   draft?: DraftContextValue["draft"];
 }): string {
@@ -131,6 +132,7 @@ function renderHeader(over: {
         publishResult={over.publishResult ?? null}
         conflict={over.conflict ?? false}
         noticeStands={over.noticeStands ?? false}
+        jsonUnapplied={over.jsonUnapplied ?? false}
         actions={{ ...noActions, ...over.actions }}
         canPublish={over.canPublish ?? true}
         baseVersion={over.baseVersion === undefined ? 3 : over.baseVersion}
@@ -185,6 +187,15 @@ describe("ProcessHeaderBar's failure region", () => {
     expect(html.indexOf("errorBanner")).toBeGreaterThan(html.indexOf("</header>"));
   });
 
+  it("says what Reload costs over a dirty draft, and keeps the plain sentence over a clean one", () => {
+    const dirty = renderHeader({ conflict: true, isDirty: true });
+    const clean = renderHeader({ conflict: true });
+
+    expect(dirty).toContain("This draft was changed elsewhere. Reload loads the stored draft and drops your unsaved changes.");
+    expect(clean).toContain("This draft was changed elsewhere.");
+    expect(clean).not.toContain("drops your unsaved changes");
+  });
+
   it("gives the save conflict the same banner shape, keeping its Reload button", () => {
     const html = renderHeader({ conflict: true });
 
@@ -236,6 +247,20 @@ function splitDialogDeveloperView(html: string): { inside: string; outside: stri
   const end = html.indexOf("</details>", summary) + "</details>".length;
   return { inside: html.slice(start, end), outside: html.slice(0, start) + html.slice(end) };
 }
+
+describe("Unapplied JSON in the header bar", () => {
+  it("reads as unsaved changes while the draft itself stands clean", () => {
+    expect(renderHeader({ jsonUnapplied: true })).toContain("Unsaved changes");
+    expect(renderHeader({})).not.toContain("Unsaved changes");
+  });
+
+  it("adds a note to the Publish dialog", () => {
+    const note = "The JSON you have not applied is not part of this publish.";
+
+    expect(renderHeader({ jsonUnapplied: true, actions: { pendingDialog: "publish" } })).toContain(note);
+    expect(renderHeader({ actions: { pendingDialog: "publish" } })).not.toContain(note);
+  });
+});
 
 describe("The publish dialog", () => {
   it("names the process and the version the publish mints", () => {
@@ -856,18 +881,29 @@ describe("The state line", () => {
   });
 
   it("prints only Unsaved changes in the refusal tone, and the other four alike", () => {
-    const unsaved = toneOf(renderHeader({ isDirty: true, actions: { saveFailed: FAILED } }));
+    const classes = (html: string) => (/class="([^"]*)"/.exec(toneOf(html) ?? "")?.[1] ?? "").split(" ");
+    // What the failed save's words carry and a saving line's do not: the refusal tone.
+    const saving = classes(renderHeader({ isDirty: true }));
+    const refusal = classes(renderHeader({ isDirty: true, actions: { saveFailed: FAILED } })).filter((name) => !saving.includes(name));
     const muted = [
       renderHeader({ isDirty: true }),
       renderHeader({ lastSavedAt: new Date() }),
       renderHeader({ lastSavedAt: new Date(2026, 0, 2, 10, 32) }),
       renderHeader({}),
-    ].map(toneOf);
+    ].map(classes);
 
-    expect(new Set(muted).size).toBe(1);
-    expect(muted[0]).not.toBe(unsaved);
-    expect(toneOf(renderHeader({ isDirty: true, conflict: true }))).toBe(unsaved);
-    expect(toneOf(renderHeader({ isDirty: true, noticeStands: true }))).toBe(unsaved);
+    expect(refusal).toHaveLength(1);
+    expect(muted.filter((names) => names.includes(refusal[0] ?? ""))).toEqual([]);
+    expect(classes(renderHeader({ isDirty: true, conflict: true }))).toContain(refusal[0]);
+    expect(classes(renderHeader({ isDirty: true, noticeStands: true }))).toContain(refusal[0]);
+    expect(classes(renderHeader({ jsonUnapplied: true }))).toContain(refusal[0]);
+  });
+
+  it("takes no minimum width at rest, and the width of Saved just now from the first change on", () => {
+    expect(toneOf(renderHeader({}))).not.toContain("data-held-width");
+    for (const html of [renderHeader({ isDirty: true }), renderHeader({ lastSavedAt: new Date() }), renderHeader({ jsonUnapplied: true })]) {
+      expect(toneOf(html)).toContain('data-held-width="Saved just now"');
+    }
   });
 });
 

@@ -67,5 +67,59 @@ prints every language at once and reads no content locale.
 
 #### Scenario: A tab press leaves the surface
 
-- **WHEN** an author presses a tab while the JSON surface stands open
+- **WHEN** an author presses a tab while the JSON surface stands open with no
+  unapplied text
 - **THEN** the JSON surface leaves and that tab's body stands open
+
+## ADDED Requirements
+
+### Requirement: Unapplied JSON counts as unsaved work
+
+The JSON surface's text SHALL count as unsaved work while it differs from its seed or its last Apply. The state line SHALL then read "Unsaved changes", and a tab close SHALL prompt. No save SHALL run, since the draft does not hold the text.
+
+An exit SHALL ask in the leave dialog with no flush. A tab press and each menu entry that leaves the surface SHALL ask the same dialog. A successful Apply, or the text back at its seed, SHALL clear this. The Publish dialog SHALL note what it leaves out.
+
+#### Scenario: Unapplied text reads as unsaved and sends nothing
+
+- **WHEN** an author changes the JSON surface's text and presses no Apply
+- **THEN** the state line reads "Unsaved changes", in the refusal tone
+- **AND** closing the tab prompts
+- **AND** no `PUT /drafts/:processId` leaves
+
+#### Scenario: An exit asks with no flush
+
+- **WHEN** an author presses the back control over unapplied text
+- **THEN** the leave dialog opens at once and no save request leaves
+- **AND** its body reads "The JSON you have not applied goes with it. The saved draft stays."
+- **AND** its heading and its confirm read as they do after a failed save
+
+#### Scenario: A tab press or the menu asks first
+
+- **WHEN** an author presses a tab, or the menu's entry that leaves the surface, over unapplied text
+- **THEN** the same dialog opens
+- **AND** Cancel keeps the surface and the text
+
+#### Scenario: Confirming drops the text alone
+
+- **WHEN** an author applied a change, typed more, and confirms the dialog at an exit
+- **THEN** the typed text goes and the applied change still saves
+
+#### Scenario: A successful Apply clears the state
+
+- **WHEN** an author presses Apply on text that parses
+- **THEN** the state line follows the draft again and a tab press leaves with no question
+
+#### Scenario: A refused Apply keeps the state
+
+- **WHEN** an author presses Apply on text that does not parse
+- **THEN** the state line still reads "Unsaved changes"
+
+#### Scenario: Text back at its seed clears the state
+
+- **WHEN** an author types the text back to what the surface was seeded with
+- **THEN** the state line follows the draft again, and closing the tab does not prompt
+
+#### Scenario: The Publish dialog says what it leaves out
+
+- **WHEN** an author presses Publish over unapplied text
+- **THEN** the dialog adds the note "The JSON you have not applied is not part of this publish."

@@ -364,7 +364,13 @@ describe("nextVersionLabel (studio-publish: the dialog names a valid version lab
 
 describe("headerStateLine", () => {
   const NOW = new Date(2026, 0, 2, 12, 0, 0).getTime();
-  const clean = { dirty: false, failed: false, conflict: false, noticeStands: false, lastSavedAt: undefined, now: NOW, baseVersion: null };
+  const clean = { dirty: false, failed: false, conflict: false, noticeStands: false, jsonUnapplied: false, lastSavedAt: undefined, now: NOW, baseVersion: null };
+
+  it("unapplied JSON reads unsaved over a clean draft, and no other state outranks it", () => {
+    expect(headerStateLine({ ...clean, jsonUnapplied: true })).toEqual({ state: "unsaved" });
+    expect(headerStateLine({ ...clean, jsonUnapplied: true, baseVersion: 1, lastSavedAt: new Date(NOW) })).toEqual({ state: "unsaved", version: "v1" });
+    expect(headerStateLine({ ...clean, jsonUnapplied: true, dirty: true })).toEqual({ state: "unsaved" });
+  });
 
   it("a failed save reads unsaved, with or without a version and a past save", () => {
     expect(headerStateLine({ ...clean, dirty: true, failed: true })).toEqual({ state: "unsaved" });

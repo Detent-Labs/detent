@@ -15,7 +15,7 @@ import { ProcessesScreen } from "../src/areas/studio/screens/ProcessesScreen.js"
  */
 function renderScreen(roles: readonly string[]): string {
   return renderToStaticMarkup(
-    <ProcessesScreen token="tok" roles={roles} navigate={() => {}} onUnauthorized={() => {}} />,
+    <ProcessesScreen token="tok" actorId="actor_a" roles={roles} navigate={() => {}} onUnauthorized={() => {}} />,
   );
 }
 

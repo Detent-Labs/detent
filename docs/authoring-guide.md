@@ -1116,6 +1116,11 @@ The `⋮` menu holds three entries under Views. The **JSON** entry prints the
 same draft as raw text. That helps when you want to read the whole body at
 once. The **Versions** and **Player** entries open their own screens.
 
+Text you type on the JSON surface reaches the draft only when you press
+**Apply**. Until then the header bar reads "Unsaved changes". Each way off the
+surface asks first, because the text goes with it. The Publish dialog says that
+the text stays out of that publish.
+
 #### Save points
 
 Autosave keeps the latest state of the draft. It keeps no earlier one. A save

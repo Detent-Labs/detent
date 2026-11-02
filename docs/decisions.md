@@ -2266,7 +2266,9 @@ The change made the draft save itself and added save points. It left five
 points to later changes. The AUTOSAVE tag is local to this section.
 
 - **AUTOSAVE-1: a lost answer, then a hand-revert, leaves the server ahead of the
-  screen.** A save commits and its answer is lost on the network. The author then
+  screen.** A save commits and its answer is lost, on the network or behind a
+  gateway's 502, 503 or 504. A restore's lost answer no longer belongs here: it
+  reads the stored draft and adopts it. The author then
   types the text back to the last saved version. The draft reads clean, so the
   state line reads saved and an exit asks nothing, while the stored draft holds
   the lost text. Publish would mint that text. Risk (Medium): an author publishes
@@ -2305,6 +2307,15 @@ points to later changes. The AUTOSAVE tag is local to this section.
 
   Upgrade entry: clear the ref on `blur` only while the control still stands in
   the document, in `panels/ProcessHeaderBar.tsx`.
+- **AUTOSAVE-6: a browser Back or a 401 drops unapplied JSON with no question.**
+  Unapplied text asks at every exit `askLeave` guards. A browser Back bypasses
+  that rule, and a dead session asks nothing, so the text goes. The stash holds a
+  draft and no raw text. Risk (Low): the author loses typed JSON that no Apply
+  took, after the state line read "Unsaved changes" throughout.
+
+  Upgrade entry: a text slot in `draft/draftStash.ts`, offered when the JSON
+  surface next opens. The report is `onUnappliedJsonChange` in
+  `screens/EditScreen.tsx`.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

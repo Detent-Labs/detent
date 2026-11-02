@@ -2057,10 +2057,10 @@ Only a keyboard pass shows the second.
 Source: `studio-draft-autosave-and-save-points` task 7.3.
 
 `e2e/draft-autosave.e2e.ts` and `e2e/save-points.e2e.ts` cover the request
-counts, the dialogs, the leave flows and the Try again focus in Chromium. Four
-things stay manual. They are a screen reader, a pointer drag across an answer,
-a width that a clock decides and a browser other than Chromium. Use the
-production build. Sign in as `demo-superuser@example.test`. Open the draft of "IT
+counts, the dialogs, the leave flows and the Try again focus in Chromium. Six
+things stay manual: a screen reader, a pointer drag across an answer, a width
+that a clock decides, a wrapped name, the browser's own close prompt and a
+browser other than Chromium. Use the production build. Sign in as `demo-superuser@example.test`. Open the draft of "IT
 Offboarding".
 
 1. **Opening writes nothing.** Open the Network log, then open the draft and
@@ -2075,9 +2075,11 @@ Offboarding".
    Pass: with no input from you, the line reads "Saved at" and the time of
    that save. Make a change. Pass: the line leaves that wording and reads
    "Saved just now" again.
-4. **The words keep their place.** Change a label. Watch Test, Publish and the
-   `⋮` trigger while the line moves between "Saving…" and "Saved just now".
-   Pass: none of the three moves sideways. Repeat at 1280px and at 800px.
+4. **The words keep their place.** On a draft at rest, read the line. Pass: no
+   hole stands between "Saved" and "· v1 published". Change a label. Watch Test,
+   Publish, the `⋮` trigger and the version while the line moves between "Saving…"
+   and "Saved just now". Pass: none of them moves sideways, and only the normal
+   space stands after "Saved just now". Repeat at 1280px and at 800px.
 5. **A drag across an answer.** Delay the answer of `PUT /drafts/:id` by three
    seconds. Change a label, then drag a step on the Map tab while the request
    runs. Pass: the step keeps the drop position when the answer lands, and a
@@ -2107,6 +2109,10 @@ Offboarding".
 
    Go to the Map tab and choose "Save points" in the `⋮` menu. Pass: the view
    opens, and the focus stands on the name input.
+
+   Name a point with 120 characters and one with a long unbroken word. Pass: each
+   name wraps inside its row at 1280px and at 420px. Nothing clips, and Restore
+   and Remove stay beside the name or under it.
 9. **Restore.** Change a label so it differs from the point. Choose Restore on
    the row. Pass: the dialog names the point and who saved it. Its note says
    that your work becomes a save point.
@@ -2128,11 +2134,18 @@ Offboarding".
     no dialog. "Test this draft" leads, filled. Click it. Pass: the test
     instance shows the new label. "Start a case from the published version"
     stands beside it, outlined.
+
+    Narrow the window to 420px. Pass: that outlined label wraps inside its
+    button. It clips nothing and does not overflow the row.
 14. **The notice holds the saves.** Make the save answer 401, change
     a label and log in again. Open the draft. Pass: the notice reads "Detent
     kept unsaved changes to this draft in this browser tab." Change a label while
     the notice stands, then wait ten seconds. Pass: the header bar reads
     "Unsaved changes", and no `PUT` goes out while the notice stands.
+15. **Unapplied JSON and the browser's prompt.** Open the JSON surface and type a
+    space. Pass: the state line reads "Unsaved changes". Close the tab. Pass: the
+    browser's own prompt rises, and declining it keeps the text. Type the space
+    back out. Close the tab again. Pass: no prompt rises.
 
 ### Selecting a path shows the source step's Ways out section with the row highlighted
 

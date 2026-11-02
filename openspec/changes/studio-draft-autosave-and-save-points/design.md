@@ -60,9 +60,10 @@ ran.
   - A name of up to 120 characters: it wraps.
   - Fifty points: a sentence takes the form's place.
   - A failed fetch: a banner where the rows would stand.
-- **Interaction and layout:** no motion, per `DESIGN.md`. The state's words take a
-  minimum width. "Saving…" and "Saved just now" then trade places without moving
-  what follows them.
+- **Interaction and layout:** no motion, per `DESIGN.md`. From the first change on,
+  the state's words take the width of "Saved just now" in the body face. "Saving…" and
+  it then trade places without moving what follows them. A draft at rest takes no
+  minimum, so "Saved" leaves no hole.
 - **Anti-goals:** a toast, a spinner, a Save button "just in case", a machine value
   on the Save points view.
 
@@ -136,7 +137,9 @@ landing after a delete would otherwise create the draft again.
 
 An unmount that bypasses `askLeave` (the browser's Back or Forward) would drop a
 waiting change with the timer. So one unmount effect acts from refs, unless a `dropped`
-ref is set:
+ref is set. A layout effect writes those refs, so they hold the last commit and never a
+render that crashed. `root.tsx` keys `EditScreen` by the process id, so a history jump
+between two drafts unmounts the old one with its own commit:
 
 - Dirty with nothing standing: one last `saveDraft`, its rejection caught.
 - A request running: it chains on a `running` promise ref. It sends only if the latest
@@ -179,10 +182,10 @@ Detent keeps trying.
 A successful save clears only the failure's own banner. A plain `clearError()` there
 would wipe an Arrange banner the author is still reading.
 
-A network failure can hide a save that committed. The next send then carries a passed
-revision and answers 409, with this tab as the only other writer. So a ref `unconfirmed`
-lists each pair a send sent and lost on the network (`status === undefined`). A success
-or a real conflict empties it, and a flush leaves it alone.
+A network failure can hide a save that committed, and so can a gateway's 502, 503 or
+504. The next send then carries a passed revision and answers 409, with this tab as the
+only other writer. So a ref `unconfirmed` lists each pair a send sent and lost that way.
+A success or a real conflict empties it, and a flush leaves it alone.
 
 A 409 while `unconfirmed` holds an entry reads the stored draft first. Where its body and
 layout equal an entry under `canonicalize`, that entry landed at the stored revision.
@@ -224,8 +227,10 @@ in a ref.
 their shape. Its body moves:
 
 ```ts
-if (!dirtyRef.current) return proceed();
+if (!dirtyRef.current && !unappliedRef.current) return proceed();
 leaveTrigger.current = activeControl();
+setLeaveForJson(unappliedRef.current);
+if (unappliedRef.current) return setLeaving(() => proceed); // no flush
 pendingLeave.current = proceed;          // one slot: the last exit asked wins
 void flushRef.current?.().then((r) => {
   const exit = pendingLeave.current;
@@ -235,7 +240,7 @@ void flushRef.current?.().then((r) => {
 });
 ```
 
-`dirtyRef` stays first, because `onDiscarded` lowers it before it navigates. A flush
+Both refs stay first, because `onDiscarded` lowers them before it navigates. A flush
 there would write to a draft the author just deleted. `EditScreen` reports `dirtyNow ||
 actions.saving` into it, so an exit during a request waits for the answer even after the
 author took the text back by hand. The one slot stops two presses
@@ -247,6 +252,23 @@ stands. A healed retry cannot then land what the dialog says it will drop. A
 `LeaveDraftDialog` stays, and its body now says the save failed. The `beforeunload`
 prompt stays while the draft is dirty. A fetch `keepalive` body caps at 64 KiB and a
 draft can reach 8 MiB, so a page close cannot promise the save.
+
+Text on the JSON surface that no Apply has taken stands in no draft, so no save can
+carry it, and a save that lands says nothing about it. `JsonView` compares its text with
+its seed, which a successful Apply moves, and reports the answer upward. While that holds:
+
+- `askLeave` asks through the dialog at once, and it sends no flush. Its body reads "The
+  JSON you have not applied goes with it. The saved draft stays." Its heading and confirm
+  stay. Its confirm calls no `drop()`, since the text alone goes. An applied change still
+  saves on the unmount.
+- `beforeunload` prompts.
+- A tab press and the two menu entries that leave the surface (its own and Save points)
+  ask the same dialog through `leaveJsonSurface`. Cancel keeps the surface and the text.
+- The Publish dialog adds "The JSON you have not applied is not part of this publish."
+
+An apply on a typing pause would fit autosave more closely. The owner ruled for this
+report instead: half-typed JSON should not reach the draft. A browser Back and a 401
+cannot ask, so the text goes. `AUTOSAVE-6` records that.
 
 The other former `confirm()` sites all stay. None guards only unsaved work.
 
@@ -278,13 +300,14 @@ tone, and the other four print muted.
 
 | Condition | State | Words |
 |---|---|---|
-| failure, a conflict over a dirty draft, or a dirty draft under the restore notice | `unsaved` | Unsaved changes |
+| failure, a conflict over a dirty draft, a dirty draft under the restore notice, or unapplied JSON | `unsaved` | Unsaved changes |
 | dirty otherwise | `saving` | Saving… |
 | saved in this session, under a minute ago | `savedJustNow` | Saved just now |
 | saved in this session, a minute ago or more | `savedAt` | Saved at 12:02 PM |
 | nothing saved in this session | `saved` | Saved |
 
-A one-shot timeout re-renders the line at the one-minute mark. The refusal tone moves
+A one-shot timeout re-renders the line one millisecond past the one-minute mark, since a
+timer can fire early. A save point restore moves the time, as a save does. The refusal tone moves
 off an ordinary change, so a keystroke no longer flashes red.
 
 Announcing every "Saving…" would talk over a screen reader user's typing. So the
@@ -410,9 +433,10 @@ boundary, so no new error type appears.
 ### D10. The Save points view
 
 It is the fourth Settings view, at the address `/edit/settings/points`.
-`SavePointsPanel` fetches on its first visible commit and after each act. Every
-Settings view stays mounted, and an unopened view should cost nothing. A refetch keeps
-the old rows until its answer, so Restore keeps its focus.
+`SavePointsPanel` fetches each time it turns visible and after each act. Every Settings
+view stays mounted, an unopened view should cost nothing, and a return visit should not
+show old rows and ages. A refetch keeps the old rows until its answer, so Restore keeps
+its focus. While a request runs, each row's Restore and Remove stand `aria-disabled`.
 
 The form renders from the first commit, and a waiting line stands only where the rows
 will. When an answer reaches the bound while the input holds the focus, the focus moves to
@@ -455,8 +479,9 @@ them. Each outcome has one home:
 | False flush | the Restore dialog closes, and the banner reports it |
 | 409 | any open dialog closes, and the conflict banner stands |
 | 404 on restore or remove | the dialog closes, and the list refetches |
+| Lost answer on a restore | reads the stored draft under the same timeout. A revision past the flushed one lands as done, and otherwise the next row applies. The list refetches either way |
 | Other refused restore or remove | inside the open dialog, through `StudioDialog`'s `refusal` |
-| Refused create | at the input, with the name still typed |
+| Refused create | at the input, with the name still typed. A lost answer also refetches the list |
 
 `reload`'s body splits. A new `adoptDraft(record)` holds the replace and the saved-state
 calls, and it leaves the draft clean and starts no save. `reload` adds its own
@@ -472,8 +497,9 @@ confirm reads "Restore". Its row stays, so its control takes the focus back. An
 unavailable Restore uses `aria-disabled`, as Publish does, so a restore that reaches
 the bound keeps that focus.
 
-Remove asks "Remove “{name}”?" with "The studio has no undo." Its row leaves, so the
-focus lands on the name input, through a pending focus consumed after the rows commit.
+Remove asks "Remove “{name}”?" with "The studio has no undo." Its row leaves, on a 404
+too, so the focus lands on the name input, through a pending focus consumed after the
+rows commit.
 At the bound the input returns in that same commit.
 
 The fiftieth create takes the input away, so the bound's sentence takes `tabIndex={-1}`

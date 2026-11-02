@@ -177,7 +177,13 @@ function scan({ toolbar, screen, header }: Sources): string[] {
   flag(/\breturn \(\) => clearTimeout\(timer\)/.test(passMinute), "the minute's timer outlives the save it counts from");
   flag(/\[lastSavedAt\]\s*,?\s*\)$/.test(passMinute), "the minute's timer does not rearm per save");
   flag(/\bconst line = headerStateLine\(\{[^}]*\bnow: Date\.now\(\)/.test(header), "the state line reads a stale clock");
-  flag(/\bstateWords:\s*\{[^}]*\bminWidth:/.test(header), "the state's words take no minimum width");
+  flag(/\bstateWordsHeld:\s*\{\s*"::after":\s*\{\s*content:\s*"attr\(data-held-width\)"/.test(header), "the state's words hold no width");
+  flag(/\bstateWords:\s*\{\s*display:\s*"inline-block",?\s*\}/.test(header), "the state's words take a minimum at rest");
+  flag(/\bchangedOnce && styles\.stateWordsHeld\b/.test(header), "the words' width does not wait for the first change");
+  flag(/\bif\s*\(\s*line\.state !== "saved" && !changedOnce\s*\)\s*setChangedOnce\(true\);/.test(header), "the words' width does not stay after the first change");
+  flag(/\bdata-held-width=\{changedOnce \? t\("headerBar\.savedJustNow"\) : undefined\}/.test(header), "the words' width is not that of Saved just now");
+  flag(/\bconst line = headerStateLine\(\{[^}]*\bnoticeStands, jsonUnapplied, lastSavedAt\b/.test(header), "the state line does not read unapplied JSON");
+  flag(/\bjsonUnapplied=\{jsonUnapplied\}/.test(screen), "the header bar does not hear of unapplied JSON");
   flag(/\bfailed=\{actions\.saveFailed !== null\}/.test(header), "the state line does not read the failed save");
   const announced = effectHolding(header, "stateAnnouncement(");
   flag(/\[line\.state\]\s*,?\s*\)$/.test(announced) && /\bheardUnsaved\.current = heard\b/.test(announced), "the hidden status does not follow the state");
@@ -200,6 +206,21 @@ function scan({ toolbar, screen, header }: Sources): string[] {
   flag(/\bwaiting=\{isDirty \|\| actions\.saving\}/.test(header), "the publish confirm does not wait on the save");
   flag(/\bbusy=\{actions\.publishing\}/.test(header), "the publish dialog's busy reads a request it did not start");
   flag(/\bbusy=\{actions\.discarding \|\| actions\.saving\}/.test(header), "the discard dialog's busy does not wait on a running save");
+
+  // The unmount's commit (final review I1): a render that crashed writes nothing.
+  flag(/\buseLayoutEffect\(\(\) => \{\s*latest\.current = commit;\s*\}\);/.test(toolbar), "the unmount does not read the last commit");
+
+  // A restore's lost answer (final review I2).
+  const lostRestore = actBody(toolbar, "restore");
+  flag(/\bclassifySaveFailure\(e\)\.lost\b/.test(lostRestore), "a restore does not sort out a lost answer");
+  flag(/\bgetDraft\(processId, token, AbortSignal\.timeout\(SAVE_TIMEOUT_MS\)\)/.test(lostRestore), "a restore's stored read carries no timeout");
+  flag(/\bis401\(readError\)\) throw readError/.test(lostRestore), "a 401 on a restore's stored read does not end the session");
+  flag(/\bif \(!restoreLanded\(stored, flushed\.revision\)\) throw e;\s*record = stored;/.test(lostRestore), "a restore that landed unseen is not adopted");
+
+  // Reload over a draft that went (final review M8), and what a restore moves (M4).
+  flag(/\bif \(!record\) \{\s*setError\(t\("error\.notFound"\)\)/.test(bodyAfter(toolbar, "reload")), "a reload of a draft that went says nothing");
+  flag(/\bclearError\(\);/.test(bodyAfter(toolbar, "reload")), "a reload keeps a banner it resolved");
+  flag(/\bonRestored:\s*\(record\) => \{\s*setLastSavedAt\(new Date\(\)\);/.test(options), "a restore does not move Saved at");
 
   // The save point acts (3.8).
   const adopt = bodyAfter(toolbar, "adoptDraft");
@@ -439,7 +460,7 @@ describe("the autosave's wiring", () => {
   });
 
   it("a state line that never turns Saved at at the minute is flagged", () => {
-    expect(scan(mutate("header", /setTimeout\(\(\) => passMinute\(\(minutes\) => minutes \+ 1\), left\)/, "setTimeout(() => {}, left)"))).toEqual(["no timer turns Saved just now into Saved at"]);
+    expect(scan(mutate("header", /setTimeout\(\(\) => passMinute\(\(minutes\) => minutes \+ 1\), left \+ 1\)/, "setTimeout(() => {}, left + 1)"))).toEqual(["no timer turns Saved just now into Saved at"]);
   });
 
   it("a minute's timer that survives its save is flagged", () => {
@@ -454,8 +475,42 @@ describe("the autosave's wiring", () => {
     expect(scan(mutate("header", "now: Date.now(), baseVersion", "now: 0, baseVersion"))).toEqual(["the state line reads a stale clock"]);
   });
 
-  it("state words with no minimum width are flagged, since what follows them would move", () => {
-    expect(scan(mutate("header", /(stateWords: \{\s*display: "inline-block",)\s*minWidth: "14ch",/, "$1"))).toEqual(["the state's words take no minimum width"]);
+  it("state words that hold no width are flagged, since what follows them would move", () => {
+    expect(scan(mutate("header", /content: "attr\(data-held-width\)"/, 'content: \'""\''))).toEqual(["the state's words hold no width"]);
+    expect(scan(mutate("header", /data-held-width=\{changedOnce \? t\("headerBar\.savedJustNow"\) : undefined\}/, 'data-held-width={changedOnce ? t("headerBar.saved") : undefined}'))).toEqual(["the words' width is not that of Saved just now"]);
+  });
+
+  it("a minimum at rest is flagged, since Saved would leave a hole", () => {
+    expect(scan(mutate("header", /(stateWords: \{\s*display: "inline-block",)/, '$1\n    minWidth: "14ch",'))).toEqual(["the state's words take a minimum at rest"]);
+    expect(scan(mutate("header", /changedOnce && styles\.stateWordsHeld/, "styles.stateWordsHeld"))).toEqual(["the words' width does not wait for the first change"]);
+  });
+
+  it("a width that lets go after the first change is flagged", () => {
+    expect(scan(mutate("header", /if \(line\.state !== "saved" && !changedOnce\) setChangedOnce\(true\);/, ""))).toEqual(["the words' width does not stay after the first change"]);
+  });
+
+  it("a state line blind to unapplied JSON is flagged", () => {
+    expect(scan(mutate("header", /noticeStands, jsonUnapplied, lastSavedAt, now/, "noticeStands, jsonUnapplied: false, lastSavedAt, now"))).toEqual(["the state line does not read unapplied JSON"]);
+    expect(scan(mutate("screen", /\bjsonUnapplied=\{jsonUnapplied\}/, "jsonUnapplied={false}"))).toEqual(["the header bar does not hear of unapplied JSON"]);
+  });
+
+  it("an unmount that reads a render, not a commit, is flagged, since a render crash would save the draft that crashed", () => {
+    expect(scan(mutate("toolbar", /useLayoutEffect\(\(\) => \{\s*latest\.current = commit;\s*\}\);/, "latest.current = commit;"))).toEqual(["the unmount does not read the last commit"]);
+  });
+
+  it("a restore whose lost answer is not followed up is flagged, at each step", () => {
+    expect(scan(mutate("toolbar", /if \(!classifySaveFailure\(e\)\.lost\) throw e;/, "throw e;"))).toEqual(["a restore does not sort out a lost answer"]);
+    expect(scan(mutate("toolbar", /await getDraft\(processId, token, AbortSignal\.timeout\(SAVE_TIMEOUT_MS\)\)\.catch/, "await getDraft(processId, token).catch"))).toEqual(["a restore's stored read carries no timeout"]);
+    expect(scan(mutate("toolbar", /if \(is401\(readError\)\) throw readError;/, ""))).toEqual(["a 401 on a restore's stored read does not end the session"]);
+    expect(scan(mutate("toolbar", /if \(!restoreLanded\(stored, flushed\.revision\)\) throw e;\s*record = stored;/, "throw e;"))).toEqual(["a restore that landed unseen is not adopted"]);
+  });
+
+  it("a reload of a draft that went, in silence, is flagged", () => {
+    expect(scan(mutate("toolbar", /setError\(t\("error\.notFound"\)\);/, ""))).toEqual(["a reload of a draft that went says nothing"]);
+  });
+
+  it("a restore that leaves Saved at behind is flagged", () => {
+    expect(scan(mutate("screen", /(onRestored: \(record\) => \{\s*)setLastSavedAt\(new Date\(\)\);/, "$1"))).toEqual(["a restore does not move Saved at"]);
   });
 
   it("a state line blind to the failed save is flagged", () => {

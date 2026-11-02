@@ -79,14 +79,17 @@ export function nextDirtySince(
   return commit.changed ? commit.now : undefined;
 }
 
+/** What a gateway answers in the engine's place: the engine may have committed behind it. */
+const GATEWAY_STATUSES: readonly number[] = [502, 503, 504];
+
 /**
  * How a thrown save reads. A value that is no client error is a timeout firing
- * during the body read, so it counts as a network failure. A network failure can
- * hide a save that committed (`lost`).
+ * during the body read, so it counts as a network failure. A network failure or a
+ * gateway's answer can hide a save that committed (`lost`).
  */
 export function classifySaveFailure(err: unknown): { retryable: boolean; lost: boolean } {
   const status = err instanceof StudioClientError ? err.status : undefined;
-  return { retryable: status === undefined || status >= 500, lost: status === undefined };
+  return { retryable: status === undefined || status >= 500, lost: status === undefined || GATEWAY_STATUSES.includes(status) };
 }
 
 /** The failure a thrown save leaves. A repeat of the same pair counts up the backoff. */
@@ -179,7 +182,8 @@ export type SavePointOutcome<T> =
   | { kind: "unsaved" }
   | { kind: "conflict" }
   | { kind: "gone" }
-  | { kind: "refused"; message: string }
+  /** `lost` means the act may have committed unseen, so the list reads again. */
+  | { kind: "refused"; message: string; lost?: true }
   | { kind: "ended" };
 
 /** How a thrown save point request lands. A refused create prints at its input, a 404 included. */
@@ -187,7 +191,17 @@ export function savePointFailure(act: "create" | "restore" | "remove", err: unkn
   const status = err instanceof StudioClientError ? err.status : undefined;
   if (status === 409) return { kind: "conflict" };
   if (status === 404 && act !== "create") return { kind: "gone" };
-  return { kind: "refused", message: describeCaughtError(err) };
+  const message = describeCaughtError(err);
+  return classifySaveFailure(err).lost ? { kind: "refused", message, lost: true } : { kind: "refused", message };
+}
+
+/**
+ * Whether the stored draft shows that a restore committed behind a lost answer. The
+ * draft read clean at the flushed revision and the saves are held, so a revision past
+ * it means the restore landed.
+ */
+export function restoreLanded<T extends { revision: number }>(stored: T | undefined, flushedRevision: number): stored is T {
+  return stored !== undefined && stored.revision > flushedRevision;
 }
 
 /** The most of a restored point's name the kept point's name embeds. */

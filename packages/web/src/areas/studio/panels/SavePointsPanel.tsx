@@ -293,9 +293,9 @@ export function SavePointsBody({
                   type="button"
                   className="btn btn-secondary"
                   aria-label={restoreRowLabel(point.name)}
-                  aria-disabled={bound || undefined}
+                  aria-disabled={bound || acting || undefined}
                   onClick={(event) => {
-                    if (!bound) onRestore(point, event.currentTarget);
+                    if (!bound && !acting) onRestore(point, event.currentTarget);
                   }}
                 >
                   {t("savePoints.restore")}
@@ -304,7 +304,10 @@ export function SavePointsBody({
                   type="button"
                   className="btn btn-secondary btn-destructive"
                   aria-label={removeRowLabel(point.name)}
-                  onClick={(event) => onRemove(point, event.currentTarget)}
+                  aria-disabled={acting || undefined}
+                  onClick={(event) => {
+                    if (!acting) onRemove(point, event.currentTarget);
+                  }}
                 >
                   {t("savePoints.remove")}
                 </button>
@@ -322,7 +325,7 @@ type SavePointActions = Pick<DraftToolbarActions, "createSavePoint" | "restoreSa
 interface Props {
   processId: string;
   token: string;
-  /** True while the Settings tab stands open on this view. The first true commit fetches. */
+  /** True while the Settings tab stands open on this view. Each turn to true fetches. */
   visible: boolean;
   /** Counts the `⋮` entry's presses. Each moves the focus to the input, or to the bound's sentence. */
   focusRequest: number;
@@ -334,12 +337,12 @@ type OpenDialog = { act: "restore" | "remove"; point: SavePointRow; refusal: str
 
 /**
  * The Settings tab's Save points view (`studio-app`, `design.md` D10). It fetches
- * on its first visible commit and after each act, since every Settings view
- * stays mounted and an unopened one should cost nothing. A refetch keeps the old
- * rows until its answer, so Restore keeps its focus. The hook owns the acts.
+ * each time it turns visible and after each act, since every Settings view stays
+ * mounted, an unopened one should cost nothing, and a return visit should not show
+ * old rows and ages. A refetch keeps the old rows until its answer, so Restore keeps
+ * its focus. The hook owns the acts.
  */
 export function SavePointsPanel({ processId, token, visible, focusRequest, actions, onUnauthorized }: Props) {
-  const [opened, setOpened] = useState(false);
   const [list, setList] = useState<SavePointList | undefined>(undefined);
   const [fetchFailure, setFetchFailure] = useState<string | undefined>(undefined);
   const [now, setNow] = useState(() => Date.now());
@@ -363,9 +366,6 @@ export function SavePointsPanel({ processId, token, visible, focusRequest, actio
   const onUnauthorizedRef = useRef(onUnauthorized);
   onUnauthorizedRef.current = onUnauthorized;
   const handledFocus = useRef(0);
-
-  // Adjusted during render, as the Fields tab's views do: no effect, no extra commit.
-  if (visible && !opened) setOpened(true);
 
   const load = useCallback(() => {
     const mine = ++latest.current;
@@ -395,11 +395,16 @@ export function SavePointsPanel({ processId, token, visible, focusRequest, actio
   }, [processId, token]);
 
   useEffect(() => {
-    if (opened) load();
-    return () => {
+    if (visible) load();
+  }, [visible, load]);
+
+  // An unmounted view takes no answer.
+  useEffect(
+    () => () => {
       latest.current += 1;
-    };
-  }, [opened, load]);
+    },
+    [],
+  );
 
   // The bound took the input while it held the focus.
   useEffect(() => {
@@ -461,6 +466,7 @@ export function SavePointsPanel({ processId, token, visible, focusRequest, actio
         act === "restore"
           ? restoreLanding(await actions.restoreSavePoint(point), point.name)
           : removeLanding(await actions.removeSavePoint(point.savePointId));
+      if (landing.refetch) load();
       if (landing.dialog === "stay") {
         setDialog({ act, point, refusal: landing.refusal });
         return;
@@ -468,7 +474,6 @@ export function SavePointsPanel({ processId, token, visible, focusRequest, actio
       setDialog(null);
       if (landing.status !== undefined) setStatus(landing.status);
       if (landing.focusInputAfter) setInputAfterFetch(true);
-      if (landing.refetch) load();
     } finally {
       setActing(false);
     }

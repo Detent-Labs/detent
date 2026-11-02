@@ -38,9 +38,14 @@ The state SHALL read "Saving…" from a change until its save answers. It SHALL 
 "Saved just now" for the first minute after a save in this session. It SHALL then read
 "Saved at" and a time. It SHALL read "Saved" where no save has run in this session.
 
-It SHALL read "Unsaved changes", in the refusal tone, in three cases. A save has
-failed, a conflict stands over a dirty draft, or a restore notice holds a change back. Where a published version exists, the state SHALL add
-that version and the word "published". The version SHALL print in the mono face.
+It SHALL read "Unsaved changes", in the refusal tone, in four cases. A save has
+failed. A conflict stands over a dirty draft. A restore notice holds a change back. The
+JSON surface holds text no Apply has taken.
+
+Where a published version exists, the state SHALL add that version and the word
+"published". The version SHALL print in the mono face.
+
+A save point restore is a stored write, so it counts as a save for these readings.
 
 The visible state SHALL be no live region, so a save stays quiet for an author typing.
 A polite status beside it SHALL announce three moments. They are "Unsaved changes" on
@@ -58,6 +63,16 @@ focus to the state.
 - **WHEN** a save succeeds
 - **THEN** the state reads "Saved just now"
 - **AND** it reads "Saved at" and the time of that save a minute later
+
+#### Scenario: A restore names its time
+
+- **WHEN** a save point restore lands
+- **THEN** the state reads "Saved just now"
+
+#### Scenario: Unapplied JSON reads as unsaved
+
+- **WHEN** the JSON surface holds text no Apply has taken, over a clean draft
+- **THEN** the bar prints "Unsaved changes" in the refusal tone
 
 #### Scenario: A published process names its version
 

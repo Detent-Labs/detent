@@ -133,6 +133,7 @@ When the save before an exit fails, or a conflict stands, the control SHALL ask 
 studio's dialog form. The dialog SHALL say the latest changes could not reach the
 server. Confirming SHALL navigate and drop them. Canceling SHALL leave the author on
 the draft with every change kept. No automatic save SHALL run while the dialog stands.
+Text the JSON surface has not applied asks first, with no save (`studio-json-view`).
 
 #### Scenario: A failed save asks first
 
@@ -306,8 +307,13 @@ point", with a "Save this point" control, over the draft's save points. A row SH
 print the name, who saved it and how long ago, with Restore and Remove. An empty list
 SHALL say so in a sentence. No key, id, revision or hash SHALL print on the view.
 
-The view SHALL fetch its list when it first opens. A failed fetch SHALL report where
-the rows would stand.
+The view SHALL fetch its list each time it turns visible. A failed fetch SHALL report
+where the rows would stand.
+
+#### Scenario: A return visit reads the rows again
+
+- **WHEN** an author leaves the view and comes back to it
+- **THEN** the list reads the server's rows again, and their ages move
 
 #### Scenario: A draft with no save point says so
 
@@ -347,6 +353,11 @@ the bound's sentence.
 - **WHEN** an author presses "Save this point" with an empty input
 - **THEN** a sentence at the input asks for a name
 - **AND** no request leaves
+
+#### Scenario: A create whose answer is lost shows its row
+
+- **WHEN** a create commits and its answer is lost
+- **THEN** the sentence prints at the input, and the list reads the server's rows again
 
 #### Scenario: A refused create prints at the input
 
@@ -419,6 +430,7 @@ The focus SHALL return to that row's Restore.
 
 - **WHEN** a restore or a remove answers 404
 - **THEN** the dialog closes and the list reads the server's rows again
+- **AND** after a remove, the focus lands on the name input
 
 #### Scenario: A restore retires the Versions offer
 
@@ -430,6 +442,35 @@ The focus SHALL return to that row's Restore.
 - **WHEN** an author restores a point on a draft holding 49
 - **THEN** the kept point is the fiftieth and Restore stands unavailable
 - **AND** a press on Remove makes Restore available again
+
+### Requirement: A restore whose answer is lost reads the stored draft
+
+A restore whose answer is lost SHALL read the stored draft under the same time limit. A
+revision past the one the restore carried SHALL land as a restore, in the same way.
+Otherwise the dialog SHALL print the reason. The list SHALL read the server's rows again
+in both cases.
+
+#### Scenario: A restore whose answer is lost still lands
+
+- **WHEN** a restore commits and its answer is lost
+- **THEN** the editor holds the restored draft, clean, and the status line names both points
+- **AND** no conflict banner stands
+
+#### Scenario: A restore that never arrived stays in its dialog
+
+- **WHEN** a restore's request fails on the network and the stored revision has not moved
+- **THEN** the dialog stays open and prints the reason
+- **AND** the list reads the server's rows again
+
+### Requirement: A running save point request holds the rows' controls
+
+A row's Restore and Remove SHALL stand unavailable while a save point request runs, so a
+second request cannot move the revision the first one carries.
+
+#### Scenario: A running request holds the rows' controls
+
+- **WHEN** a save point request runs
+- **THEN** each row's Restore and Remove stand `aria-disabled`, and a press starts nothing
 
 ### Requirement: Removing a save point asks first
 
@@ -502,7 +543,11 @@ NOT discard the conflict. No automatic save SHALL run while a conflict stands.
 
 One 409 is no conflict. A send after a lost answer SHALL read the stored draft. Where
 its body and layout equal what a failed request sent, that save SHALL count as landed
-at the stored revision. Equal content means this tab made the only write.
+at the stored revision. Equal content means this tab made the only write. A network
+failure loses an answer, and so does a gateway's 502, 503 or 504.
+
+The banner over a dirty draft SHALL say that Reload drops the unsaved changes. Reload
+SHALL report a draft that no longer exists.
 
 <!-- antislop: allow sentence-length run-ons passive-voice em-dash -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
@@ -576,6 +621,17 @@ revision for nothing, invalidating a concurrent editor's in-flight revision.
 - **WHEN** a save lands, its answer is lost, and the retry answers 409
 - **THEN** the studio reads the stored draft and finds what it sent
 - **AND** no conflict banner stands, and the state line reads as saved
+
+#### Scenario: The banner says what Reload costs
+
+- **WHEN** a conflict stands over a dirty draft
+- **THEN** the banner reads "This draft was changed elsewhere. Reload loads the stored draft and drops your unsaved changes."
+- **AND** over a clean draft it reads "This draft was changed elsewhere."
+
+#### Scenario: A Reload of a draft that went says so
+
+- **WHEN** an author presses Reload and the stored draft no longer exists
+- **THEN** a banner reads "Not found."
 
 #### Scenario: A conflict stops the automatic saves
 

@@ -18,7 +18,8 @@ interface ConfirmationProps {
   onConfirm: () => void;
 }
 
-export function LeaveDraftDialog({ triggerRef, onCancel, onConfirm }: ConfirmationProps) {
+/** `jsonUnapplied` names what goes when the exit drops text no Apply put in the draft. */
+export function LeaveDraftDialog({ triggerRef, onCancel, onConfirm, jsonUnapplied = false }: ConfirmationProps & { jsonUnapplied?: boolean }) {
   return (
     <StudioDialog
       heading={t("leaveDialog.heading")}
@@ -26,7 +27,7 @@ export function LeaveDraftDialog({ triggerRef, onCancel, onConfirm }: Confirmati
       onCancel={onCancel}
       confirm={<DestructiveConfirm onClick={onConfirm}>{t("leaveDialog.confirm")}</DestructiveConfirm>}
     >
-      <DialogNote>{t("leaveDialog.body")}</DialogNote>
+      <DialogNote>{t(jsonUnapplied ? "leaveDialog.bodyJson" : "leaveDialog.body")}</DialogNote>
     </StudioDialog>
   );
 }

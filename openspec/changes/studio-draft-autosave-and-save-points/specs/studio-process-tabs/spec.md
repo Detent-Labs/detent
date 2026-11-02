@@ -167,7 +167,8 @@ the entry opens the JSON surface or leaves it.
 
 #### Scenario: The menu leaves the JSON surface for Save points
 
-- **WHEN** an author chooses Save points while the JSON surface stands open
+- **WHEN** an author chooses Save points while the JSON surface stands open with no
+  unapplied text
 - **THEN** the JSON surface leaves and the Save points view is open
 
 #### Scenario: The menu leaves the form editor for Save points

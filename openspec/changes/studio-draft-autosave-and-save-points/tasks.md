@@ -37,6 +37,7 @@
 - [x] 4.5 Rewrite `askLeave` in `root.tsx` per D4, add `onFlushChange` and `holdSaves` to `EditScreen`, report `dirtyNow || actions.saving` upward, make the dialog's confirm call `drop()`, and rewrite the leave dialog's body. Keep the wrappers' shape. Pass: `studio-leave-guard.test.ts` gains rules for the flush, the one slot, the hold and `drop`, each proved by an in-memory mutation.
 - [x] 4.6 Apply the four D7 rules. Pass: named tests cover each scenario of the two stash requirements, and the `onSaved` pins in `studio-stash-wiring.test.ts` flip with their mutation kept.
 - [x] 4.7 Add flows to `e2e/draft-autosave.e2e.ts`. An edit saves once and survives a reload. The `PUT` count settles after a label, a drag, an Arrange and a JSON apply, then 5 idle seconds. Back leaves with no dialog. Test reaches the Player with the new label. A stubbed 500 raises the banner and the leave dialog, and it closes the Publish dialog with the focus on Publish. A `PUT` that aborts and then succeeds heals with no press. Pass: `bun run e2e` is green.
+- [x] 4.8 Report unapplied JSON from `JsonView` upward, make the state line, `beforeunload` and the Publish dialog read it, and ask through the leave dialog before any flush per D4 and D6. Pass: `studio-jsonView-unapplied.test.ts` and `studio-leave-guard.test.ts` hold under in-memory mutations, and the three `e2e/draft-autosave.e2e.ts` JSON flows are green.
 - [x] 4.9 Rewrite `formEditor.navigateAwayKeepsChanges` and `formEditor.loadFailed`, delete the unused `panelsScreen.keepsChanges`, and sweep the catalog. Pass: `grep -n -i 'save' packages/web/src/i18n/catalogs/studio.ts` shows no instruction to press or perform a save.
 
 ## 5. The Save points view
@@ -59,6 +60,7 @@
 - [x] 7.3 Sweep `docs/browser-checks.md` for steps that press Save, save the draft, or name a retired label. Rewrite the "Leave this draft?" steps around a failed save. Add one entry "Autosave and save points" holding what stays manual, with a step that waits past the minute for "Saved at". Pass: `git grep -n -i -E 'press(es)? save|save the draft|create (test|new) instance' -- docs/browser-checks.md` prints only non-studio entries, each confirmed by its section.
 - [x] 7.4 Record open points in `docs/decisions.md`. Close the entry "The header reads Unsaved changes after a `PUT` that answered 200" only on 4.7's settled count, and otherwise keep it with the new symptom. Pass: the entry stands where that result puts it.
 - [x] 7.5 Update `docs/current-state.md` for the new module and the new panel. Pass: `git grep -n 'draft-save-points' -- docs/current-state.md` prints a line.
+- [x] 7.6 Update `docs/authoring-guide.md`, the glossary's JSON surface row and `docs/browser-checks.md` for unapplied JSON. Pass: the prose gate reports no rise on each file.
 
 ## 8. Verification
 

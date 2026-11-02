@@ -6,7 +6,8 @@ import { describe, expect, it } from "bun:test";
  *
  * Each one calls `askLeave`, which flushes a change that has not landed and runs the
  * exit on the answer. A failed save or a conflict raises `LeaveDraftDialog`, and then
- * only the dialog's confirm runs the exit. Four kinds of exit leave the draft: in-area navigation (the area nav and
+ * only the dialog's confirm runs the exit. JSON an author has not applied is in no
+ * save, so it asks through that dialog first, with no flush. Four kinds of exit leave the draft: in-area navigation (the area nav and
  * `EditScreen`'s `navigate`), the `go` that `EditScreen` receives (the `⋮`
  * menu's groups link), the account menu's three handlers on `Chrome`, and
  * closing the tab. A raw `navigate`, `go` or `onLogout` on any of them brings
@@ -151,8 +152,12 @@ function scan(source: string): string[] {
   // A clean draft proceeds at once, and a change that has not landed saves first. The
   // opener is read from the press, before the dialog takes the focus.
   const ask = arrowBody(code, "askLeave") ?? "";
-  if (!ask.startsWith("if (!dirtyRef.current) { proceed(); return; }")) violations.push("askLeave does not read dirtyRef before it flushes");
-  if (!/\bleaveTrigger\.current = activeControl\(\); pendingLeave\.current = proceed;/.test(ask)) violations.push("askLeave does not hold the exit in its one slot");
+  if (!ask.startsWith("if (!dirtyRef.current && !unappliedRef.current) { proceed(); return; }")) violations.push("askLeave does not read dirtyRef before it flushes");
+  if (!/\bleaveTrigger\.current = activeControl\(\); .*?pendingLeave\.current = proceed;/.test(ask)) violations.push("askLeave does not hold the exit in its one slot");
+  const unapplied = /setLeaveForJson\(unappliedRef\.current\); if \(unappliedRef\.current\) \{ pendingLeave\.current = undefined; setLeaving\(\(\) => proceed\); return; \}/;
+  if (!unapplied.test(ask)) violations.push("unapplied JSON does not ask before the flush");
+  if (!/\bunappliedRef\.current = unapplied;/.test(propValue(edit ?? "", "onUnappliedJsonChange") ?? "")) violations.push("EditScreen's unapplied JSON does not reach unappliedRef");
+  if (propValue(edit ?? "", "key") !== "route.processId") violations.push("EditScreen is not one instance per process");
   const answer = /void flushRef\.current\?\.flush\(\)\.then\(\(result\) => \{ (.*) \}\);$/.exec(ask)?.[1];
   if (answer === undefined) violations.push("askLeave does not flush first");
   else {
@@ -175,7 +180,8 @@ function scan(source: string): string[] {
   else {
     const confirmed = propValue(dialog, "onConfirm")?.replace(/\s+/g, " ") ?? "";
     if (!/\bsetLeaving\(undefined\); leaving\(\);/.test(confirmed)) violations.push("the leave dialog's confirm does not run the exit");
-    if (!/\bflushRef\.current\?\.drop\(\); setLeaving\(undefined\);/.test(confirmed)) violations.push("the leave dialog's confirm does not drop the work first");
+    if (!/\bif \(!leaveForJson\) flushRef\.current\?\.drop\(\); setLeaving\(undefined\);/.test(confirmed)) violations.push("the leave dialog's confirm does not drop the work first");
+    if (propValue(dialog, "jsonUnapplied") !== "leaveForJson") violations.push("the leave dialog's body does not name unapplied JSON");
     if (propValue(dialog, "onCancel")?.replace(/\s+/g, " ") !== "() => setLeaving(undefined)") violations.push("the leave dialog's cancel does more than close it");
     if (propValue(dialog, "triggerRef") !== "leaveTrigger") violations.push("the leave dialog returns the focus elsewhere");
   }
@@ -192,7 +198,7 @@ function scan(source: string): string[] {
   if (added && removed && added[1] !== removed[1]) violations.push("beforeunload add and remove name different handlers");
   // `(?<![!\w.])` refuses a negated read: `!dirtyRef.current` prompts on a
   // clean draft and stays silent on a dirty one.
-  if (!/(?<![!\w.])dirtyRef\.current\s*(?:&&\s*|\)\s*\{?\s*)\w+\.preventDefault\s*\(/.test(code)) {
+  if (!/(?<![!\w.])dirtyRef\.current \|\| unappliedRef\.current\)\s*\w+\.preventDefault\s*\(/.test(code)) {
     violations.push("beforeunload handler ignores dirtyRef");
   }
 
@@ -274,13 +280,37 @@ describe("every exit from an open draft in root.tsx saves first", () => {
   });
 
   it("a beforeunload handler that prompts on a clean draft is flagged", () => {
-    const always = mutate(real, /if \(dirtyRef\.current\) (\w+\.preventDefault\(\))/, "$1");
+    const always = mutate(real, /if \(dirtyRef\.current \|\| unappliedRef\.current\) (\w+\.preventDefault\(\))/, "$1");
     expect(scan(always)).toEqual(["beforeunload handler ignores dirtyRef"]);
   });
 
   it("a beforeunload handler that reads dirtyRef negated is flagged", () => {
-    const negated = mutate(real, /if \(dirtyRef\.current\) (\w+\.preventDefault\(\))/, "if (!dirtyRef.current) $1");
+    const negated = mutate(real, /if \(dirtyRef\.current \|\| unappliedRef\.current\) (\w+\.preventDefault\(\))/, "if (!dirtyRef.current || unappliedRef.current) $1");
     expect(scan(negated)).toEqual(["beforeunload handler ignores dirtyRef"]);
+  });
+
+  it("a beforeunload handler blind to unapplied JSON is flagged", () => {
+    const blind = mutate(real, /if \(dirtyRef\.current \|\| unappliedRef\.current\) (\w+\.preventDefault\(\))/, "if (dirtyRef.current) $1");
+    expect(scan(blind)).toEqual(["beforeunload handler ignores dirtyRef"]);
+  });
+
+  it("an EditScreen shared between two processes is flagged, since an unmount would write one process's body into the other", () => {
+    expect(scan(mutate(real, /\s*key=\{route\.processId\}/, ""))).toEqual(["EditScreen is not one instance per process"]);
+  });
+
+  it("unapplied JSON that takes the flush is flagged, since a landed save would run the exit", () => {
+    const flushed = mutate(real, /if \(unappliedRef\.current\) \{\s*pendingLeave\.current = undefined;\s*setLeaving\(\(\) => proceed\);\s*return;\s*\}/, "");
+    expect(scan(flushed)).toEqual(["unapplied JSON does not ask before the flush"]);
+    const unread = mutate(real, /if \(!dirtyRef\.current && !unappliedRef\.current\) \{/, "if (!dirtyRef.current) {");
+    expect(scan(unread)).toEqual(["askLeave does not read dirtyRef before it flushes"]);
+  });
+
+  it("unapplied JSON that never reaches root.tsx is flagged", () => {
+    expect(scan(mutate(real, /unappliedRef\.current = unapplied;/, ""))).toEqual(["EditScreen's unapplied JSON does not reach unappliedRef"]);
+  });
+
+  it("a leave dialog that reads the failed save's body over unapplied JSON is flagged", () => {
+    expect(scan(mutate(real, /\s*jsonUnapplied=\{leaveForJson\}/, ""))).toEqual(["the leave dialog's body does not name unapplied JSON"]);
   });
 
   it("a guarded wrapper that skips askLeave is flagged", () => {
@@ -316,12 +346,12 @@ describe("every exit from an open draft in root.tsx saves first", () => {
   });
 
   it("an askLeave that never reads dirtyRef is flagged", () => {
-    const blind = mutate(real, /if \(!dirtyRef\.current\) \{\s*proceed\(\);\s*return;\s*\}/, "");
+    const blind = mutate(real, /if \(!dirtyRef\.current && !unappliedRef\.current\) \{\s*proceed\(\);\s*return;\s*\}/, "");
     expect(scan(blind)).toEqual(["askLeave does not read dirtyRef before it flushes"]);
   });
 
   it("an askLeave that reads dirtyRef the wrong way round is flagged", () => {
-    const flipped = mutate(real, /if \(!dirtyRef\.current\) (\{\s*proceed)/, "if (dirtyRef.current) $1");
+    const flipped = mutate(real, /if \(!dirtyRef\.current && !unappliedRef\.current\) (\{\s*proceed)/, "if (dirtyRef.current) $1");
     expect(scan(flipped)).toEqual(["askLeave does not read dirtyRef before it flushes"]);
   });
 
@@ -378,8 +408,11 @@ describe("every exit from an open draft in root.tsx saves first", () => {
   });
 
   it("a confirm that keeps the work is flagged, since the unmount would send what the dialog dropped", () => {
-    const kept = mutate(real, /flushRef\.current\?\.drop\(\);/, "");
+    const kept = mutate(real, /if \(!leaveForJson\) flushRef\.current\?\.drop\(\);/, "");
     expect(scan(kept)).toEqual(["the leave dialog's confirm does not drop the work first"]);
+    // Unapplied JSON gives up its text alone: what the draft holds still saves on the unmount.
+    const both = mutate(real, /if \(!leaveForJson\) flushRef\.current\?\.drop\(\);/, "flushRef.current?.drop();");
+    expect(scan(both)).toEqual(["the leave dialog's confirm does not drop the work first"]);
   });
 
   it("a leave dialog that is missing or miswired is flagged", () => {

@@ -121,10 +121,21 @@ const styles = stylex.create({
   stateLine: {
     color: colors.textMuted,
   },
-  // "Saving…" and "Saved just now" trade places without moving what follows them.
   stateWords: {
     display: "inline-block",
-    minWidth: "14ch",
+  },
+  // From the first change on, the words hold the width of "Saved just now" in their
+  // own face, so it and "Saving…" trade places without moving what follows them. A
+  // draft at rest takes no minimum, so "Saved" leaves no hole. The width comes from
+  // `data-held-width`, printed with no height and hidden from every reader.
+  stateWordsHeld: {
+    "::after": {
+      content: "attr(data-held-width)",
+      display: "block",
+      height: 0,
+      overflow: "hidden",
+      visibility: "hidden",
+    },
   },
   stateUnsaved: {
     color: colors.refusal,
@@ -407,6 +418,8 @@ interface PublishConfirmDialogProps {
   nextVersion: string;
   /** A change has not landed, so the confirm reads "Saving…" and ignores a press. */
   waiting: boolean;
+  /** The JSON surface holds text this publish leaves out. */
+  jsonUnapplied: boolean;
   openIssues: number;
   blocked: boolean;
   /** The Publish control that opened this dialog, for the focus return. */
@@ -438,6 +451,7 @@ function PublishConfirmDialog({
   revision,
   nextVersion,
   waiting,
+  jsonUnapplied,
   openIssues,
   blocked,
   error,
@@ -481,6 +495,7 @@ function PublishConfirmDialog({
         <PublishChanges processId={processId} token={token} baseVersion={baseVersion} draft={draft} contentLocale={contentLocale} />
       </DialogFacts>
       {blocked && <DialogWarning>{t("draftToolbar.publishDialogBlocked")}</DialogWarning>}
+      {jsonUnapplied && <DialogNote>{t("draftToolbar.publishDialogJsonUnapplied")}</DialogNote>}
       <DialogNote>{t("draftToolbar.publishDialogImmutable")}</DialogNote>
       <DialogDeveloperView>
         {draft.key && <DialogMonoFact term={t("draftToolbar.dialogKey")}>{draft.key}</DialogMonoFact>}
@@ -507,6 +522,7 @@ function DraftStateLine({
   failed,
   conflict,
   noticeStands,
+  jsonUnapplied,
   lastSavedAt,
   baseVersion,
   justPublished,
@@ -516,6 +532,7 @@ function DraftStateLine({
   failed: boolean;
   conflict: boolean;
   noticeStands: boolean;
+  jsonUnapplied: boolean;
   lastSavedAt: Date | undefined;
   baseVersion: number | null;
   justPublished: boolean;
@@ -526,11 +543,15 @@ function DraftStateLine({
   useEffect(() => {
     const left = savedJustNowLeft(lastSavedAt, Date.now());
     if (left === undefined) return;
-    const timer = setTimeout(() => passMinute((minutes) => minutes + 1), left);
+    // One past the mark: a timer can fire a millisecond early, and the line would stay.
+    const timer = setTimeout(() => passMinute((minutes) => minutes + 1), left + 1);
     return () => clearTimeout(timer);
   }, [lastSavedAt]);
 
-  const line = headerStateLine({ dirty, failed, conflict, noticeStands, lastSavedAt, now: Date.now(), baseVersion });
+  const line = headerStateLine({ dirty, failed, conflict, noticeStands, jsonUnapplied, lastSavedAt, now: Date.now(), baseVersion });
+  // Only "Saved" reads as no change yet. The words keep their minimum once it has gone.
+  const [changedOnce, setChangedOnce] = useState(false);
+  if (line.state !== "saved" && !changedOnce) setChangedOnce(true);
   const words =
     line.state === "unsaved"
       ? t("headerBar.unsaved")
@@ -558,7 +579,12 @@ function DraftStateLine({
   return (
     <>
       <span ref={ref} tabIndex={-1} {...stylex.props(styles.stateLine)}>
-        <span {...stylex.props(styles.stateWords, line.state === "unsaved" && styles.stateUnsaved)}>{words}</span>
+        <span
+          {...stylex.props(styles.stateWords, changedOnce && styles.stateWordsHeld, line.state === "unsaved" && styles.stateUnsaved)}
+          data-held-width={changedOnce ? t("headerBar.savedJustNow") : undefined}
+        >
+          {words}
+        </span>
         {line.version !== undefined && (
           <>
             {" · "}
@@ -593,6 +619,8 @@ interface Props {
   conflict: boolean;
   /** The restore notice stands, so a change waits for the author's answer. */
   noticeStands: boolean;
+  /** The JSON surface holds text no Apply has put in the draft. */
+  jsonUnapplied: boolean;
   /** `useDraftToolbarActions`'s own return value, lifted by the caller the
    * same way `saveState` already is. The header bar reads it fully now: the
    * failure state for the banners below, and `retry`/`discard`/`publish`/
@@ -695,6 +723,7 @@ export function ProcessHeaderBar({
   publishResult,
   conflict,
   noticeStands,
+  jsonUnapplied,
   actions,
   canPublish,
   baseVersion,
@@ -833,6 +862,7 @@ export function ProcessHeaderBar({
           failed={actions.saveFailed !== null}
           conflict={conflict}
           noticeStands={noticeStands}
+          jsonUnapplied={jsonUnapplied}
           lastSavedAt={lastSavedAt}
           baseVersion={baseVersion}
           justPublished={justPublished}
@@ -894,7 +924,7 @@ export function ProcessHeaderBar({
             <div {...stylex.props(styles.headerBarMenuPanel)}>
               {/* Views: navigation to other views of this process, never a
                   draft-body mutation, so it stays reachable whichever surface is
-                  active. Draft holds Discard draft. Publish stands in
+                  active. Draft holds Save points and Discard draft. Publish stands in
                   this row instead, and the process settings on the Settings tab
                   (`studio-process-tabs`). The panel holds command buttons alone
                   but implements no arrow-key navigation, so it carries no
@@ -966,6 +996,7 @@ export function ProcessHeaderBar({
           revision={revision}
           nextVersion={nextVersionLabel(baseVersion)}
           waiting={isDirty || actions.saving}
+          jsonUnapplied={jsonUnapplied}
           openIssues={validation.issues.length}
           blocked={blocked}
           triggerRef={publishTriggerRef}
@@ -1060,7 +1091,7 @@ export function ProcessHeaderBar({
       {!dialogOpen && conflict && (
         <div {...stylex.props(styles.errorBanner)} role="alert">
           <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
-          <span {...stylex.props(styles.errorBannerMessage)}>{t("draftToolbar.conflictMessage")}</span>
+          <span {...stylex.props(styles.errorBannerMessage)}>{t(isDirty ? "draftToolbar.conflictMessageDirty" : "draftToolbar.conflictMessage")}</span>
           <button ref={reloadRef} type="button" className="btn btn-secondary" onClick={actions.reload}>
             {t("draftToolbar.conflictReload")}
           </button>

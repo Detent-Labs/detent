@@ -117,8 +117,9 @@ export interface HeaderStateLine {
 /**
  * The state line's parts (studio-canvas spec: "The header bar's state says what
  * holds for the draft"). `unsaved` means a change will not land by itself: a failed
- * save, a conflict over a dirty draft, or a dirty draft under the restore notice.
- * Any other dirty draft is `saving`. A conflict on a clean draft has nothing unsaved,
+ * save, a conflict over a dirty draft, a dirty draft under the restore notice, or
+ * text on the JSON surface that no Apply has put in the draft. Any other dirty draft
+ * is `saving`. A conflict on a clean draft has nothing unsaved,
  * so it reads as saved. `baseVersion` is the version the draft stands on; null,
  * undefined, 0 or a non-integer means nobody has published it, so the line carries
  * no version.
@@ -128,14 +129,15 @@ export function headerStateLine(input: {
   failed: boolean;
   conflict: boolean;
   noticeStands: boolean;
+  jsonUnapplied: boolean;
   lastSavedAt: Date | undefined;
   now: number;
   baseVersion: number | null | undefined;
 }): HeaderStateLine {
-  const { dirty, failed, conflict, noticeStands, lastSavedAt, now, baseVersion } = input;
+  const { dirty, failed, conflict, noticeStands, jsonUnapplied, lastSavedAt, now, baseVersion } = input;
   const published = typeof baseVersion === "number" && Number.isInteger(baseVersion) && baseVersion > 0;
   const version = published ? { version: `v${baseVersion}` } : {};
-  if (failed || (dirty && (conflict || noticeStands))) return { state: "unsaved", ...version };
+  if (failed || jsonUnapplied || (dirty && (conflict || noticeStands))) return { state: "unsaved", ...version };
   if (dirty) return { state: "saving", ...version };
   if (lastSavedAt === undefined) return { state: "saved", ...version };
   if (now - lastSavedAt.getTime() < SAVED_JUST_NOW_MS) return { state: "savedJustNow", ...version };

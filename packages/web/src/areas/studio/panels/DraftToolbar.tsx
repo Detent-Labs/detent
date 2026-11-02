@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useDraft } from "../draft/store.js";
 import {
   createSavePoint as requestCreateSavePoint,
@@ -9,7 +9,9 @@ import {
   restoreSavePoint as requestRestoreSavePoint,
   SAVE_TIMEOUT_MS,
   saveDraft,
+  StudioClientError,
 } from "../api/client.js";
+import { t } from "../catalog.js";
 import { applySaveResult, applyReload, type DraftSaveState } from "../screens/draftSaveLogic.js";
 import { isDraftDirty } from "../screens/draftToolbarState.js";
 import {
@@ -22,6 +24,7 @@ import {
   nextDirtySince,
   nextFailure,
   nextUnconfirmed,
+  restoreLanded,
   savePointFailure,
   unmountPlan,
   type FlushResult,
@@ -30,7 +33,6 @@ import {
   type SavePointOutcome,
   type SentPair,
 } from "../screens/draftAutosaveLogic.js";
-import { StudioClientError } from "../api/client.js";
 import { describeCaughtError, describePublishRefusal } from "../errors.js";
 import { is401, useFail } from "../../../shell/useFail.js";
 import type { DraftStash } from "../draft/draftStash.js";
@@ -334,10 +336,13 @@ export function useDraftToolbarActions({
     return () => clearTimeout(timer);
   }, [draft, saveState.layout, saveState.revision, saveState.conflict, dirty, saving, held, failure, flushTick, processId, token]);
 
-  // What the unmount below reads. No commit follows it, so it holds the last one.
+  // What the unmount below reads: the last commit, and never a render that crashed
+  // or was abandoned. A layout effect runs ahead of every passive one.
   const commit = { draft, layout: saveState.layout, revision: saveState.revision, conflict: saveState.conflict, dirty, failure, noticeStands, keepCopy, processId, token };
   const latest = useRef(commit);
-  latest.current = commit;
+  useLayoutEffect(() => {
+    latest.current = commit;
+  });
 
   // An unmount that bypassed the leave rule (the browser's Back or Forward) would
   // drop a waiting change with the timer. A fetch outlives the unmount.
@@ -435,17 +440,26 @@ export function useDraftToolbarActions({
     onSavedLayoutChange(record.layout);
   };
 
-  const reload = () =>
-    withUnauthorized(async () => {
+  const reload = async () => {
+    try {
       const record = await getDraft(processId, token);
-      if (!record) return; // draft was discarded elsewhere — nothing to reload into
+      // The draft was discarded elsewhere: nothing to reload into, and the banner says so.
+      if (!record) {
+        setError(t("error.notFound"));
+        setErrorDetail(null);
+        return;
+      }
       adoptDraft(record);
       setFailure(undefined);
       // An administrator can grant or withdraw the publish permission while the
       // edit screen sits open. Reload is the one control the conflict banner
       // offers, so it has to clear a stale report too.
       onCanPublishChange?.(record.canPublish);
-    });
+      clearError();
+    } catch (e) {
+      fail(e);
+    }
+  };
 
   const raiseConflict = () => onSaveState((current) => applySaveResult(current, undefined, current.layout));
 
@@ -484,14 +498,27 @@ export function useDraftToolbarActions({
   /**
    * Flushes first, so the kept point holds what the author sees. The answer carries
    * no `canPublish`, so this adopts it with no permission report: `reload` whole
-   * would wipe a re-read permission.
+   * would wipe a re-read permission. A lost answer can hide a restore that committed,
+   * so it reads the stored draft under the same timeout, and a revision past the
+   * flushed one lands as done.
    */
   const restoreSavePoint = (point: Pick<SavePointSummary, "savePointId" | "name">) =>
     savePointRequest<{ kept: string }>("restore", async () => {
       const flushed = await flush();
       if (!flushed.saved) return { kind: "unsaved" };
       const kept = keptPointName(point.name);
-      const record = await requestRestoreSavePoint(processId, point.savePointId, { revision: flushed.revision, keepName: kept }, token);
+      let record: RestoredDraft | undefined;
+      try {
+        record = await requestRestoreSavePoint(processId, point.savePointId, { revision: flushed.revision, keepName: kept }, token);
+      } catch (e) {
+        if (!classifySaveFailure(e).lost) throw e;
+        const stored = await getDraft(processId, token, AbortSignal.timeout(SAVE_TIMEOUT_MS)).catch((readError: unknown) => {
+          if (is401(readError)) throw readError;
+          return undefined;
+        });
+        if (!restoreLanded(stored, flushed.revision)) throw e;
+        record = stored;
+      }
       if (record === undefined) {
         raiseConflict();
         return { kind: "conflict" };

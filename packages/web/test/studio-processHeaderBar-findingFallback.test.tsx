@@ -69,6 +69,7 @@ function renderHeader(findings: PublishFinding[]): string {
         publishResult={publishResult}
         conflict={false}
         noticeStands={false}
+        jsonUnapplied={false}
         actions={{ saving: false, publishing: false, discarding: false, error: null, errorDetail: null, pendingDialog: null, resolveDialog: () => {}, saveFailed: null, retry: () => {}, flush: () => Promise.resolve({ saved: false }), drop: () => {}, createSavePoint: () => Promise.resolve({ kind: "unsaved" }), restoreSavePoint: () => Promise.resolve({ kind: "unsaved" }), removeSavePoint: () => Promise.resolve({ kind: "done", value: undefined }), discard: () => {}, publish: () => undefined, reload: () => {}, reportError: () => {} }}
         canPublish={true}
         baseVersion={null}

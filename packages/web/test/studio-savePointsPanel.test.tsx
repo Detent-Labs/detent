@@ -103,6 +103,16 @@ describe("the form", () => {
     expect(tag).not.toContain(" disabled");
   });
 
+  it("keeps a row's Restore and Remove from starting another request, by aria-disabled", () => {
+    const idle = buttonTags(render({ list: listOf(2) })).filter((b) => /aria-label="(Restore|Remove) /.test(b));
+    const busy = buttonTags(render({ list: listOf(2), acting: true })).filter((b) => /aria-label="(Restore|Remove) /.test(b));
+
+    expect(idle).toHaveLength(4);
+    expect(idle.every((b) => !b.includes("aria-disabled"))).toBe(true);
+    expect(busy).toHaveLength(4);
+    expect(busy.every((b) => b.includes('aria-disabled="true"') && !b.includes(" disabled"))).toBe(true);
+  });
+
   it("holds an always-present polite status line for the last create or restore", () => {
     expect(render()).toMatch(/<p role="status"[^>]*><\/p>/);
     expect(render({ status: "Saved “A”." })).toMatch(/<p role="status"[^>]*>Saved “A”\.<\/p>/);

@@ -148,13 +148,25 @@ describe("a restore's outcome", () => {
   });
 });
 
+describe("a lost answer reads the list again", () => {
+  const lost = { kind: "refused", message: "No answer.", lost: true } as const;
+
+  it("a create keeps its name and its sentence, and shows the row that may have landed", () => {
+    expect(createLanding(lost, "x")).toEqual({ clearName: false, inputError: "No answer.", refetch: true });
+  });
+
+  it("a restore keeps its dialog and its sentence, and shows the point that may have been kept", () => {
+    expect(restoreLanding(lost, "A")).toEqual({ dialog: "stay", refusal: "No answer.", refetch: true, focusInputAfter: false });
+  });
+});
+
 describe("a remove's outcome", () => {
   it("closes the dialog, refetches and sends the focus to the input afterwards", () => {
     expect(removeLanding({ kind: "done", value: undefined })).toEqual({ dialog: "close", refetch: true, focusInputAfter: true });
   });
 
-  it("closes the dialog and refetches on a 404, with no focus claim", () => {
-    expect(removeLanding({ kind: "gone" })).toEqual({ dialog: "close", refetch: true, focusInputAfter: false });
+  it("closes the dialog and refetches on a 404, and sends the focus to the input, since the row goes", () => {
+    expect(removeLanding({ kind: "gone" })).toEqual({ dialog: "close", refetch: true, focusInputAfter: true });
   });
 
   it("keeps the dialog open on a refusal", () => {

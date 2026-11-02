@@ -204,6 +204,15 @@ test("Test saves first and the Player runs the new label", async ({ page }) => {
   await expect(page.getByText("Tag in the Player")).toBeVisible();
 });
 
+/** How much wider the words' box stands than their text, the hole before what follows them. */
+function holeAfter(words: Locator): Promise<number> {
+  return words.evaluate((element) => {
+    const text = element.ownerDocument.createRange();
+    text.selectNodeContents(element);
+    return element.getBoundingClientRect().width - text.getBoundingClientRect().width;
+  });
+}
+
 test("the state turns Saved at at the minute, and the words leave what follows them in place", async ({ page }) => {
   await page.clock.install();
   // The suite's unedited draft prints a version after the words, and nothing reaches the server.
@@ -217,14 +226,17 @@ test("the state turns Saved at at the minute, and the words leave what follows t
   const version = page.locator("header").getByText(/published/).first();
   const place = async () => (await version.boundingBox())?.x;
   await expect(version).toBeVisible();
-  const atSaved = await place();
+  // A draft at rest takes no minimum, so no hole stands after "Saved".
+  expect(await holeAfter(stateLine(page, "Saved"))).toBeLessThan(1);
 
   await (await fieldName(page)).fill("Tag under the clock");
   await expect(stateLine(page, "Saving…")).toBeVisible();
-  expect(await place()).toBe(atSaved);
+  const atSaving = await place();
   await page.clock.fastForward(1500);
   await expect(stateLine(page, STATE_SAVED)).toBeVisible();
-  expect(await place()).toBe(atSaved);
+  expect(await place()).toBe(atSaving);
+  // The minimum is the width of these very words, so no gap stands after them.
+  expect(await holeAfter(stateLine(page, STATE_SAVED))).toBeLessThan(1);
 
   await page.clock.fastForward(61_000);
   await expect(page.locator("header").getByText(/^Saved at /)).toBeVisible();
@@ -287,6 +299,67 @@ test("a save that aborts and then succeeds heals with no press", async ({ page }
   await expect(banner).toBeVisible();
   await expect(stateLine(page, STATE_SAVED)).toBeVisible({ timeout: 10_000 });
   await expect(banner).toBeHidden();
+});
+
+test("a save that landed behind a lost answer is no conflict", async ({ page }) => {
+  // The request reaches the server and commits, and the answer never reaches the page.
+  let lost = false;
+  await page.route("**/drafts/*", async (route) => {
+    if (!isSave(route.request()) || lost) return route.fallback();
+    lost = true;
+    await route.fetch();
+    await route.abort("connectionreset");
+  });
+  await openDraft(page);
+  await (await fieldName(page)).fill("Tag behind a lost answer");
+  const banner = page.getByRole("alert").filter({ hasText: RETRYING });
+  await expect(banner).toBeVisible();
+  // The retry answers 409, and the stored draft holds what the lost send sent.
+  await expect(stateLine(page, STATE_SAVED)).toBeVisible({ timeout: 10_000 });
+  await expect(banner).toBeHidden();
+  await expect(page.getByRole("button", { name: "Reload", exact: true })).toHaveCount(0);
+  await expect(stateLine(page, STATE_UNSAVED)).toHaveCount(0);
+});
+
+test("a history jump between two open drafts sends the change to its own draft alone", async ({ page }) => {
+  const sentTo: string[] = [];
+  page.on("request", (request) => {
+    if (isSave(request)) sentTo.push(new URL(request.url()).pathname);
+  });
+  await page.goto("/studio");
+  await page.getByRole("link", { name: "E2E draft", exact: true }).click();
+  const processName = page.getByRole("textbox", { name: "Process name" });
+  await expect(processName).toHaveValue("E2E draft");
+  await page.getByRole("button", { name: "Back to processes" }).click();
+  await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
+  await expect(processName).toHaveValue(DRAFT_NAME);
+
+  // History reads the first draft, the list, this draft, its Fields tab. The jump lands within the pause.
+  await (await fieldName(page)).fill("Tag before the history jump");
+  const saved = page.waitForResponse((response) => isSave(response.request()));
+  await page.evaluate("history.go(-3)");
+  await saved;
+  await expect(processName).toHaveValue("E2E draft");
+  await page.waitForTimeout(IDLE_MS);
+  await expect(processName).toHaveValue("E2E draft");
+  expect(sentTo).toEqual(["/drafts/proc_e2e_writes"]);
+
+  await page.goto("/studio");
+  await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
+  await expect(await fieldName(page)).toHaveValue("Tag before the history jump");
+});
+
+test("a Reload of a draft discarded elsewhere says so", async ({ page }) => {
+  await stubSaves(page, [409]);
+  await openDraft(page);
+  await page.route("**/drafts/*", (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    return route.fulfill({ status: 404, json: { error: { type: "not-found", message: "Stubbed by the smoke suite." } } });
+  });
+  await (await fieldName(page)).fill("Tag over a draft that went");
+  await expect(page.getByText("This draft was changed elsewhere. Reload loads the stored draft and drops your unsaved changes.")).toBeVisible();
+  await page.getByRole("button", { name: "Reload", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Not found." })).toBeVisible();
 });
 
 test("a refused save waits, and Try again keeps the keyboard's place", async ({ page }) => {
@@ -418,4 +491,152 @@ test("an exit under the notice saves and keeps the copy, and the copy restores w
   expect(saves.count()).toBe(2);
   await expect(page.getByRole("button", { name: "Reload", exact: true })).toHaveCount(0);
   await expect(await fieldName(page)).toHaveValue("Tag copy to restore");
+});
+
+test("the process list's discard deletes the copy the tab kept", async ({ page }) => {
+  await raiseNotice(page, "Tag kept, then discarded");
+  await page.getByRole("button", { name: "Back to processes" }).click();
+  const kept = () => page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith("studio.draftStash:")));
+  expect(await kept()).toHaveLength(1);
+
+  // The suite's draft stays for the next flow: only the delete's answer is stubbed.
+  await page.route("**/drafts/*", (route) => (route.request().method() === "DELETE" ? route.fulfill({ status: 204 }) : route.fallback()));
+  const row = page.getByRole("row").filter({ has: page.getByRole("link", { name: DRAFT_NAME, exact: true }) });
+  await row.getByRole("button", { name: "Discard draft", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Discard this draft?" });
+  await dialog.getByRole("button", { name: "Discard draft", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(await kept()).toEqual([]);
+
+  await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Process name" })).toHaveValue(DRAFT_NAME);
+  await expect(page.getByRole("button", { name: "Discard them", exact: true })).toHaveCount(0);
+});
+
+const JSON_GOES = "The JSON you have not applied goes with it. The saved draft stays.";
+const JSON_NOT_PUBLISHED = "The JSON you have not applied is not part of this publish.";
+
+async function openJson(page: Page): Promise<Locator> {
+  await page.getByRole("button", { name: "More actions", exact: true }).click();
+  await page.getByRole("button", { name: "Open the JSON surface", exact: true }).click();
+  return page.getByRole("textbox", { name: "Draft body (JSON)" });
+}
+
+/** Whether a tab close would prompt: the browser reads `defaultPrevented` off this event. */
+function closeWouldPrompt(page: Page): Promise<boolean> {
+  return page.evaluate<boolean>(`(() => {
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  })()`);
+}
+
+test("JSON no Apply has taken reads as unsaved work, sends nothing and asks at every way off", async ({ page }) => {
+  await openDraft(page);
+  const saves = countSaves(page);
+  const json = await openJson(page);
+  const seed = await json.inputValue();
+  expect(await closeWouldPrompt(page)).toBe(false);
+  await json.fill(`${seed} `);
+
+  await expect(stateLine(page, STATE_UNSAVED)).toBeVisible();
+  expect(await closeWouldPrompt(page)).toBe(true);
+  await page.waitForTimeout(IDLE_MS);
+  expect(saves.count()).toBe(0);
+
+  // An exit asks at once, with no flush, and Cancel keeps the surface and the text.
+  const back = page.getByRole("button", { name: "Back to processes" });
+  await back.click();
+  const leave = page.getByRole("dialog", { name: "Leave this draft?" });
+  await expect(leave.getByText(JSON_GOES)).toBeVisible();
+  await leave.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(leave).toBeHidden();
+  await expect(back).toBeFocused();
+  await expect(json).toHaveValue(`${seed} `);
+  expect(saves.count()).toBe(0);
+
+  // A tab press asks the same dialog, and so does the menu's way off.
+  await page.getByRole("tab", { name: /^Map/ }).click();
+  await expect(leave.getByText(JSON_GOES)).toBeVisible();
+  await leave.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(json).toHaveValue(`${seed} `);
+
+  await page.getByRole("button", { name: "More actions", exact: true }).click();
+  await page.getByRole("button", { name: "Leave the JSON surface", exact: true }).click();
+  await expect(leave.getByText(JSON_GOES)).toBeVisible();
+  await leave.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(json).toHaveValue(`${seed} `);
+
+  await page.getByRole("button", { name: "More actions", exact: true }).click();
+  await page.getByRole("button", { name: "Save points", exact: true }).click();
+  await expect(leave.getByText(JSON_GOES)).toBeVisible();
+  await leave.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(json).toHaveValue(`${seed} `);
+
+  // Publish says what it leaves out.
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  const publish = page.getByRole("dialog", { name: "Publish this draft" });
+  await expect(publish.getByText(JSON_NOT_PUBLISHED)).toBeVisible();
+  await publish.getByRole("button", { name: "Cancel", exact: true }).click();
+
+  // The text back at its seed clears it all.
+  await json.fill(seed);
+  await expect(stateLine(page, STATE_UNSAVED)).toHaveCount(0);
+  expect(await closeWouldPrompt(page)).toBe(false);
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(publish).toBeVisible();
+  await expect(publish.getByText(JSON_NOT_PUBLISHED)).toHaveCount(0);
+  await publish.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("tab", { name: /^Map/ }).click();
+  await expect(leave).toHaveCount(0);
+  await expect(json).toHaveCount(0);
+  expect(saves.count()).toBe(0);
+});
+
+test("a successful Apply clears the unapplied state, and a refused one keeps it", async ({ page }) => {
+  await openDraft(page);
+  const label = await (await fieldName(page)).inputValue();
+  const json = await openJson(page);
+  const seed = await json.inputValue();
+  await json.fill("not json");
+  await page.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(stateLine(page, STATE_UNSAVED)).toBeVisible();
+
+  await json.fill(seed.replace(`"${label}"`, '"Tag from an Apply"'));
+  await page.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(stateLine(page, STATE_SAVED)).toBeVisible();
+  expect(await closeWouldPrompt(page)).toBe(false);
+  await page.getByRole("tab", { name: /^Map/ }).click();
+  await expect(json).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("confirming the question drops the text alone, and an applied change still lands", async ({ page }) => {
+  await openDraft(page);
+  const label = await (await fieldName(page)).inputValue();
+  const json = await openJson(page);
+  const seed = await json.inputValue();
+
+  // Confirmed from a tab press, the text goes and the next open reads the draft.
+  await json.fill(`${seed} `);
+  await page.getByRole("tab", { name: /^Map/ }).click();
+  const leave = page.getByRole("dialog", { name: "Leave this draft?" });
+  await leave.getByRole("button", { name: "Leave without saving" }).click();
+  await expect(json).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: /^Map/ })).toHaveAttribute("aria-selected", "true");
+  await expect(stateLine(page, STATE_UNSAVED)).toHaveCount(0);
+
+  // An Apply waits out its pause while newer text stands, and an exit keeps what it applied.
+  const applied = "Tag applied ahead of the exit";
+  await openJson(page);
+  const text = await json.inputValue();
+  await json.fill(text.replace(`"${label}"`, `"${applied}"`));
+  const landed = page.waitForResponse((response) => isSave(response.request()));
+  await page.getByRole("button", { name: "Apply", exact: true }).click();
+  await json.fill(`${await json.inputValue()} `);
+  await page.getByRole("button", { name: "Back to processes" }).click();
+  await leave.getByRole("button", { name: "Leave without saving" }).click();
+  await landed;
+  await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
+  await expect(await fieldName(page)).toHaveValue(applied);
 });

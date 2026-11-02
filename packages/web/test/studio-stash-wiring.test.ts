@@ -259,7 +259,7 @@ describe("EditScreen.tsx wires the unsaved-draft stash", () => {
   it("a discarded draft that drops the stash after navigate is flagged", () => {
     const late = mutate(
       real,
-      /(\bonDiscarded\s*:\s*\(\)\s*=>\s*\{\s*)dropStash\(\);(\s*onDirtyChange\?\.\(false\);\s*navigate\(\{ name: "processes" \}\);)/,
+      /(\bonDiscarded\s*:\s*\(\)\s*=>\s*\{\s*)dropStash\(\);(\s*onDirtyChange\?\.\(false\);\s*onUnappliedJsonChange\?\.\(false\);\s*navigate\(\{ name: "processes" \}\);)/,
       "$1$2\ndropStash();",
     );
     expect(scan(late)).toEqual(["onDiscarded does not call dropStash before navigate"]);
@@ -438,11 +438,35 @@ describe("A kept copy waits for the author's answer", () => {
 });
 
 /** Each scenario of `studio-app`'s "A standing notice holds the automatic saves". */
+describe("The process list's discard deletes the kept copy", () => {
+  const list = stripComments(readFileSync(new URL("../src/areas/studio/screens/ProcessesScreen.tsx", import.meta.url).pathname, "utf8"));
+  const rootFile = stripComments(readFileSync(new URL("../src/areas/studio/root.tsx", import.meta.url).pathname, "utf8"));
+  const clears = (code: string) => /await deleteDraft\(processId, token\);\s*clearStash\(tabStorage\(\), actorId, processId\);/.test(code);
+  const passes = (code: string) => /<ProcessesScreen\b[^>]*\bactorId=\{session\.actorId\}/.test(code);
+
+  it("clears the copy right after the delete answers, under the session's actor", () => {
+    expect(clears(list)).toBe(true);
+    expect(passes(rootFile)).toBe(true);
+  });
+
+  it("a discard that leaves the copy is flagged", () => {
+    expect(clears(list.replace("clearStash(tabStorage(), actorId, processId);", ""))).toBe(false);
+  });
+
+  it("a clear ahead of the delete is flagged, since a refused delete keeps the draft", () => {
+    expect(clears(list.replace(/await deleteDraft\(processId, token\);\s*clearStash\(tabStorage\(\), actorId, processId\);/, "clearStash(tabStorage(), actorId, processId);\nawait deleteDraft(processId, token);"))).toBe(false);
+  });
+
+  it("a process list with no actor is flagged", () => {
+    expect(passes(rootFile.replace("actorId={session.actorId} roles", "roles"))).toBe(false);
+  });
+});
+
 describe("A standing notice holds the automatic saves", () => {
   it("A change under the notice sends nothing", () => {
     expect(autosaveWait({ ...FOR_WAIT, held: true, flushAsked: false })).toBeUndefined();
     expect(scan(mutate(real, /noticeStands: stash !== undefined/, "noticeStands: false"))).toEqual(["the notice does not hold the saves"]);
-    const line = headerStateLine({ dirty: true, failed: false, conflict: false, noticeStands: true, lastSavedAt: undefined, now: 0, baseVersion: null });
+    const line = headerStateLine({ dirty: true, failed: false, conflict: false, noticeStands: true, jsonUnapplied: false, lastSavedAt: undefined, now: 0, baseVersion: null });
     expect(line.state).toBe("unsaved");
   });
 

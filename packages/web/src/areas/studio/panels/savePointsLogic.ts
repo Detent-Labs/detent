@@ -76,7 +76,7 @@ export function createLanding(outcome: SavePointOutcome<unknown>, name: string):
     case "done":
       return { clearName: true, status: createdLine(name), refetch: true };
     case "refused":
-      return { clearName: false, inputError: outcome.message, refetch: false };
+      return { clearName: false, inputError: outcome.message, refetch: outcome.lost === true };
     default:
       return { clearName: false, refetch: false };
   }
@@ -100,7 +100,7 @@ export function restoreLanding(outcome: SavePointOutcome<{ kept: string }>, name
     case "gone":
       return { dialog: "close", refetch: true, focusInputAfter: false };
     case "refused":
-      return { dialog: "stay", refusal: outcome.message, refetch: false, focusInputAfter: false };
+      return { dialog: "stay", refusal: outcome.message, refetch: outcome.lost === true, focusInputAfter: false };
     default:
       return { dialog: "close", refetch: false, focusInputAfter: false };
   }
@@ -111,7 +111,7 @@ export function removeLanding(outcome: SavePointOutcome<undefined>): DialogLandi
     case "done":
       return { dialog: "close", refetch: true, focusInputAfter: true };
     case "gone":
-      return { dialog: "close", refetch: true, focusInputAfter: false };
+      return { dialog: "close", refetch: true, focusInputAfter: true };
     case "refused":
       return { dialog: "stay", refusal: outcome.message, refetch: false, focusInputAfter: false };
     default:

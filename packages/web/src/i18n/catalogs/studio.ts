@@ -29,6 +29,7 @@ export const en = {
   // The confirmations that stand in `panels/confirmations.tsx`.
   "leaveDialog.heading": "Leave this draft?",
   "leaveDialog.body": "Detent could not save your latest changes, so they go with it. The saved draft stays.",
+  "leaveDialog.bodyJson": "The JSON you have not applied goes with it. The saved draft stays.",
   "leaveDialog.confirm": "Leave without saving",
   "arrangeDialog.heading": "Arrange every step?",
   "arrangeDialog.body": "Every step moves to a new place, and each path loses the bends placed on it.",
@@ -56,6 +57,7 @@ export const en = {
   "draftToolbar.saving": "Saving…",
   "draftToolbar.discard": "Discard draft",
   "draftToolbar.conflictMessage": "This draft was changed elsewhere.",
+  "draftToolbar.conflictMessageDirty": "This draft was changed elsewhere. Reload loads the stored draft and drops your unsaved changes.",
   "draftToolbar.conflictReload": "Reload",
   "draftToolbar.publish": "Publish",
   "draftToolbar.publishing": "Publishing…",
@@ -75,6 +77,7 @@ export const en = {
   "draftToolbar.publishDialogNextVersion": "Next version",
   "draftToolbar.publishDialogOpenIssues": "Open issues",
   "draftToolbar.publishDialogBlocked": "This draft cannot go out yet. Open Checks and fix what it marks Must fix.",
+  "draftToolbar.publishDialogJsonUnapplied": "The JSON you have not applied is not part of this publish.",
   "draftToolbar.publishDialogImmutable": "A published version can never change. To correct it, publish a new one.",
   // The publish dialog's Changes row (`studio-publish`): one sentence per
   // state of the base-version fetch, then a disclosure over the change list.

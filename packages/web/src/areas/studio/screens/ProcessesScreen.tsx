@@ -30,6 +30,7 @@ import {
 import type { TemplateSummary } from "../api/types.js";
 import { collidingProcessId, parsePromotionFile, type PromotionPreview } from "./promotionImportLogic.js";
 import { mintId } from "../draft/ids.js";
+import { clearStash, tabStorage } from "../draft/draftStash.js";
 import { routePath, type Route } from "../routing.js";
 import { areaHref } from "../../../shell/routing.js";
 import { describeCaughtError } from "../errors.js";
@@ -230,6 +231,8 @@ const CREATE_ROLE = "system:create";
 
 interface ProcessesScreenProps {
   token: string;
+  /** Names the tab's kept copy of a draft, which a discard deletes with it. */
+  actorId: string;
   roles: readonly string[];
   navigate: (route: Route) => void;
   onUnauthorized: () => void;
@@ -481,7 +484,7 @@ export function ProcessListTable({ children }: { children: ReactNode }) {
   );
 }
 
-export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: ProcessesScreenProps) {
+export function ProcessesScreen({ token, actorId, roles, navigate, onUnauthorized }: ProcessesScreenProps) {
   const isAdmin = roles.includes(ADMIN_ROLE);
   const canCreate = roles.includes(CREATE_ROLE);
   const [rows, setRows] = useState<ProcessRow[]>([]);
@@ -688,6 +691,8 @@ export function ProcessesScreen({ token, roles, navigate, onUnauthorized }: Proc
     setDiscardError(undefined);
     try {
       await deleteDraft(processId, token);
+      // A discarded draft restarts its revision at 0, so a kept copy could restore over a new one.
+      clearStash(tabStorage(), actorId, processId);
       discardTrigger.current = null;
       setPendingDiscard(undefined);
       await load();
