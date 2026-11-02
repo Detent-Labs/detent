@@ -74,7 +74,6 @@ export const en = {
   "draftToolbar.dialogLanguages": "Languages",
   "draftToolbar.publishDialogHeading": "Publish this draft?",
   "draftToolbar.publishDialogNextVersion": "Next version",
-  "draftToolbar.publishDialogUnsaved": "This draft has unsaved changes. Publishing saves them first.",
   "draftToolbar.publishDialogOpenIssues": "Open issues",
   "draftToolbar.publishDialogBlocked": "This draft cannot go out yet. Open Checks and fix what it marks Must fix.",
   "draftToolbar.publishDialogImmutable": "A published version can never change. To correct it, publish a new one.",
@@ -92,6 +91,11 @@ export const en = {
   "draftToolbar.discardDialogHeading": "Discard this draft?",
   "draftToolbar.discardDialogLastSaved": "Last saved",
   "draftToolbar.discardDialogKeepsPublished": "The published versions stay. Only the unpublished draft goes.",
+  // The banner after a failed save. One says Detent keeps trying, the other waits.
+  "draftToolbar.saveFailedRetrying": "Your latest changes stay in this tab, unsaved. Detent keeps trying.",
+  "draftToolbar.saveFailedRefused": "Your latest changes stay in this tab, unsaved. The server refused them.",
+  // The point a restore keeps. `keptPointName` clips `{name}`.
+  "savePoints.keptName": "Before restoring “{name}”",
 
   // The notice under the header bar that offers the work a 401 kept in the
   // tab (`panels/RestoreNotice.tsx`). `t` takes no values, so the message

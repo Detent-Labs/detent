@@ -134,11 +134,11 @@ describe("what the surface no longer carries", () => {
     expect(run.indexOf("setMenuOpen(false)")).toBeLessThan(run.indexOf("action()"));
   });
 
-  it("reads the discard request's pending flag into the discard dialog's busy", () => {
+  it("reads the discard request's pending flag and a running save into the discard dialog's busy", () => {
     const code = stripComments(read("src/areas/studio/panels/ProcessHeaderBar.tsx"));
     const dialog = code.slice(code.indexOf("<DiscardDraftDialog"));
 
-    expect(dialog).toContain("busy={actions.discarding}");
+    expect(dialog).toContain("busy={actions.discarding || actions.saving}");
   });
 
   // `studio-draftToolbarState.test.ts` tests the rule. This pins its wiring: the

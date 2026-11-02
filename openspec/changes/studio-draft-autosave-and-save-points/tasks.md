@@ -18,14 +18,14 @@
 
 ## 3. The autosave core
 
-- [ ] 3.1 Add `screens/draftAutosaveLogic.ts` with the D1 constants other than `SAVE_TIMEOUT_MS`, `autosaveWait` and `nextDirtySince`. Pass: `bun:test` pins each step of D1's order, the max wait, the backoff, a refused failure's `undefined`, and a send, the saving commit, an answer, a pause and one key giving the debounce wait.
-- [ ] 3.2 Add the timer effect, `dirtySince`, the failure state, `retry` and `flush` to `useDraftToolbarActions` per D1, D2 and D3. Keep `save` for now. Pass: wiring tests pin each of these, and a mutation on a copy shows a named test fails without the effect's `conflict` guard.
-- [ ] 3.3 Clear the failure on a clean draft and in `reload`, and clear only the failure's own banner on success, per D2. Pass: named tests fail on a plain `clearError()` and on a lost clean-draft clear.
-- [ ] 3.4 Add `unconfirmed` and the lost-answer rule of D2. Pass: logic tests cover equal content, differing content, a change made since, a flush after a lost answer, and A lost then B failed.
-- [ ] 3.5 Add the unmount effect, the `dropped` ref, the `running` promise ref and `keepCopy` of D1. Pass: tests cover a dirty unmount, a running request, a rejected last save, a standing failure and conflict that keep a copy, and each skip.
-- [ ] 3.6 Rewrite `publish` and `runPublish` per D5, add `PrimaryConfirm`'s `waiting` prop, and remove `publishDialogUnsaved`. Pass: tests pin the waiting markup with Cancel live, `runPublish` holds no `doSave`, and the dirty-gate pins in `studio-draft-toolbar-wiring.test.ts`, `studio-confirmations.test.tsx` and `studio-processHeaderBar-publishGate.test.tsx` flip with their mutations kept.
-- [ ] 3.7 Hold the timer while the discard dialog stands, and make its `busy` read `discarding || saving`, per D1. Pass: named tests cover both.
-- [ ] 3.8 Split `adoptDraft` out of `reload`, add `createSavePoint` and `restoreSavePoint` to the hook behind `flush`, add `removeSavePoint` with no flush, and add the pure `keptPointName` of D10. Pass: logic tests cover each row of D10's outcome table, `canPublish` left alone, the Versions offer retired, the selection filtered, a 200-character name and five nested rounds.
+- [x] 3.1 Add `screens/draftAutosaveLogic.ts` with the D1 constants other than `SAVE_TIMEOUT_MS`, `autosaveWait` and `nextDirtySince`. Pass: `bun:test` pins each step of D1's order, the max wait, the backoff, a refused failure's `undefined`, and a send, the saving commit, an answer, a pause and one key giving the debounce wait.
+- [x] 3.2 Add the timer effect, `dirtySince`, the failure state, `retry` and `flush` to `useDraftToolbarActions` per D1, D2 and D3. Keep `save` for now. Pass: wiring tests pin each of these, and a mutation on a copy shows a named test fails without the effect's `conflict` guard.
+- [x] 3.3 Clear the failure on a clean draft and in `reload`, and clear only the failure's own banner on success, per D2. Pass: named tests fail on a plain `clearError()` and on a lost clean-draft clear.
+- [x] 3.4 Add `unconfirmed` and the lost-answer rule of D2. Pass: logic tests cover equal content, differing content, a change made since, a flush after a lost answer, and A lost then B failed.
+- [x] 3.5 Add the unmount effect, the `dropped` ref, the `running` promise ref and `keepCopy` of D1. Pass: tests cover a dirty unmount, a running request, a rejected last save, a standing failure and conflict that keep a copy, and each skip.
+- [x] 3.6 Rewrite `publish` and `runPublish` per D5, add `PrimaryConfirm`'s `waiting` prop, and remove `publishDialogUnsaved`. Pass: tests pin the waiting markup with Cancel live, `runPublish` holds no `doSave`, and the dirty-gate pins in `studio-draft-toolbar-wiring.test.ts`, `studio-confirmations.test.tsx` and `studio-processHeaderBar-publishGate.test.tsx` flip with their mutations kept.
+- [x] 3.7 Hold the timer while the discard dialog stands, and make its `busy` read `discarding || saving`, per D1. Pass: named tests cover both.
+- [x] 3.8 Split `adoptDraft` out of `reload`, add `createSavePoint` and `restoreSavePoint` to the hook behind `flush`, add `removeSavePoint` with no flush, and add the pure `keptPointName` of D10. Pass: logic tests cover each row of D10's outcome table, `canPublish` left alone, the Versions offer retired, the selection filtered, a 200-character name and five nested rounds.
 
 ## 4. The surface: header bar, leave rule, stash
 

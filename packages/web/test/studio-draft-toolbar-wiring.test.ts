@@ -14,10 +14,11 @@ import { describe, expect, it } from "bun:test";
  *    state read when the answer arrives, drops a drag made during the request.
  *    `onSaveState` is a `Dispatch<SetStateAction<...>>`, so a plain value
  *    still type-checks.
- * 3. `runPublish` gates on `isDraftDirty`. The body-only `isDirty` lets a
- *    layout-only difference publish without saving first.
- * 4. `reload` hands `onSavedLayoutChange` the layout it hands `applyReload`, so
- *    a reloaded draft reads clean.
+ * 3. `publish` flushes on `dirty`, built from `isDraftDirty`. The body-only
+ *    `isDirty` lets a layout-only difference publish without landing. `runPublish`
+ *    holds no save of its own.
+ * 4. `adoptDraft` hands `onSavedLayoutChange` the layout it hands `applyReload`,
+ *    so a reloaded draft reads clean.
  *
  * A source test in the idiom `studio-stash-wiring.test.ts` uses: no harness in
  * this package can click a control or run a request. `scan` returns one name
@@ -43,8 +44,8 @@ function braced(code: string, open: number): string | undefined {
   return undefined;
 }
 
-/** The body of the first brace pair after `const name =`. For `doSave` that is
- * its own arrow function. For `runPublish` and `reload` it is the callback
+/** The body of the first brace pair after `const name =`. For `doSave` and
+ * `adoptDraft` that is its own arrow function. For `runPublish` it is the callback
  * handed to `withUnauthorized`. */
 function bodyAfter(code: string, name: string): string | undefined {
   const m = new RegExp(`\\bconst\\s+${name}\\s*=`).exec(code);
@@ -71,13 +72,22 @@ function scan(source: string): string[] {
     }
   }
 
+  const dirty = /\bconst\s+dirty\s*=\s*useMemo\s*\(\s*\(\)\s*=>\s*([^,]*(?:,[^,]*){0,3})\s*,\s*\[/.exec(code)?.[1] ?? "";
+  if (!/\bisDraftDirty\s*\(\s*draft\s*,\s*savedBody\s*,\s*saveState\.layout\s*,\s*savedLayout\s*\)/.test(dirty)) {
+    violations.push("dirty does not read isDraftDirty(draft, savedBody, saveState.layout, savedLayout)");
+  }
+  if (/\bisDirty\s*\(/.test(dirty)) violations.push("dirty reads the body-only isDirty");
+
+  const open = bodyAfter(code, "publish");
+  if (open === undefined) violations.push("publish not found");
+  else if (!/\bif\s*\(\s*!dirty\s*&&\s*!saving\s*\)\s*return;[\s\S]*\bflush\s*\(\s*\)/.test(open)) {
+    violations.push("publish does not hurry a dirty draft through flush");
+  }
+
   const publish = bodyAfter(code, "runPublish");
   if (publish === undefined) violations.push("runPublish not found");
   else {
-    if (!/\bisDraftDirty\s*\(\s*draft\s*,\s*savedBody\s*,\s*saveState\.layout\s*,\s*savedLayout\s*\)/.test(publish)) {
-      violations.push("runPublish does not read isDraftDirty(draft, savedBody, saveState.layout, savedLayout)");
-    }
-    if (/\bisDirty\s*\(/.test(publish)) violations.push("runPublish reads the body-only isDirty");
+    if (/\bdoSave\b/.test(publish)) violations.push("runPublish holds a doSave");
     if (!/^\s*clearError\(\);/.test(publish)) violations.push("runPublish does not clear the last refusal first");
   }
 
@@ -85,13 +95,13 @@ function scan(source: string): string[] {
   if (discard === undefined) violations.push("runDiscard not found");
   else if (!/^\s*clearError\(\);/.test(discard)) violations.push("runDiscard does not clear the last refusal first");
 
-  const reload = bodyAfter(code, "reload");
-  if (reload === undefined) violations.push("reload not found");
+  const adopt = bodyAfter(code, "adoptDraft");
+  if (adopt === undefined) violations.push("adoptDraft not found");
   else {
-    const handed = /\bapplyReload\s*\(\s*\{[^}]*\blayout:\s*([\w.]+)/.exec(reload)?.[1];
-    const saved = /\bonSavedLayoutChange\s*\(\s*([\w.]+)\s*\)/.exec(reload)?.[1];
+    const handed = /\bapplyReload\s*\(\s*\{[^}]*\blayout:\s*([\w.]+)/.exec(adopt)?.[1];
+    const saved = /\bonSavedLayoutChange\s*\(\s*([\w.]+)\s*\)/.exec(adopt)?.[1];
     if (handed !== "record.layout" || saved !== handed) {
-      violations.push("reload does not hand onSavedLayoutChange the record.layout it hands applyReload");
+      violations.push("adoptDraft does not hand onSavedLayoutChange the record.layout it hands applyReload");
     }
   }
 
@@ -127,7 +137,7 @@ describe("DraftToolbar.tsx wires the saved layout", () => {
 
   it("a saved layout advanced outside the success branch is flagged", () => {
     const dropped = mutate(real, /\s*onSavedLayoutChange\(result\.layout\);/, "");
-    const outside = mutate(dropped, /(\n\s*return result !== undefined;)/, "\nonSavedLayoutChange(saveState.layout);$1");
+    const outside = mutate(dropped, /(\n\s*setFailure\(undefined\);)/, "\nonSavedLayoutChange(saveState.layout);$1");
     expect(scan(outside)).toEqual(["doSave success branch does not call onSavedLayoutChange(result.layout)"]);
   });
 
@@ -156,29 +166,39 @@ describe("DraftToolbar.tsx wires the saved layout", () => {
     expect(scan(other)).toEqual(["doSave does not send sentLayout"]);
   });
 
-  it("a publish that gates on the body-only isDirty is flagged", () => {
-    const bodyOnly = mutate(real, /isDraftDirty\(draft, savedBody, saveState\.layout, savedLayout\) && /, "isDirty(draft, savedBody) && ");
+  it("a dirty state built on the body-only isDirty is flagged", () => {
+    const bodyOnly = mutate(real, /isDraftDirty\(draft, savedBody, saveState\.layout, savedLayout\)/, "isDirty(draft, savedBody)");
     expect(scan(bodyOnly)).toEqual([
-      "runPublish does not read isDraftDirty(draft, savedBody, saveState.layout, savedLayout)",
-      "runPublish reads the body-only isDirty",
+      "dirty does not read isDraftDirty(draft, savedBody, saveState.layout, savedLayout)",
+      "dirty reads the body-only isDirty",
     ]);
   });
 
-  it("a publish that compares against the wrong saved layout is flagged", () => {
+  it("a dirty state that compares against the wrong saved layout is flagged", () => {
     const wrong = mutate(real, /isDraftDirty\(draft, savedBody, saveState\.layout, savedLayout\)/, "isDraftDirty(draft, savedBody, saveState.layout, saveState.layout)");
-    expect(scan(wrong)).toEqual(["runPublish does not read isDraftDirty(draft, savedBody, saveState.layout, savedLayout)"]);
+    expect(scan(wrong)).toEqual(["dirty does not read isDraftDirty(draft, savedBody, saveState.layout, savedLayout)"]);
   });
 
-  it("a reload that leaves the saved layout behind is flagged", () => {
+  it("a publish that saves on its own again is flagged", () => {
+    const chained = mutate(real, /(const runPublish = [^{]*\{\s*clearError\(\);)/, "$1\nawait doSave();");
+    expect(scan(chained)).toEqual(["runPublish holds a doSave"]);
+  });
+
+  it("a publish that leaves a dirty draft unhurried is flagged", () => {
+    const unhurried = mutate(real, /if \(!dirty && !saving\) return;[\s\S]*?\}\);(\s*\};)/, "$1");
+    expect(scan(unhurried)).toEqual(["publish does not hurry a dirty draft through flush"]);
+  });
+
+  it("an adopted draft that leaves the saved layout behind is flagged", () => {
     const dropped = mutate(real, /\s*onSavedLayoutChange\(record\.layout\);/, "");
-    expect(scan(dropped)).toEqual(["reload does not hand onSavedLayoutChange the record.layout it hands applyReload"]);
+    expect(scan(dropped)).toEqual(["adoptDraft does not hand onSavedLayoutChange the record.layout it hands applyReload"]);
   });
 
-  it("a reload that saves another layout than it applies is flagged", () => {
+  it("an adopted draft that saves another layout than it applies is flagged", () => {
     const other = mutate(real, /onSavedLayoutChange\(record\.layout\);/, "onSavedLayoutChange(saveState.layout);");
-    expect(scan(other)).toEqual(["reload does not hand onSavedLayoutChange the record.layout it hands applyReload"]);
+    expect(scan(other)).toEqual(["adoptDraft does not hand onSavedLayoutChange the record.layout it hands applyReload"]);
     const copy = mutate(real, /onSavedLayoutChange\(record\.layout\);/, "onSavedLayoutChange({ ...record.layout });");
-    expect(scan(copy)).toEqual(["reload does not hand onSavedLayoutChange the record.layout it hands applyReload"]);
+    expect(scan(copy)).toEqual(["adoptDraft does not hand onSavedLayoutChange the record.layout it hands applyReload"]);
   });
 
   it("whitespace and line breaks inside a call change no verdict", () => {

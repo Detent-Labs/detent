@@ -22,6 +22,7 @@ import { RemoveStepDialog } from "../panels/RemoveStepDialog.js";
 import { stepRemovalReach } from "../draft/stepRemoval.js";
 import { activeControl } from "../panels/shared/dialogFocus.js";
 import { clearStash, readRestorable, stashDraft, tabStorage } from "../draft/draftStash.js";
+import { selectionAfterRestore } from "./draftAutosaveLogic.js";
 import { stepEntityIds } from "../draft/panel-rail.js";
 import { seedLocalizedText } from "../draft/localized-text";
 import { getDraft, listProcesses } from "../api/client.js";
@@ -486,6 +487,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // holds it in a ref, so a new identity on each render re-runs no effect.
   const stashOnUnauthorized = () => {
     if (dirtyNow) stashDraft(tabStorage(), actorId, processId, { body: draft, layout: saveState.layout, revision: saveState.revision });
+    actions.drop();
     onUnauthorized();
   };
   // The stash a past 401 left for this actor and process, read once on
@@ -987,6 +989,18 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     },
     onUnauthorized: stashOnUnauthorized,
     onCanPublishChange: setReloadedCanPublish,
+    noticeStands: stash !== undefined,
+    // The store has one slot, and a copy that stands holds the larger work.
+    keepCopy: (copy) => {
+      if (stash === undefined) stashDraft(tabStorage(), actorId, processId, copy);
+    },
+    // The draft changed, so the Versions offer goes. The selection drops what went,
+    // or the canvas bar would count a step the draft no longer holds.
+    onRestored: (record) => {
+      setJustPublished(false);
+      setSelectedStepIds((selected) => selectionAfterRestore(selected, record.body));
+      setSelectedPathId(undefined);
+    },
   });
   // A save's answer writes its revision over the draft's. The restore notice
   // waits for the answer, or a restore would drop the stored revision.

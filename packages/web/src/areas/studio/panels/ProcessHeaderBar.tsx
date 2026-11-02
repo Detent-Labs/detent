@@ -381,7 +381,8 @@ interface PublishConfirmDialogProps {
   draft: Draft;
   contentLocale: string;
   nextVersion: string;
-  dirty: boolean;
+  /** A change has not landed, so the confirm reads "Saving…" and ignores a press. */
+  waiting: boolean;
   openIssues: number;
   blocked: boolean;
   /** The Publish control that opened this dialog, for the focus return. */
@@ -412,7 +413,7 @@ function PublishConfirmDialog({
   contentLocale,
   revision,
   nextVersion,
-  dirty,
+  waiting,
   openIssues,
   blocked,
   error,
@@ -430,7 +431,11 @@ function PublishConfirmDialog({
       triggerRef={triggerRef}
       onCancel={onCancel}
       busy={busy}
-      confirm={<PrimaryConfirm onClick={onConfirm}>{busy ? t("draftToolbar.publishing") : t("draftToolbar.publish")}</PrimaryConfirm>}
+      confirm={
+        <PrimaryConfirm onClick={onConfirm} waiting={waiting}>
+          {waiting ? t("draftToolbar.saving") : busy ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
+        </PrimaryConfirm>
+      }
       refusal={error !== null && <DialogRefusal detail={errorDetail}>{error}</DialogRefusal>}
     >
       <DialogFacts>
@@ -452,7 +457,6 @@ function PublishConfirmDialog({
         <PublishChanges processId={processId} token={token} baseVersion={baseVersion} draft={draft} contentLocale={contentLocale} />
       </DialogFacts>
       {blocked && <DialogWarning>{t("draftToolbar.publishDialogBlocked")}</DialogWarning>}
-      {dirty && <DialogNote>{t("draftToolbar.publishDialogUnsaved")}</DialogNote>}
       <DialogNote>{t("draftToolbar.publishDialogImmutable")}</DialogNote>
       <DialogDeveloperView>
         {draft.key && <DialogMonoFact term={t("draftToolbar.dialogKey")}>{draft.key}</DialogMonoFact>}
@@ -890,13 +894,13 @@ export function ProcessHeaderBar({
           contentLocale={contentLocale}
           revision={revision}
           nextVersion={nextVersionLabel(baseVersion)}
-          dirty={isDirty}
+          waiting={isDirty || actions.saving}
           openIssues={validation.issues.length}
           blocked={blocked}
           triggerRef={publishTriggerRef}
           error={actions.error}
           errorDetail={actions.errorDetail}
-          busy={actions.saving || actions.publishing}
+          busy={actions.publishing}
           onCancel={() => actions.resolveDialog(false)}
           onConfirm={() => actions.resolveDialog(true)}
         />
@@ -907,7 +911,7 @@ export function ProcessHeaderBar({
           lastSavedAt={lastSavedAt}
           triggerRef={triggerRef}
           refusal={actions.error === null ? null : { message: actions.error, detail: actions.errorDetail }}
-          busy={actions.discarding}
+          busy={actions.discarding || actions.saving}
           onCancel={() => actions.resolveDialog(false)}
           onConfirm={() => actions.resolveDialog(true)}
         />

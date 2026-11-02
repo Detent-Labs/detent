@@ -65,6 +65,13 @@ const noActions: DraftToolbarActions = {
   errorDetail: null,
   pendingDialog: null,
   resolveDialog: () => {},
+  saveFailed: null,
+  retry: () => {},
+  flush: () => Promise.resolve({ saved: false }),
+  drop: () => {},
+  createSavePoint: () => Promise.resolve({ kind: "unsaved" }),
+  restoreSavePoint: () => Promise.resolve({ kind: "unsaved" }),
+  removeSavePoint: () => Promise.resolve({ kind: "done", value: undefined }),
   save: () => {},
   discard: () => {},
   publish: () => {},
@@ -269,13 +276,32 @@ describe("The publish dialog", () => {
     expect(renderHeader({ actions: { pendingDialog: "publish" } })).toMatch(/<dt[^>]*>Process<\/dt><dd class="value">Expense approval<\/dd>/);
   });
 
-  it("disables both controls while a save or a publish runs", () => {
-    for (const actions of [{ saving: true }, { publishing: true }]) {
-      const html = renderHeader({ actions: { pendingDialog: "publish", ...actions } });
-      const dialogTags = buttonTags(html.slice(html.indexOf("<dialog")));
+  it("disables both controls while a publish runs", () => {
+    const html = renderHeader({ actions: { pendingDialog: "publish", publishing: true } });
+    const dialogTags = buttonTags(html.slice(html.indexOf("<dialog")));
 
-      expect(dialogTags.filter((b) => b.includes("disabled"))).toHaveLength(2);
+    expect(dialogTags.filter((b) => b.includes("disabled"))).toHaveLength(2);
+    expect(html.slice(html.indexOf("<dialog"))).toContain("Publishing…");
+  });
+
+  it("waits on the confirm alone while a change has not landed, and Cancel stays live", () => {
+    for (const [isDirty, saving] of [[true, false], [false, true], [true, true]] as const) {
+      const html = renderHeader({ isDirty, actions: { pendingDialog: "publish", saving } });
+      const dialog = html.slice(html.indexOf("<dialog"));
+      const confirm = /<button[^>]*>Saving…<\/button>/.exec(dialog)?.[0];
+
+      expect(confirm).toContain('aria-disabled="true"');
+      expect(confirm).not.toContain('disabled=""');
+      expect(buttonTags(dialog).filter((b) => /\sdisabled=/.test(b))).toHaveLength(0);
+      expect(dialog).toContain(">Cancel</button>");
     }
+  });
+
+  it("carries no wait on a clean draft with no request running", () => {
+    const dialog = renderHeader({ actions: { pendingDialog: "publish" } });
+    const confirm = /<button[^>]*>Publish<\/button>/.exec(dialog.slice(dialog.indexOf("<dialog")))?.[0];
+
+    expect(confirm).not.toContain("aria-disabled");
   });
 
   it("omits the key row when the draft has no key", () => {
@@ -343,9 +369,20 @@ describe("The publish dialog", () => {
     expect(html).not.toContain("This draft cannot go out yet");
   });
 
-  it("states the unsaved-changes sentence only when the draft is dirty", () => {
+  it("states no unsaved-changes sentence, since a publish no longer saves first", () => {
     expect(renderHeader({ actions: { pendingDialog: "publish" } })).not.toContain("Publishing saves them first");
-    expect(renderHeader({ isDirty: true, actions: { pendingDialog: "publish" } })).toContain("Publishing saves them first");
+    expect(renderHeader({ isDirty: true, actions: { pendingDialog: "publish" } })).not.toContain("Publishing saves them first");
+  });
+
+  it("disables both of the discard dialog's controls while a save runs, so its confirm cannot pass that save", () => {
+    const tags = (actions: Partial<DraftToolbarActions>) => {
+      const html = renderHeader({ actions: { pendingDialog: "discard", ...actions } });
+      return buttonTags(html.slice(html.indexOf("<dialog"))).filter((b) => /\sdisabled=/.test(b));
+    };
+
+    expect(tags({ saving: true })).toHaveLength(2);
+    expect(tags({ discarding: true })).toHaveLength(2);
+    expect(tags({})).toHaveLength(0);
   });
 
   // A static render fires no effect, so the base body's read never starts and

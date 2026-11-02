@@ -1,13 +1,40 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useDraft } from "../draft/store.js";
-import { saveDraft, getDraft, deleteDraft, publishDraft } from "../api/client.js";
+import {
+  createSavePoint as requestCreateSavePoint,
+  deleteDraft,
+  getDraft,
+  publishDraft,
+  removeSavePoint as requestRemoveSavePoint,
+  restoreSavePoint as requestRestoreSavePoint,
+  saveDraft,
+} from "../api/client.js";
 import { applySaveResult, applyReload, type DraftSaveState } from "../screens/draftSaveLogic.js";
 import { isDraftDirty } from "../screens/draftToolbarState.js";
+import {
+  afterRunningSave,
+  autosaveWait,
+  classifySaveFailure,
+  flushAnswer,
+  keptPointName,
+  landedEntry,
+  nextDirtySince,
+  nextFailure,
+  nextUnconfirmed,
+  savePointFailure,
+  unmountPlan,
+  type FlushResult,
+  type SaveAnswer,
+  type SaveFailure,
+  type SavePointOutcome,
+  type SentPair,
+} from "../screens/draftAutosaveLogic.js";
 import { StudioClientError } from "../api/client.js";
 import { describeCaughtError, describePublishRefusal } from "../errors.js";
-import { useFail } from "../../../shell/useFail.js";
+import { is401, useFail } from "../../../shell/useFail.js";
+import type { DraftStash } from "../draft/draftStash.js";
 import type { Draft } from "../draft/types.js";
-import type { PublishResult } from "../api/types.js";
+import type { PublishResult, RestoredDraft, SavePointSummary } from "../api/types.js";
 
 export interface DraftToolbarProps {
   processId: string;
@@ -24,15 +51,16 @@ export interface DraftToolbarProps {
   savedBody: Draft;
   onSavedBodyChange: (body: Draft) => void;
   /** The layout last known to be persisted, beside `savedBody`. A save and a
-   * reload advance it. Publish saves first when the body or the layout differs
+   * reload advance it. The draft is dirty when the body or the layout differs
    * from these two. */
   savedLayout: Record<string, unknown>;
   onSavedLayoutChange: (layout: Record<string, unknown>) => void;
   /** Fired only from `doSave()`'s success branch — never from `reload()`'s
    * conflict-recovery branch, which calls `onSavedBodyChange` and
    * `onSavedLayoutChange` alone. A mere reload is not a save, and must not
-   * advance the `lastSavedAt` the header bar's state line prints. */
-  onSaved?: () => void;
+   * advance the `lastSavedAt` the header bar's state line prints. It carries the
+   * answer's revision. */
+  onSaved?: (revision: number) => void;
   publishResult: PublishResult | null;
   /** A successful publish's answer. The caller raises the header bar's
    * just-published line and Versions offer from it. */
@@ -48,6 +76,14 @@ export interface DraftToolbarProps {
    * `publishResult.version`. Without this, a stale `false` would survive the
    * one control the conflict banner offers. */
   onCanPublishChange?: (canPublish: boolean) => void;
+  /** The restore notice stands. No automatic save runs until the author answers it. */
+  noticeStands: boolean;
+  /** Another dialog over this screen holds the automatic saves. */
+  holdSaves?: boolean;
+  /** Keeps work an unmount could not save, as a copy in the tab. */
+  keepCopy: (copy: DraftStash) => void;
+  /** A save point restore landed, and the draft holds its answer. */
+  onRestored?: (record: RestoredDraft) => void;
 }
 
 /** Which confirmation dialog the header bar has open, if any. Publish and
@@ -75,6 +111,20 @@ export interface DraftToolbarActions {
   /** Resolves whichever dialog `pendingDialog` names. `true` runs the act,
    * `false` declines it and sends no request. */
   resolveDialog: (confirmed: boolean) => void;
+  /** A save's standing failure. `retryable` says the backoff runs. `detail` is the
+   * caught text, for a closed Developer view. */
+  saveFailed: Pick<SaveFailure, "retryable" | "detail"> | null;
+  /** Sends at once and keeps the failure until the answer replaces or clears it. */
+  retry: () => void;
+  /** The one way to hurry a save. It settles after the commit that answers it. It
+   * keeps one identity, so a caller can hold it in a ref. */
+  flush: () => Promise<FlushResult>;
+  /** Marks the draft's unsaved work as given up, so the unmount sends nothing. */
+  drop: () => void;
+  createSavePoint: (name: string) => Promise<SavePointOutcome<SavePointSummary>>;
+  /** The value names the point the restore kept. */
+  restoreSavePoint: (point: Pick<SavePointSummary, "savePointId" | "name">) => Promise<SavePointOutcome<{ kept: string }>>;
+  removeSavePoint: (savePointId: string) => Promise<SavePointOutcome<undefined>>;
   save: () => void;
   discard: () => void;
   publish: () => void;
@@ -87,8 +137,8 @@ export interface DraftToolbarActions {
 
 /**
  * The save/discard/publish logic `DraftToolbar` has always owned — pending
- * flags, the network calls, the 401 and conflict handling — lives in this one
- * hook. `EditScreen.tsx` calls it once and threads the result down as props,
+ * flags, the timer that saves the draft, the network calls, the 401 and conflict
+ * handling — lives in this one hook. `EditScreen.tsx` calls it once and threads the result down as props,
  * so whichever component renders the controls (`ProcessHeaderBar` and its `⋮`
  * menu today) never reimplements the logic itself.
  *
@@ -112,6 +162,10 @@ export function useDraftToolbarActions({
   onDiscarded,
   onUnauthorized,
   onCanPublishChange,
+  noticeStands,
+  holdSaves = false,
+  keepCopy,
+  onRestored,
 }: DraftToolbarProps): DraftToolbarActions {
   const { draft, replace } = useDraft();
   const [saving, setSaving] = useState(false);
@@ -139,25 +193,180 @@ export function useDraftToolbarActions({
     }
   };
 
-  /** Returns whether the save persisted (false on a 409 — the conflict banner below already explains that, so a caller chaining off this shouldn't proceed). */
-  const doSave = async (): Promise<boolean> => {
+  const [failure, setFailure] = useState<SaveFailure | undefined>(undefined);
+  const [savePointActs, setSavePointActs] = useState(0);
+  const dirty = useMemo(
+    () => isDraftDirty(draft, savedBody, saveState.layout, savedLayout),
+    [draft, savedBody, saveState.layout, savedLayout],
+  );
+  // A clean draft has nothing left to fail. An author may take a change back by
+  // hand. Adjusted during render, as `justPublishedAfter` is.
+  if (failure !== undefined && !dirty) setFailure(undefined);
+
+  const held = noticeStands || holdSaves || pendingDialog === "discard" || savePointActs > 0;
+  const dropped = useRef(false);
+  const drop = useCallback(() => {
+    dropped.current = true;
+  }, []);
+  // The request that runs. A second send cannot leave beside it, and an unmount
+  // chains on it.
+  const running = useRef<Promise<SaveAnswer> | undefined>(undefined);
+  const lastSent = useRef<SentPair>({ draft, layout: saveState.layout });
+  const dirtySince = useRef<number | undefined>(undefined);
+  const unconfirmed = useRef<SentPair[]>([]);
+  const flushWaiters = useRef<((result: FlushResult) => void)[]>([]);
+  const [flushTick, setFlushTick] = useState(0);
+
+  /**
+   * Sends the draft as this render holds it. The answer lands in one commit, so
+   * none reads "dirty, not saving, no failure" and arms a second timer. A 409 while
+   * `unconfirmed` holds an entry reads the stored draft first: a lost send may have
+   * committed. `savedBody` then takes the entry's draft, since `isDirty` compares
+   * with `JSON.stringify` and `jsonb` reorders keys. It never rejects.
+   */
+  const doSave = (): Promise<SaveAnswer> => {
+    if (running.current !== undefined) return running.current;
+    const sentDraft = draft;
+    const sentLayout = saveState.layout;
+    const sent: SentPair = { draft: sentDraft, layout: sentLayout };
+    dirtySince.current = undefined;
+    lastSent.current = sent;
     setSaving(true);
-    try {
-      const sentLayout = saveState.layout;
-      const result = await saveDraft(processId, { body: draft, layout: sentLayout, revision: saveState.revision }, token);
-      if (result) {
-        onSavedBodyChange(draft);
-        onSavedLayoutChange(result.layout);
-        onSaved?.();
+    const send = async (): Promise<SaveAnswer> => {
+      let answered = false;
+      try {
+        let result = await saveDraft(processId, { body: sentDraft, layout: sentLayout, revision: saveState.revision }, token);
+        answered = true;
+        let landed = sent;
+        if (result === undefined && unconfirmed.current.length > 0) {
+          const stored = await getDraft(processId, token);
+          const entry = stored && landedEntry(unconfirmed.current, stored);
+          if (entry) {
+            result = stored;
+            landed = entry;
+          }
+        }
+        unconfirmed.current = nextUnconfirmed(unconfirmed.current, sent, "answered");
+        if (result) {
+          onSavedBodyChange(landed.draft);
+          onSavedLayoutChange(result.layout);
+          onSaved?.(result.revision);
+        }
+        // Only the failure's own banner leaves. `error` may hold another act's.
+        setFailure(undefined);
+        onSaveState((current) => applySaveResult(current, result, sentLayout));
+        return result ? { saved: true, revision: result.revision, ...landed } : { saved: false };
+      } catch (e) {
+        if (is401(e)) {
+          fail(e);
+          return { saved: false };
+        }
+        if (!answered) unconfirmed.current = nextUnconfirmed(unconfirmed.current, sent, classifySaveFailure(e).lost ? "lost" : "failed");
+        setFailure((prior) => nextFailure(prior, sent, e));
+        return { saved: false };
+      } finally {
+        running.current = undefined;
+        setSaving(false);
       }
-      onSaveState((current) => applySaveResult(current, result, sentLayout));
-      return result !== undefined;
-    } finally {
-      setSaving(false);
-    }
+    };
+    running.current = send();
+    return running.current;
   };
 
-  const save = () => withUnauthorized(() => doSave().then(() => undefined));
+  const save = () => {
+    if (!saving) void doSave();
+  };
+  const retry = save;
+
+  /** A flush that fails settles false. One the screen unmounts under never settles:
+   * its caller left with it, and a 401 must run no exit. */
+  const flush = useCallback(
+    () =>
+      new Promise<FlushResult>((resolve) => {
+        flushWaiters.current.push(resolve);
+        // One fresh try, and that try settles it.
+        setFailure(undefined);
+        setFlushTick((tick) => tick + 1);
+      }),
+    [],
+  );
+
+  // Ahead of the timer below, so a flush that settles here reads as settled there:
+  // a timer armed for a settled flush could beat the commit that holds the saves.
+  useEffect(() => {
+    if (flushWaiters.current.length === 0) return;
+    const answer = flushAnswer({ dirty, saving, failed: failure !== undefined, conflict: saveState.conflict, revision: saveState.revision });
+    if (answer === undefined) return;
+    const waiters = flushWaiters.current;
+    flushWaiters.current = [];
+    for (const settle of waiters) settle(answer);
+  }, [flushTick, dirty, saving, failure, saveState.conflict, saveState.revision]);
+
+  // The closure holds the current draft and revision, so `doSave` reads no ref for
+  // them. A commit that moves either clears the timer, and that is the debounce.
+  useEffect(() => {
+    if (dropped.current) return;
+    const now = Date.now();
+    dirtySince.current = nextDirtySince(dirtySince.current, {
+      dirty,
+      changed: draft !== lastSent.current.draft || saveState.layout !== lastSent.current.layout,
+      now,
+    });
+    const wait = autosaveWait({
+      dirty,
+      saving,
+      conflict: saveState.conflict,
+      held,
+      flushAsked: flushWaiters.current.length > 0,
+      failure,
+      changedSinceFailure: failure !== undefined && (draft !== failure.draft || saveState.layout !== failure.layout),
+      dirtyFor: dirtySince.current === undefined ? 0 : now - dirtySince.current,
+    });
+    if (wait === undefined) return;
+    const timer = setTimeout(() => void doSave(), wait);
+    return () => clearTimeout(timer);
+  }, [draft, saveState.layout, saveState.revision, saveState.conflict, dirty, saving, held, failure, flushTick, processId, token]);
+
+  // What the unmount below reads. No commit follows it, so it holds the last one.
+  const commit = { draft, layout: saveState.layout, revision: saveState.revision, conflict: saveState.conflict, dirty, failure, noticeStands, keepCopy, processId, token };
+  const latest = useRef(commit);
+  latest.current = commit;
+
+  // An unmount that bypassed the leave rule (the browser's Back or Forward) would
+  // drop a waiting change with the timer. A fetch outlives the unmount.
+  useEffect(
+    () => () => {
+      const last = latest.current;
+      const keep = (revision: number) => last.keepCopy({ body: last.draft, layout: last.layout, revision });
+      const lastSave = (revision: number) => {
+        saveDraft(last.processId, { body: last.draft, layout: last.layout, revision }, last.token)
+          .then((result) => {
+            if (result === undefined) keep(revision);
+          })
+          .catch(() => keep(revision));
+      };
+      const request = running.current;
+      const plan = unmountPlan({
+        dropped: dropped.current,
+        noticeStands: last.noticeStands,
+        running: request !== undefined,
+        dirty: last.dirty,
+        failed: last.failure !== undefined,
+        conflict: last.conflict,
+      });
+      if (plan === "save") lastSave(last.revision);
+      else if (plan === "keepCopy") keep(last.revision);
+      else if (plan === "chain") {
+        void request?.then((answer) => {
+          if (dropped.current) return;
+          const next = afterRunningSave(answer, last);
+          if (next === "keepCopy") keep(last.revision);
+          else if (next === "save" && answer.saved) lastSave(answer.revision);
+        });
+      }
+    },
+    [],
+  );
 
   const doPublish = async () => {
     setPublishing(true);
@@ -169,9 +378,10 @@ export function useDraftToolbarActions({
   };
 
   /**
-   * Opens the publish dialog. It sends nothing: the request leaves only from
-   * `resolveDialog(true)` (studio-publish spec: "no publish request is sent
-   * until the developer confirms").
+   * Opens the publish dialog and hurries a change that has not landed. It sends no
+   * publish: that request leaves only from `resolveDialog(true)` (studio-publish
+   * spec: "no publish request is sent until the developer confirms"). A failed save
+   * closes this dialog alone, and the banner reports it.
    */
   const publish = () => {
     // A dialog reports its own refusal alone. Without this, a failure from an
@@ -179,52 +389,114 @@ export function useDraftToolbarActions({
     // reads as a refusal of the act the developer is about to confirm.
     clearError();
     setPendingDialog("publish");
+    if (!dirty && !saving) return;
+    void flush().then((result) => {
+      if (!result.saved) setPendingDialog((open) => (open === "publish" ? null : open));
+    });
   };
 
   /**
-   * The act the publish dialog confirms. Publish always targets the persisted
-   * draft (studio-publish spec) — a dirty in-browser edit is never sent
-   * implicitly — so a dirty draft saves first, under that one dialog and with
-   * no second prompt between the two calls (studio-app spec: "does not call
-   * the publish route until the save completes").
-   *
-   * A save conflict closes the dialog rather than reporting inside it. The
-   * conflict is not a refusal; it is a state with its own banner and its own
-   * Reload button, and a modal puts both out of reach.
+   * The act the publish dialog confirms. Publish targets the persisted draft
+   * (studio-publish spec), and the confirm waits while a change has not landed.
    */
   const runPublish = () =>
     withUnauthorized(async () => {
       // The slot leaves and returns, so a repeated refusal scrolls and announces again.
       clearError();
-      if (isDraftDirty(draft, savedBody, saveState.layout, savedLayout) && !(await doSave())) {
-        setPendingDialog(null);
-        return;
-      }
       await doPublish();
       setPendingDialog(null);
     });
+
+  /**
+   * Puts a stored draft in the editor, where current and saved coincide (design.md).
+   * Without the saved-state calls, `savedBody` keeps pointing at the replaced work,
+   * so a draft byte-identical to the server's reads as dirty for the rest of the
+   * session. It leaves the draft clean and starts no save. No `onSaved()` here
+   * (design.md): this is no save, and must not advance the `lastSavedAt` the header
+   * bar's state line prints.
+   */
+  const adoptDraft = (record: RestoredDraft) => {
+    const body = record.body as Draft;
+    replace(body);
+    onSavedBodyChange(body);
+    unconfirmed.current = [];
+    onSaveState(applyReload({ revision: record.revision, layout: record.layout }));
+    // The layout is part of the same coincidence: the adopted layout is both the
+    // current and the saved one.
+    onSavedLayoutChange(record.layout);
+  };
 
   const reload = () =>
     withUnauthorized(async () => {
       const record = await getDraft(processId, token);
       if (!record) return; // draft was discarded elsewhere — nothing to reload into
-      const body = record.body as Draft;
-      replace(body);
-      // A reload is by definition the point where current and saved coincide
-      // (design.md) — without this, savedBody keeps pointing at the discarded
-      // local edits, so a draft byte-identical to the server's reads as dirty
-      // for the rest of the session and Publish always prompts to save first.
-      // No onSaved() call here (design.md): a reload is not a save, and must
-      // not advance the lastSavedAt the header bar's state line prints.
-      onSavedBodyChange(body);
+      adoptDraft(record);
+      setFailure(undefined);
       // An administrator can grant or withdraw the publish permission while the
       // edit screen sits open. Reload is the one control the conflict banner
       // offers, so it has to clear a stale report too.
       onCanPublishChange?.(record.canPublish);
-      onSaveState(applyReload({ revision: record.revision, layout: record.layout }));
-      // The layout is part of the same coincidence: the reloaded layout is both
-      // the current and the saved one.
-      onSavedLayoutChange(record.layout);
+    });
+
+  const raiseConflict = () => onSaveState((current) => applySaveResult(current, undefined, current.layout));
+
+  /** One save point request, under `held`: a save landing beside it would move the
+   * revision it carries. Each outcome has one home (`SavePointOutcome`). */
+  const savePointRequest = async <T,>(act: "create" | "restore" | "remove", send: () => Promise<SavePointOutcome<T>>): Promise<SavePointOutcome<T>> => {
+    setSavePointActs((count) => count + 1);
+    try {
+      return await send();
+    } catch (e) {
+      if (is401(e)) {
+        fail(e);
+        return { kind: "ended" };
+      }
+      const outcome = savePointFailure(act, e);
+      if (outcome.kind === "conflict") raiseConflict();
+      return outcome;
+    } finally {
+      setSavePointActs((count) => count - 1);
+    }
+  };
+
+  /** Flushes first, so the copy holds what the author sees. */
+  const createSavePoint = (name: string) =>
+    savePointRequest<SavePointSummary>("create", async () => {
+      const flushed = await flush();
+      if (!flushed.saved) return { kind: "unsaved" };
+      const point = await requestCreateSavePoint(processId, { name, revision: flushed.revision }, token);
+      if (point === undefined) {
+        raiseConflict();
+        return { kind: "conflict" };
+      }
+      return { kind: "done", value: point };
+    });
+
+  /**
+   * Flushes first, so the kept point holds what the author sees. The answer carries
+   * no `canPublish`, so this adopts it with no permission report: `reload` whole
+   * would wipe a re-read permission.
+   */
+  const restoreSavePoint = (point: Pick<SavePointSummary, "savePointId" | "name">) =>
+    savePointRequest<{ kept: string }>("restore", async () => {
+      const flushed = await flush();
+      if (!flushed.saved) return { kind: "unsaved" };
+      const kept = keptPointName(point.name);
+      const record = await requestRestoreSavePoint(processId, point.savePointId, { revision: flushed.revision, keepName: kept }, token);
+      if (record === undefined) {
+        raiseConflict();
+        return { kind: "conflict" };
+      }
+      adoptDraft(record);
+      onRestored?.(record);
+      return { kind: "done", value: { kept } };
+    });
+
+  /** Sends at once: a removal copies nothing and carries no revision. */
+  const removeSavePoint = (savePointId: string) =>
+    savePointRequest<undefined>("remove", async () => {
+      await requestRemoveSavePoint(processId, savePointId, token);
+      return { kind: "done", value: undefined };
     });
 
   /**
@@ -242,10 +514,15 @@ export function useDraftToolbarActions({
     withUnauthorized(async () => {
       clearError();
       setDiscarding(true);
+      // A `PUT` at revision 0 landing after the delete would create the draft again.
+      dropped.current = true;
       try {
         await deleteDraft(processId, token);
         setPendingDialog(null);
         onDiscarded();
+      } catch (e) {
+        dropped.current = false;
+        throw e;
       } finally {
         setDiscarding(false);
       }
@@ -263,8 +540,10 @@ export function useDraftToolbarActions({
       setPendingDialog(null);
       return;
     }
-    if (open === "publish") void runPublish();
-    else void runDiscard();
+    if (open === "publish") {
+      // The confirm waits while a change has not landed, and a press does nothing.
+      if (!dirty && !saving) void runPublish();
+    } else void runDiscard();
   };
 
   return {
@@ -275,7 +554,14 @@ export function useDraftToolbarActions({
     errorDetail,
     pendingDialog,
     resolveDialog,
-    save: () => void save(),
+    saveFailed: failure === undefined ? null : { retryable: failure.retryable, detail: failure.detail },
+    retry,
+    flush,
+    drop,
+    createSavePoint,
+    restoreSavePoint,
+    removeSavePoint,
+    save,
     discard,
     publish,
     reload: () => void reload(),

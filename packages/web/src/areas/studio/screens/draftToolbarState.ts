@@ -5,10 +5,8 @@ import { resolveAddLocaleAttempt } from "../draft/localized-text.js";
  * Whether the currently-open draft differs from the last body successfully
  * saved to the server, checked structurally, since neither side carries a
  * cheap identity or hash the client can compare instead. This is the body half
- * of `isDraftDirty`, the gate `DraftToolbar`'s Publish action checks before
- * calling `publishDraft` (studio-app spec: "Publishing with unsaved changes
- * prompts a save first"). Publish always targets the persisted draft
- * (studio-publish spec), so a dirty draft must be saved first.
+ * of `isDraftDirty`, which the autosave's timer reads. Publish always targets
+ * the persisted draft (studio-publish spec), so its confirm waits on it too.
  */
 export function isDirty(current: unknown, savedSnapshot: unknown): boolean {
   return JSON.stringify(current) !== JSON.stringify(savedSnapshot);

@@ -167,6 +167,24 @@ describe("the confirm variants", () => {
   });
 });
 
+describe("PrimaryConfirm's wait", () => {
+  it("carries aria-disabled and no native disabled, with Cancel live", () => {
+    const html = frame(null, { confirm: <PrimaryConfirm onClick={noop} waiting>Saving…</PrimaryConfirm> });
+    const confirm = buttonTag(html, "Saving…");
+    expect(confirm).toContain('aria-disabled="true"');
+    expect(confirm).not.toMatch(/\sdisabled=/);
+    expect(buttonTag(html, "Cancel")).not.toMatch(/\sdisabled=/);
+  });
+
+  it("carries no aria-disabled when it does not wait", () => {
+    expect(buttonTag(frame(null, { confirm: <PrimaryConfirm onClick={noop}>Publish</PrimaryConfirm> }), "Publish")).not.toContain("aria-disabled");
+  });
+
+  it("gives a press nothing to do while it waits", () => {
+    expect(readFileSync(FRAME_FILE, "utf8")).toContain("onClick={waiting ? undefined : onClick}");
+  });
+});
+
 describe("DialogFacts", () => {
   const facts = (children: React.ReactNode) => renderToStaticMarkup(<DialogFacts>{children}</DialogFacts>);
 

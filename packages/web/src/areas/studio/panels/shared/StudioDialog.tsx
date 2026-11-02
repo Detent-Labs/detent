@@ -316,10 +316,20 @@ export function DestructiveConfirm({ onClick, children }: ConfirmProps) {
   );
 }
 
-/** The filled primary action. Disabled while busy. */
-export function PrimaryConfirm({ onClick, children }: ConfirmProps) {
+/**
+ * The filled primary action. Disabled while busy. `waiting` means a request the
+ * dialog did not start must answer first. A press then does nothing, and the
+ * control keeps the focus a native `disabled` would drop for a short wait.
+ */
+export function PrimaryConfirm({ onClick, waiting = false, children }: ConfirmProps & { waiting?: boolean }) {
   return (
-    <button type="button" className="btn btn-primary" onClick={onClick} disabled={use(BusyContext)}>
+    <button
+      type="button"
+      className="btn btn-primary"
+      onClick={waiting ? undefined : onClick}
+      disabled={use(BusyContext)}
+      aria-disabled={waiting ? true : undefined}
+    >
       {children}
     </button>
   );
