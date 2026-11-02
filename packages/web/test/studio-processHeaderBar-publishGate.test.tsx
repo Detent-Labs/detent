@@ -323,6 +323,33 @@ describe("The publish dialog", () => {
     }
   });
 
+  describe("over a failed save", () => {
+    const failed = { retryable: true, detail: "HTTP 500 from the server" };
+    const SENTENCE = "Detent cannot publish yet, because your latest changes have not saved. Cancel and press Try again.";
+
+    it("stays open, says why inside itself and holds its confirm, reading Publish once no save runs", () => {
+      const html = renderHeader({ isDirty: true, actions: { pendingDialog: "publish", saveFailed: failed } });
+      const dialog = html.slice(html.indexOf("<dialog"));
+
+      expect(dialog).toMatch(new RegExp(`role="alert"[^>]*>${SENTENCE}<`));
+      expect(/<button[^>]*>Publish<\/button>/.exec(dialog)?.[0]).toContain('aria-disabled="true"');
+      expect(dialog).not.toContain("Saving…");
+      expect(dialog).toContain(">Cancel</button>");
+    });
+
+    it("reads Saving… again while a retry runs, and the sentence stands", () => {
+      const html = renderHeader({ isDirty: true, actions: { pendingDialog: "publish", saving: true, saveFailed: failed } });
+      const dialog = html.slice(html.indexOf("<dialog"));
+
+      expect(/<button[^>]*>Saving…<\/button>/.exec(dialog)?.[0]).toContain('aria-disabled="true"');
+      expect(dialog).toContain(SENTENCE);
+    });
+
+    it("prints no such sentence where no save failed", () => {
+      expect(renderHeader({ isDirty: true, actions: { pendingDialog: "publish" } })).not.toContain(SENTENCE);
+    });
+  });
+
   it("carries no wait on a clean draft with no request running", () => {
     const dialog = renderHeader({ actions: { pendingDialog: "publish" } });
     const confirm = /<button[^>]*>Publish<\/button>/.exec(dialog.slice(dialog.indexOf("<dialog")))?.[0];
@@ -909,7 +936,7 @@ describe("The state line", () => {
 
 describe("The failed save's banner", () => {
   const RETRYING = "Your latest changes stay in this tab, unsaved. Detent keeps trying.";
-  const REFUSED = "Your latest changes stay in this tab, unsaved. The server refused them.";
+  const REFUSED = "Your latest changes stay in this tab, unsaved. The server refused them, so trying again may not help. To keep them, copy the text from the JSON surface.";
   const retrying = { retryable: true, detail: "HTTP 500 from the server" };
   const refused = { retryable: false, detail: "HTTP 400 from the server" };
 
@@ -940,13 +967,22 @@ describe("The failed save's banner", () => {
     expect(tag).not.toContain("aria-disabled");
   });
 
-  it("reads Saving… and carries aria-disabled and no native disabled while a save runs", () => {
+  it("keeps its label under a timed retry, and carries aria-disabled and no native disabled while a save runs", () => {
     const html = renderHeader({ isDirty: true, actions: { saving: true, saveFailed: retrying } });
-    const tag = /<button[^>]*>Saving…/.exec(html)?.[0];
+    const tag = /<button[^>]*>Try again/.exec(html)?.[0];
 
     expect(tag).toContain('aria-disabled="true"');
     expect(tag).not.toContain('disabled=""');
-    expect(html).not.toContain("Try again");
+    expect(html.slice(html.indexOf("</header>"))).not.toContain("Saving…");
+  });
+
+  it("stamps a failed save Not saved, and leaves the other banners' stamp alone", () => {
+    const failedSave = renderHeader({ isDirty: true, actions: { saveFailed: retrying } });
+    expect(failedSave).toContain(">Not saved<");
+    expect(failedSave).not.toContain(">Failed<");
+    expect(renderHeader({ actions: { error: "Arrange failed" } })).toContain(">Failed<");
+    expect(renderHeader({ conflict: true })).toContain(">Failed<");
+    expect(renderHeader({ conflict: true })).not.toContain(">Not saved<");
   });
 
   it("holds the caught text in a closed Developer view", () => {
@@ -961,7 +997,7 @@ describe("The failed save's banner", () => {
     const html = renderHeader({ isDirty: true, actions: { pendingDialog: "publish", saveFailed: retrying } });
 
     expect(html).not.toContain(RETRYING);
-    expect(html).not.toContain("Try again");
+    expect(html).not.toMatch(/<button[^>]*>Try again/);
   });
 
   it("stands apart from the action error, which keeps its own banner", () => {

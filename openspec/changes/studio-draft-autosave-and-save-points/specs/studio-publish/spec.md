@@ -38,9 +38,13 @@ nobody has published the draft before.
 
 A publish SHALL NOT save first. Pressing Publish SHALL hurry a change that has
 not landed. While that save runs, the confirm SHALL read "Saving…", carry
-`aria-disabled="true"` and ignore a press, and Cancel SHALL stay usable. A save
-that fails SHALL close the dialog, and the banner under the header bar SHALL report it.
-Declining SHALL send no publish request.
+`aria-disabled="true"` and ignore a press, and Cancel SHALL stay usable. Declining
+SHALL send no publish request.
+
+A save that fails SHALL keep the dialog open, and the dialog SHALL print why inside
+itself. While no save runs, its confirm SHALL read "Publish", keep
+`aria-disabled="true"` and ignore a press. A conflict that save raises SHALL close
+the dialog, and the conflict banner SHALL report it.
 
 Publish pressed while a conflict stands SHALL open no dialog. The focus SHALL
 move to the conflict banner's Reload control.
@@ -141,11 +145,17 @@ restarts their traversal from the top of the screen.
 - **WHEN** the publish dialog opens on a draft holding one language
 - **THEN** the dialog prints no language fact
 
-#### Scenario: A failed save closes the dialog
+#### Scenario: A failed save stops the dialog
 
 - **WHEN** an author presses Publish and the waiting change's save answers 500
-- **THEN** the dialog closes and the focus returns to Publish
-- **AND** the banner reports the failed save and no publish request leaves
+- **THEN** the dialog stays open and prints "Detent cannot publish yet, because your latest changes have not saved. Cancel and press Try again."
+- **AND** the confirm reads "Publish" with `aria-disabled="true"`, and a press sends no publish request
+- **AND** Cancel returns the focus to Publish, and the banner reports the failed save
+
+#### Scenario: A conflict during that save closes the dialog
+
+- **WHEN** an author presses Publish and the waiting change's save answers 409
+- **THEN** the dialog closes and the conflict banner stands
 
 #### Scenario: A standing conflict sends Publish to Reload
 

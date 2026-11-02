@@ -117,6 +117,12 @@ describe("the form", () => {
     expect(render()).toMatch(/<p role="status"[^>]*><\/p>/);
     expect(render({ status: "Saved “A”." })).toMatch(/<p role="status"[^>]*>Saved “A”\.<\/p>/);
   });
+
+  it("takes the empty line out of the column's flow, and a printed one back into it", () => {
+    const classOf = (html: string) => /<p role="status" class="([^"]*)"/.exec(html)?.[1];
+
+    expect(classOf(render())).not.toBe(classOf(render({ status: "Saved “A”." })));
+  });
 });
 
 describe("the rows", () => {
@@ -173,9 +179,11 @@ describe("the rows", () => {
     const restore = tags.find((b) => b.includes("Restore"))!;
     const remove = tags.find((b) => b.includes("Remove"))!;
 
-    expect(restore).toContain("btn btn-secondary");
-    expect(restore).not.toContain("btn-destructive");
-    expect(remove).toContain("btn btn-secondary btn-destructive");
+    for (const command of [restore, remove]) {
+      expect(command).toContain("btn btn-ghost");
+      expect(command).not.toContain("btn-secondary");
+      expect(command).not.toContain("btn-destructive");
+    }
   });
 
   it("reports a failed fetch where the rows would stand, with the form kept", () => {
@@ -280,7 +288,7 @@ describe("the Restore dialog", () => {
     expect(html).toContain("Restore “Before the review step”?</h2>");
     expect(html).toMatch(/<dt[^>]*>Saved by<\/dt><dd[^>]*>Roman<\/dd>/);
     expect(html).toMatch(/<dt[^>]*>Saved<\/dt><dd[^>]*>Nov 2, 2026/);
-    expect(html).toContain("Your work as it stands now becomes a save point, so you can come back to it.");
+    expect(html).toContain("The draft goes back to this point. Your work as it stands now becomes a save point, so you can come back to it.");
     expect(html).toContain(">Restore</button>");
   });
 
@@ -324,11 +332,12 @@ describe("the Restore dialog", () => {
 });
 
 describe("the Remove dialog", () => {
-  it("asks about the point by name and says the studio has no undo", () => {
+  it("asks about the point by name and says what goes and what stays", () => {
     const html = renderDialog("remove");
 
     expect(html).toContain("Remove “Before the review step”?</h2>");
-    expect(html).toContain("The studio has no undo.");
+    expect(html).toContain("This save point goes for good. The draft stays as it is.");
+    expect(html).not.toContain("The studio has no undo.");
     expect(html).toContain(">Remove</button>");
   });
 

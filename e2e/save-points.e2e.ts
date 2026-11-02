@@ -62,7 +62,7 @@ test("a save point is named, restored, restored back and removed", async ({ page
   const restore = row.getByRole("button", { name: "Restore “Before the label”" });
   await restore.click();
   const dialog = page.getByRole("dialog", { name: "Restore “Before the label”?" });
-  await expect(dialog.getByText("Your work as it stands now becomes a save point, so you can come back to it.")).toBeVisible();
+  await expect(dialog.getByText("The draft goes back to this point. Your work as it stands now becomes a save point, so you can come back to it.")).toBeVisible();
   await dialog.getByRole("button", { name: "Restore", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText("Restored “Before the label”. Your work before it stands as “Before restoring “Before the label””.")).toBeVisible();
@@ -79,15 +79,18 @@ test("a save point is named, restored, restored back and removed", async ({ page
   await kept.getByRole("button", { name: /^Restore/ }).click();
   await page.getByRole("dialog", { name: /^Restore/ }).getByRole("button", { name: "Restore", exact: true }).click();
   await expect(page.getByText(/^Restored “Before restoring/)).toBeVisible();
+  // A kept name stays flat, so the kept point's own kept point shares its name.
+  await expect(kept).toHaveCount(2);
   await expect(await fieldName(page)).toHaveValue(changed);
 
   // Remove asks first, and the focus lands on the input.
   await openSavePoints(page);
   await row.getByRole("button", { name: "Remove “Before the label”" }).click();
   const removal = page.getByRole("dialog", { name: "Remove “Before the label”?" });
-  await expect(removal.getByText("The studio has no undo.")).toBeVisible();
+  await expect(removal.getByText("This save point goes for good. The draft stays as it is.")).toBeVisible();
   await removal.getByRole("button", { name: "Remove", exact: true }).click();
   await expect(row).toHaveCount(0);
+  await expect(page.getByRole("tabpanel", { name: "Save points" }).getByRole("status")).toHaveText("Removed “Before the label”.");
   await expect(input).toBeFocused();
 
   // The discard dialog says the points go with the draft.
@@ -138,6 +141,20 @@ test("the bound takes the input, keeps Remove, and a remove brings the input bac
   const input = page.getByRole("textbox", { name: "Name this save point" });
   await expect(input).toBeFocused();
 
+  // The empty status line stays mounted and leaves the column's one gap, the gap above the form.
+  const rowsAt = page.getByRole("button", { name: "Restore “Alpha”", exact: true });
+  await expect(rowsAt).toBeVisible();
+  await expect(page.getByRole("tabpanel", { name: "Save points" }).getByRole("status")).toBeAttached();
+  const box = async (locator: Locator) => (await locator.boundingBox())!;
+  const form = await box(page.locator("form").filter({ has: input }));
+  const help = await box(page.getByText("A save point keeps the draft as it stands now, so you can come back to it."));
+  const list = await box(page.getByRole("list").filter({ has: rowsAt }));
+  expect(list.y - (form.y + form.height)).toBeCloseTo(form.y - (help.y + help.height), 0);
+
+  // The row's two commands take the authoring command's face.
+  await expect(rowsAt).toHaveCSS("font-size", "11px");
+  await expect(page.getByRole("button", { name: "Remove “Alpha”", exact: true })).toHaveCSS("font-size", "11px");
+
   // The create that reaches the bound moves the focus from the input to the sentence.
   await input.fill("Gamma");
   await page.getByRole("button", { name: "Save this point", exact: true }).click();
@@ -148,6 +165,8 @@ test("the bound takes the input, keeps Remove, and a remove brings the input bac
   // Restore stands aria-disabled and opens nothing, and Remove stays available.
   const restore = page.getByRole("button", { name: "Restore “Alpha”", exact: true });
   await expect(restore).toHaveAttribute("aria-disabled", "true");
+  await expect(restore).toHaveCSS("opacity", "0.45");
+  await expect(page.getByRole("button", { name: "Remove “Alpha”", exact: true })).toHaveCSS("opacity", "1");
   await restore.click({ force: true });
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
@@ -162,6 +181,86 @@ test("the bound takes the input, keeps Remove, and a remove brings the input bac
   await expect(input).toBeFocused();
   await expect(sentence).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Restore “Alpha”", exact: true })).not.toHaveAttribute("aria-disabled", "true");
+});
+
+/** Answers each `PUT` of a draft with this status until the page unroutes it. */
+async function stubSaveAnswers(page: Page, status: number): Promise<void> {
+  await page.route("**/drafts/*", (route) => {
+    const request = route.request();
+    if (request.method() !== "PUT") return route.fallback();
+    return route.fulfill({ status, json: { error: { type: status === 409 ? "draft-conflict" : "stubbed", message: "Stubbed by the smoke suite." } } });
+  });
+}
+
+/** Counts the acts that would write a save point. The stub answers them, so none reaches the server. */
+function countActs(page: Page): { count: () => number } {
+  let acts = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && /\/save-points(\/[^/]+\/restore)?$/.test(new URL(request.url()).pathname)) acts += 1;
+  });
+  return { count: () => acts };
+}
+
+test("a failed save stops naming and restoring, says so at the act, and the sentence leaves when the save heals", async ({ page }) => {
+  await stubBoundedList(page);
+  await stubSaveAnswers(page, 500);
+  const acts = countActs(page);
+  await page.goto("/studio");
+  await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Process name" })).toHaveValue(DRAFT_NAME);
+  await (await fieldName(page)).fill("Tag behind a failed save");
+  await expect(page.getByRole("button", { name: "Try again", exact: true })).toBeVisible();
+  await openSavePoints(page);
+
+  // Naming prints at the input and keeps the name typed.
+  const input = page.getByRole("textbox", { name: "Name this save point" });
+  await input.fill("Held name");
+  await page.getByRole("button", { name: "Save this point", exact: true }).click();
+  const createStopped = page.getByRole("alert").filter({ hasText: "This save point cannot hold your latest changes until they save. Try again above." });
+  await expect(createStopped).toBeVisible();
+  await expect(input).toHaveValue("Held name");
+  expect(acts.count()).toBe(0);
+
+  // The Restore dialog stays open and says why, and no restore request leaves.
+  await page.getByRole("button", { name: "Restore “Alpha”", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Restore “Alpha”?" });
+  await dialog.getByRole("button", { name: "Restore", exact: true }).click();
+  const restoreStopped = dialog.getByRole("alert").filter({ hasText: "Detent cannot restore yet, because your latest changes have not saved. Try again above, then restore." });
+  await expect(restoreStopped).toBeVisible();
+  expect(acts.count()).toBe(0);
+
+  // A timed retry heals under the dialog, so neither sentence stands any longer.
+  await page.unroute("**/drafts/*");
+  await expect(restoreStopped).toHaveCount(0, { timeout: 10_000 });
+  await expect(dialog).toBeVisible();
+  await expect(createStopped).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(input).toHaveValue("Held name");
+});
+
+test("a standing conflict keeps its route: a create says nothing, and the Restore dialog closes", async ({ page }) => {
+  await stubBoundedList(page);
+  await stubSaveAnswers(page, 409);
+  const acts = countActs(page);
+  await page.goto("/studio");
+  await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Process name" })).toHaveValue(DRAFT_NAME);
+  await (await fieldName(page)).fill("Tag under a conflict");
+  await expect(page.getByRole("button", { name: "Reload", exact: true })).toBeVisible();
+  await openSavePoints(page);
+
+  const input = page.getByRole("textbox", { name: "Name this save point" });
+  await input.fill("Held name");
+  await page.getByRole("button", { name: "Save this point", exact: true }).click();
+  await expect(input).toHaveValue("Held name");
+  await expect(page.getByText("This save point cannot hold your latest changes until they save.", { exact: false })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Restore “Alpha”", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Restore “Alpha”?" });
+  await dialog.getByRole("button", { name: "Restore", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("button", { name: "Reload", exact: true })).toBeVisible();
+  expect(acts.count()).toBe(0);
 });
 
 /** Lets one request of each act through to the server and loses its answer, or sends nothing at all. */

@@ -28,9 +28,11 @@ export const en = {
 
   // The confirmations that stand in `panels/confirmations.tsx`.
   "leaveDialog.heading": "Leave this draft?",
+  "leaveDialog.headingJson": "Leave without applying?",
   "leaveDialog.body": "Detent could not save your latest changes, so they go with it. The saved draft stays.",
   "leaveDialog.bodyJson": "The JSON you have not applied goes with it. The saved draft stays.",
   "leaveDialog.confirm": "Leave without saving",
+  "leaveDialog.confirmJson": "Leave without applying",
   "arrangeDialog.heading": "Arrange every step?",
   "arrangeDialog.body": "Every step moves to a new place, and each path loses the bends placed on it.",
   "arrangeDialog.confirm": "Arrange",
@@ -95,7 +97,10 @@ export const en = {
   "draftToolbar.discardDialogKeepsPublished": "The published versions stay. Only the unpublished draft goes.",
   // The banner after a failed save. One says Detent keeps trying, the other waits.
   "draftToolbar.saveFailedRetrying": "Your latest changes stay in this tab, unsaved. Detent keeps trying.",
-  "draftToolbar.saveFailedRefused": "Your latest changes stay in this tab, unsaved. The server refused them.",
+  "draftToolbar.saveFailedRefused":
+    "Your latest changes stay in this tab, unsaved. The server refused them, so trying again may not help. To keep them, copy the text from the JSON surface.",
+  "draftToolbar.saveFailedStamp": "Not saved",
+  "draftToolbar.publishDialogSaveFailed": "Detent cannot publish yet, because your latest changes have not saved. Cancel and press Try again.",
   "draftToolbar.saveFailedTryAgain": "Try again",
   // The point a restore keeps. `keptPointName` clips `{name}`.
   "savePoints.keptName": "Before restoring “{name}”",
@@ -109,6 +114,7 @@ export const en = {
   "savePoints.nameLabel": "Name this save point",
   "savePoints.create": "Save this point",
   "savePoints.nameRequired": "Give this save point a name.",
+  "savePoints.createUnsaved": "This save point cannot hold your latest changes until they save. Try again above.",
   "savePoints.created": "Saved “{name}”.",
   "savePoints.restored": "Restored “{name}”. Your work before it stands as “{kept}”.",
   "savePoints.empty": "No save points yet.",
@@ -121,9 +127,11 @@ export const en = {
   "savePoints.restoreRow": "Restore “{name}”",
   "savePoints.removeRow": "Remove “{name}”",
   "savePoints.restoreHeading": "Restore “{name}”?",
-  "savePoints.restoreNote": "Your work as it stands now becomes a save point, so you can come back to it.",
+  "savePoints.restoreNote": "The draft goes back to this point. Your work as it stands now becomes a save point, so you can come back to it.",
+  "savePoints.restoreUnsaved": "Detent cannot restore yet, because your latest changes have not saved. Try again above, then restore.",
   "savePoints.removeHeading": "Remove “{name}”?",
-  "savePoints.removeNote": "The studio has no undo.",
+  "savePoints.removeNote": "This save point goes for good. The draft stays as it is.",
+  "savePoints.removed": "Removed “{name}”.",
   "savePoints.savedByTerm": "Saved by",
   "savePoints.savedTerm": "Saved",
 

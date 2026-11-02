@@ -13,10 +13,21 @@ in the `⋮` menu. A failed save's Try again SHALL stand in its banner under the
 
 ### Requirement: Try again keeps the keyboard's place
 
-A running retry SHALL leave the focus on Try again. The control SHALL read "Saving…"
-and carry `aria-disabled="true"` while it runs. When a retry's answer removes the
+A running retry SHALL leave the focus on Try again. The control SHALL carry
+`aria-disabled="true"` while any save runs. It SHALL read "Saving…" only after a press,
+and a timed retry SHALL leave its label as "Try again". When a retry's answer removes the
 control while it holds the focus, focus SHALL move to the state line. Focus an author
 moved elsewhere in the meantime SHALL stay there.
+
+#### Scenario: A timed retry keeps the label
+
+- **WHEN** a timed retry runs
+- **THEN** the control reads "Try again" and carries `aria-disabled="true"`
+
+#### Scenario: A press reads as saving
+
+- **WHEN** an author presses Try again
+- **THEN** the control reads "Saving…" until that save answers
 
 #### Scenario: A successful keyboard retry lands on the state
 

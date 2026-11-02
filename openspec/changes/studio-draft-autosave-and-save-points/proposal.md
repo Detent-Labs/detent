@@ -21,8 +21,8 @@ save point also covers part of that gap.
   only where that save fails. The browser's own prompt stays for a tab close or
   a reload while a change has not landed.
 - Publish no longer saves first. Pressing Publish hurries a waiting save, and
-  the dialog's confirm waits for its answer. A failed save closes the dialog,
-  and the banner reports it.
+  the dialog's confirm waits for its answer. A failed save stops the dialog,
+  which says why and holds its confirm.
 - Test reaches the Player with no prompt, and the Player's run holds the
   author's latest work.
 - The Player's two create buttons name their runs. The filled one tests the

@@ -317,9 +317,9 @@ export function DestructiveConfirm({ onClick, children }: ConfirmProps) {
 }
 
 /**
- * The filled primary action. Disabled while busy. `waiting` means a request the
- * dialog did not start must answer first. A press then does nothing, and the
- * control keeps the focus a native `disabled` would drop for a short wait.
+ * The filled primary action. Disabled while busy. `waiting` means a change must
+ * land first, through a request the dialog did not start. A press then does nothing,
+ * and the control keeps the focus a native `disabled` would drop.
  */
 export function PrimaryConfirm({ onClick, waiting = false, children }: ConfirmProps & { waiting?: boolean }) {
   return (

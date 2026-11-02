@@ -19,6 +19,7 @@ import {
   autosaveWait,
   classifySaveFailure,
   flushAnswer,
+  flushRefusal,
   keptPointName,
   landedEntry,
   nextDirtySince,
@@ -393,8 +394,9 @@ export function useDraftToolbarActions({
    * Opens the publish dialog and hurries a change that has not landed. It sends no
    * publish: that request leaves only from `resolveDialog(true)` (studio-publish
    * spec: "no publish request is sent until the developer confirms"). A failed save
-   * closes this dialog alone, and the banner reports it. A standing conflict opens
-   * none: the author would publish a stored draft that differs from the one on screen.
+   * keeps the dialog, which says why and holds its confirm. A conflict the flush
+   * raises closes it, and the banner reports that. A standing conflict opens none:
+   * the author would publish a stored draft that differs from the one on screen.
    */
   const publish = (): "conflict" | undefined => {
     if (saveState.conflict) return "conflict";
@@ -405,7 +407,7 @@ export function useDraftToolbarActions({
     setPendingDialog("publish");
     if (!dirty && !saving) return;
     void flush().then((result) => {
-      if (!result.saved) setPendingDialog((open) => (open === "publish" ? null : open));
+      if (!result.saved && result.conflict) setPendingDialog((open) => (open === "publish" ? null : open));
     });
   };
 
@@ -486,7 +488,7 @@ export function useDraftToolbarActions({
   const createSavePoint = (name: string) =>
     savePointRequest<SavePointSummary>("create", async () => {
       const flushed = await flush();
-      if (!flushed.saved) return { kind: "unsaved" };
+      if (!flushed.saved) return flushRefusal(flushed);
       const point = await requestCreateSavePoint(processId, { name, revision: flushed.revision }, token);
       if (point === undefined) {
         raiseConflict();
@@ -505,7 +507,7 @@ export function useDraftToolbarActions({
   const restoreSavePoint = (point: Pick<SavePointSummary, "savePointId" | "name">) =>
     savePointRequest<{ kept: string }>("restore", async () => {
       const flushed = await flush();
-      if (!flushed.saved) return { kind: "unsaved" };
+      if (!flushed.saved) return flushRefusal(flushed);
       const kept = keptPointName(point.name);
       let record: RestoredDraft | undefined;
       try {

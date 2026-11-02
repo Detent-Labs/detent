@@ -162,7 +162,7 @@ function scan({ toolbar, screen, header }: Sources): string[] {
   // Publish (3.6).
   const publish = bodyAfter(toolbar, "publish");
   flag(/\bsetPendingDialog\("publish"\)/.test(publish), "publish opens no dialog");
-  flag(/\bif\s*\(\s*!result\.saved\s*\)\s*setPendingDialog\(\(open\) => \(open === "publish" \? null : open\)\)/.test(publish), "a failed flush does not close the publish dialog alone");
+  flag(/\bif\s*\(\s*!result\.saved && result\.conflict\s*\)\s*setPendingDialog\(\(open\) => \(open === "publish" \? null : open\)\)/.test(publish), "the publish dialog does not stay for a failed save and close for a conflict alone");
   flag(/\bif\s*\(\s*!dirty && !saving\s*\)\s*void runPublish\(\)/.test(bodyAfter(toolbar, "resolveDialog")), "a press on a waiting confirm publishes");
 
   // Publish under a conflict (4.4): no dialog, and the focus lands on what resolves it.
@@ -177,7 +177,7 @@ function scan({ toolbar, screen, header }: Sources): string[] {
   flag(/\breturn \(\) => clearTimeout\(timer\)/.test(passMinute), "the minute's timer outlives the save it counts from");
   flag(/\[lastSavedAt\]\s*,?\s*\)$/.test(passMinute), "the minute's timer does not rearm per save");
   flag(/\bconst line = headerStateLine\(\{[^}]*\bnow: Date\.now\(\)/.test(header), "the state line reads a stale clock");
-  flag(/\bstateWordsHeld:\s*\{\s*"::after":\s*\{\s*content:\s*"attr\(data-held-width\)"/.test(header), "the state's words hold no width");
+  flag(/\bstateWordsHeld:\s*\{\s*"::before":\s*\{\s*content:\s*"attr\(data-held-width\)"/.test(header), "the state's words hold no width");
   flag(/\bstateWords:\s*\{\s*display:\s*"inline-block",?\s*\}/.test(header), "the state's words take a minimum at rest");
   flag(/\bchangedOnce && styles\.stateWordsHeld\b/.test(header), "the words' width does not wait for the first change");
   flag(/\bif\s*\(\s*line\.state !== "saved" && !changedOnce\s*\)\s*setChangedOnce\(true\);/.test(header), "the words' width does not stay after the first change");
@@ -191,7 +191,9 @@ function scan({ toolbar, screen, header }: Sources): string[] {
 
   // Try again (4.3).
   const banner = /<button[^>]*?aria-disabled=\{actions\.saving \? true : undefined\}[\s\S]*?<\/button>/.exec(header)?.[0] ?? "";
-  flag(/\bif\s*\(\s*!actions\.saving\s*\)\s*actions\.retry\(\);/.test(banner), "a press during a save passes Try again's guard");
+  flag(/\bif\s*\(\s*actions\.saving\s*\)\s*return;\s*setTryAgainPressed\(true\);\s*actions\.retry\(\);/.test(banner), "a press during a save passes Try again's guard");
+  flag(/\{tryAgainPressed \? t\("draftToolbar\.saving"\) : t\("draftToolbar\.saveFailedTryAgain"\)\}/.test(banner), "Try again's label flips with a timed retry");
+  flag(/\bif\s*\(\s*tryAgainPressed && !actions\.saving\s*\)\s*setTryAgainPressed\(false\);/.test(header), "Try again keeps reading Saving… after its save answers");
   flag(/\bonFocus=\{[^}]*\{\s*tryAgainHeld\.current = true;/.test(banner) && /\bonBlur=\{[^}]*\{\s*tryAgainHeld\.current = false;/.test(banner), "the ref does not follow Try again's focus");
   flag(/!dialogOpen && actions\.saveFailed !== null/.test(header), "the failed save's banner stands behind a dialog");
 
@@ -236,7 +238,7 @@ function scan({ toolbar, screen, header }: Sources): string[] {
   flag(/\bkeptPointName\(point\.name\)/.test(restore), "a restore does not name its kept point");
   flag(/\badoptDraft\(record\);\s*onRestored\?\.\(record\);/.test(restore), "a restore does not adopt its answer and report it");
   flag(!/\breload\(/.test(restore), "a restore runs the whole reload");
-  flag(/\bif\s*\(\s*!flushed\.saved\s*\)\s*return \{ kind: "unsaved" \}/.test(create) && /\bif\s*\(\s*!flushed\.saved\s*\)\s*return \{ kind: "unsaved" \}/.test(restore), "a false flush does not stop the act");
+  flag(/\bif\s*\(\s*!flushed\.saved\s*\)\s*return flushRefusal\(flushed\)/.test(create) && /\bif\s*\(\s*!flushed\.saved\s*\)\s*return flushRefusal\(flushed\)/.test(restore), "a false flush does not stop the act");
   const remove = actBody(toolbar, "remove");
   flag(/\brequestRemoveSavePoint\(/.test(remove) && !/\bflush\b/.test(remove), "a remove flushes first");
   const request = bodyAfter(toolbar, "savePointRequest");
@@ -369,8 +371,8 @@ describe("the autosave's wiring", () => {
   });
 
   it("a false flush that does not stop the act is flagged", () => {
-    expect(scan(mutate("toolbar", /("create", async \(\) => \{\s*const flushed = await flush\(\);)\s*if \(!flushed\.saved\) return \{ kind: "unsaved" \};/, "$1"))).toEqual(["a false flush does not stop the act"]);
-    expect(scan(mutate("toolbar", /("restore", async \(\) => \{\s*const flushed = await flush\(\);)\s*if \(!flushed\.saved\) return \{ kind: "unsaved" \};/, "$1"))).toEqual(["a false flush does not stop the act"]);
+    expect(scan(mutate("toolbar", /("create", async \(\) => \{\s*const flushed = await flush\(\);)\s*if \(!flushed\.saved\) return flushRefusal\(flushed\);/, "$1"))).toEqual(["a false flush does not stop the act"]);
+    expect(scan(mutate("toolbar", /("restore", async \(\) => \{\s*const flushed = await flush\(\);)\s*if \(!flushed\.saved\) return flushRefusal\(flushed\);/, "$1"))).toEqual(["a false flush does not stop the act"]);
   });
 
   it("a 401 on a save point request that does not end the session is flagged", () => {
@@ -523,7 +525,16 @@ describe("the autosave's wiring", () => {
   });
 
   it("a press that passes a running retry's guard is flagged", () => {
-    expect(scan(mutate("header", "if (!actions.saving) actions.retry();", "actions.retry();"))).toEqual(["a press during a save passes Try again's guard"]);
+    expect(scan(mutate("header", "if (actions.saving) return;\n                setTryAgainPressed(true);", "setTryAgainPressed(true);"))).toEqual(["a press during a save passes Try again's guard"]);
+  });
+
+  it("a label that flips with a timed retry is flagged", () => {
+    expect(scan(mutate("header", '{tryAgainPressed ? t("draftToolbar.saving")', '{actions.saving ? t("draftToolbar.saving")'))).toEqual(["Try again's label flips with a timed retry"]);
+    expect(scan(mutate("header", "if (tryAgainPressed && !actions.saving) setTryAgainPressed(false);", ""))).toEqual(["Try again keeps reading Saving… after its save answers"]);
+  });
+
+  it("a block after the words, which lifts them off the version's baseline, is flagged", () => {
+    expect(scan(mutate("header", '"::before": {\n      content: "attr(data-held-width)"', '"::after": {\n      content: "attr(data-held-width)"'))).toEqual(["the state's words hold no width"]);
   });
 
   it("a ref that does not follow Try again's focus is flagged", () => {
@@ -596,7 +607,8 @@ describe("the autosave's wiring", () => {
   });
 
   it("a failed flush that closes any dialog is flagged", () => {
-    expect(scan(mutate("toolbar", 'setPendingDialog((open) => (open === "publish" ? null : open))', "setPendingDialog(null)"))).toEqual(["a failed flush does not close the publish dialog alone"]);
+    expect(scan(mutate("toolbar", 'setPendingDialog((open) => (open === "publish" ? null : open))', "setPendingDialog(null)"))).toEqual(["the publish dialog does not stay for a failed save and close for a conflict alone"]);
+    expect(scan(mutate("toolbar", "if (!result.saved && result.conflict) setPendingDialog", "if (!result.saved) setPendingDialog"))).toEqual(["the publish dialog does not stay for a failed save and close for a conflict alone"]);
   });
 
   it("a waiting confirm that a press can pass is flagged", () => {

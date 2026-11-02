@@ -42,9 +42,9 @@ const CASES: Expected[] = [
   {
     name: "LeaveDraftDialog over unapplied JSON",
     element: <LeaveDraftDialog jsonUnapplied {...handlers} />,
-    heading: "Leave this draft?",
+    heading: "Leave without applying?",
     body: ["The JSON you have not applied goes with it. The saved draft stays."],
-    confirm: "Leave without saving",
+    confirm: "Leave without applying",
   },
   {
     name: "ArrangeDialog",

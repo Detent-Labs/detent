@@ -31,6 +31,7 @@ import {
   headerStateLine,
   nextVersionLabel,
   publishAvailability,
+  publishConfirmWord,
   saveFocusTarget,
   savedJustNowLeft,
   stateAnnouncement,
@@ -127,9 +128,11 @@ const styles = stylex.create({
   // From the first change on, the words hold the width of "Saved just now" in their
   // own face, so it and "Saving…" trade places without moving what follows them. A
   // draft at rest takes no minimum, so "Saved" leaves no hole. The width comes from
-  // `data-held-width`, printed with no height and hidden from every reader.
+  // `data-held-width`, printed with no height and hidden from every reader. It stands
+  // ahead of the words: an inline-block's baseline is its last line box's, so a block
+  // after them would lift them off the version's baseline.
   stateWordsHeld: {
-    "::after": {
+    "::before": {
       content: "attr(data-held-width)",
       display: "block",
       height: 0,
@@ -416,8 +419,12 @@ interface PublishConfirmDialogProps {
   draft: Draft;
   contentLocale: string;
   nextVersion: string;
-  /** A change has not landed, so the confirm reads "Saving…" and ignores a press. */
+  /** A change has not landed, so the confirm ignores a press. */
   waiting: boolean;
+  /** A save is running, so the confirm reads "Saving…". */
+  saving: boolean;
+  /** A failed save holds the confirm, and the dialog says why. */
+  saveFailed: boolean;
   /** The JSON surface holds text this publish leaves out. */
   jsonUnapplied: boolean;
   openIssues: number;
@@ -451,6 +458,8 @@ function PublishConfirmDialog({
   revision,
   nextVersion,
   waiting,
+  saving,
+  saveFailed,
   jsonUnapplied,
   openIssues,
   blocked,
@@ -462,6 +471,7 @@ function PublishConfirmDialog({
   onConfirm,
 }: PublishConfirmDialogProps) {
   const languages = collectUsedLocales(draft);
+  const word = publishConfirmWord({ waiting, saving, saveFailed, publishing: busy });
 
   return (
     <StudioDialog
@@ -471,10 +481,12 @@ function PublishConfirmDialog({
       busy={busy}
       confirm={
         <PrimaryConfirm onClick={onConfirm} waiting={waiting}>
-          {waiting ? t("draftToolbar.saving") : busy ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
+          {word === "saving" ? t("draftToolbar.saving") : word === "publishing" ? t("draftToolbar.publishing") : t("draftToolbar.publish")}
         </PrimaryConfirm>
       }
-      refusal={error !== null && <DialogRefusal detail={errorDetail}>{error}</DialogRefusal>}
+      refusal={
+        saveFailed ? <DialogRefusal>{t("draftToolbar.publishDialogSaveFailed")}</DialogRefusal> : error !== null && <DialogRefusal detail={errorDetail}>{error}</DialogRefusal>
+      }
     >
       <DialogFacts>
         <DialogFact term={t("draftToolbar.dialogProcess")}>{processLabel}</DialogFact>
@@ -676,9 +688,10 @@ interface Props {
  * Settings tab's Developer view.
  *
  * The bar has no Save, since the draft saves itself. A failed save's banner under
- * the bar holds Try again (`studio-process-tabs`). While a save runs it reads
- * "Saving…" and carries `aria-disabled` with a press guard, so the button keeps the
- * focus. A native `disabled` would blur it. When the answer removes the button, the
+ * the bar holds Try again (`studio-process-tabs`). While a save runs it carries
+ * `aria-disabled` with a press guard, so the button keeps the focus. A native
+ * `disabled` would blur it. It reads "Saving…" only after a press, so a timed retry
+ * leaves its width and its words alone. When the answer removes the button, the
  * focus moves to the state line, not the body. A ref its focus sets limits that to
  * this case.
  *
@@ -750,6 +763,9 @@ export function ProcessHeaderBar({
   // Whether Try again holds the focus. A timed retry can heal under a resting
   // keyboard user, so a press would not cover it.
   const tryAgainHeld = useRef(false);
+  // A press runs its save in the same commit, so this falls with that save's answer.
+  const [tryAgainPressed, setTryAgainPressed] = useState(false);
+  if (tryAgainPressed && !actions.saving) setTryAgainPressed(false);
 
   // The blocking verdict the publish dialog states, from the same groups the
   // area nav's Checks control reads. The `view` group holds the studio's own
@@ -996,6 +1012,8 @@ export function ProcessHeaderBar({
           revision={revision}
           nextVersion={nextVersionLabel(baseVersion)}
           waiting={isDirty || actions.saving}
+          saving={actions.saving}
+          saveFailed={actions.saveFailed !== null}
           jsonUnapplied={jsonUnapplied}
           openIssues={validation.issues.length}
           blocked={blocked}
@@ -1059,12 +1077,12 @@ export function ProcessHeaderBar({
           {actions.errorDetail !== null && <RefusalDetail detail={actions.errorDetail} />}
         </>
       )}
-      {/* The alert holds the sentence alone. Try again's words flip with every timed
-          retry, and an alert around them would read the whole banner out each time. */}
+      {/* The alert holds the sentence alone. Try again's words flip after a press, and
+          an alert around them would read the whole banner out each time. */}
       {!dialogOpen && actions.saveFailed !== null && (
         <>
           <div {...stylex.props(styles.errorBanner)}>
-            <span {...stylex.props(styles.errorBannerStamp)}>{t("error.failed")}</span>
+            <span {...stylex.props(styles.errorBannerStamp)}>{t("draftToolbar.saveFailedStamp")}</span>
             <span {...stylex.props(styles.errorBannerMessage)} role="alert">
               {t(actions.saveFailed.retryable ? "draftToolbar.saveFailedRetrying" : "draftToolbar.saveFailedRefused")}
             </span>
@@ -1079,10 +1097,12 @@ export function ProcessHeaderBar({
                 tryAgainHeld.current = false;
               }}
               onClick={() => {
-                if (!actions.saving) actions.retry();
+                if (actions.saving) return;
+                setTryAgainPressed(true);
+                actions.retry();
               }}
             >
-              {actions.saving ? t("draftToolbar.saving") : t("draftToolbar.saveFailedTryAgain")}
+              {tryAgainPressed ? t("draftToolbar.saving") : t("draftToolbar.saveFailedTryAgain")}
             </button>
           </div>
           <RefusalDetail detail={actions.saveFailed.detail} />

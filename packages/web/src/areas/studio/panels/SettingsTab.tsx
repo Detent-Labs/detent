@@ -70,7 +70,7 @@ interface Props {
    * view fetches on its first visible commit. */
   visible: boolean;
   /** The hook's save point acts, for the Save points view. */
-  savePointActions: Pick<DraftToolbarActions, "createSavePoint" | "restoreSavePoint" | "removeSavePoint">;
+  savePointActions: Pick<DraftToolbarActions, "createSavePoint" | "restoreSavePoint" | "removeSavePoint" | "saveFailed">;
   /** Counts the `⋮` menu's Save points presses. Each moves the focus into the view. */
   savePointsFocus: number;
 }

@@ -53,6 +53,11 @@ entering that state, "Saved" on leaving it, and the version after a publish. Tha
 announcement moves no focus. Only the Try again rule in `studio-process-tabs` sends
 focus to the state.
 
+#### Scenario: The words stand on the version's baseline
+
+- **WHEN** the state reads "Saving…", "Saved just now" or "Unsaved changes" beside a version
+- **THEN** the words' text top matches the version's
+
 #### Scenario: A dirty draft's bar names its state
 
 - **WHEN** a save has failed and the draft carries the change

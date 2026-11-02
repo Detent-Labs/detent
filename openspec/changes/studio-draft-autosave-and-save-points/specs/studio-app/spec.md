@@ -48,9 +48,9 @@ or bar SHALL carry a Save control.
 ### Requirement: A failed save says so and offers Try again
 
 A save that fails with anything but a 401 or a 409 SHALL raise a banner under the
-header bar. The banner SHALL say that the latest changes stay in the tab, unsaved.
-The caught text SHALL stand in a closed Developer view. The banner SHALL carry a "Try
-again" control, and the state line SHALL read "Unsaved changes".
+header bar, stamped "Not saved". The banner SHALL say that the latest changes stay in
+the tab, unsaved. The caught text SHALL stand in a closed Developer view. The banner
+SHALL carry a "Try again" control, and the state line SHALL read "Unsaved changes".
 
 A successful save SHALL remove this banner. It SHALL leave a banner another act
 raised.
@@ -71,6 +71,17 @@ raised.
 
 - **WHEN** a save fails and the author then takes the change back by hand
 - **THEN** the banner leaves and the state line reads as saved
+
+### Requirement: A refused save points to the JSON surface
+
+A refused save's banner SHALL say that trying again may not help and name the JSON
+surface. The JSON surface SHALL hold the draft as the tab holds it.
+
+#### Scenario: A refused save points to the JSON surface
+
+- **WHEN** a save answers 400 and the author opens the JSON surface
+- **THEN** the banner reads "Your latest changes stay in this tab, unsaved. The server refused them, so trying again may not help. To keep them, copy the text from the JSON surface."
+- **AND** the surface's text holds the change no save took
 
 ### Requirement: A failed save retries where an answer may heal
 
@@ -325,12 +336,33 @@ where the rows would stand.
 - **WHEN** an author reads the view
 - **THEN** no key, id, revision or hash prints on it
 
+### Requirement: A save point row's commands stay quiet
+
+Restore and Remove SHALL take the authoring command style, so Remove reaches the accent
+only in its dialog.
+
+#### Scenario: A row's commands stay quiet
+
+- **WHEN** an author reads a row
+- **THEN** Restore and Remove print as authoring commands, with no accent
+- **AND** an unavailable Restore carries `aria-disabled="true"` and draws dimmed
+
+### Requirement: An empty status line takes no room
+
+The Save points view's status line SHALL stay mounted for the live region. While empty it
+SHALL take no room.
+
+#### Scenario: An empty status line leaves no gap
+
+- **WHEN** no act has printed a status
+- **THEN** the rows stand one column gap under the form
+
 ### Requirement: Naming a save point holds what the author sees
 
 A press on "Save this point" SHALL save a waiting change first. A failed save SHALL
-stop the act and leave the banner standing. A 409 SHALL raise the conflict banner. An
-empty name SHALL print a sentence at the input and send no request. Another refusal
-SHALL print at the input.
+stop the act, leave the banner standing and say so at the input. A 409 SHALL raise the
+conflict banner. An empty name SHALL print a sentence at the input and send no request.
+Another refusal SHALL print at the input.
 
 A successful create SHALL clear the input, add the row and say so in a status line.
 The focus SHALL stay in the input. A create that reaches the bound SHALL move it to
@@ -341,6 +373,18 @@ the bound's sentence.
 - **WHEN** an author types "Before the review step" and presses "Save this point"
 - **THEN** a row reads "Before the review step" and who saved it, just now
 - **AND** the input is empty and holds the focus
+
+#### Scenario: A failed save stops a create at the input
+
+- **WHEN** an author presses "Save this point" and the waiting change's save answers 500
+- **THEN** the input prints "This save point cannot hold your latest changes until they save. Try again above."
+- **AND** the name stays typed and no create request leaves
+- **AND** the sentence leaves when a timed retry succeeds
+
+#### Scenario: A standing conflict says nothing at the input
+
+- **WHEN** a conflict stands over a dirty draft and an author presses "Save this point"
+- **THEN** the conflict banner stands, the name stays typed and no create request leaves
 
 #### Scenario: A waiting change lands in the save point
 
@@ -391,11 +435,16 @@ returns. A refetch SHALL keep the rows on screen until its answer.
 
 Restore SHALL open the studio's dialog form. The heading SHALL read "Restore “{name}”?"
 and the confirm "Restore". The dialog SHALL name who saved the point and when. It SHALL
-say that the current work becomes a save point.
+say that the draft goes back and that the current work becomes a save point.
 
 Confirming SHALL save a waiting change, then restore. The editor SHALL hold the
 restored draft, clean, and no save SHALL follow. A status line SHALL name both points.
 The focus SHALL return to that row's Restore.
+
+#### Scenario: The dialog says what a restore does
+
+- **WHEN** an author opens the Restore dialog
+- **THEN** its note reads "The draft goes back to this point. Your work as it stands now becomes a save point, so you can come back to it."
 
 #### Scenario: A restore brings the old draft back
 
@@ -415,11 +464,17 @@ The focus SHALL return to that row's Restore.
 - **THEN** the dialog closes and the conflict banner stands
 - **AND** the draft on the server keeps its content
 
-#### Scenario: A failed save closes the Restore dialog
+#### Scenario: A failed save stops the Restore dialog
 
 - **WHEN** an author confirms a restore and the waiting change's save answers 500
-- **THEN** the dialog closes and the banner stands
+- **THEN** the dialog stays open and prints "Detent cannot restore yet, because your latest changes have not saved. Try again above, then restore."
 - **AND** no restore request leaves
+- **AND** the sentence leaves when a timed retry succeeds
+
+#### Scenario: A standing conflict closes the Restore dialog
+
+- **WHEN** a conflict stands over a dirty draft and an author confirms a restore
+- **THEN** the dialog closes, the conflict banner stands and no restore request leaves
 
 #### Scenario: A refused restore prints in the dialog
 
@@ -442,6 +497,16 @@ The focus SHALL return to that row's Restore.
 - **WHEN** an author restores a point on a draft holding 49
 - **THEN** the kept point is the fiftieth and Restore stands unavailable
 - **AND** a press on Remove makes Restore available again
+
+### Requirement: A kept point's name stays flat
+
+The kept point's name SHALL read "Before restoring “{name}”". A name that already reads
+that way SHALL stay as it is, so two points may share a name.
+
+#### Scenario: Repeated restores keep a flat name
+
+- **WHEN** an author restores a point named "Before restoring “A”"
+- **THEN** the point it keeps reads "Before restoring “A”" too
 
 ### Requirement: A restore whose answer is lost reads the stored draft
 
@@ -475,13 +540,15 @@ second request cannot move the revision the first one carries.
 ### Requirement: Removing a save point asks first
 
 Remove SHALL open the studio's dialog form, with the heading "Remove “{name}”?" and the
-confirm "Remove". A refusal SHALL print inside the open dialog. After a remove, the
-focus SHALL land on the name input.
+confirm "Remove". Its note SHALL read "This save point goes for good. The draft stays as
+it is." A refusal SHALL print inside the open dialog. After a remove, the status line
+SHALL read "Removed “{name}”." and the focus SHALL land on the name input.
 
 #### Scenario: Removing a point
 
 - **WHEN** an author confirms the removal of a point
 - **THEN** the row leaves and the focus stands on the name input
+- **AND** the status line names the point that went
 
 ## MODIFIED Requirements
 

@@ -1074,7 +1074,10 @@ minute it reads **Saved at** and the time. It reads **Unsaved changes** in
 three cases.
 
 - A save failed. A banner says Studio keeps your changes in the tab, and
-  **Try again** sends them at once.
+  **Try again** sends them at once. If the server refused them, trying again may
+  not help. To keep them, choose **JSON** in the `⋮` menu and copy the text. Until
+  that save lands, **Save this point**, **Restore** and **Publish** each wait and
+  say so.
 - Somebody else changed the draft. A banner says so, and **Reload** loads the
   stored draft. Reload drops the changes you made since your last save, so copy
   any you want to keep first.
@@ -1130,7 +1133,8 @@ point**. Name one before a risky change, such as a large rewrite.
 
 Each row shows the name, who saved it and when. **Restore** puts a point back
 as the draft. Studio first keeps your current work as a new point, named
-"Before restoring" and the old name. A restore is therefore reversible: restore
+"Before restoring" and the old name. A point that already carries such a name
+hands it on, so two rows can share one. A restore is therefore reversible: restore
 that new point. **Remove** deletes a point for good.
 
 A draft holds fifty save points. At that bound, remove one to name another or

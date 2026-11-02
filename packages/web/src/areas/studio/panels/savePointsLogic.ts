@@ -48,6 +48,9 @@ function fillName(key: Parameters<typeof t>[0], name: string): string {
 }
 
 export const createdLine = (name: string) => fillName("savePoints.created", name);
+export const removedLine = (name: string) => fillName("savePoints.removed", name);
+export const createUnsavedLine = () => t("savePoints.createUnsaved");
+export const restoreUnsavedLine = () => t("savePoints.restoreUnsaved");
 export const restoreHeading = (name: string) => fillName("savePoints.restoreHeading", name);
 export const removeHeading = (name: string) => fillName("savePoints.removeHeading", name);
 export const restoreRowLabel = (name: string) => fillName("savePoints.restoreRow", name);
@@ -68,8 +71,9 @@ export interface CreateLanding {
 }
 
 /**
- * Each outcome has one home (`design.md` D10). An unsaved or conflicted create
- * prints nothing here: the banner already stands, and the name stays typed.
+ * Each outcome has one home (`design.md` D10). A failed save says so at the input,
+ * since its banner stands apart from the press. A conflicted create prints nothing
+ * here: its banner holds the one way on, and the name stays typed.
  */
 export function createLanding(outcome: SavePointOutcome<unknown>, name: string): CreateLanding {
   switch (outcome.kind) {
@@ -77,7 +81,11 @@ export function createLanding(outcome: SavePointOutcome<unknown>, name: string):
       return { clearName: true, status: createdLine(name), refetch: true };
     case "refused":
       return { clearName: false, inputError: outcome.message, refetch: outcome.lost === true };
-    default:
+    case "unsaved":
+      return { clearName: false, inputError: createUnsavedLine(), refetch: false };
+    case "conflict":
+    case "gone":
+    case "ended":
       return { clearName: false, refetch: false };
   }
 }
@@ -101,17 +109,20 @@ export function restoreLanding(outcome: SavePointOutcome<{ kept: string }>, name
       return { dialog: "close", refetch: true, focusInputAfter: false };
     case "refused":
       return { dialog: "stay", refusal: outcome.message, refetch: outcome.lost === true, focusInputAfter: false };
-    default:
+    case "unsaved":
+      return { dialog: "stay", refusal: restoreUnsavedLine(), refetch: false, focusInputAfter: false };
+    case "conflict":
+    case "ended":
       return { dialog: "close", refetch: false, focusInputAfter: false };
   }
 }
 
-export function removeLanding(outcome: SavePointOutcome<undefined>): DialogLanding {
+/** A remove sends at once, so it never meets a failed save. */
+export function removeLanding(outcome: SavePointOutcome<undefined>, name: string): DialogLanding {
   switch (outcome.kind) {
     case "done":
-      return { dialog: "close", refetch: true, focusInputAfter: true };
     case "gone":
-      return { dialog: "close", refetch: true, focusInputAfter: true };
+      return { dialog: "close", refetch: true, status: removedLine(name), focusInputAfter: true };
     case "refused":
       return { dialog: "stay", refusal: outcome.message, refetch: false, focusInputAfter: false };
     default:

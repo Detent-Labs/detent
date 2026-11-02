@@ -91,7 +91,7 @@ An exit SHALL ask in the leave dialog with no flush. A tab press and each menu e
 - **WHEN** an author presses the back control over unapplied text
 - **THEN** the leave dialog opens at once and no save request leaves
 - **AND** its body reads "The JSON you have not applied goes with it. The saved draft stays."
-- **AND** its heading and its confirm read as they do after a failed save
+- **AND** its heading reads "Leave without applying?" and its confirm "Leave without applying"
 
 #### Scenario: A tab press or the menu asks first
 

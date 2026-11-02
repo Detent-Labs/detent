@@ -8,6 +8,7 @@ import {
   entryFocus,
   movesToBound,
   nameDecision,
+  removedLine,
   removeLanding,
   restoredLine,
   restoreLanding,
@@ -102,7 +103,15 @@ describe("a create's outcome", () => {
     });
   });
 
-  for (const kind of ["unsaved", "conflict", "ended"] as const) {
+  it("says at the input that a failed save stops it, and keeps the name typed", () => {
+    expect(createLanding({ kind: "unsaved" }, "x")).toEqual({
+      clearName: false,
+      inputError: "This save point cannot hold your latest changes until they save. Try again above.",
+      refetch: false,
+    });
+  });
+
+  for (const kind of ["conflict", "ended"] as const) {
     it(`prints nothing for ${kind}: the banner stands and the name stays typed`, () => {
       expect(createLanding({ kind }, "x")).toEqual({ clearName: false, refetch: false });
     });
@@ -136,7 +145,16 @@ describe("a restore's outcome", () => {
     });
   });
 
-  for (const kind of ["unsaved", "conflict", "ended"] as const) {
+  it("keeps the dialog open and says why when a failed save stops it", () => {
+    expect(restoreLanding({ kind: "unsaved" }, "A")).toEqual({
+      dialog: "stay",
+      refusal: "Detent cannot restore yet, because your latest changes have not saved. Try again above, then restore.",
+      refetch: false,
+      focusInputAfter: false,
+    });
+  });
+
+  for (const kind of ["conflict", "ended"] as const) {
     it(`closes the dialog with no request for ${kind}, leaving the banner to report it`, () => {
       expect(restoreLanding({ kind }, "A")).toEqual({ dialog: "close", refetch: false, focusInputAfter: false });
     });
@@ -161,21 +179,36 @@ describe("a lost answer reads the list again", () => {
 });
 
 describe("a remove's outcome", () => {
-  it("closes the dialog, refetches and sends the focus to the input afterwards", () => {
-    expect(removeLanding({ kind: "done", value: undefined })).toEqual({ dialog: "close", refetch: true, focusInputAfter: true });
+  it("closes the dialog, says what went, refetches and sends the focus to the input afterwards", () => {
+    expect(removeLanding({ kind: "done", value: undefined }, "A")).toEqual({
+      dialog: "close",
+      refetch: true,
+      status: "Removed “A”.",
+      focusInputAfter: true,
+    });
   });
 
-  it("closes the dialog and refetches on a 404, and sends the focus to the input, since the row goes", () => {
-    expect(removeLanding({ kind: "gone" })).toEqual({ dialog: "close", refetch: true, focusInputAfter: true });
+  it("closes the dialog and refetches on a 404, says the same and sends the focus to the input, since the row goes", () => {
+    expect(removeLanding({ kind: "gone" }, "A")).toEqual({
+      dialog: "close",
+      refetch: true,
+      status: "Removed “A”.",
+      focusInputAfter: true,
+    });
+  });
+
+  it("keeps a $ pattern in the name as written", () => {
+    expect(removedLine("Cost $& centre")).toBe("Removed “Cost $& centre”.");
   });
 
   it("keeps the dialog open on a refusal", () => {
     const outcome: SavePointOutcome<undefined> = { kind: "refused", message: "No." };
-    expect(removeLanding(outcome)).toMatchObject({ dialog: "stay", refusal: "No.", refetch: false });
+    expect(removeLanding(outcome, "A")).toMatchObject({ dialog: "stay", refusal: "No.", refetch: false });
+    expect(removeLanding(outcome, "A").status).toBeUndefined();
   });
 
   it("closes the dialog on a conflict", () => {
-    expect(removeLanding({ kind: "conflict" })).toMatchObject({ dialog: "close", refetch: false });
+    expect(removeLanding({ kind: "conflict" }, "A")).toMatchObject({ dialog: "close", refetch: false });
   });
 });
 

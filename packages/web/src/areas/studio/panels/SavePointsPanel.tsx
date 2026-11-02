@@ -10,11 +10,13 @@ import { is401 } from "../../../shell/useFail.js";
 import type { DraftToolbarActions } from "./DraftToolbar.js";
 import { ABSOLUTE_TIME } from "./DiscardDraftDialog.js";
 import { RemoveSavePointDialog, RestoreSavePointDialog, type SavePointRow } from "./SavePointDialogs.js";
+import { ghost } from "./shared/btn.js";
 import {
   SAVE_POINT_NAME_MAX,
   atBound,
   boundSentence,
   createLanding,
+  createUnsavedLine,
   entryFocus,
   movesToBound,
   nameDecision,
@@ -22,6 +24,7 @@ import {
   removeRowLabel,
   restoreLanding,
   restoreRowLabel,
+  restoreUnsavedLine,
   savedLineTemplate,
   viewState,
 } from "./savePointsLogic.js";
@@ -80,6 +83,11 @@ const styles = stylex.create({
     margin: 0,
     overflowWrap: "anywhere",
   },
+  // Out of flow, so an empty line takes no room and no gap of the column. It stays
+  // mounted, since a live region announces a change only where it already stands.
+  statusEmpty: {
+    position: "absolute",
+  },
   waiting: {
     margin: 0,
     color: colors.textMuted,
@@ -122,6 +130,40 @@ const styles = stylex.create({
   actions: {
     display: "flex",
     gap: space.s2,
+  },
+  // The authoring command (`DESIGN.md`, Buttons), the same shape as
+  // `FormEditorScreen.tsx`'s `authoringCommand`, copied rather than exported per
+  // `design-language.md`'s deliberate-duplicate precedent. `.btn-ghost` supplies the
+  // inline padding, and `.btn[aria-disabled="true"]` the 45% opacity.
+  command: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: {
+      default: colors.textMuted,
+      ":hover": colors.text,
+      ":active": colors.text,
+    },
+    paddingBlock: space.s2,
+    minHeight: 24,
+    backgroundColor: {
+      default: "transparent",
+      ":hover": colors.surfaceMuted,
+      ":active": `color-mix(in srgb, ${colors.text} 14%, transparent)`,
+    },
+  },
+  // An unavailable command takes no hover or press look. It stacks after `command`,
+  // which would otherwise win under the pointer.
+  commandUnavailable: {
+    color: {
+      default: colors.textMuted,
+      ":hover": colors.textMuted,
+      ":active": colors.textMuted,
+    },
+    backgroundColor: {
+      default: "transparent",
+      ":hover": "transparent",
+      ":active": "transparent",
+    },
   },
   errorBanner: {
     display: "flex",
@@ -263,7 +305,7 @@ export function SavePointsBody({
           )}
         </form>
       )}
-      <p role="status" {...stylex.props(styles.status)}>
+      <p role="status" {...stylex.props(styles.status, status === "" && styles.statusEmpty)}>
         {status}
       </p>
       {view.rows === "waiting" && <p {...stylex.props(styles.waiting)}>{t("savePoints.loading")}</p>}
@@ -291,7 +333,7 @@ export function SavePointsBody({
                 {/* At the bound a restore would keep a point the draft has no room for. `aria-disabled` keeps the focus a native `disabled` would drop. */}
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  {...ghost(styles.command, (bound || acting) && styles.commandUnavailable)}
                   aria-label={restoreRowLabel(point.name)}
                   aria-disabled={bound || acting || undefined}
                   onClick={(event) => {
@@ -302,7 +344,7 @@ export function SavePointsBody({
                 </button>
                 <button
                   type="button"
-                  className="btn btn-secondary btn-destructive"
+                  {...ghost(styles.command, acting && styles.commandUnavailable)}
                   aria-label={removeRowLabel(point.name)}
                   aria-disabled={acting || undefined}
                   onClick={(event) => {
@@ -320,7 +362,7 @@ export function SavePointsBody({
   );
 }
 
-type SavePointActions = Pick<DraftToolbarActions, "createSavePoint" | "restoreSavePoint" | "removeSavePoint">;
+type SavePointActions = Pick<DraftToolbarActions, "createSavePoint" | "restoreSavePoint" | "removeSavePoint" | "saveFailed">;
 
 interface Props {
   processId: string;
@@ -426,6 +468,14 @@ export function SavePointsPanel({ processId, token, visible, focusRequest, actio
     (entryFocus(atBound(list)) === "bound" ? boundRef.current : inputRef.current)?.focus();
   }, [visible, focusRequest, list]);
 
+  // A timed retry can heal under a failed save's sentence, which would then read false.
+  const saveFailed = actions.saveFailed !== null;
+  useEffect(() => {
+    if (saveFailed) return;
+    setNameError((error) => (error === createUnsavedLine() ? undefined : error));
+    setDialog((open) => (open?.refusal === restoreUnsavedLine() ? { ...open, refusal: undefined } : open));
+  }, [saveFailed]);
+
   const create = async () => {
     const decision = nameDecision(name);
     if (decision.kind === "empty") {
@@ -465,7 +515,7 @@ export function SavePointsPanel({ processId, token, visible, focusRequest, actio
       const landing =
         act === "restore"
           ? restoreLanding(await actions.restoreSavePoint(point), point.name)
-          : removeLanding(await actions.removeSavePoint(point.savePointId));
+          : removeLanding(await actions.removeSavePoint(point.savePointId), point.name);
       if (landing.refetch) load();
       if (landing.dialog === "stay") {
         setDialog({ act, point, refusal: landing.refusal });

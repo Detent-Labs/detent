@@ -2262,8 +2262,8 @@ to later changes. The DIALOG tag is local to this section.
 
 ## Open from studio-draft-autosave-and-save-points (needs its own OpenSpec change)
 
-The change made the draft save itself and added save points. It left five
-points to later changes. The AUTOSAVE tag is local to this section.
+The change made the draft save itself and added save points. It left the
+points below to later changes. The AUTOSAVE tag is local to this section.
 
 - **AUTOSAVE-1: a lost answer, then a hand-revert, leaves the server ahead of the
   screen.** A save commits and its answer is lost, on the network or behind a
@@ -2316,6 +2316,56 @@ points to later changes. The AUTOSAVE tag is local to this section.
   Upgrade entry: a text slot in `draft/draftStash.ts`, offered when the JSON
   surface next opens. The report is `onUnappliedJsonChange` in
   `screens/EditScreen.tsx`.
+- **AUTOSAVE-7: the Player prints a healthy run in the refusal box.** A run that
+  started correctly stands in `studioConflict`, a 2px box in refusal text. Risk
+  (Medium): the last thing an author sees after a good test reads as a failure.
+
+  Upgrade entry: a plain line with the step name and a status stamp, in
+  `screens/PlayerScreen.tsx`.
+- **AUTOSAVE-8: the Player prints raw instance ids and "Instance access".** The
+  run's line holds the instance id and step key, and the frame's legend reads
+  "Instance access". Neither stands in a Developer view. Risk (Low): an author
+  meets machine words the rest of the studio keeps from them.
+
+  Upgrade entry: move the id and Open by id into a Developer view, in
+  `screens/PlayerScreen.tsx`, and take the words from the catalog.
+- **AUTOSAVE-9: the Player stands three filled primaries together.** Test this
+  draft, Claim and Submit all fill once a run is open. Risk (Low): starting a run
+  and working one carry equal weight on one screen.
+
+  Upgrade entry: keep Claim or Submit as the one primary after a create, and step
+  Test this draft down to secondary, in `screens/PlayerScreen.tsx`.
+- **AUTOSAVE-10: the focus falls to the body after a Player create.** Both create
+  buttons take a native `disabled` during their request, which drops the focus.
+  Risk (Medium): a keyboard user restarts from the top after each new run.
+
+  Upgrade entry: move the focus to the new run's status line on arrival, in
+  `screens/PlayerScreen.tsx`.
+- **AUTOSAVE-11: a new Player run says nothing.** A create replaces the open run
+  with no status line, and the record pane looks the same. Risk (Medium): a screen
+  reader hears nothing, and a sighted author sees only an id change.
+
+  Upgrade entry: a `role="status"` line naming the new run, in
+  `screens/PlayerScreen.tsx`.
+- **AUTOSAVE-12: Test takes a second press to start anything.** The header bar's
+  Test opens the Player, and Test this draft then starts the run. Design D11 kept
+  this, since a test instance is a real instance whose actions run. Risk (Low): one
+  more press on the most common way to try a draft.
+
+  Upgrade entry: let `onPlayer` in `screens/EditScreen.tsx` ask for a run, and let
+  the Player open with it.
+- **AUTOSAVE-13: Start a case names no version.** The outlined button makes a real
+  case in one press, and a never-published draft gets no reason beside it. Risk
+  (Medium): real participants see a case the author took for a test.
+
+  Upgrade entry: "Start a case from v2" in `player.startCase`, with an unavailable
+  state and a reason where no version stands, in `screens/PlayerScreen.tsx`.
+- **AUTOSAVE-14: Ctrl+S falls to the browser's save dialog.** The process surface
+  binds no save key, so an author from another tool gets the browser's page dialog.
+  Risk (Low): a stray dialog, and no work is at stake.
+
+  Upgrade entry: a `keydown` handler that calls `preventDefault` and `flush`, on the
+  screen in `screens/EditScreen.tsx`. It should state "Saved" where nothing waits.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

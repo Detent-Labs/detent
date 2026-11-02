@@ -9,6 +9,7 @@ import {
   autosaveWait,
   classifySaveFailure,
   flushAnswer,
+  flushRefusal,
   keptPointName,
   landedEntry,
   nextDirtySince,
@@ -287,9 +288,9 @@ describe("flushAnswer", () => {
     expect(flushAnswer({ ...commit, dirty: false, conflict: true })).toEqual({ saved: true, revision: 4 });
   });
 
-  it("settles false on a failure or a conflict over a dirty draft", () => {
+  it("settles false on a failure or a conflict over a dirty draft, and names a conflict", () => {
     expect(flushAnswer({ ...commit, failed: true })).toEqual({ saved: false });
-    expect(flushAnswer({ ...commit, conflict: true })).toEqual({ saved: false });
+    expect(flushAnswer({ ...commit, conflict: true })).toEqual({ saved: false, conflict: true });
   });
 
   it("waits while a request runs, whatever else stands", () => {
@@ -396,6 +397,13 @@ describe("a restore's lost answer", () => {
   });
 });
 
+describe("flushRefusal", () => {
+  it("lands a failed save as unsaved, and a standing conflict on the conflict's route", () => {
+    expect(flushRefusal({})).toEqual({ kind: "unsaved" });
+    expect(flushRefusal({ conflict: true })).toEqual({ kind: "conflict" });
+  });
+});
+
 describe("keptPointName", () => {
   it("embeds a short name whole", () => {
     expect(keptPointName("Before the review step")).toBe("Before restoring “Before the review step”");
@@ -411,14 +419,29 @@ describe("keptPointName", () => {
     expect(keptPointName("y".repeat(120))).toBe(`Before restoring “${"y".repeat(120)}”`);
   });
 
-  it("stays at 139 and under the engine's bound through five nested rounds", () => {
-    let name = "x".repeat(200);
+  it("answers a kept name with that same name, through five rounds", () => {
+    const first = keptPointName("x".repeat(200));
+    let name = first;
     for (let round = 0; round < 5; round++) {
       name = keptPointName(name);
-      expect(name.length).toBeLessThanOrEqual(139);
-      expect(name.length).toBeLessThanOrEqual(200);
+      expect(name).toBe(first);
     }
-    expect(name.startsWith("Before restoring “Before restoring “")).toBe(true);
+    expect(name.length).toBe(139);
+  });
+
+  it("does not nest a short kept name", () => {
+    expect(keptPointName("Before restoring “A”")).toBe("Before restoring “A”");
+  });
+
+  it("keeps a kept name at the engine's own bound as it stands", () => {
+    const long = `Before restoring “${"x".repeat(181)}”`;
+    expect(long.length).toBe(200);
+    expect(keptPointName(long)).toBe(long);
+  });
+
+  it("embeds a name that only opens or only closes like a kept one", () => {
+    expect(keptPointName("Before restoring the review")).toBe("Before restoring “Before restoring the review”");
+    expect(keptPointName("The “review”")).toBe("Before restoring “The “review””");
   });
 
   it("does not split a surrogate pair at the clip", () => {

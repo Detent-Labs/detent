@@ -62,8 +62,9 @@ ran.
   - A failed fetch: a banner where the rows would stand.
 - **Interaction and layout:** no motion, per `DESIGN.md`. From the first change on,
   the state's words take the width of "Saved just now" in the body face. "Saving…" and
-  it then trade places without moving what follows them. A draft at rest takes no
-  minimum, so "Saved" leaves no hole.
+  it then trade places without moving what follows them. The held width stands ahead
+  of the words in a zero-height `::before`, so the words stay on the version's baseline.
+  A draft at rest takes no minimum, so "Saved" leaves no hole.
 - **Anti-goals:** a toast, a spinner, a Save button "just in case", a machine value
   on the Save points view.
 
@@ -168,16 +169,19 @@ A discard, a 401 (through `stashOnUnauthorized`) and a confirmed leave dialog se
 A later change takes the ordinary debounce again. The hook sees it by comparing
 identity with `sentDraft` and `sentLayout`.
 
-`retry` keeps `failure` and sends at once. `saving` paints the control, and the
-answer replaces or clears `failure`. So Try again stays mounted during its run. Try
-again leaves when `failure` leaves, on a dirty draft too.
+`retry` keeps `failure` and sends at once, and the answer replaces or clears `failure`.
+So Try again stays mounted during its run, and it leaves when `failure` leaves, on a
+dirty draft too. A press reads "Saving…" until its answer. A timed retry keeps the
+label, so the button holds its width. Any running save sets `aria-disabled`.
 
 A clean draft clears the failure, by the render-time adjustment `justPublishedAfter`
 uses. An author may take a change back by hand, and `reload` clears it too.
 
-The banner prints one catalog sentence. The caught text stands in the closed
-Developer view `RefusalDetail` already gives. A retryable failure's sentence says
-Detent keeps trying.
+The banner prints one catalog sentence under the stamp "Not saved". The caught text
+stands in the closed Developer view `RefusalDetail` already gives. A retryable
+failure's sentence says Detent keeps trying. A refused failure's sentence says trying
+again may not help, and it points to the JSON surface. That surface seeds from the
+draft in the tab, so it holds the work no save took.
 
 A successful save clears only the failure's own banner. A plain `clearError()` there
 would wipe an Arrange banner the author is still reading.
@@ -200,7 +204,7 @@ thrown fetch to the `network` error, so a hung request takes the retry path.
 ### D3. `flush()` is the one way to hurry a save
 
 ```ts
-flush(): Promise<{ saved: true; revision: number } | { saved: false }>
+flush(): Promise<{ saved: true; revision: number } | { saved: false; conflict?: true }>
 ```
 
 A flush pushes a waiter and bumps a state counter. The D1 effect then answers a wait
@@ -258,9 +262,10 @@ carry it, and a save that lands says nothing about it. `JsonView` compares its t
 its seed, which a successful Apply moves, and reports the answer upward. While that holds:
 
 - `askLeave` asks through the dialog at once, and it sends no flush. Its body reads "The
-  JSON you have not applied goes with it. The saved draft stays." Its heading and confirm
-  stay. Its confirm calls no `drop()`, since the text alone goes. An applied change still
-  saves on the unmount.
+  JSON you have not applied goes with it. The saved draft stays." Its confirm calls no
+  `drop()`, since the text alone goes. An applied change still saves on the unmount.
+- Its heading and confirm read "Leave without applying?" and "Leave without applying". A
+  tab press stays inside the draft, so "Leave this draft?" would be false there.
 - `beforeunload` prompts.
 - A tab press and the two menu entries that leave the surface (its own and Save points)
   ask the same dialog through `leaveJsonSurface`. Cancel keeps the surface and the text.
@@ -279,15 +284,18 @@ The other former `confirm()` sites all stay. None guards only unsaved work.
 
 ### D5. Publish
 
-`publish()` opens the dialog and, when dirty, calls `flush()`. A false result closes
-the publish dialog alone, through `setPendingDialog((open) => (open === "publish" ?
-null : open))`, and the banner reports it. `runPublish` loses the chained `doSave`.
-`publishDialogUnsaved` leaves the catalog.
+`publish()` opens the dialog and, when dirty, calls `flush()`. A failed save keeps the
+dialog. It prints through `DialogRefusal` "Detent cannot publish yet, because your latest
+changes have not saved. Cancel and press Try again." A banner stands behind a modal, so
+it cannot answer the press. A conflict closes the publish dialog alone, through
+`setPendingDialog((open) => (open === "publish" ? null : open))`, and its banner reports
+it. `runPublish` loses the chained `doSave`. `publishDialogUnsaved` leaves the catalog.
 
-While the draft is dirty the confirm carries `waiting`. It reads "Saving…" and
-`aria-disabled="true"`, and a press does nothing. Cancel stays live, since declining
-harms nothing. So the dialog's `busy` drops `actions.saving` and keeps meaning a
-request the dialog started. A native `disabled` would drop the focus for a short wait.
+While the draft is dirty the confirm carries `waiting`: `aria-disabled="true"`, and a
+press does nothing. It reads "Saving…" while a save can still answer, and "Publish" once
+a failed save stands and none runs. Cancel stays live, since declining harms nothing. So
+the dialog's `busy` drops `actions.saving` and keeps meaning a request the dialog
+started. A native `disabled` would drop the focus for a short wait.
 
 Publish pressed under a standing conflict opens no dialog. The focus moves to the
 banner's Reload control, the one thing that resolves it. Otherwise the author would
@@ -454,19 +462,25 @@ Copy (catalog, English only):
 - Empty: "No save points yet."
 - Row: the name, then "Saved by Roman, 3 minutes ago" through the process list's
   `relativeAgo`, with Restore and Remove. With no display name it reads "Saved 3 minutes
-  ago", as `processList.savedAnonymous` does.
+  ago", as `processList.savedAnonymous` does. Both controls take the authoring command
+  style, so a row stays quiet and Remove reaches the accent only in its dialog. An
+  unavailable one keeps `aria-disabled` and draws at 45% opacity.
 - At the bound: "This draft holds {limit} save points. Remove one to name another or
   to restore one."
 - An empty name: "Give this save point a name." at the input, with no request.
 - After a create: "Saved “{name}”."
 - After a restore: "Restored “{name}”. Your work before it stands as “{kept}”."
+- After a remove: "Removed “{name}”."
+- A failed save at the input: "This save point cannot hold your latest changes until
+  they save. Try again above."
 
-The last two print in a `role="status"` line.
+The three lines after an act print in a `role="status"` line. An empty line takes no room
+and stays mounted for the live region.
 
 The kept name comes from a pure `keptPointName(name)`, in the catalog's words: "Before
-restoring “{name}”". It clips the embedded name to 120 characters with "…". A kept name
-therefore never exceeds 139, however many rounds nest, and the engine's bound of 200
-holds.
+restoring “{name}”". It clips the embedded name to 120 characters with "…", so a new kept
+name never exceeds 139. A name that already reads that way answers itself, so repeated
+restores stay flat and the engine's bound of 200 holds. Two points may share a name.
 
 Naming and restoring call `flush()` first, so a copy holds what the author sees. Remove
 sends its request at once, since it copies nothing and carries no revision. The hook owns
@@ -476,8 +490,8 @@ them. Each outcome has one home:
 
 | Outcome | Where it lands |
 |---|---|
-| False flush | the Restore dialog closes, and the banner reports it |
-| 409 | any open dialog closes, and the conflict banner stands |
+| False flush from a failed save | the Restore dialog stays open and prints "Detent cannot restore yet, because your latest changes have not saved. Try again above, then restore." A create prints its sentence at the input with the name still typed. No request leaves. A timed retry that heals clears either sentence |
+| 409, or a false flush from a standing conflict | any open dialog closes, a create prints nothing, and the conflict banner stands |
 | 404 on restore or remove | the dialog closes, and the list refetches |
 | Lost answer on a restore | reads the stored draft under the same timeout. A revision past the flushed one lands as done, and otherwise the next row applies. The list refetches either way |
 | Other refused restore or remove | inside the open dialog, through `StudioDialog`'s `refusal` |
@@ -492,12 +506,14 @@ the answer's steps and clears `selectedPathId`, or the canvas bar would count a 
 went.
 
 Restore asks "Restore “{name}”?" and names who saved the point and when. Its note reads
-"Your work as it stands now becomes a save point, so you can come back to it." Its
-confirm reads "Restore". Its row stays, so its control takes the focus back. An
+"The draft goes back to this point. Your work as it stands now becomes a save point, so
+you can come back to it." Its confirm reads "Restore". Its row stays, so its control takes
+the focus back. An
 unavailable Restore uses `aria-disabled`, as Publish does, so a restore that reaches
 the bound keeps that focus.
 
-Remove asks "Remove “{name}”?" with "The studio has no undo." Its row leaves, on a 404
+Remove asks "Remove “{name}”?" with "This save point goes for good. The draft stays as it
+is." Its row leaves, on a 404
 too, so the focus lands on the name input, through a pending focus consumed after the
 rows commit.
 At the bound the input returns in that same commit.

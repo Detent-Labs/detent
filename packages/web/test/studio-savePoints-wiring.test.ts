@@ -93,6 +93,7 @@ function scan(src: Sources): string[] {
   if (/\bdisabled=\{/.test(p.replace(/aria-disabled=\{/g, ""))) out.push("a control uses native disabled and drops the focus");
   if ((p.match(/aria-disabled=\{acting \|\| undefined\}/g) ?? []).length !== 2 || !p.includes("if (!acting) onCreate()")) out.push("the create control or Remove is not aria-disabled with a dead press");
   if (!p.includes("opener.current = trigger ?? activeControl()")) out.push("the dialog's opener is not the row's control");
+  if (!/useEffect\(\(\) => \{\s*if \(saveFailed\) return;\s*setNameError\([^\n]*createUnsavedLine\(\)[^\n]*\s*setDialog\([^\n]*restoreUnsavedLine\(\)[^\n]*\s*\}, \[saveFailed\]\);/.test(p)) out.push("a failed save's sentence outlives a healed save");
   if ((p.match(/triggerRef=\{opener\}/g) ?? []).length !== 2) out.push("a dialog does not return the focus to the row's control");
   if (/<dialog|showModal/.test(p)) out.push("the panel opens a dialog outside StudioDialog");
   const dialogs = src.dialogs;
@@ -123,6 +124,7 @@ describe("the Save points view's wiring", () => {
   });
 
   const cases: [string, keyof Sources, string, string, string][] = [
+    ["a sentence that outlives a healed save", "panel", "if (saveFailed) return;\n    setNameError", "setNameError", "outlives a healed save"],
     ["an entry that keeps the JSON surface open", "edit", "      setJsonOpen(false);\n      setJsonNote(undefined);\n      goToTab(\"settings\", \"points\")", "      goToTab(\"settings\", \"points\")", "openSavePoints does not close"],
     ["an entry that drops unapplied JSON with no question", "edit", "const openSavePoints = () =>\n    leaveJsonSurface(() => {", "const openSavePoints = () =>\n    ((run: () => void) => run())(() => {", "with no question"],
     ["an entry that never asks for the focus", "edit", "setSavePointsFocus((count) => count + 1);\n    });", "});", "openSavePoints does not close"],

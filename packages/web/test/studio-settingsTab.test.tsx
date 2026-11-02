@@ -49,6 +49,7 @@ const context: DraftContextValue = {
 };
 
 const savePointActions = {
+  saveFailed: null,
   createSavePoint: async () => ({ kind: "ended" as const }),
   restoreSavePoint: async () => ({ kind: "ended" as const }),
   removeSavePoint: async () => ({ kind: "ended" as const }),

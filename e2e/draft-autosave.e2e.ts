@@ -46,7 +46,8 @@ const FIELD_ID = "field_8a1c2e60-0001-4a1c-8e2f-000000000001";
 const STATE_SAVED = "Saved just now";
 const STATE_UNSAVED = "Unsaved changes";
 const RETRYING = "Your latest changes stay in this tab, unsaved. Detent keeps trying.";
-const REFUSED = "Your latest changes stay in this tab, unsaved. The server refused them.";
+const REFUSED = "Your latest changes stay in this tab, unsaved. The server refused them, so trying again may not help. To keep them, copy the text from the JSON surface.";
+const PUBLISH_STOPPED = "Detent cannot publish yet, because your latest changes have not saved. Cancel and press Try again.";
 
 /** The state line's words. The hidden status beside it can repeat them. */
 function stateLine(page: Page, words: string): Locator {
@@ -242,8 +243,63 @@ test("the state turns Saved at at the minute, and the words leave what follows t
   await expect(page.locator("header").getByText(/^Saved at /)).toBeVisible();
 });
 
-test("a failed save raises the banner, the leave dialog and closes the Publish dialog", async ({ page }) => {
+/**
+ * How far the state's words stand from the version's baseline, as the difference of
+ * their text tops. A block sized after the words measured 5.5px.
+ */
+async function baselineStep(page: Page): Promise<number> {
+  return focusableStateLine(page).evaluate((line) => {
+    const [words, version] = [line.firstElementChild!, line.querySelector('[translate="no"]')!].map((node) => {
+      const text = line.ownerDocument.createRange();
+      text.selectNodeContents(node);
+      return text.getBoundingClientRect().top;
+    });
+    return words! - version!;
+  });
+}
+
+test("the state's words stand on the version's baseline in every state", async ({ page }) => {
+  await page.clock.install();
+  let failing = false;
+  await page.route("**/drafts/*", async (route) => {
+    if (!isSave(route.request())) return route.fallback();
+    if (failing) return route.fulfill({ status: 500, json: { error: { type: "stubbed", message: "Stubbed by the smoke suite." } } });
+    const sent = route.request().postDataJSON() as { body: unknown; layout: unknown; revision: number };
+    await route.fulfill({ json: { body: sent.body, layout: sent.layout, revision: sent.revision + 1 } });
+  });
+  await page.goto("/studio");
+  await page.getByRole("link", { name: "E2E draft", exact: true }).click();
+  const measured = async (words: Locator) => {
+    await expect(words).toBeVisible();
+    expect(Math.abs(await baselineStep(page))).toBeLessThan(1);
+  };
+  await measured(stateLine(page, "Saved"));
+
+  const name = await fieldName(page);
+  await name.fill("Tag on the baseline");
+  await measured(stateLine(page, "Saving…"));
+  await page.clock.fastForward(1500);
+  await measured(stateLine(page, STATE_SAVED));
+
+  failing = true;
+  await name.fill("Tag off the server");
+  await page.clock.fastForward(1500);
+  await measured(stateLine(page, STATE_UNSAVED));
+
+  failing = false;
+  await page.clock.fastForward(6000);
+  await measured(stateLine(page, STATE_SAVED));
+  await page.clock.fastForward(61_000);
+  await measured(page.locator("header").getByText(/^Saved at /));
+});
+
+test("a failed save raises the banner and the leave dialog, and stops the Publish dialog", async ({ page }) => {
   await stubSaves(page, [500]);
+  let published = 0;
+  await page.route("**/drafts/*/publish", (route) => {
+    published += 1;
+    return route.abort();
+  });
   await openDraft(page);
   await (await fieldName(page)).fill("Tag that fails");
 
@@ -251,6 +307,7 @@ test("a failed save raises the banner, the leave dialog and closes the Publish d
   await expect(banner).toBeVisible();
   await expect(stateLine(page, STATE_UNSAVED)).toBeVisible();
   await expect(page.getByRole("button", { name: "Try again", exact: true })).toBeVisible();
+  await expect(page.getByText("Not saved", { exact: true })).toBeVisible();
 
   // The leave dialog asks, and a decline keeps the change.
   const back = page.getByRole("button", { name: "Back to processes" });
@@ -262,10 +319,17 @@ test("a failed save raises the banner, the leave dialog and closes the Publish d
   await expect(back).toBeFocused();
   await expect(page.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Tag that fails");
 
-  // Publish hurries the save, and its failure closes the dialog on Publish.
+  // Publish hurries the save. Its failure keeps the dialog, which says why and holds the confirm.
   const publish = page.getByRole("button", { name: "Publish", exact: true });
   await publish.click();
   const dialog = page.getByRole("dialog", { name: "Publish this draft" });
+  await expect(dialog.getByRole("alert").filter({ hasText: PUBLISH_STOPPED })).toBeVisible();
+  const held = dialog.getByRole("button", { name: "Publish", exact: true });
+  await expect(held).toHaveAttribute("aria-disabled", "true");
+  await held.click({ force: true });
+  await expect(dialog).toBeVisible();
+  expect(published).toBe(0);
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(publish).toBeFocused();
   await expect(banner).toBeVisible();
@@ -380,6 +444,50 @@ test("a refused save waits, and Try again keeps the keyboard's place", async ({ 
   await expect(tryAgain).toBeHidden();
   await expect(focusableStateLine(page)).toBeFocused();
   await expect(focusableStateLine(page)).toContainText(STATE_SAVED);
+});
+
+test("a refused save's unsaved text stands on the JSON surface, to copy", async ({ page }) => {
+  await stubSaves(page, [400]);
+  await openDraft(page);
+  await (await fieldName(page)).fill("Tag held in this tab alone");
+  await expect(page.getByRole("alert").filter({ hasText: REFUSED })).toBeVisible();
+
+  const json = await openJson(page);
+  await expect(json).toHaveValue(/Tag held in this tab alone/);
+  await expect(stateLine(page, STATE_UNSAVED)).toBeVisible();
+});
+
+test("a timed retry leaves Try again's label, and a press reads Saving…", async ({ page }) => {
+  let sends = 0;
+  let release = () => {};
+  await page.route("**/drafts/*", async (route) => {
+    if (!isSave(route.request())) return route.fallback();
+    sends += 1;
+    if (sends > 1) {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+    }
+    await route.fulfill({ status: 500, json: { error: { type: "stubbed", message: "Stubbed by the smoke suite." } } });
+  });
+  await openDraft(page);
+  await (await fieldName(page)).fill("Tag under a timed retry");
+  const tryAgain = page.getByRole("button", { name: "Try again", exact: true });
+  const saving = page.getByRole("button", { name: "Saving…", exact: true });
+  await expect(tryAgain).toBeVisible();
+
+  await expect.poll(() => sends, { timeout: 10_000 }).toBe(2);
+  await expect(tryAgain).toHaveAttribute("aria-disabled", "true");
+  await expect(saving).toHaveCount(0);
+  release();
+  await expect(tryAgain).not.toHaveAttribute("aria-disabled", "true");
+
+  await tryAgain.click();
+  await expect(saving).toHaveAttribute("aria-disabled", "true");
+  await expect.poll(() => sends).toBe(3);
+  release();
+  await expect(tryAgain).toBeVisible();
+  await expect(saving).toHaveCount(0);
 });
 
 test("a timed retry that heals moves the focus from Try again", async ({ page }) => {
@@ -547,7 +655,7 @@ test("JSON no Apply has taken reads as unsaved work, sends nothing and asks at e
   // An exit asks at once, with no flush, and Cancel keeps the surface and the text.
   const back = page.getByRole("button", { name: "Back to processes" });
   await back.click();
-  const leave = page.getByRole("dialog", { name: "Leave this draft?" });
+  const leave = page.getByRole("dialog", { name: "Leave without applying?" });
   await expect(leave.getByText(JSON_GOES)).toBeVisible();
   await leave.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(leave).toBeHidden();
@@ -620,8 +728,8 @@ test("confirming the question drops the text alone, and an applied change still 
   // Confirmed from a tab press, the text goes and the next open reads the draft.
   await json.fill(`${seed} `);
   await page.getByRole("tab", { name: /^Map/ }).click();
-  const leave = page.getByRole("dialog", { name: "Leave this draft?" });
-  await leave.getByRole("button", { name: "Leave without saving" }).click();
+  const leave = page.getByRole("dialog", { name: "Leave without applying?" });
+  await leave.getByRole("button", { name: "Leave without applying" }).click();
   await expect(json).toHaveCount(0);
   await expect(page.getByRole("tab", { name: /^Map/ })).toHaveAttribute("aria-selected", "true");
   await expect(stateLine(page, STATE_UNSAVED)).toHaveCount(0);
@@ -635,7 +743,7 @@ test("confirming the question drops the text alone, and an applied change still 
   await page.getByRole("button", { name: "Apply", exact: true }).click();
   await json.fill(`${await json.inputValue()} `);
   await page.getByRole("button", { name: "Back to processes" }).click();
-  await leave.getByRole("button", { name: "Leave without saving" }).click();
+  await leave.getByRole("button", { name: "Leave without applying" }).click();
   await landed;
   await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
   await expect(await fieldName(page)).toHaveValue(applied);

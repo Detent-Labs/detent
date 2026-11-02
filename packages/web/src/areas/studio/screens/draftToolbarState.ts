@@ -144,6 +144,16 @@ export function headerStateLine(input: {
   return { state: "savedAt", time: formatSavedTime(lastSavedAt), ...version };
 }
 
+/**
+ * What the publish dialog's confirm reads (`studio-publish`). It says "Saving…" only
+ * while a save can still answer. Once a failed save stands and none runs, nothing is
+ * coming, so it reads its own word and the dialog's refusal says why it waits.
+ */
+export function publishConfirmWord(input: { waiting: boolean; saving: boolean; saveFailed: boolean; publishing: boolean }): "saving" | "publishing" | "publish" {
+  if (input.saving || (input.waiting && !input.saveFailed)) return "saving";
+  return input.publishing ? "publishing" : "publish";
+}
+
 /** Milliseconds until "Saved just now" turns "Saved at", or `undefined` where it no longer can. */
 export function savedJustNowLeft(lastSavedAt: Date | undefined, now: number): number | undefined {
   if (lastSavedAt === undefined) return undefined;

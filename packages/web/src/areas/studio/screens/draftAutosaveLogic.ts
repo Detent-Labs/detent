@@ -124,7 +124,8 @@ export function landedEntry(entries: readonly SentPair[], stored: { body: unknow
   return entries.find((entry) => canonicalize(entry.draft) === body && canonicalize(entry.layout) === layout);
 }
 
-export type FlushResult = { saved: true; revision: number } | { saved: false };
+/** A false answer names a conflict, whose banner holds its own route. Otherwise the save failed. */
+export type FlushResult = { saved: true; revision: number } | { saved: false; conflict?: true };
 
 /**
  * What a waiting flush reads off a commit, or `undefined` while it still waits. It
@@ -139,7 +140,8 @@ export function flushAnswer(commit: {
 }): FlushResult | undefined {
   if (commit.saving) return undefined;
   if (!commit.dirty) return { saved: true, revision: commit.revision };
-  return commit.failed || commit.conflict ? { saved: false } : undefined;
+  if (commit.conflict) return { saved: false, conflict: true };
+  return commit.failed ? { saved: false } : undefined;
 }
 
 /** What one send answered. A landed answer carries the pair that reached the server. */
@@ -174,8 +176,8 @@ export function afterRunningSave(answer: SaveAnswer, latest: SentPair): "nothing
 
 /**
  * Where a save point act lands (design.md D10's outcome table). `unsaved` is a
- * false flush. `gone` is a 404 on a restore or a remove, and the list then
- * refetches. `ended` is a 401, which already ended the session.
+ * flush whose save failed. `gone` is a 404 on a restore or a remove, and the list
+ * then refetches. `ended` is a 401, which already ended the session.
  */
 export type SavePointOutcome<T> =
   | { kind: "done"; value: T }
@@ -185,6 +187,11 @@ export type SavePointOutcome<T> =
   /** `lost` means the act may have committed unseen, so the list reads again. */
   | { kind: "refused"; message: string; lost?: true }
   | { kind: "ended" };
+
+/** How a false flush lands. A standing conflict keeps the conflict's route. */
+export function flushRefusal(result: { conflict?: true }): SavePointOutcome<never> {
+  return result.conflict ? { kind: "conflict" } : { kind: "unsaved" };
+}
 
 /** How a thrown save point request lands. A refused create prints at its input, a 404 included. */
 export function savePointFailure(act: "create" | "restore" | "remove", err: unknown): SavePointOutcome<never> {
@@ -209,10 +216,13 @@ const KEPT_NAME_CLIP = 120;
 
 /**
  * The name of the point a restore keeps. The embedded name clips to 120 characters
- * with "…", so a kept name never exceeds 139, however many rounds nest, and the
- * engine's bound of 200 holds.
+ * with "…", so a new kept name never exceeds 139. A name that already reads as a
+ * kept name answers itself, so repeated restores stay flat and the engine's bound
+ * of 200 holds. Two points may share a name.
  */
 export function keptPointName(name: string): string {
+  const [before = "", after = ""] = t("savePoints.keptName").split("{name}");
+  if (name.startsWith(before) && name.endsWith(after)) return name;
   const clipped = name.length > KEPT_NAME_CLIP ? `${name.slice(0, KEPT_NAME_CLIP - 1).replace(/[\uD800-\uDBFF]$/, "")}…` : name;
   return t("savePoints.keptName").replace("{name}", () => clipped);
 }

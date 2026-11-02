@@ -1863,9 +1863,10 @@ route fulfills only `PUT /drafts/:id`, with status 422. A refused save is not
 retried.
 
 While the route stands, the state line reads "Unsaved changes". A banner reads
-"Your latest changes stay in this tab, unsaved. The server refused them." beside
-Try again. To end the hold, unroute the answer and press Try again. Pass: the
-state line reads "Saved just now".
+"Your latest changes stay in this tab, unsaved. The server refused them, so
+trying again may not help. To keep them, copy the text from the JSON surface."
+beside Try again, under the stamp "Not saved". To end the hold, unroute the answer
+and press Try again. Pass: the state line reads "Saved just now".
 
 Each check opens `/studio/processes/<id>/edit` for that draft, unless it names
 another route. Each prompt is the studio's own dialog, so the check reads its
@@ -2115,14 +2116,15 @@ Offboarding".
    and Remove stay beside the name or under it.
 9. **Restore.** Change a label so it differs from the point. Choose Restore on
    the row. Pass: the dialog names the point and who saved it. Its note says
-   that your work becomes a save point.
+   that the draft goes back and that your work becomes a save point.
 
    Confirm. Pass: the label returns to the point's text. A second row reads
    "Before restoring" and the first name, and the status line names both. The
    focus stays on the control of the restored row.
 10. **Remove.** Choose Remove on the "Before restoring" row. Pass: the dialog
-    reads "The studio has no undo." Confirm. Pass: the row goes, and the focus
-    lands on the name input.
+    reads "This save point goes for good. The draft stays as it is." Confirm.
+    Pass: the row goes, the status line names it, and the focus lands on the name
+    input.
 11. **The bound.** Name fifty save points. Pass: when the fiftieth lands, the
     input and button give way to the sentence "This draft holds 50 save
     points." and the focus moves to that sentence. Remove one. Pass: the form
