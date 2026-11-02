@@ -547,6 +547,28 @@ export function newGroup(parentJoiner: Condition["joiner"], operands: Operand[])
   return { kind: "group", joiner: parentJoiner === "&&" ? "||" : "&&", rows: [newLeaf(operands)] };
 }
 
+/** A row's place: a top-level row, or with `inner` a leaf of the group there. */
+export interface RowAt {
+  row: number;
+  inner?: number;
+}
+
+/** The condition without the row at `at`. A group's last leaf takes the
+ * group with it: the author never faces an empty group. */
+export function withoutRow(condition: Condition, at: RowAt): Condition {
+  const target = condition.rows[at.row];
+  if (at.inner === undefined || target?.kind !== "group") {
+    return { ...condition, rows: condition.rows.filter((_, i) => i !== at.row) };
+  }
+  const rows = target.rows.filter((_, i) => i !== at.inner);
+  return {
+    ...condition,
+    rows: rows.length
+      ? condition.rows.map((r, i) => (i === at.row ? { ...target, rows } : r))
+      : condition.rows.filter((_, i) => i !== at.row),
+  };
+}
+
 /** One complete leaf as CEL, a raw row's text as it stands. */
 function leafCel(leaf: Leaf, byPath: Map<string, Operand>): string {
   if (leaf.kind === "raw") return leaf.src;
