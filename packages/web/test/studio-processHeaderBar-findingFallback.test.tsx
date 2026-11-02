@@ -83,6 +83,7 @@ function renderHeader(findings: PublishFinding[]): string {
         onToggleJson={() => {}}
         onVersions={() => {}}
         onPlayer={() => {}}
+        onSavePoints={() => {}}
       />
     </DraftContext.Provider>,
   );

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import * as stylex from "@stylexjs/stylex";
-import { FileJson, History, MoreVertical, Play, Trash2 } from "lucide-react";
+import { Bookmark, FileJson, History, MoreVertical, Play, Trash2 } from "lucide-react";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import { t } from "../catalog.js";
 import { useDraft } from "../draft/store.js";
@@ -629,6 +629,8 @@ interface Props {
   onBack: () => void;
   /** Opens the Settings tab's Process view, from the "Editing" note. */
   onOpenSettings: () => void;
+  /** Opens the Settings tab's Save points view and puts the focus in it. */
+  onSavePoints: () => void;
   /** Flips the JSON surface. `ProcessTabRow` keeps its own `jsonOpen` prop —
    * this menu derives the same fact from `structureActive` (`= !jsonOpen`)
    * instead of taking a second, redundant copy. */
@@ -657,8 +659,8 @@ interface Props {
  * and neither moves the trailing cluster.
  *
  * The `⋮` menu carries two groups. "Views" holds the JSON surface toggle, Versions
- * and Player, navigation to other views of this process. "Draft" holds Discard
- * draft. The menu stays reachable whichever surface is active. The process
+ * and Player, navigation to other views of this process. "Draft" holds Save points
+ * and Discard draft. The menu stays reachable whichever surface is active. The process
  * settings stand on the Settings tab. The studio's area nav carries no draft
  * control: the Checks tab's own count reports that state instead.
  *
@@ -704,6 +706,7 @@ export function ProcessHeaderBar({
   justPublished,
   onBack,
   onOpenSettings,
+  onSavePoints,
   onToggleJson,
   onVersions,
   onPlayer,
@@ -928,6 +931,15 @@ export function ProcessHeaderBar({
               </div>
               <div {...stylex.props(styles.headerBarMenuGroup)}>
                 <span {...stylex.props(styles.headerBarMenuLabel)}>{t("headerBar.menuGroupDraft")}</span>
+                <button
+                  type="button"
+                  className={`btn btn-secondary ${headerBarMenuLinkProps.className}`}
+                  style={headerBarMenuLinkProps.style}
+                  onClick={() => runMenuAction(onSavePoints)}
+                >
+                  <Bookmark size={18} strokeWidth={1.75} aria-hidden="true" />
+                  {t("headerBar.savePoints")}
+                </button>
                 <button
                   type="button"
                   className={`btn btn-secondary btn-destructive ${headerBarMenuLinkProps.className}`}

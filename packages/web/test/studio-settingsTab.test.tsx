@@ -48,11 +48,17 @@ const context: DraftContextValue = {
   loadGeneration: 0,
 };
 
-function render(): string {
+const savePointActions = {
+  createSavePoint: async () => ({ kind: "ended" as const }),
+  restoreSavePoint: async () => ({ kind: "ended" as const }),
+  removeSavePoint: async () => ({ kind: "ended" as const }),
+};
+
+function render(view: "process" | "points" = "process"): string {
   return renderToStaticMarkup(
     <DraftContext.Provider value={context}>
       <SettingsTab
-        view="process"
+        view={view}
         onOpenView={() => {}}
         token="t"
         roles={[]}
@@ -60,20 +66,32 @@ function render(): string {
         revision={1}
         go={() => {}}
         onUnauthorized={() => {}}
+        visible={false}
+        savePointActions={savePointActions}
+        savePointsFocus={0}
       />
     </DraftContext.Provider>,
   );
 }
 
 describe("the Settings tab's views", () => {
-  it("lists Process, What it takes in and gives back, and Access", () => {
-    expect(SETTINGS_VIEWS).toEqual(["process", "contract", "access"]);
+  it("lists Process, What it takes in and gives back, Access and Save points", () => {
+    expect(SETTINGS_VIEWS).toEqual(["process", "contract", "access", "points"]);
     const tabs = [...render().matchAll(/<button[^>]*role="tab"[^>]*>(.*?)<\/button>/g)].map((m) => m[1]);
 
-    expect(tabs).toEqual(["Process", "What it takes in and gives back", "Access"]);
+    expect(tabs).toEqual(["Process", "What it takes in and gives back", "Access", "Save points"]);
   });
 
-  it("gives each of the three views a tab and a tabpanel id", () => {
+  it("opens the Save points view on its address, and hides it behind the others", () => {
+    const open = render("points");
+    const panel = (html: string) => new RegExp(`<div[^>]*id="${subTabPanelDomId("settings", "points")}"[^>]*>`).exec(html)![0];
+
+    expect(panel(open)).not.toContain("hidden");
+    expect(open).toContain("Name this save point");
+    expect(panel(render("process"))).toContain("hidden");
+  });
+
+  it("gives each of the four views a tab and a tabpanel id", () => {
     const html = render();
 
     for (const view of SETTINGS_VIEWS) {

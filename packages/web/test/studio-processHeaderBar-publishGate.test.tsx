@@ -145,6 +145,7 @@ function renderHeader(over: {
         onToggleJson={() => {}}
         onVersions={() => {}}
         onPlayer={() => {}}
+        onSavePoints={() => {}}
       />
     </DraftContext.Provider>,
   );

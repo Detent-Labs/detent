@@ -6,7 +6,9 @@ import type { SettingsView, TabView } from "../routing.js";
 import { areaHref, type NavigateOptions } from "../../../shell/routing.js";
 import { AccessPanel } from "./AccessPanel.js";
 import { ContractPanel } from "./ContractPanel.js";
+import type { DraftToolbarActions } from "./DraftToolbar.js";
 import { ProcessSettingsPanel } from "./ProcessSettingsPanel.js";
+import { SavePointsPanel } from "./SavePointsPanel.js";
 import { SubRow, subTabDomId, subTabPanelDomId } from "./SubRow.js";
 
 const styles = stylex.create({
@@ -64,16 +66,36 @@ interface Props {
   /** Cross-area navigation, for the assignment-groups link. */
   go: (href: string, opts?: NavigateOptions) => void;
   onUnauthorized: () => void;
+  /** True while the tab stands open and the JSON surface does not. The Save points
+   * view fetches on its first visible commit. */
+  visible: boolean;
+  /** The hook's save point acts, for the Save points view. */
+  savePointActions: Pick<DraftToolbarActions, "createSavePoint" | "restoreSavePoint" | "removeSavePoint">;
+  /** Counts the `⋮` menu's Save points presses. Each moves the focus into the view. */
+  savePointsFocus: number;
 }
 
 /**
  * The Settings tab: a sub-row over the process's own settings, its
- * contract and its access lists (`studio-process-tabs`: "The Settings tab
- * gathers the process-wide settings"). Every view body stays mounted, and
+ * contract, its access lists and its save points (`studio-process-tabs`: "The
+ * Settings tab gathers the process-wide settings"). Every view body stays mounted, and
  * `hidden` reveals one, so the contract editor keeps a half-typed outcome
  * name across a switch.
  */
-export function SettingsTab({ view, onOpenView, token, roles, processId, revision, lastPublish, go, onUnauthorized }: Props) {
+export function SettingsTab({
+  view,
+  onOpenView,
+  token,
+  roles,
+  processId,
+  revision,
+  lastPublish,
+  go,
+  onUnauthorized,
+  visible,
+  savePointActions,
+  savePointsFocus,
+}: Props) {
   const groupsLinkProps = stylex.props(styles.groupsLink);
   const body = (id: SettingsView) => {
     const hide = view !== id;
@@ -93,6 +115,7 @@ export function SettingsTab({ view, onOpenView, token, roles, processId, revisio
           { id: "process", label: t("settings.process") },
           { id: "contract", label: t("settings.contract") },
           { id: "access", label: t("settings.access") },
+          { id: "points", label: t("settings.points") },
         ]}
         open={view}
         onOpen={onOpenView}
@@ -117,6 +140,16 @@ export function SettingsTab({ view, onOpenView, token, roles, processId, revisio
           <Users2 size={18} strokeWidth={1.75} aria-hidden="true" />
           {t("settings.manageGroups")}
         </button>
+      </div>
+      <div {...body("points")}>
+        <SavePointsPanel
+          processId={processId}
+          token={token}
+          visible={visible && view === "points"}
+          focusRequest={savePointsFocus}
+          actions={savePointActions}
+          onUnauthorized={onUnauthorized}
+        />
       </div>
     </div>
   );

@@ -41,11 +41,11 @@
 
 ## 5. The Save points view
 
-- [ ] 5.1 Add `points` to `SettingsView`, `SETTINGS_VIEWS` and the sub-row. Add the `⋮` entry and `openSavePoints` per D10. Pass: `studio-settingsTab.test.tsx` and the routing tests pin the address and an unknown view's fallback, and tests cover the entry from the JSON surface and from the form editor.
-- [ ] 5.2 Add `panels/SavePointsPanel.tsx` and its logic per D10: form from the first commit, the rows' waiting line, rows, a row with no display name, empty, bound, failed fetch and kept rows during a refetch, all from the catalog. Use `DESIGN.md`'s register row and field rules. Pass: static-markup tests pin each state, and a test scans the markup for no id, revision or hash.
-- [ ] 5.3 Add the restore and remove dialogs through `StudioDialog`, with each D10 focus landing and each row of its outcome table. Pass: `studio-no-confirm.test.ts` stays green, and named tests cover both headings, the note, the refusals, the 404 refetch, the three focus cases at the bound and an answer reaching the bound under the focus.
-- [ ] 5.4 Add the discard dialog's save point note. Pass: `DiscardDraftDialog`'s test covers the header bar and the process list.
-- [ ] 5.5 Add an e2e flow on the second draft: name a point, change a label, restore, read the old label, restore the kept point, read the new label, remove a point. Pass: `bun run e2e` is green.
+- [x] 5.1 Add `points` to `SettingsView`, `SETTINGS_VIEWS` and the sub-row. Add the `⋮` entry and `openSavePoints` per D10. Pass: `studio-settingsTab.test.tsx` and the routing tests pin the address and an unknown view's fallback, and tests cover the entry from the JSON surface and from the form editor.
+- [x] 5.2 Add `panels/SavePointsPanel.tsx` and its logic per D10: form from the first commit, the rows' waiting line, rows, a row with no display name, empty, bound, failed fetch and kept rows during a refetch, all from the catalog. Use `DESIGN.md`'s register row and field rules. Pass: static-markup tests pin each state, and a test scans the markup for no id, revision or hash.
+- [x] 5.3 Add the restore and remove dialogs through `StudioDialog`, with each D10 focus landing and each row of its outcome table. Pass: `studio-no-confirm.test.ts` stays green, and named tests cover both headings, the note, the refusals, the 404 refetch, the three focus cases at the bound and an answer reaching the bound under the focus.
+- [x] 5.4 Add the discard dialog's save point note. Pass: `DiscardDraftDialog`'s test covers the header bar and the process list.
+- [x] 5.5 Add an e2e flow on the second draft: name a point, change a label, restore, read the old label, restore the kept point, read the new label, remove a point. Pass: `bun run e2e` is green.
 
 ## 6. The Player
 

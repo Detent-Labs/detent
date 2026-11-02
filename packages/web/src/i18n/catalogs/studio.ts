@@ -96,6 +96,33 @@ export const en = {
   "draftToolbar.saveFailedTryAgain": "Try again",
   // The point a restore keeps. `keptPointName` clips `{name}`.
   "savePoints.keptName": "Before restoring “{name}”",
+  // The discard dialog's note, beside the one that keeps the published versions.
+  "draftToolbar.discardDialogSavePoints": "Its save points go with it.",
+
+  // The Settings tab's Save points view (`panels/SavePointsPanel.tsx`). `{name}` is
+  // the author's own text, `{kept}` the name of the point a restore kept, `{limit}`
+  // the bound the server states.
+  "savePoints.help": "A save point keeps the draft as it stands now, so you can come back to it.",
+  "savePoints.nameLabel": "Name this save point",
+  "savePoints.create": "Save this point",
+  "savePoints.nameRequired": "Give this save point a name.",
+  "savePoints.created": "Saved “{name}”.",
+  "savePoints.restored": "Restored “{name}”. Your work before it stands as “{kept}”.",
+  "savePoints.empty": "No save points yet.",
+  "savePoints.loading": "Loading save points…",
+  "savePoints.loadFailed": "The save points did not load.",
+  "savePoints.tryAgain": "Try again",
+  "savePoints.atBound": "This draft holds {limit} save points. Remove one to name another or to restore one.",
+  "savePoints.restore": "Restore",
+  "savePoints.remove": "Remove",
+  "savePoints.restoreRow": "Restore “{name}”",
+  "savePoints.removeRow": "Remove “{name}”",
+  "savePoints.restoreHeading": "Restore “{name}”?",
+  "savePoints.restoreNote": "Your work as it stands now becomes a save point, so you can come back to it.",
+  "savePoints.removeHeading": "Remove “{name}”?",
+  "savePoints.removeNote": "The studio has no undo.",
+  "savePoints.savedByTerm": "Saved by",
+  "savePoints.savedTerm": "Saved",
 
   // The notice under the header bar that offers the work a 401 kept in the
   // tab (`panels/RestoreNotice.tsx`). `t` takes no values, so the message
@@ -595,6 +622,7 @@ export const en = {
   "settings.process": "Process",
   "settings.contract": "What it takes in and gives back",
   "settings.access": "Access",
+  "settings.points": "Save points",
   "settings.baseLocale": "Base language",
   "settings.contentLocale": "Language you are editing",
   "settings.cancellable": "A case can be cancelled while it runs",
@@ -911,6 +939,7 @@ export const en = {
   "headerBar.versionPublished": "{version} published",
   "headerBar.test": "Test",
   "headerBar.menuGroupDraft": "Draft",
+  "headerBar.savePoints": "Save points",
   // Beside the state while the content locale differs from the base language
   // (`studio-app`). `{language}` is the language's English name.
   "headerBar.editingNote": "Editing {language}",

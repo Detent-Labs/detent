@@ -22,14 +22,14 @@ const isProcessTab = (v: string): v is ProcessTab => (PROCESS_TABS as string[]).
 /** The Fields tab's views, in sub-row order. */
 export type FieldsView = "catalog" | "matrix" | "sources";
 /** The Settings tab's views, in sub-row order. */
-export type SettingsView = "process" | "contract" | "access";
+export type SettingsView = "process" | "contract" | "access" | "points";
 /** A view of a tab that carries a sub-row. */
 export type TabView = FieldsView | SettingsView;
 
 /** The Fields tab's views, in sub-row order. */
 export const FIELDS_VIEWS: readonly FieldsView[] = ["catalog", "matrix", "sources"];
 /** The Settings tab's views, in sub-row order. */
-export const SETTINGS_VIEWS: readonly SettingsView[] = ["process", "contract", "access"];
+export const SETTINGS_VIEWS: readonly SettingsView[] = ["process", "contract", "access", "points"];
 
 /** Each tab's views, in sub-row order. A tab with no sub-row lists none. The
  * first entry is the view an address naming the tab alone opens. */

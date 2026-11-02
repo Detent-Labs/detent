@@ -404,6 +404,8 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // Where focus goes once the commit that opens `tab` has run: the element
   // named, else that tab's button. The effect under `fixCheck` consumes it.
   const [pendingFocus, setPendingFocus] = useState<PendingFocus | undefined>(undefined);
+  // Counts the `⋮` menu's Save points presses. The view moves the focus into itself on each.
+  const [savePointsFocus, setSavePointsFocus] = useState(0);
   // The path an edit-rail drag currently sits over, resolved the same way the
   // drop itself resolves one (design.md: "The rail reports its moving
   // position"). Drives the drop-target render in `CanvasView`; not the
@@ -1127,6 +1129,17 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     goToTab("settings", "process");
     setPendingFocus({ tab: "settings" });
   };
+  /**
+   * The `⋮` menu's Save points: the view itself, from the JSON surface and from the
+   * form editor too. `openSettings` is no model, since it keeps the JSON surface open
+   * and lands on the first view. The view takes the focus.
+   */
+  const openSavePoints = () => {
+    setJsonOpen(false);
+    setJsonNote(undefined);
+    goToTab("settings", "points");
+    setSavePointsFocus((count) => count + 1);
+  };
   /** Leaves the form editor for the tab it stands in. */
   const leaveFormEditor = () => leaveFormEditorFor(formEditorReturnTab(formOrigin));
   /** The breadcrumb's step crumb: the step's own page on the Steps tab. */
@@ -1226,6 +1239,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
           justPublished={justPublished}
           onBack={() => navigate({ name: "processes" })}
           onOpenSettings={openSettings}
+          onSavePoints={openSavePoints}
           onToggleJson={() => {
             setJsonOpen((open) => !open);
             setJsonNote(undefined);
@@ -1427,6 +1441,9 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
               lastPublish={publishResult ? { version: publishResult.version, definitionHash: publishResult.definitionHash } : undefined}
               go={go}
               onUnauthorized={stashOnUnauthorized}
+              visible={!jsonOpen && openTab === "settings"}
+              savePointActions={actions}
+              savePointsFocus={savePointsFocus}
             />,
           )}
         </div>

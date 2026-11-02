@@ -42,6 +42,7 @@ export function DiscardDraftDialog({ processLabel, lastSavedAt, refusal, busy, t
         {lastSavedAt && <DialogFact term={t("draftToolbar.discardDialogLastSaved")}>{ABSOLUTE_TIME.format(lastSavedAt)}</DialogFact>}
       </DialogFacts>
       <DialogNote>{t("draftToolbar.discardDialogKeepsPublished")}</DialogNote>
+      <DialogNote>{t("draftToolbar.discardDialogSavePoints")}</DialogNote>
     </StudioDialog>
   );
 }

@@ -36,6 +36,13 @@ describe("DiscardDraftDialog", () => {
     expect(html).toContain("The published versions stay. Only the unpublished draft goes.");
   });
 
+  it("says the draft's save points go with it, after the note that keeps the published versions", () => {
+    const html = renderDialog();
+
+    expect(html).toContain("Its save points go with it.");
+    expect(html.indexOf("Its save points go with it.")).toBeGreaterThan(html.indexOf("The published versions stay."));
+  });
+
   it("prints no revision and no key or id", () => {
     const html = renderDialog();
 
@@ -101,5 +108,26 @@ describe("useDraftToolbarActions' discarding flag", () => {
 
   it("is returned beside saving and publishing", () => {
     expect(code).toMatch(/return \{\s*saving,\s*publishing,\s*discarding,/);
+  });
+});
+
+describe("the save points note reaches both mounts", () => {
+  const read = (path: string) => readFileSync(new URL(`../src/areas/studio/${path}`, import.meta.url), "utf8");
+  const code = (path: string) => read(path).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+
+  it("mounts the one dialog in the header bar and in the process list", () => {
+    expect(code("panels/ProcessHeaderBar.tsx")).toContain("<DiscardDraftDialog");
+    expect(code("screens/ProcessesScreen.tsx")).toContain("<DiscardDraftDialog");
+  });
+
+  it("keeps the sentence in the dialog, so neither mount can drop it", () => {
+    expect(code("panels/DiscardDraftDialog.tsx")).toContain('t("draftToolbar.discardDialogSavePoints")');
+    expect(code("panels/ProcessHeaderBar.tsx")).not.toContain("discardDialogSavePoints");
+    expect(code("screens/ProcessesScreen.tsx")).not.toContain("discardDialogSavePoints");
+  });
+
+  it("flags a dialog without the note, the violating input", () => {
+    const without = code("panels/DiscardDraftDialog.tsx").replace('t("draftToolbar.discardDialogSavePoints")', "null");
+    expect(without).not.toContain('t("draftToolbar.discardDialogSavePoints")');
   });
 });
