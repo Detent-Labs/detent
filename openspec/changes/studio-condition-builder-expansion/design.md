@@ -345,4 +345,8 @@ as rows and raw rows, and the text input reads it as text.
 
 ## Open Questions
 
-None that would change the specs or the tasks. The deferrals stand in Non-Goals. They are emptiness checks, a literal list, negated groups, text operators, date-time ordering, and the rule builder's fold.
+None that would change the specs or the tasks. The deferrals stand in
+Non-Goals. They are emptiness checks, a literal list, negated groups, text
+operators, date-time ordering, and the rule builder's fold. The critique and
+the audit added three more, recorded in `docs/decisions.md`: a picker over the
+known roles, moving an existing row into a group, and arithmetic rows.
