@@ -100,33 +100,64 @@ export function nextVersionLabel(baseVersion: number | null | undefined): string
   return `v${typeof baseVersion === "number" ? baseVersion + 1 : 1}`;
 }
 
+/** How long a save in this session reads "Saved just now". */
+export const SAVED_JUST_NOW_MS = 60_000;
+
 /** What the header bar's state line prints, as parts the caller turns into
- * catalog sentences. `unsaved` carries no time. `savedAt` carries the formatted
- * clock time of a save in this session. `saved` is a clean draft with no save
- * yet. `version` is present where a published version exists. */
+ * catalog sentences. `savedAt` carries the formatted clock time of a save in this
+ * session. `saved` is a clean draft with no save yet. `version` is present where a
+ * published version exists. */
 export interface HeaderStateLine {
-  state: "unsaved" | "savedAt" | "saved";
+  state: "unsaved" | "saving" | "savedJustNow" | "savedAt" | "saved";
   time?: string;
   version?: string;
 }
 
 /**
- * The state line's parts (studio-canvas spec: "The header bar's state says
- * what holds for the draft"). A dirty draft is `unsaved`, whatever happened
- * before. A clean one is `savedAt` once `savedTime` exists, else `saved`.
- * `baseVersion` is the version the draft stands on; null, undefined, 0 or a
- * non-integer means nobody has published it, so the line carries no version.
+ * The state line's parts (studio-canvas spec: "The header bar's state says what
+ * holds for the draft"). `unsaved` means a change will not land by itself: a failed
+ * save, a conflict over a dirty draft, or a dirty draft under the restore notice.
+ * Any other dirty draft is `saving`. A conflict on a clean draft has nothing unsaved,
+ * so it reads as saved. `baseVersion` is the version the draft stands on; null,
+ * undefined, 0 or a non-integer means nobody has published it, so the line carries
+ * no version.
  */
-export function headerStateLine(
-  dirty: boolean,
-  savedTime: string | undefined,
-  baseVersion: number | null | undefined,
-): HeaderStateLine {
+export function headerStateLine(input: {
+  dirty: boolean;
+  failed: boolean;
+  conflict: boolean;
+  noticeStands: boolean;
+  lastSavedAt: Date | undefined;
+  now: number;
+  baseVersion: number | null | undefined;
+}): HeaderStateLine {
+  const { dirty, failed, conflict, noticeStands, lastSavedAt, now, baseVersion } = input;
   const published = typeof baseVersion === "number" && Number.isInteger(baseVersion) && baseVersion > 0;
   const version = published ? { version: `v${baseVersion}` } : {};
-  if (dirty) return { state: "unsaved", ...version };
-  if (savedTime !== undefined) return { state: "savedAt", time: savedTime, ...version };
-  return { state: "saved", ...version };
+  if (failed || (dirty && (conflict || noticeStands))) return { state: "unsaved", ...version };
+  if (dirty) return { state: "saving", ...version };
+  if (lastSavedAt === undefined) return { state: "saved", ...version };
+  if (now - lastSavedAt.getTime() < SAVED_JUST_NOW_MS) return { state: "savedJustNow", ...version };
+  return { state: "savedAt", time: formatSavedTime(lastSavedAt), ...version };
+}
+
+/** Milliseconds until "Saved just now" turns "Saved at", or `undefined` where it no longer can. */
+export function savedJustNowLeft(lastSavedAt: Date | undefined, now: number): number | undefined {
+  if (lastSavedAt === undefined) return undefined;
+  const left = lastSavedAt.getTime() + SAVED_JUST_NOW_MS - now;
+  return left > 0 ? left : undefined;
+}
+
+/**
+ * What the hidden status says when the state moves (`studio-canvas`). Announcing
+ * every "Saving…" would talk over a screen reader user's typing, so only `unsaved`
+ * speaks, and "Saved" answers it once a saved state follows. `heard` says "Unsaved
+ * changes" was the last thing said.
+ */
+export function stateAnnouncement(heard: boolean, state: HeaderStateLine["state"]): { heard: boolean; say: "unsaved" | "saved" | undefined } {
+  if (state === "unsaved") return { heard: true, say: "unsaved" };
+  if (state === "saving") return { heard, say: undefined };
+  return { heard: false, say: heard ? "saved" : undefined };
 }
 
 /**
@@ -140,18 +171,20 @@ export function justPublishedAfter(current: boolean, dirty: boolean): boolean {
 }
 
 /**
- * Where the focus goes once a save has answered (studio-process-tabs spec: "A
- * keyboard save keeps its place"). `"stateLine"` only when Save's own press
- * started that save, the answer left the draft clean, so the button is gone, and
- * the focus fell to the body. `undefined` leaves the focus where it stands: a
- * refused save keeps the button, and focus the author moved stays put.
+ * Where the focus goes once a save has answered (studio-process-tabs spec: "Try
+ * again keeps the keyboard's place"). `"stateLine"` only when Try again held the
+ * focus, the answer removed it and the focus fell to the body. A timed retry can heal
+ * under a resting keyboard user, so this reads no press. A retry answered 409 removes
+ * the control on a dirty draft, so it reads no clean draft either. `undefined` leaves
+ * the focus where it stands: a refused retry keeps the control, and focus the author
+ * moved stays put.
  */
 export function saveFocusTarget(answer: {
-  pressed: boolean;
-  clean: boolean;
+  heldControl: boolean;
+  controlGone: boolean;
   focusOnBody: boolean;
 }): "stateLine" | undefined {
-  return answer.pressed && answer.clean && answer.focusOnBody ? "stateLine" : undefined;
+  return answer.heldControl && answer.controlGone && answer.focusOnBody ? "stateLine" : undefined;
 }
 
 /** The clock time of a save, hour and minute, in the browser's locale. */

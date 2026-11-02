@@ -14,9 +14,8 @@ import { ProcessHeaderBar, PublishNavControl, PublishReasonLine } from "../src/a
  * bare colored paragraph, as one more inline item in a wrapping row of ten
  * badges, with no alert role on it — it reached the DOM and reached nobody.
  *
- * The header bar holds the back control, the name, the state, Save beside the
- * state while the draft is dirty, Test, Publish and the `⋮` menu, with the two
- * confirmation dialogs and the Publish permission gate. This file covers all of
+ * The header bar holds the back control, the name, the state, Test, Publish and
+ * the `⋮` menu, with the two confirmation dialogs and the Publish permission gate. This file covers all of
  * it. `studio-draftNavControls.test.tsx` keeps only the Checks control, which
  * stays in the studio's area nav.
  *
@@ -72,9 +71,8 @@ const noActions: DraftToolbarActions = {
   createSavePoint: () => Promise.resolve({ kind: "unsaved" }),
   restoreSavePoint: () => Promise.resolve({ kind: "unsaved" }),
   removeSavePoint: () => Promise.resolve({ kind: "done", value: undefined }),
-  save: () => {},
   discard: () => {},
-  publish: () => {},
+  publish: () => undefined,
   reload: () => {},
   reportError: () => {},
 };
@@ -111,6 +109,7 @@ function issue(source: EditorIssue["source"]): EditorIssue {
 function renderHeader(over: {
   actions?: Partial<DraftToolbarActions>;
   conflict?: boolean;
+  noticeStands?: boolean;
   issues?: EditorIssue[];
   zodValid?: boolean;
   isDirty?: boolean;
@@ -131,6 +130,7 @@ function renderHeader(over: {
         lastSavedAt={over.lastSavedAt}
         publishResult={over.publishResult ?? null}
         conflict={over.conflict ?? false}
+        noticeStands={over.noticeStands ?? false}
         actions={{ ...noActions, ...over.actions }}
         canPublish={over.canPublish ?? true}
         baseVersion={over.baseVersion === undefined ? 3 : over.baseVersion}
@@ -716,7 +716,7 @@ function barOf(html: string): string {
 
 /** The state line's own markup. Its span closes where the open tags balance. */
 function stateLineOf(html: string): string {
-  const start = html.indexOf('role="status"');
+  const start = html.indexOf('tabindex="-1"');
   let depth = 0;
   for (const tag of html.slice(start - "<span ".length).matchAll(/<span\b|<\/span>/g)) {
     depth += tag[0] === "</span>" ? -1 : 1;
@@ -773,45 +773,63 @@ describe("A clean header bar", () => {
   });
 });
 
-describe("Save beside the state", () => {
-  it("stands after the state while the draft is dirty, outside the state's span", () => {
-    const html = renderHeader({ isDirty: true });
-    const line = stateLineOf(html);
+describe("The bar has no Save", () => {
+  const STATES: Parameters<typeof renderHeader>[0][] = [
+    {},
+    { isDirty: true },
+    { isDirty: true, actions: { saving: true } },
+    { isDirty: true, structureActive: false },
+    { isDirty: true, conflict: true },
+    { isDirty: true, actions: { saveFailed: { retryable: true, detail: "boom" } } },
+  ];
 
-    expect(line).toContain("Unsaved changes");
-    expect(line).not.toContain("<button");
-    expect(html.indexOf(">Save<")).toBeGreaterThan(html.indexOf(line) + line.length - 1);
-    expect(html.indexOf(">Save<")).toBeLessThan(html.indexOf(">Test<"));
+  it("in any state, over either surface", () => {
+    for (const state of STATES) expect(buttonLabels(renderHeader(state))).not.toContain("Save");
   });
 
-  it("carries aria-disabled and no native disabled while saving, and reads Saving…", () => {
-    const html = renderHeader({ isDirty: true, actions: { saving: true } });
-    const save = /<button[^>]*>Saving…/.exec(html)?.[0];
-
-    expect(save).toBeDefined();
-    expect(save).toContain('aria-disabled="true"');
-    expect(save).not.toContain("disabled=\"\"");
-    expect(html).not.toContain(">Save<");
-  });
-
-  it("carries no aria-disabled while idle", () => {
-    expect(/<button[^>]*>Save</.exec(renderHeader({ isDirty: true }))?.[0]).not.toContain("aria-disabled");
-  });
-
-  it("stays while a refused save leaves the draft dirty", () => {
-    const html = renderHeader({ isDirty: true, actions: { error: "refused" } });
-
-    expect(html).toContain(">Save<");
-    expect(stateLineOf(html)).toContain("Unsaved changes");
+  it("while a change saves, Publish keeps its place as the bar's primary control", () => {
+    const trailing = (html: string) => {
+      const labels = buttonLabels(barOf(html));
+      return labels.slice(labels.indexOf("Test"));
+    };
+    expect(trailing(renderHeader({ isDirty: true }))).toEqual(trailing(renderHeader({})));
   });
 });
 
 describe("The state line", () => {
-  it("is one status span the focus can land on and Tab skips", () => {
+  const FAILED = { retryable: true, detail: "boom" };
+  const words = (html: string) => /tabindex="-1"[^>]*><span[^>]*>([^<]*)</.exec(html)?.[1];
+  const toneOf = (html: string) => /tabindex="-1"[^>]*><span([^>]*)>/.exec(html)?.[1];
+
+  it("is no live region, the focus can land on it and Tab skips it", () => {
     const html = renderHeader({});
+    const line = /<span[^>]*tabindex="-1"[^>]*>/.exec(html)?.[0];
+
+    expect(line).toBeDefined();
+    expect(line).not.toContain("role=");
+    expect(line).not.toContain("aria-live");
+  });
+
+  it("stands beside one hidden status that starts empty", () => {
+    const html = renderHeader({ isDirty: true, actions: { saveFailed: FAILED } });
 
     expect(html.match(/role="status"/g)).toHaveLength(1);
-    expect(/<span[^>]*role="status"[^>]*>/.exec(html)?.[0]).toContain('tabindex="-1"');
+    expect(/<span[^>]*role="status"[^>]*><\/span>/.test(html)).toBe(true);
+    expect(stateLineOf(html)).not.toContain('role="status"');
+  });
+
+  it("reads Saving… on a dirty draft", () => {
+    expect(words(renderHeader({ isDirty: true }))).toBe("Saving…");
+  });
+
+  it("reads Unsaved changes on a failed save, a conflict over a change, and a change under the notice", () => {
+    expect(words(renderHeader({ isDirty: true, actions: { saveFailed: FAILED } }))).toBe("Unsaved changes");
+    expect(words(renderHeader({ isDirty: true, conflict: true }))).toBe("Unsaved changes");
+    expect(words(renderHeader({ isDirty: true, noticeStands: true }))).toBe("Unsaved changes");
+  });
+
+  it("reads Saved just now after a save this minute", () => {
+    expect(words(renderHeader({ lastSavedAt: new Date() }))).toBe("Saved just now");
   });
 
   it("reads Saved and the version on a clean published draft", () => {
@@ -821,7 +839,7 @@ describe("The state line", () => {
     expect(line).toMatch(/translate="no"[^>]*>v1<\/span> published/);
   });
 
-  it("reads the save's time after a save in this session", () => {
+  it("reads the save's time after a save past the minute", () => {
     const line = stateLineOf(renderHeader({ lastSavedAt: new Date(2026, 0, 2, 10, 32) }));
 
     expect(line).toContain("Saved at ");
@@ -836,10 +854,84 @@ describe("The state line", () => {
     expect(line).not.toContain("·");
   });
 
-  it("parts the dirty words from the clean ones by class", () => {
-    const words = (html: string) => /role="status"[^>]*><span([^>]*)>/.exec(html)?.[1];
+  it("prints only Unsaved changes in the refusal tone, and the other four alike", () => {
+    const unsaved = toneOf(renderHeader({ isDirty: true, actions: { saveFailed: FAILED } }));
+    const muted = [
+      renderHeader({ isDirty: true }),
+      renderHeader({ lastSavedAt: new Date() }),
+      renderHeader({ lastSavedAt: new Date(2026, 0, 2, 10, 32) }),
+      renderHeader({}),
+    ].map(toneOf);
 
-    expect(words(renderHeader({ isDirty: true }))).not.toBe(words(renderHeader({})));
+    expect(new Set(muted).size).toBe(1);
+    expect(muted[0]).not.toBe(unsaved);
+    expect(toneOf(renderHeader({ isDirty: true, conflict: true }))).toBe(unsaved);
+    expect(toneOf(renderHeader({ isDirty: true, noticeStands: true }))).toBe(unsaved);
+  });
+});
+
+describe("The failed save's banner", () => {
+  const RETRYING = "Your latest changes stay in this tab, unsaved. Detent keeps trying.";
+  const REFUSED = "Your latest changes stay in this tab, unsaved. The server refused them.";
+  const retrying = { retryable: true, detail: "HTTP 500 from the server" };
+  const refused = { retryable: false, detail: "HTTP 400 from the server" };
+
+  it("stands outside the header, with no banner while nothing failed", () => {
+    const html = renderHeader({ isDirty: true, actions: { saveFailed: retrying } });
+
+    expect(html.indexOf(RETRYING)).toBeGreaterThan(html.indexOf("</header>"));
+    expect(renderHeader({ isDirty: true })).not.toContain("Try again");
+  });
+
+  it("says the backoff runs where an answer may heal, and waits where it cannot", () => {
+    expect(renderHeader({ isDirty: true, actions: { saveFailed: retrying } })).toContain(RETRYING);
+    const html = renderHeader({ isDirty: true, actions: { saveFailed: refused } });
+    expect(html).toContain(REFUSED);
+    expect(html).not.toContain(RETRYING);
+  });
+
+  it("alerts with the sentence alone, so a timed retry's flipped words read nothing out", () => {
+    const alert = /role="alert"[^>]*>([^<]*)</.exec(renderHeader({ isDirty: true, actions: { saveFailed: retrying } }))?.[1];
+
+    expect(alert).toBe(RETRYING);
+  });
+
+  it("offers Try again, live and with no aria-disabled while idle", () => {
+    const tag = /<button[^>]*>Try again/.exec(renderHeader({ isDirty: true, actions: { saveFailed: retrying } }))?.[0];
+
+    expect(tag).toBeDefined();
+    expect(tag).not.toContain("aria-disabled");
+  });
+
+  it("reads Saving… and carries aria-disabled and no native disabled while a save runs", () => {
+    const html = renderHeader({ isDirty: true, actions: { saving: true, saveFailed: retrying } });
+    const tag = /<button[^>]*>Saving…/.exec(html)?.[0];
+
+    expect(tag).toContain('aria-disabled="true"');
+    expect(tag).not.toContain('disabled=""');
+    expect(html).not.toContain("Try again");
+  });
+
+  it("holds the caught text in a closed Developer view", () => {
+    const html = renderHeader({ isDirty: true, actions: { saveFailed: retrying } });
+
+    expect(html).toContain(retrying.detail);
+    expect(html).not.toMatch(/<details[^>]*\bopen\b/);
+    expect(/role="alert"[^>]*>[^<]*</.exec(html)?.[0]).not.toContain(retrying.detail);
+  });
+
+  it("hides while a dialog stands open, as the other banners do", () => {
+    const html = renderHeader({ isDirty: true, actions: { pendingDialog: "publish", saveFailed: retrying } });
+
+    expect(html).not.toContain(RETRYING);
+    expect(html).not.toContain("Try again");
+  });
+
+  it("stands apart from the action error, which keeps its own banner", () => {
+    const html = renderHeader({ isDirty: true, actions: { error: "Arrange failed", saveFailed: retrying } });
+
+    expect(html).toContain("Arrange failed");
+    expect(html).toContain(RETRYING);
   });
 });
 
@@ -889,13 +981,12 @@ describe("The Editing note", () => {
 });
 
 describe("The commands over the JSON surface", () => {
-  it("keeps Test, Publish, the menu and a dirty draft's Save", () => {
+  it("keeps Test, Publish and the menu", () => {
     const html = renderHeader({ structureActive: false, isDirty: true });
 
     expect(html).toContain(">Test<");
     expect(html).toContain(">Publish<");
     expect(html).toContain("More actions");
-    expect(html).toContain(">Save<");
   });
 });
 

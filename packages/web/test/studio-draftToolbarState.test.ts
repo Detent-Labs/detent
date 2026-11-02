@@ -6,6 +6,10 @@ import {
   publishAvailability,
   nextVersionLabel,
   headerStateLine,
+  SAVED_JUST_NOW_MS,
+  savedJustNowLeft,
+  stateAnnouncement,
+  type HeaderStateLine,
   formatSavedTime,
   editingLocaleNote,
   languageName,
@@ -359,32 +363,98 @@ describe("nextVersionLabel (studio-publish: the dialog names a valid version lab
 });
 
 describe("headerStateLine", () => {
-  it("a dirty draft reads unsaved, with or without a version and a past save", () => {
-    expect(headerStateLine(true, undefined, null)).toEqual({ state: "unsaved" });
-    expect(headerStateLine(true, undefined, 1)).toEqual({ state: "unsaved", version: "v1" });
-    expect(headerStateLine(true, "10:32", 1)).toEqual({ state: "unsaved", version: "v1" });
+  const NOW = new Date(2026, 0, 2, 12, 0, 0).getTime();
+  const clean = { dirty: false, failed: false, conflict: false, noticeStands: false, lastSavedAt: undefined, now: NOW, baseVersion: null };
+
+  it("a failed save reads unsaved, with or without a version and a past save", () => {
+    expect(headerStateLine({ ...clean, dirty: true, failed: true })).toEqual({ state: "unsaved" });
+    expect(headerStateLine({ ...clean, dirty: true, failed: true, baseVersion: 1 })).toEqual({ state: "unsaved", version: "v1" });
+    expect(headerStateLine({ ...clean, dirty: true, failed: true, lastSavedAt: new Date(NOW), baseVersion: 1 })).toEqual({ state: "unsaved", version: "v1" });
+  });
+
+  it("a conflict over a dirty draft reads unsaved", () => {
+    expect(headerStateLine({ ...clean, dirty: true, conflict: true })).toEqual({ state: "unsaved" });
+  });
+
+  it("a dirty draft under the restore notice reads unsaved", () => {
+    expect(headerStateLine({ ...clean, dirty: true, noticeStands: true })).toEqual({ state: "unsaved" });
+  });
+
+  it("any other dirty draft reads saving, whatever saved before", () => {
+    expect(headerStateLine({ ...clean, dirty: true })).toEqual({ state: "saving" });
+    expect(headerStateLine({ ...clean, dirty: true, lastSavedAt: new Date(NOW), baseVersion: 2 })).toEqual({ state: "saving", version: "v2" });
+  });
+
+  it("a conflict or a notice on a clean draft reads as saved, since nothing unsaved stands", () => {
+    expect(headerStateLine({ ...clean, conflict: true })).toEqual({ state: "saved" });
+    expect(headerStateLine({ ...clean, noticeStands: true })).toEqual({ state: "saved" });
   });
 
   it("a clean draft with no save in this session reads saved", () => {
-    expect(headerStateLine(false, undefined, null)).toEqual({ state: "saved" });
-    expect(headerStateLine(false, undefined, undefined)).toEqual({ state: "saved" });
-    expect(headerStateLine(false, undefined, 3)).toEqual({ state: "saved", version: "v3" });
+    expect(headerStateLine(clean)).toEqual({ state: "saved" });
+    expect(headerStateLine({ ...clean, baseVersion: undefined })).toEqual({ state: "saved" });
+    expect(headerStateLine({ ...clean, baseVersion: 3 })).toEqual({ state: "saved", version: "v3" });
   });
 
   it("NaN and 0 are no published version", () => {
-    expect(headerStateLine(false, undefined, Number.NaN)).toEqual({ state: "saved" });
-    expect(headerStateLine(false, undefined, 0)).toEqual({ state: "saved" });
-    expect(headerStateLine(true, undefined, 0)).toEqual({ state: "unsaved" });
+    expect(headerStateLine({ ...clean, baseVersion: Number.NaN })).toEqual({ state: "saved" });
+    expect(headerStateLine({ ...clean, baseVersion: 0 })).toEqual({ state: "saved" });
+    expect(headerStateLine({ ...clean, dirty: true, failed: true, baseVersion: 0 })).toEqual({ state: "unsaved" });
   });
 
   it("a non-integer or negative base is no published version", () => {
-    expect(headerStateLine(false, undefined, 1.5)).toEqual({ state: "saved" });
-    expect(headerStateLine(false, undefined, -1)).toEqual({ state: "saved" });
+    expect(headerStateLine({ ...clean, baseVersion: 1.5 })).toEqual({ state: "saved" });
+    expect(headerStateLine({ ...clean, baseVersion: -1 })).toEqual({ state: "saved" });
   });
 
-  it("a clean draft after a save reads saved at its time", () => {
-    expect(headerStateLine(false, "10:32", null)).toEqual({ state: "savedAt", time: "10:32" });
-    expect(headerStateLine(false, "10:32", 2)).toEqual({ state: "savedAt", time: "10:32", version: "v2" });
+  it("reads just now for the first minute after a save, to the millisecond", () => {
+    const saved = new Date(NOW - SAVED_JUST_NOW_MS + 1);
+    expect(headerStateLine({ ...clean, lastSavedAt: saved })).toEqual({ state: "savedJustNow" });
+    expect(headerStateLine({ ...clean, lastSavedAt: saved, baseVersion: 2 })).toEqual({ state: "savedJustNow", version: "v2" });
+  });
+
+  it("reads saved at its time from the minute on", () => {
+    const saved = new Date(NOW - SAVED_JUST_NOW_MS);
+    expect(headerStateLine({ ...clean, lastSavedAt: saved })).toEqual({ state: "savedAt", time: formatSavedTime(saved) });
+    expect(headerStateLine({ ...clean, lastSavedAt: saved, baseVersion: 2 })).toEqual({ state: "savedAt", time: formatSavedTime(saved), version: "v2" });
+  });
+});
+
+describe("savedJustNowLeft", () => {
+  const SAVED = new Date(2026, 0, 2, 12, 0, 0);
+
+  it("counts to the minute", () => {
+    expect(savedJustNowLeft(SAVED, SAVED.getTime())).toBe(SAVED_JUST_NOW_MS);
+    expect(savedJustNowLeft(SAVED, SAVED.getTime() + 59_000)).toBe(1000);
+  });
+
+  it("arms nothing with no save or past the minute", () => {
+    expect(savedJustNowLeft(undefined, SAVED.getTime())).toBeUndefined();
+    expect(savedJustNowLeft(SAVED, SAVED.getTime() + SAVED_JUST_NOW_MS)).toBeUndefined();
+  });
+});
+
+describe("stateAnnouncement", () => {
+  /** What a run of states says, from a first silent one. */
+  const said = (states: HeaderStateLine["state"][]) => {
+    let heard = false;
+    return states.map((state) => {
+      const next = stateAnnouncement(heard, state);
+      heard = next.heard;
+      return next.say;
+    });
+  };
+
+  it("stays silent through an automatic save", () => {
+    expect(said(["saved", "saving", "savedJustNow", "saving", "savedJustNow", "savedAt"])).toEqual([undefined, undefined, undefined, undefined, undefined, undefined]);
+  });
+
+  it("says Unsaved changes on entering it, and Saved on the saved state after it", () => {
+    expect(said(["saving", "unsaved", "savedJustNow"])).toEqual([undefined, "unsaved", "saved"]);
+  });
+
+  it("waits through a later save for the saved state, and says it once", () => {
+    expect(said(["unsaved", "saving", "savedJustNow", "savedAt"])).toEqual(["unsaved", undefined, "saved", undefined]);
   });
 });
 
@@ -456,26 +526,31 @@ describe("justPublishedAfter", () => {
 });
 
 describe("saveFocusTarget", () => {
-  const answered = { pressed: true, clean: true, focusOnBody: true };
+  const answered = { heldControl: true, controlGone: true, focusOnBody: true };
 
-  it("moves the focus to the state line when a pressed Save vanished from the focus", () => {
+  it("a press on Try again that heals lands on the state line", () => {
     expect(saveFocusTarget(answered)).toBe("stateLine");
   });
 
-  it("moves nothing on a refused save, which leaves the draft dirty", () => {
-    expect(saveFocusTarget({ ...answered, clean: false })).toBeUndefined();
+  it("a timed retry that heals under the resting focus lands there too, so it reads no press", () => {
+    expect(saveFocusTarget({ heldControl: true, controlGone: true, focusOnBody: true })).toBe("stateLine");
   });
 
-  it("moves nothing on a successful save with a draft edited meanwhile", () => {
-    expect(saveFocusTarget({ ...answered, clean: false, focusOnBody: false })).toBeUndefined();
+  it("a retry answered 409 removes the control on a dirty draft, and lands there too", () => {
+    expect(saveFocusTarget({ heldControl: true, controlGone: true, focusOnBody: true })).toBe("stateLine");
+  });
+
+  it("a refused retry keeps the control and the focus on it", () => {
+    expect(saveFocusTarget({ ...answered, controlGone: false, focusOnBody: false })).toBeUndefined();
+    expect(saveFocusTarget({ ...answered, controlGone: false })).toBeUndefined();
   });
 
   it("moves nothing when the author moved the focus elsewhere", () => {
     expect(saveFocusTarget({ ...answered, focusOnBody: false })).toBeUndefined();
   });
 
-  it("moves nothing on a save Save's own press did not start, such as the publish dialog's", () => {
-    expect(saveFocusTarget({ ...answered, pressed: false })).toBeUndefined();
+  it("moves nothing when Try again never held the focus", () => {
+    expect(saveFocusTarget({ ...answered, heldControl: false })).toBeUndefined();
   });
 });
 

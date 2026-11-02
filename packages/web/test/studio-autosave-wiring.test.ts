@@ -135,8 +135,8 @@ function scan({ toolbar, screen, header }: Sources): string[] {
   flag(toolbar.indexOf("flushAnswer(") < toolbar.indexOf("autosaveWait(") && toolbar.indexOf("flushAnswer(") > 0, "the settling effect runs after the timer effect");
 
   // `retry` keeps the failure (D2).
-  const retry = /\bconst\s+retry\s*=\s*(\w+);/.exec(toolbar)?.[1];
-  flag(retry === "save" && /\bif\s*\(\s*!saving\s*\)\s*void doSave\(\);/.test(bodyAfter(toolbar, "save")), "retry does not send at once and keep the failure");
+  const retry = bodyAfter(toolbar, "retry");
+  flag(/\bif\s*\(\s*!saving\s*\)\s*void doSave\(\);/.test(retry) && !/\bflush\b|\bsetFailure\b/.test(retry), "retry does not send at once and keep the failure");
 
   // The unmount (3.5).
   const unmount = effectHolding(toolbar, "unmountPlan(");
@@ -164,6 +164,37 @@ function scan({ toolbar, screen, header }: Sources): string[] {
   flag(/\bsetPendingDialog\("publish"\)/.test(publish), "publish opens no dialog");
   flag(/\bif\s*\(\s*!result\.saved\s*\)\s*setPendingDialog\(\(open\) => \(open === "publish" \? null : open\)\)/.test(publish), "a failed flush does not close the publish dialog alone");
   flag(/\bif\s*\(\s*!dirty && !saving\s*\)\s*void runPublish\(\)/.test(bodyAfter(toolbar, "resolveDialog")), "a press on a waiting confirm publishes");
+
+  // Publish under a conflict (4.4): no dialog, and the focus lands on what resolves it.
+  flag(/^\s*if\s*\(\s*saveState\.conflict\s*\)\s*return "conflict";/.test(publish), "publish under a conflict opens the dialog");
+  const publishControl = /<PublishNavControl\b[\s\S]*?onPublish=\{\(\) => \{([^}]*)\}\}/.exec(header)?.[1] ?? "";
+  flag(/\bif\s*\(\s*actions\.publish\(\) === "conflict"\s*\)\s*reloadRef\.current\?\.focus\(\);/.test(publishControl), "Publish under a conflict does not move the focus to Reload");
+  flag(/<button ref=\{reloadRef\}[^>]*onClick=\{actions\.reload\}/.test(header), "the focus target is not the conflict banner's Reload");
+
+  // The state line (4.2): one re-render at the minute, armed once per save.
+  const passMinute = effectHolding(header, "savedJustNowLeft(");
+  flag(/\bsetTimeout\(\(\) => passMinute\(/.test(passMinute), "no timer turns Saved just now into Saved at");
+  flag(/\breturn \(\) => clearTimeout\(timer\)/.test(passMinute), "the minute's timer outlives the save it counts from");
+  flag(/\[lastSavedAt\]\s*,?\s*\)$/.test(passMinute), "the minute's timer does not rearm per save");
+  flag(/\bconst line = headerStateLine\(\{[^}]*\bnow: Date\.now\(\)/.test(header), "the state line reads a stale clock");
+  flag(/\bstateWords:\s*\{[^}]*\bminWidth:/.test(header), "the state's words take no minimum width");
+  flag(/\bfailed=\{actions\.saveFailed !== null\}/.test(header), "the state line does not read the failed save");
+  const announced = effectHolding(header, "stateAnnouncement(");
+  flag(/\[line\.state\]\s*,?\s*\)$/.test(announced) && /\bheardUnsaved\.current = heard\b/.test(announced), "the hidden status does not follow the state");
+  flag(/role="status"[^>]*>\s*\{announcement\}/.test(header), "the hidden status prints no announcement");
+
+  // Try again (4.3).
+  const banner = /<button[^>]*?aria-disabled=\{actions\.saving \? true : undefined\}[\s\S]*?<\/button>/.exec(header)?.[0] ?? "";
+  flag(/\bif\s*\(\s*!actions\.saving\s*\)\s*actions\.retry\(\);/.test(banner), "a press during a save passes Try again's guard");
+  flag(/\bonFocus=\{[^}]*\{\s*tryAgainHeld\.current = true;/.test(banner) && /\bonBlur=\{[^}]*\{\s*tryAgainHeld\.current = false;/.test(banner), "the ref does not follow Try again's focus");
+  flag(/!dialogOpen && actions\.saveFailed !== null/.test(header), "the failed save's banner stands behind a dialog");
+
+  // What the exits read (4.5).
+  flag(/\bconst changeNotLanded = dirtyNow \|\| actions\.saving;/.test(screen), "an exit does not wait on a running save");
+  flag(/\bonDirtyChange\?\.\(changeNotLanded\)/.test(screen), "the screen reports no running save upward");
+  flag(/\bonFlushChange\?\.\(\{ flush, drop \}\)/.test(screen), "the screen does not report flush and drop upward");
+  flag(/\bonFlushChange\?\.\(undefined\)/.test(screen), "an unmount leaves a stale flush upward");
+  flag(/\bholdSaves,/.test(options), "the leave dialog's hold does not reach the hook");
 
   // The two dialogs' props (3.6, 3.7).
   flag(/\bwaiting=\{isDirty \|\| actions\.saving\}/.test(header), "the publish confirm does not wait on the save");
@@ -388,7 +419,79 @@ describe("the autosave's wiring", () => {
   });
 
   it("a retry that clears the failure is flagged", () => {
-    expect(scan(mutate("toolbar", "const retry = save;", "const retry = () => flush();"))).toEqual(["retry does not send at once and keep the failure"]);
+    expect(scan(mutate("toolbar", /const retry = \(\) => \{\s*if \(!saving\) void doSave\(\);\s*\};/, "const retry = () => { void flush(); };"))).toEqual(["retry does not send at once and keep the failure"]);
+  });
+
+  it("a retry that clears the failure before it sends is flagged", () => {
+    expect(scan(mutate("toolbar", /(const retry = \(\) => \{)/, "$1 setFailure(undefined);"))).toEqual(["retry does not send at once and keep the failure"]);
+  });
+
+  it("a Publish under a standing conflict that opens the dialog is flagged", () => {
+    expect(scan(mutate("toolbar", /if \(saveState\.conflict\) return "conflict";/, ""))).toEqual(["publish under a conflict opens the dialog"]);
+  });
+
+  it("a Publish under a standing conflict that leaves the focus behind is flagged", () => {
+    expect(scan(mutate("header", /if \(actions\.publish\(\) === "conflict"\) reloadRef\.current\?\.focus\(\);/, "actions.publish();"))).toEqual(["Publish under a conflict does not move the focus to Reload"]);
+  });
+
+  it("a focus target other than the conflict banner's Reload is flagged", () => {
+    expect(scan(mutate("header", "<button ref={reloadRef} ", "<button "))).toEqual(["the focus target is not the conflict banner's Reload"]);
+  });
+
+  it("a state line that never turns Saved at at the minute is flagged", () => {
+    expect(scan(mutate("header", /setTimeout\(\(\) => passMinute\(\(minutes\) => minutes \+ 1\), left\)/, "setTimeout(() => {}, left)"))).toEqual(["no timer turns Saved just now into Saved at"]);
+  });
+
+  it("a minute's timer that survives its save is flagged", () => {
+    expect(scan(mutate("header", /return \(\) => clearTimeout\(timer\);(\s*\}, \[lastSavedAt\])/, "$1"))).toEqual(["the minute's timer outlives the save it counts from"]);
+  });
+
+  it("a minute's timer armed once a mount is flagged, since a later save would keep the first deadline", () => {
+    expect(scan(mutate("header", "}, [lastSavedAt]);", "}, []);"))).toEqual(["the minute's timer does not rearm per save"]);
+  });
+
+  it("a state line that holds its first clock is flagged", () => {
+    expect(scan(mutate("header", "now: Date.now(), baseVersion", "now: 0, baseVersion"))).toEqual(["the state line reads a stale clock"]);
+  });
+
+  it("state words with no minimum width are flagged, since what follows them would move", () => {
+    expect(scan(mutate("header", /(stateWords: \{\s*display: "inline-block",)\s*minWidth: "14ch",/, "$1"))).toEqual(["the state's words take no minimum width"]);
+  });
+
+  it("a state line blind to the failed save is flagged", () => {
+    expect(scan(mutate("header", "failed={actions.saveFailed !== null}", "failed={false}"))).toEqual(["the state line does not read the failed save"]);
+  });
+
+  it("a hidden status that stops following the state is flagged", () => {
+    expect(scan(mutate("header", "}, [line.state]);", "}, []);"))).toEqual(["the hidden status does not follow the state"]);
+    expect(scan(mutate("header", "{announcement}", "{words}"))).toEqual(["the hidden status prints no announcement"]);
+  });
+
+  it("a press that passes a running retry's guard is flagged", () => {
+    expect(scan(mutate("header", "if (!actions.saving) actions.retry();", "actions.retry();"))).toEqual(["a press during a save passes Try again's guard"]);
+  });
+
+  it("a ref that does not follow Try again's focus is flagged", () => {
+    expect(scan(mutate("header", /onFocus=\{\(\) => \{\s*tryAgainHeld\.current = true;\s*\}\}/, ""))).toEqual(["the ref does not follow Try again's focus"]);
+    expect(scan(mutate("header", /onBlur=\{\(\) => \{\s*tryAgainHeld\.current = false;\s*\}\}/, ""))).toEqual(["the ref does not follow Try again's focus"]);
+  });
+
+  it("a failed save's banner behind an open dialog is flagged", () => {
+    expect(scan(mutate("header", "!dialogOpen && actions.saveFailed !== null", "actions.saveFailed !== null"))).toEqual(["the failed save's banner stands behind a dialog"]);
+  });
+
+  it("a report upward that drops the running save is flagged", () => {
+    expect(scan(mutate("screen", "const changeNotLanded = dirtyNow || actions.saving;", "const changeNotLanded = dirtyNow;"))).toEqual(["an exit does not wait on a running save"]);
+    expect(scan(mutate("screen", "onDirtyChange?.(changeNotLanded)", "onDirtyChange?.(dirtyNow)"))).toEqual(["the screen reports no running save upward"]);
+  });
+
+  it("a flush that does not reach root.tsx, or stays after the unmount, is flagged", () => {
+    expect(scan(mutate("screen", "onFlushChange?.({ flush, drop });", ""))).toEqual(["the screen does not report flush and drop upward"]);
+    expect(scan(mutate("screen", "return () => onFlushChange?.(undefined);", ""))).toEqual(["an unmount leaves a stale flush upward"]);
+  });
+
+  it("a leave dialog's hold that does not reach the hook is flagged", () => {
+    expect(scan(mutate("screen", /\n\s*holdSaves,/, ""))).toEqual(["the leave dialog's hold does not reach the hook"]);
   });
 
   it("an unmount effect with dependencies is flagged, since it would act on each change", () => {
@@ -432,7 +535,7 @@ describe("the autosave's wiring", () => {
   });
 
   it("each of a restore's retirements is flagged when it goes", () => {
-    expect(scan(mutate("screen", /(onRestored: \(record\) => \{\s*)setJustPublished\(false\);/, "$1"))).toEqual(["a restore keeps the Versions offer"]);
+    expect(scan(mutate("screen", /setJustPublished\(false\);(\s*setSelectedStepIds)/, "$1"))).toEqual(["a restore keeps the Versions offer"]);
     expect(scan(mutate("screen", /setSelectedStepIds\(\(selected\) => selectionAfterRestore\(selected, record\.body\)\);/, ""))).toEqual(["a restore keeps the selection unfiltered"]);
     expect(scan(mutate("screen", /(selectionAfterRestore\(selected, record\.body\)\);\s*)setSelectedPathId\(undefined\);/, "$1"))).toEqual(["a restore keeps the selected path"]);
   });

@@ -36,7 +36,7 @@ const CASES: Expected[] = [
     name: "LeaveDraftDialog",
     element: <LeaveDraftDialog {...handlers} />,
     heading: "Leave this draft?",
-    body: ["Your unsaved changes go with it. The saved draft stays."],
+    body: ["Detent could not save your latest changes, so they go with it. The saved draft stays."],
     confirm: "Leave without saving",
   },
   {

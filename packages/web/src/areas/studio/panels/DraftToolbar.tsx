@@ -92,7 +92,11 @@ export interface DraftToolbarProps {
  * the application's own modal dialog (studio-publish, studio-app). */
 export type PendingDialog = "publish" | "discard" | null;
 
-/** What `useDraftToolbarActions` exposes: the four calls a trigger (a
+/** The part of the hook that `root.tsx` holds for its exits: an exit saves first
+ * through `flush`, and a confirmed leave dialog gives the work up through `drop`. */
+export type DraftExit = Pick<DraftToolbarActions, "flush" | "drop">;
+
+/** What `useDraftToolbarActions` exposes: the calls a trigger (a
  * button, a menu item) invokes, plus the pending/error state a presentation
  * reads to decide what to show. `saveState.conflict` stays the caller's own
  * read (it already owns `saveState`) rather than duplicated here. */
@@ -126,9 +130,10 @@ export interface DraftToolbarActions {
   /** The value names the point the restore kept. */
   restoreSavePoint: (point: Pick<SavePointSummary, "savePointId" | "name">) => Promise<SavePointOutcome<{ kept: string }>>;
   removeSavePoint: (savePointId: string) => Promise<SavePointOutcome<undefined>>;
-  save: () => void;
   discard: () => void;
-  publish: () => void;
+  /** Opens the publish dialog. Under a standing conflict it opens none and answers
+   * `"conflict"`, and the caller moves the focus to the banner's Reload. */
+  publish: () => "conflict" | undefined;
   reload: () => void;
   /** Routes an error the screen caught elsewhere through the same 401 rule
    * and the same `error` banner. The Arrange command reports a layout library
@@ -276,10 +281,9 @@ export function useDraftToolbarActions({
     return running.current;
   };
 
-  const save = () => {
+  const retry = () => {
     if (!saving) void doSave();
   };
-  const retry = save;
 
   /** A flush that fails settles false. One the screen unmounts under never settles:
    * its caller left with it, and a 401 must run no exit. */
@@ -384,9 +388,11 @@ export function useDraftToolbarActions({
    * Opens the publish dialog and hurries a change that has not landed. It sends no
    * publish: that request leaves only from `resolveDialog(true)` (studio-publish
    * spec: "no publish request is sent until the developer confirms"). A failed save
-   * closes this dialog alone, and the banner reports it.
+   * closes this dialog alone, and the banner reports it. A standing conflict opens
+   * none: the author would publish a stored draft that differs from the one on screen.
    */
-  const publish = () => {
+  const publish = (): "conflict" | undefined => {
+    if (saveState.conflict) return "conflict";
     // A dialog reports its own refusal alone. Without this, a failure from an
     // earlier action renders inside a dialog that has sent nothing yet, and
     // reads as a refusal of the act the developer is about to confirm.
@@ -564,7 +570,6 @@ export function useDraftToolbarActions({
     createSavePoint,
     restoreSavePoint,
     removeSavePoint,
-    save,
     discard,
     publish,
     reload: () => void reload(),

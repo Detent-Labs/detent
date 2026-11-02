@@ -28,7 +28,7 @@ export const en = {
 
   // The confirmations that stand in `panels/confirmations.tsx`.
   "leaveDialog.heading": "Leave this draft?",
-  "leaveDialog.body": "Your unsaved changes go with it. The saved draft stays.",
+  "leaveDialog.body": "Detent could not save your latest changes, so they go with it. The saved draft stays.",
   "leaveDialog.confirm": "Leave without saving",
   "arrangeDialog.heading": "Arrange every step?",
   "arrangeDialog.body": "Every step moves to a new place, and each path loses the bends placed on it.",
@@ -53,7 +53,6 @@ export const en = {
   "templateReplaceDialog.body": "A template keeps no earlier version, so the old one goes. Processes already created from it stay as they are.",
   "templateReplaceDialog.confirm": "Replace template",
 
-  "draftToolbar.save": "Save",
   "draftToolbar.saving": "Saving…",
   "draftToolbar.discard": "Discard draft",
   "draftToolbar.conflictMessage": "This draft was changed elsewhere.",
@@ -94,6 +93,7 @@ export const en = {
   // The banner after a failed save. One says Detent keeps trying, the other waits.
   "draftToolbar.saveFailedRetrying": "Your latest changes stay in this tab, unsaved. Detent keeps trying.",
   "draftToolbar.saveFailedRefused": "Your latest changes stay in this tab, unsaved. The server refused them.",
+  "draftToolbar.saveFailedTryAgain": "Try again",
   // The point a restore keeps. `keptPointName` clips `{name}`.
   "savePoints.keptName": "Before restoring “{name}”",
 
@@ -383,8 +383,8 @@ export const en = {
   "formEditor.markCondition": "Condition",
   "formEditor.noteKind": "Note",
   "formEditor.stepNotFound": "This step no longer exists in the draft.",
-  "formEditor.loadFailed": "The form editor could not load. Your draft is unchanged: go back, save it, then reload the page.",
-  "formEditor.navigateAwayKeepsChanges": "Every change is already in the draft. The header bar saves and publishes it, and its ⋮ menu discards it.",
+  "formEditor.loadFailed": "The form editor could not load. Your draft is unchanged: go back, then reload the page.",
+  "formEditor.navigateAwayKeepsChanges": "Every change is already in the draft, and the draft saves itself. The header bar publishes it, and its ⋮ menu discards it.",
   "formEditor.paletteLabel": "Catalog fields not on this form",
   "formEditor.paletteHeading": "Available fields",
   "formEditor.paletteEmpty": "Every catalog field is on this form.",
@@ -672,7 +672,6 @@ export const en = {
   "panelsScreen.fieldRemoved": "{field} removed.",
   "panelsScreen.fieldRemovedWithOne": "{field} removed, with the one field inside it.",
   "panelsScreen.fieldRemovedWithMany": "{field} removed, with the {count} fields inside it.",
-  "panelsScreen.keepsChanges": "This screen keeps every change. Save from the toolbar to persist it.",
 
   "fieldMatrix.heading": "Field matrix",
   "fieldMatrix.scrollRegionLabel": "Field matrix grid",
@@ -892,6 +891,7 @@ export const en = {
   "headerBar.nameLabel": "Process name",
   "headerBar.unsaved": "Unsaved changes",
   "headerBar.saved": "Saved",
+  "headerBar.savedJustNow": "Saved just now",
   "headerBar.findingPrefix": "Stale reference in",
   "headerBar.findingCarriedBy": "carried by",
   "headerBar.findingLiveElsewhere": "live instance(s) elsewhere",

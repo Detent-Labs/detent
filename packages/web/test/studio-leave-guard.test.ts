@@ -2,14 +2,18 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "bun:test";
 
 /**
- * Every exit from an open, unsaved draft in `root.tsx` asks first.
+ * Every exit from an open draft in `root.tsx` saves first, and asks only if that fails.
  *
- * Each one calls `askLeave`, whose question is `LeaveDraftDialog`, and only the
- * dialog's confirm runs the exit. Four kinds of exit leave the draft: in-area navigation (the area nav and
+ * Each one calls `askLeave`, which flushes a change that has not landed and runs the
+ * exit on the answer. A failed save or a conflict raises `LeaveDraftDialog`, and then
+ * only the dialog's confirm runs the exit. Four kinds of exit leave the draft: in-area navigation (the area nav and
  * `EditScreen`'s `navigate`), the `go` that `EditScreen` receives (the `⋮`
  * menu's groups link), the account menu's three handlers on `Chrome`, and
  * closing the tab. A raw `navigate`, `go` or `onLogout` on any of them brings
  * the defect back with every type check still green.
+ *
+ * One slot holds the exit that waits, so two presses run one exit. The dialog holds the
+ * saves while it stands, and its confirm drops the work before it runs the exit.
  *
  * A source test in the idiom `studio-no-confirm.test.ts` uses: no harness in
  * this package can click a control and observe a prompt, so the wiring is
@@ -144,11 +148,21 @@ function scan(source: string): string[] {
     if (!guardedOnly(propValue(chrome, "onLogout"), "guardedLogout", "onLogout")) violations.push("Chrome onLogout is not guardedLogout");
   }
 
-  // The question: a clean draft proceeds at once, and a dirty one waits. The
+  // A clean draft proceeds at once, and a change that has not landed saves first. The
   // opener is read from the press, before the dialog takes the focus.
   const ask = arrowBody(code, "askLeave") ?? "";
-  if (!ask.startsWith("if (!dirtyRef.current) { proceed(); return; }")) violations.push("askLeave does not read dirtyRef before it asks");
-  if (!ask.endsWith("leaveTrigger.current = activeControl(); setLeaving(() => proceed);")) violations.push("askLeave does not hold the exit for the dialog");
+  if (!ask.startsWith("if (!dirtyRef.current) { proceed(); return; }")) violations.push("askLeave does not read dirtyRef before it flushes");
+  if (!/\bleaveTrigger\.current = activeControl\(\); pendingLeave\.current = proceed;/.test(ask)) violations.push("askLeave does not hold the exit in its one slot");
+  const answer = /void flushRef\.current\?\.flush\(\)\.then\(\(result\) => \{ (.*) \}\);$/.exec(ask)?.[1];
+  if (answer === undefined) violations.push("askLeave does not flush first");
+  else {
+    if (!answer.startsWith("const exit = pendingLeave.current; pendingLeave.current = undefined; if (exit === undefined) return;")) {
+      violations.push("a settled flush does not take the exit from the slot");
+    }
+    if (!answer.endsWith("if (result.saved) exit(); else setLeaving(() => exit);")) violations.push("a settled flush does not run the exit or ask");
+  }
+  if (!/\bflushRef\.current = exit;/.test(propValue(edit ?? "", "onFlushChange") ?? "")) violations.push("EditScreen's flush does not reach flushRef");
+  if (propValue(edit ?? "", "holdSaves") !== "leaving !== undefined") violations.push("the leave dialog does not hold the saves");
 
   // The wrappers must ask and hand over the exit, or a guarded name guards nothing.
   for (const { name, shape } of WRAPPERS) {
@@ -161,13 +175,14 @@ function scan(source: string): string[] {
   else {
     const confirmed = propValue(dialog, "onConfirm")?.replace(/\s+/g, " ") ?? "";
     if (!/\bsetLeaving\(undefined\); leaving\(\);/.test(confirmed)) violations.push("the leave dialog's confirm does not run the exit");
+    if (!/\bflushRef\.current\?\.drop\(\); setLeaving\(undefined\);/.test(confirmed)) violations.push("the leave dialog's confirm does not drop the work first");
     if (propValue(dialog, "onCancel")?.replace(/\s+/g, " ") !== "() => setLeaving(undefined)") violations.push("the leave dialog's cancel does more than close it");
     if (propValue(dialog, "triggerRef") !== "leaveTrigger") violations.push("the leave dialog returns the focus elsewhere");
   }
 
-  // A browser Back under the open dialog closes it.
-  if (!/useEffect\(\(\) => \{\s*setLeaving\(undefined\);\s*\}, \[localPath\]\)/.test(code)) {
-    violations.push("a path change does not clear the leave dialog");
+  // A browser Back under the open dialog closes it, and moving on settles a waiting exit.
+  if (!/useEffect\(\(\) => \{\s*setLeaving\(undefined\);\s*pendingLeave\.current = undefined;\s*\}, \[localPath\]\)/.test(code)) {
+    violations.push("a path change does not clear the leave dialog and the waiting exit");
   }
 
   const added = /\.addEventListener\(\s*["']beforeunload["']\s*,\s*(\w+)\s*\)/.exec(code);
@@ -194,7 +209,7 @@ function mutate(code: string, from: RegExp, to: string): string {
 
 const real = stripComments(readFileSync(new URL(`../${ROOT}`, import.meta.url).pathname, "utf8"));
 
-describe("every exit from an unsaved draft in root.tsx asks first", () => {
+describe("every exit from an open draft in root.tsx saves first", () => {
   it("the real root.tsx has no violation", () => {
     expect(scan(real)).toEqual([]);
   });
@@ -302,22 +317,69 @@ describe("every exit from an unsaved draft in root.tsx asks first", () => {
 
   it("an askLeave that never reads dirtyRef is flagged", () => {
     const blind = mutate(real, /if \(!dirtyRef\.current\) \{\s*proceed\(\);\s*return;\s*\}/, "");
-    expect(scan(blind)).toEqual(["askLeave does not read dirtyRef before it asks"]);
+    expect(scan(blind)).toEqual(["askLeave does not read dirtyRef before it flushes"]);
   });
 
   it("an askLeave that reads dirtyRef the wrong way round is flagged", () => {
     const flipped = mutate(real, /if \(!dirtyRef\.current\) (\{\s*proceed)/, "if (dirtyRef.current) $1");
-    expect(scan(flipped)).toEqual(["askLeave does not read dirtyRef before it asks"]);
+    expect(scan(flipped)).toEqual(["askLeave does not read dirtyRef before it flushes"]);
   });
 
-  it("an askLeave that runs the exit while dirty is flagged", () => {
-    const ran = mutate(real, /setLeaving\(\(\) => proceed\);/, "proceed();");
-    expect(scan(ran)).toEqual(["askLeave does not hold the exit for the dialog"]);
+  it("an askLeave that flushes ahead of dirtyRef is flagged, since a discard would write to the deleted draft", () => {
+    const early = mutate(real, /(const askLeave = \(proceed: \(\) => void\) => \{)/, "$1\n    void flushRef.current?.flush();");
+    expect(scan(early)).toEqual(["askLeave does not read dirtyRef before it flushes"]);
+  });
+
+  it("an askLeave that runs the exit with no flush is flagged", () => {
+    const ran = mutate(real, /pendingLeave\.current = proceed;\s*void flushRef\.current\?\.flush\(\)\.then\(\(result\) => \{[\s\S]*?\}\);/, "pendingLeave.current = proceed;\n    proceed();");
+    expect(scan(ran)).toEqual(["askLeave does not flush first"]);
+  });
+
+  it("an askLeave that opens the dialog with no flush is flagged", () => {
+    const asked = mutate(real, /void flushRef\.current\?\.flush\(\)\.then\(\(result\) => \{[\s\S]*?\}\);/, "setLeaving(() => proceed);");
+    expect(scan(asked)).toEqual(["askLeave does not flush first"]);
   });
 
   it("an askLeave that loses the opener is flagged", () => {
     const lost = mutate(real, /leaveTrigger\.current = activeControl\(\);/, "");
-    expect(scan(lost)).toEqual(["askLeave does not hold the exit for the dialog"]);
+    expect(scan(lost)).toEqual(["askLeave does not hold the exit in its one slot"]);
+  });
+
+  it("two presses that fill no one slot are flagged, since each flush would run its own exit", () => {
+    const own = mutate(real, /pendingLeave\.current = proceed;/, "");
+    expect(scan(own)).toEqual(["askLeave does not hold the exit in its one slot"]);
+    const kept = mutate(real, /const exit = pendingLeave\.current;\s*pendingLeave\.current = undefined;/, "const exit = pendingLeave.current;");
+    expect(scan(kept)).toEqual(["a settled flush does not take the exit from the slot"]);
+    const closure = mutate(real, /const exit = pendingLeave\.current;/, "const exit = proceed;");
+    expect(scan(closure)).toEqual(["a settled flush does not take the exit from the slot"]);
+    const empty = mutate(real, /if \(exit === undefined\) return;/, "");
+    expect(scan(empty)).toEqual(["a settled flush does not take the exit from the slot"]);
+  });
+
+  it("a flush that leaves on a failed save, or asks on a saved one, is flagged", () => {
+    const left = mutate(real, /if \(result\.saved\) exit\(\);\s*else setLeaving\(\(\) => exit\);/, "exit();");
+    expect(scan(left)).toEqual(["a settled flush does not run the exit or ask"]);
+    const asked = mutate(real, /if \(result\.saved\) exit\(\);\s*else setLeaving\(\(\) => exit\);/, "setLeaving(() => exit);");
+    expect(scan(asked)).toEqual(["a settled flush does not run the exit or ask"]);
+    const flipped = mutate(real, /if \(result\.saved\) exit\(\);/, "if (!result.saved) exit();");
+    expect(scan(flipped)).toEqual(["a settled flush does not run the exit or ask"]);
+  });
+
+  it("a flush that never reaches root.tsx is flagged", () => {
+    const lost = mutate(real, /flushRef\.current = exit;/, "");
+    expect(scan(lost)).toEqual(["EditScreen's flush does not reach flushRef"]);
+  });
+
+  it("a leave dialog that lets a healed retry land is flagged", () => {
+    const free = mutate(real, /holdSaves=\{leaving !== undefined\}/, "holdSaves={false}");
+    expect(scan(free)).toEqual(["the leave dialog does not hold the saves"]);
+    const gone = mutate(real, /\s*holdSaves=\{leaving !== undefined\}/, "");
+    expect(scan(gone)).toEqual(["the leave dialog does not hold the saves"]);
+  });
+
+  it("a confirm that keeps the work is flagged, since the unmount would send what the dialog dropped", () => {
+    const kept = mutate(real, /flushRef\.current\?\.drop\(\);/, "");
+    expect(scan(kept)).toEqual(["the leave dialog's confirm does not drop the work first"]);
   });
 
   it("a leave dialog that is missing or miswired is flagged", () => {
@@ -332,8 +394,10 @@ describe("every exit from an unsaved draft in root.tsx asks first", () => {
   });
 
   it("a path change that leaves the dialog open is flagged", () => {
-    const stays = mutate(real, /useEffect\(\(\) => \{\s*setLeaving\(undefined\);\s*\}, \[localPath\]\);/, "");
-    expect(scan(stays)).toEqual(["a path change does not clear the leave dialog"]);
+    const stays = mutate(real, /useEffect\(\(\) => \{\s*setLeaving\(undefined\);\s*pendingLeave\.current = undefined;\s*\}, \[localPath\]\);/, "");
+    expect(scan(stays)).toEqual(["a path change does not clear the leave dialog and the waiting exit"]);
+    const waits = mutate(real, /(setLeaving\(undefined\);)\s*pendingLeave\.current = undefined;(\s*\}, \[localPath\])/, "$1$2");
+    expect(scan(waits)).toEqual(["a path change does not clear the leave dialog and the waiting exit"]);
   });
 
   it("whitespace and line breaks inside a prop change no verdict", () => {

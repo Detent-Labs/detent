@@ -14,6 +14,7 @@ import { MigrationPlanScreen } from "./screens/MigrationPlanScreen.js";
 import { ToolsScreen } from "./screens/ToolsScreen.js";
 import { TemplatesScreen } from "./screens/TemplatesScreen.js";
 import { LeaveDraftDialog } from "./panels/confirmations.js";
+import type { DraftExit } from "./panels/DraftToolbar.js";
 import { activeControl } from "./panels/shared/dialogFocus.js";
 import type { AreaRootProps } from "../../shell/App.js";
 
@@ -79,13 +80,15 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
   const { route, navigate } = useAreaRoute<Route>("studio", localPath, matchRoute, routePath, go);
   const may = (roles: readonly string[]) => roles.some((role) => session.roles.includes(role));
 
-  // Whether the open draft carries unsaved changes, reported up from
+  // Whether the open draft holds a change that has not landed, reported up from
   // `ProcessSurface` via `EditScreen`'s `onDirtyChange` prop. A ref, not
   // `useState`: nothing here renders differently based on dirtiness, it is
   // read only inside event handlers.
   const dirtyRef = useRef(false);
+  // What an exit calls on the open draft, reported through `onFlushChange`.
+  const flushRef = useRef<DraftExit | undefined>(undefined);
   // The studio's area nav reserves no element for a draft control any more.
-  // Save, Test and Publish render directly in the header bar, inside
+  // Test and Publish render directly in the header bar, inside
   // `EditScreen`'s own tree, and the Checks tab's own count reports the state
   // the old area-nav Checks control used to carry (`studio-process-tabs`).
   useEffect(() => {
@@ -96,20 +99,34 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
   // control that held the focus when the exit was asked for.
   const [leaving, setLeaving] = useState<(() => void) | undefined>(undefined);
   const leaveTrigger = useRef<HTMLElement | null>(null);
-  // A browser Back or Forward under the open dialog settles the question.
+  // The exit waiting on a save. One slot: the last exit asked wins, so two presses
+  // cannot run two exits.
+  const pendingLeave = useRef<(() => void) | undefined>(undefined);
+  // A browser Back or Forward under the open dialog settles the question, and
+  // moving on during the wait settles the exit.
   useEffect(() => {
     setLeaving(undefined);
+    pendingLeave.current = undefined;
   }, [localPath]);
 
-  // The one question before leaving an open, unsaved draft. A clean draft, or
-  // any screen but the edit screen, leaves `dirtyRef` false and asks nothing.
+  // An exit from an open draft saves first, and asks only if that fails. A clean
+  // draft, or any screen but the edit screen, leaves `dirtyRef` false and asks
+  // nothing. `dirtyRef` stays first: `onDiscarded` lowers it before it navigates,
+  // and a flush there would write to a draft the author just deleted.
   const askLeave = (proceed: () => void) => {
     if (!dirtyRef.current) {
       proceed();
       return;
     }
     leaveTrigger.current = activeControl();
-    setLeaving(() => proceed);
+    pendingLeave.current = proceed;
+    void flushRef.current?.flush().then((result) => {
+      const exit = pendingLeave.current;
+      pendingLeave.current = undefined;
+      if (exit === undefined) return;
+      if (result.saved) exit();
+      else setLeaving(() => exit);
+    });
   };
 
   // Each exit from the draft goes through `askLeave`: in-area navigation, an
@@ -212,6 +229,7 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
             triggerRef={leaveTrigger}
             onCancel={() => setLeaving(undefined)}
             onConfirm={() => {
+              flushRef.current?.drop();
               setLeaving(undefined);
               leaving();
             }}
@@ -238,6 +256,10 @@ export function StudioArea({ session, locale, localPath, go, onUnauthorized, onL
               onDirtyChange={(d) => {
                 dirtyRef.current = d;
               }}
+              onFlushChange={(exit) => {
+                flushRef.current = exit;
+              }}
+              holdSaves={leaving !== undefined}
             />
           )}
           {route.name === "versions" && (

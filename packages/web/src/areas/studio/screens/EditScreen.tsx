@@ -9,7 +9,7 @@ import { t } from "../catalog.js";
 import { StepsRail } from "../panels/StepsRail.js";
 import { focusAfterStepRemove } from "../panels/stepRailRow.js";
 import { StepPage, type WalkNeighbour } from "../panels/StepPage.js";
-import { useDraftToolbarActions } from "../panels/DraftToolbar.js";
+import { useDraftToolbarActions, type DraftExit } from "../panels/DraftToolbar.js";
 import { ProcessHeaderBar } from "../panels/ProcessHeaderBar.js";
 import { ProcessTabRow, scrollTabIntoRow, tabDomId, tabPanelDomId } from "../panels/ProcessTabRow.js";
 import { ChecksRail } from "../panels/ChecksRail.js";
@@ -311,8 +311,14 @@ interface EditScreenProps {
   onUnauthorized: () => void;
   /** Reports the open draft's dirty state upward, so `root.tsx` can guard
    * navigation away from it (design.md: "Report dirtiness upward through one
-   * callback prop into a ref"). */
+   * callback prop into a ref"). It stays true while a save runs, so an exit waits
+   * for the answer even after the author took the text back by hand. */
   onDirtyChange?: (dirty: boolean) => void;
+  /** Reports what an exit from this screen calls: `flush` saves first, and `drop`
+   * gives the work up under a confirmed leave dialog. */
+  onFlushChange?: (exit: DraftExit | undefined) => void;
+  /** The leave dialog stands. A healed retry must not land what it says it will drop. */
+  holdSaves?: boolean;
 }
 
 interface ProcessSurfaceProps {
@@ -345,6 +351,8 @@ interface ProcessSurfaceProps {
   actorId: string;
   onUnauthorized: () => void;
   onDirtyChange?: (dirty: boolean) => void;
+  onFlushChange?: (exit: DraftExit | undefined) => void;
+  holdSaves?: boolean;
 }
 
 /**
@@ -374,7 +382,7 @@ function focusTabButton(tab: ProcessTab): void {
  * component state, the data sources panel fetched its list keys on mount, and
  * the field matrix holds its selected cell.
  */
-function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, actorId, onUnauthorized, onDirtyChange }: ProcessSurfaceProps) {
+function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles, go, initialRevision, initialLayout, loadedBaseVersion, loadedCanPublish, navigate, actorId, onUnauthorized, onDirtyChange, onFlushChange, holdSaves }: ProcessSurfaceProps) {
   const { draft, mutate, validation, replace, contentLocale } = useDraft();
   const baseLocale = draft.baseLocale ?? "en";
   const [saveState, setSaveState] = useState<DraftSaveState>(() => initialSaveState(initialRevision, initialLayout));
@@ -467,26 +475,20 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // state DraftToolbar tracks nowhere today.
   const [lastSavedAt, setLastSavedAt] = useState<Date | undefined>(undefined);
 
-  // Reports dirtiness upward for `root.tsx`'s navigation guard (design.md:
-  // "Report dirtiness upward through one callback prop into a ref"). The
-  // cleanup fires on unmount AND on every dependency change, so a route
-  // change away from `edit` can never leave a stale `true` behind.
   const dirtyNow = isDraftDirty(draft, savedBody, saveState.layout, savedLayout);
   // The first dirty render retires the offer, during render, the way React
   // adjusts state from state.
   const nextJustPublished = justPublishedAfter(justPublished, dirtyNow);
   if (nextJustPublished !== justPublished) setJustPublished(nextJustPublished);
-  useEffect(() => {
-    onDirtyChange?.(dirtyNow);
-    return () => onDirtyChange?.(false);
-  }, [dirtyNow]);
 
   // A 401 ends the session and unmounts this screen. A dirty draft writes
   // its stash first, so the same actor can restore the work on the next
-  // visit (`studio-app`). Every consumer reads this through `useFail`, which
-  // holds it in a ref, so a new identity on each render re-runs no effect.
+  // visit (`studio-app`). A copy that stands keeps its place: the store has one
+  // slot, and the copy holds the larger work. Every consumer reads this through
+  // `useFail`, which holds it in a ref, so a new identity on each render re-runs
+  // no effect.
   const stashOnUnauthorized = () => {
-    if (dirtyNow) stashDraft(tabStorage(), actorId, processId, { body: draft, layout: saveState.layout, revision: saveState.revision });
+    if (dirtyNow && stash === undefined) stashDraft(tabStorage(), actorId, processId, { body: draft, layout: saveState.layout, revision: saveState.revision });
     actions.drop();
     onUnauthorized();
   };
@@ -498,13 +500,25 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     clearStash(tabStorage(), actorId, processId);
     setStash(undefined);
   };
-  // Restoring over unsaved work asks first. The press takes the focus to the
-  // dialog, so the opener is read from the press.
+  // A flush can save over the stored draft under the notice (an exit, Publish,
+  // naming or restoring a save point). The copy stays, and its revision follows the
+  // answer, so a 409 on a restored copy still means somebody else moved the draft.
+  const [savedUnderNotice, setSavedUnderNotice] = useState(false);
+  const followStash = (revision: number) => {
+    if (stash === undefined) return;
+    const moved = { ...stash, revision };
+    stashDraft(tabStorage(), actorId, processId, moved);
+    setStash(moved);
+    setSavedUnderNotice(true);
+  };
+  // Restoring over a change made since the draft opened asks first, saved or not,
+  // since the restore replaces it. The press takes the focus to the dialog, so the
+  // opener is read from the press.
   const [restoreAsked, setRestoreAsked] = useState(false);
   const restoreTrigger = useRef<HTMLElement | null>(null);
   const askRestore = () => {
     if (stash === undefined || requestRunning) return;
-    if (dirtyNow) {
+    if (dirtyNow || savedUnderNotice) {
       restoreTrigger.current = activeControl();
       setRestoreAsked(true);
     } else {
@@ -970,18 +984,17 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     onSavedBodyChange: (body: Draft) => setSavedBody(structuredClone(body)),
     savedLayout,
     onSavedLayoutChange: setSavedLayout,
-    // A successful save and a discarded draft each make the stash stale. A
-    // discarded draft restarts its revision at 0, so a stale stash could
-    // later restore over a new draft that reached the same revision.
-    onSaved: () => {
+    onSaved: (revision) => {
       setLastSavedAt(new Date());
-      dropStash();
+      followStash(revision);
     },
     publishResult,
     onPublishResult: (result: PublishResult | null) => {
       setPublishResult(result);
       setJustPublished(result !== null);
     },
+    // A discarded draft restarts its revision at 0, so a stale stash could
+    // later restore over a new draft that reached the same revision.
     onDiscarded: () => {
       dropStash();
       onDirtyChange?.(false);
@@ -990,6 +1003,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     onUnauthorized: stashOnUnauthorized,
     onCanPublishChange: setReloadedCanPublish,
     noticeStands: stash !== undefined,
+    holdSaves,
     // The store has one slot, and a copy that stands holds the larger work.
     keepCopy: (copy) => {
       if (stash === undefined) stashDraft(tabStorage(), actorId, processId, copy);
@@ -997,6 +1011,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     // The draft changed, so the Versions offer goes. The selection drops what went,
     // or the canvas bar would count a step the draft no longer holds.
     onRestored: (record) => {
+      followStash(record.revision);
       setJustPublished(false);
       setSelectedStepIds((selected) => selectionAfterRestore(selected, record.body));
       setSelectedPathId(undefined);
@@ -1005,6 +1020,23 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // A save's answer writes its revision over the draft's. The restore notice
   // waits for the answer, or a restore would drop the stored revision.
   const requestRunning = actions.saving || actions.publishing;
+
+  // Reports upward for `root.tsx`'s exits (design.md: "Report dirtiness upward
+  // through one callback prop into a ref"). A running save counts, so an exit waits
+  // for its answer even after the author took the text back by hand. The cleanup
+  // fires on unmount AND on every dependency change, so a route change away from
+  // `edit` can never leave a stale `true` behind.
+  const changeNotLanded = dirtyNow || actions.saving;
+  useEffect(() => {
+    onDirtyChange?.(changeNotLanded);
+    return () => onDirtyChange?.(false);
+  }, [changeNotLanded]);
+  // Both keep one identity, so this reports once a mount.
+  const { flush, drop } = actions;
+  useEffect(() => {
+    onFlushChange?.({ flush, drop });
+    return () => onFlushChange?.(undefined);
+  }, [flush, drop]);
 
   const counts = processTabCounts(draft, validation.issues);
   // The Checks tab's own count reads this color when the draft's worst open
@@ -1174,7 +1206,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     <PublishedFieldIdsProvider processId={processId} token={token} baseVersion={changesBaseVersion}>
       <main {...stylex.props(styles.studioScreen, styles.studioEditScreen)}>
         {/* Renders on both surfaces. Only its process label input and its
-            "Editing" note read `structureActive`. Test, Publish, Save and the
+            "Editing" note read `structureActive`. Test, Publish and the
             menu stand whichever surface is open (`studio-process-tabs`). */}
         <ProcessHeaderBar
           revision={saveState.revision}
@@ -1182,6 +1214,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
           lastSavedAt={lastSavedAt}
           publishResult={publishResult}
           conflict={saveState.conflict}
+          noticeStands={stash !== undefined}
           actions={actions}
           canPublish={canPublish}
           baseVersion={changesBaseVersion}
@@ -1413,7 +1446,7 @@ type EditLoadState =
   | { kind: "error"; message: string }
   | { kind: "loaded"; record: DraftRecord };
 
-export function EditScreen({ processId, formStepId, tab, view, stepId, token, roles, go, navigate, actorId, onUnauthorized, onDirtyChange }: EditScreenProps) {
+export function EditScreen({ processId, formStepId, tab, view, stepId, token, roles, go, navigate, actorId, onUnauthorized, onDirtyChange, onFlushChange, holdSaves }: EditScreenProps) {
   const [state, setState] = useState<EditLoadState>({ kind: "loading" });
   const fail = useFail(onUnauthorized, (e) => setState({ kind: "error", message: describeCaughtError(e) }));
 
@@ -1488,6 +1521,8 @@ export function EditScreen({ processId, formStepId, tab, view, stepId, token, ro
         actorId={actorId}
         onUnauthorized={onUnauthorized}
         onDirtyChange={onDirtyChange}
+        onFlushChange={onFlushChange}
+        holdSaves={holdSaves}
       />
     </DraftProvider>
   );

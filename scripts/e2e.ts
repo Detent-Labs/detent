@@ -6,7 +6,7 @@
  *   2. Refuse to start when the production web build is missing.
  *   3. Drop and recreate the `_e2e` database, so every run starts clean.
  *   4. Seed it (scripts/seed.ts, as a child, with SEED_ALLOW=1).
- *   5. Add the suite's account and its changed draft (design D3).
+ *   5. Add the suite's account and its two drafts (design D3).
  *   6. Start the engine on an OS-assigned port and read that port back from
  *      its own startup log line.
  *   7. Run `bunx playwright test` against it.
@@ -41,6 +41,8 @@ const ENGINE_STARTUP_DEADLINE_MS = 30_000;
 const E2E_EMAIL = "e2e-operator@example.test";
 const E2E_LAPTOP_INVENTORY_PROCESS_ID = "proc_laptop_inventory" as ProcessId;
 const E2E_DRAFT_LABEL = "E2E draft";
+const E2E_WRITES_PROCESS_ID = "proc_e2e_writes" as ProcessId;
+const E2E_WRITES_DRAFT_LABEL = "E2E writes";
 
 /**
  * Every role a flow needs across the four areas, plus `employee` — the role
@@ -95,10 +97,28 @@ async function runSeed(e2eUrl: string): Promise<void> {
   if (code !== 0) throw new Error(`scripts/seed.ts exited with code ${code}`);
 }
 
+/** A copy of a body's two steps under other ids and names, so the canvas removal flow has steps to remove and the draft keeps a process that runs. */
+function spareSteps(steps: readonly Record<string, unknown>[], locale: string): Record<string, unknown>[] {
+  const [first, last] = steps as [{ paths: Record<string, unknown>[] } & Record<string, unknown>, Record<string, unknown>];
+  const lastId = "step_e2e_spare_two";
+  return [
+    {
+      ...first,
+      id: "step_e2e_spare_one",
+      key: "spare_one",
+      label: { [locale]: "Spare One" },
+      paths: first.paths.map((path) => ({ ...path, id: "path_e2e_spare", key: "spare", to: lastId })),
+    },
+    { ...last, id: lastId, key: "spare_two", label: { [locale]: "Spare Two" } },
+  ];
+}
+
 /**
- * Design D3: one account holding every role the flows need, and one
- * draft of Laptop Inventory whose body differs from the published v1 in its
- * process label only. Calls `createUser` and `saveDraft` directly, the way
+ * Design D3: one account holding every role the flows need, and two drafts. One
+ * is a draft of Laptop Inventory whose body differs from the published v1 in its
+ * process label only. No flow writes it, so publish.e2e.ts finds it unedited. The
+ * other, on a process with no published version, takes every flow that saves.
+ * Calls `createUser` and `saveDraft` directly, the way
  * `scripts/seed.ts` calls `publishBody` directly.
  *
  * Both functions default to the shared `sql` client in `src/engine/store.ts`,
@@ -114,7 +134,11 @@ async function addSuiteFixtures(password: string): Promise<void> {
   const raw = JSON.parse(readFileSync(new URL("../examples/laptop-inventory.json", import.meta.url), "utf-8")) as {
     definition?: Record<string, unknown>;
   } & Record<string, unknown>;
-  const body = (raw.definition ?? raw) as { label: Record<string, string>; baseLocale: string } & Record<string, unknown>;
+  const body = (raw.definition ?? raw) as {
+    label: Record<string, string>;
+    baseLocale: string;
+    workflow: { steps: Record<string, unknown>[] } & Record<string, unknown>;
+  } & Record<string, unknown>;
   const draftBody = { ...body, label: { ...body.label, [body.baseLocale]: E2E_DRAFT_LABEL } };
 
   await saveDraft(E2E_LAPTOP_INVENTORY_PROCESS_ID, {
@@ -123,6 +147,18 @@ async function addSuiteFixtures(password: string): Promise<void> {
     revision: 0,
     updatedBy: userId,
     baseVersion: 1,
+  });
+
+  await saveDraft(E2E_WRITES_PROCESS_ID, {
+    body: {
+      ...body,
+      key: "e2e_writes",
+      label: { [body.baseLocale]: E2E_WRITES_DRAFT_LABEL },
+      workflow: { ...body.workflow, steps: [...body.workflow.steps, ...spareSteps(body.workflow.steps, body.baseLocale)] },
+    },
+    layout: {},
+    revision: 0,
+    updatedBy: userId,
   });
 }
 
@@ -290,7 +326,7 @@ async function main(): Promise<number> {
   console.log("Seeding...");
   await runSeed(e2eUrl);
 
-  console.log("Adding the suite account and draft...");
+  console.log("Adding the suite account and drafts...");
   const password = crypto.randomUUID();
   process.env.DATABASE_URL = e2eUrl;
   await addSuiteFixtures(password);
