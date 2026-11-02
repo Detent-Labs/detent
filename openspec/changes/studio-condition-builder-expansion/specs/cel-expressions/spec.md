@@ -6,10 +6,7 @@
 
 The authoring-time type check SHALL admit the four ordering comparators,
 `<`, `<=`, `>` and `>=`, between two `string` operands. It SHALL admit them
-between a `string` operand and a string literal too. A field with `format: "date"` or
-`format: "datetime"` stores an ISO-8601 text, whose lexical order is its
-calendar order. The studio's date ordering operators depend on this
-admission.
+between a `string` operand and a string literal too. A field with `format: "date"` stores `YYYY-MM-DD`, whose lexical order is its calendar order. A `datetime` value may carry seconds and a zone offset, so its lexical order is not its calendar order. The studio's date ordering operators depend on this admission.
 
 #### Scenario: Two date fields compare in order
 

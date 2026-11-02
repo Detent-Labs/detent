@@ -9,13 +9,17 @@ rows, with no group inside it. A control on its head says how they combine:
 "any of these" or "all of these". The builder SHALL offer "+ Add group"
 beside "+ Add row", and "+ Add row to this group" inside a group.
 
-A new group SHALL start with one fresh row, on the joiner opposite to the one
-it joins. The gutter joiner inside a group SHALL flip the group's own joiner.
+A new group SHALL start with one fresh row, on the joiner opposite to its parent's. The gutter inside a group SHALL print the group's joiner as a word and no control. The head's control alone sets it.
 
 #### Scenario: A group's remove control names the group
 
 - **WHEN** an author reads a group's remove control
 - **THEN** it reads "Remove group"
+
+#### Scenario: Removing a group's last row removes the group
+
+- **WHEN** an author removes the one row of a group
+- **THEN** the group goes too
 
 #### Scenario: A new group starts with one row on the opposite joiner
 
@@ -73,7 +77,7 @@ condition's own operator SHALL flatten on either side.
 
 #### Scenario: A group of one complete row writes that row bare
 
-- **WHEN** a group holds one complete row and one unfinished row
+- **WHEN** a group holds one complete comparison row and one unfinished row
 - **THEN** the written text carries the complete row with no parentheses
   around it
 
@@ -84,8 +88,7 @@ command under the value editor swaps the two and empties the value. It reads
 "Compare with a field instead" over a value and "Type a value instead" over a
 field.
 
-The field picker SHALL list the field and called-process operands of the
-row's operand's CEL type, the operand itself excluded. A list operand, and an
+The field picker SHALL list the field and called-process operands of the row's operand's CEL type and `format`. The operand itself stays out. A list operand, and an
 operand with no candidate, SHALL offer no command.
 
 #### Scenario: A date compares against another date field
@@ -105,8 +108,13 @@ operand with no candidate, SHALL offer no command.
 #### Scenario: The picker offers fields of the operand's type only
 
 - **WHEN** an author presses "Compare with a field instead" on a number row
-- **THEN** the picker lists the other number fields and no text, date, list
-  or context operand
+- **THEN** the picker lists the other number fields of the same CEL type
+- **AND** it lists no text, date, list or context operand
+
+#### Scenario: A date row's picker lists date fields alone
+
+- **WHEN** an author presses "Compare with a field instead" on a date row
+- **THEN** the picker lists the other date fields and no text or date-time field
 
 #### Scenario: A context operand on the right stays a raw row
 
@@ -153,9 +161,7 @@ row.
 
 ### Requirement: The builder reads the condition as a sentence
 
-Under the rows the builder SHALL print the condition in words, in place of
-its CEL. Each complete row SHALL read as one clause. The joiner SHALL read
-"and" or "or".
+Under the rows the builder SHALL print the condition in words, in place of its CEL. Each complete comparison row SHALL read as one clause of its operand's label, the operator's words and the value. A list row puts the value first. The joiner SHALL read "and" or "or".
 
 A closed list's value SHALL print as its label, and a
 boolean's as "yes" or "no". A number's SHALL print as a formatted number, and
@@ -163,8 +169,7 @@ a date's as a formatted date. Free text SHALL stand in curly quotes. A field
 value SHALL print as that field's label.
 
 A list clause SHALL read "{value} is one of {field}" or "{value} is not one
-of {field}". A group of two SHALL read "either A or B" or "both A and B". Three
-or more SHALL read "any of A, B or C" or "all of A, B and C". With no row
+of {field}". A group of two SHALL read "either A or B" or "both A and B". Three or more SHALL read "any of A, B or C" or "all of A, B and C". A group clause with a clause after it SHALL end in a comma. With no row
 and no stored condition, the
 sentence SHALL say that the condition always matches.
 
@@ -293,22 +298,20 @@ A raw row SHALL gain parentheses when its level holds a second row.
   `(data.department == "sales" || (data.region == "eu" && data.tier == "gold")) && data.amount > 1000.0`
 - **THEN** the builder shows a group holding a comparison row and a raw row
   whose text reads `data.region == "eu" && data.tier == "gold"`
-- **AND** the sentence reads "Either Department is Sales or a hand-written
-  rule and Amount is greater than 1,000."
+- **AND** the sentence reads "Either Department is Sales or a hand-written rule, and Amount is greater than 1,000."
 
 ### Requirement: Operators and value editors follow the operand type
 
 The operators a row offers SHALL follow the operand's CEL type and format. A
 number offers six: is, is not, is less than, is at most, is greater than, is
-at least. A date offers six: is, is not, is before, is on or before, is
-after, is on or after. A date-time reads "is at or before" and "is at or
-after" for the two bounds.
+at least. A date offers six: is, is not, is before, is on or before, is after, is on or after. A date-time offers is and is not.
 
 Other text and a boolean offer is and is not. A list offers includes and
 does not include. No operator prints a CEL symbol.
 
-The value editor SHALL follow the operand's type and format, as the
-scenarios state.
+The value editor SHALL follow the operand's type and the field's own declared `format`. A field declaring options in the body SHALL show those options by label and write the option value. A boolean SHALL offer yes, no and an empty choice. A row on a boolean operand starts on the empty choice. It stays incomplete until the author picks yes or no. Picking "No" from the empty choice SHALL write the row.
+
+A number SHALL use a native number input, and a `format: "date"` or `format: "datetime"` field SHALL use the matching native input. `instance.status` SHALL offer the engine's instance statuses. A field bound to a data source and `actor.roles` SHALL take free text, since no studio route resolves those values. A field value takes the field picker in place of the editor.
 
 #### Scenario: A number operand offers ordering operators
 
@@ -331,6 +334,7 @@ scenarios state.
 - **WHEN** a developer picks a `{type: "string", format: "date"}` field
 - **THEN** the value editor is a native date input
 
+<!-- The heading keeps the live wording, which a MODIFIED block must match; the operator now reads "includes". -->
 #### Scenario: A list operand offers contains
 
 - **WHEN** a developer picks `actor.roles` as the operand
@@ -369,11 +373,10 @@ scenarios state.
   before", "is after" and "is on or after"
 - **AND** "is on or before" writes `<=`
 
-#### Scenario: A date-time operand reads at or before
+#### Scenario: A date-time operand offers equality only
 
 - **WHEN** a developer picks a `{type: "string", format: "datetime"}` field
-- **THEN** the operator select reads "is at or before" and "is at or after"
-- **AND** the date's "on or" words do not appear
+- **THEN** the row offers "is" and "is not" and no ordering operator
 
 #### Scenario: A person field offers equality only
 
@@ -390,10 +393,9 @@ expression. A group with no complete row counts as incomplete too, marked
 the same way with its own flag. The builder SHALL never emit a fragment that
 fails to parse.
 
-When rows exist and none contributes, the builder SHALL write nothing, and
-the stored expression stands. Removing a row, inside a group or not, is the
-one action that can remove the stored expression. While no row contributes,
-the sentence SHALL read the condition the draft holds and say it stays.
+When rows exist and none contributes, the builder SHALL write nothing, and the stored expression stands. Removing a row, inside a group or not, is the one action that can remove that expression. A removal that leaves no complete row SHALL remove the condition, the same as clearing the text input. A removal at a site whose draft has no condition SHALL leave the draft as it was.
+
+While no row contributes, the sentence SHALL read the condition the draft holds. It SHALL say the condition stays until the author finishes the row. A site that holds nothing SHALL ask the author to finish a row instead.
 
 #### Scenario: A half-filled row does not reach the draft
 
@@ -443,7 +445,7 @@ the sentence SHALL read the condition the draft holds and say it stays.
 
 #### Scenario: Removing the last row inside a group removes the condition
 
-- **WHEN** a guard holds one group with one complete row and nothing else
+- **WHEN** the builder shows one group holding one complete row and nothing else
 - **AND** an author removes that row
 - **THEN** the guard goes away, the same as clearing the text input
 
@@ -486,7 +488,7 @@ sentence around the condition.
 
 The studio SHALL read a stored condition as one sentence, for a place that
 lists conditions without a builder. The sentence SHALL join the complete rows'
-clauses as the builder's own sentence does, a group's clause included. It SHALL start with a capital letter and end with a period. A row
+clauses as the builder's own sentence does, a group's clause included. It SHALL start with a capital letter, unless it opens on a value, and end with a period. A row
 the builder cannot read SHALL read as the catalog's phrase for it, never as
 CEL.
 
@@ -509,5 +511,9 @@ Source that does not parse, and source with no complete row, SHALL read
 
 - **WHEN** a guard reads `data.end_date > data.start_date` over the fields
   "End date" and "Start date"
-- **THEN** the Read by row of either field reads "End date is after Start
-  date."
+- **THEN** the Read by row of either field reads "End date is after Start date."
+
+#### Scenario: A list guard keeps its value's case
+
+- **WHEN** a guard reads `"vip" in data.tags` and the choice `vip` carries the label "vip"
+- **THEN** its sentence reads "vip is one of Tags."

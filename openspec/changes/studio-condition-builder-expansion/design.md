@@ -15,14 +15,14 @@ field-valued row, with its own model and no "or".
 Three readers outside the builder share the clause words. They are the
 sentence under the rows and two functions. The function `readerSentence`
 reads the Read by and Asked on rows. The function `guardPhrase` reads the
-Map's way out line and the form preview's note. All of them walk
-`summarizeCondition`. A clause change lands
-in every place at once.
+Map's way out line and the form preview's note. All of them walk `summarizeCondition`. A clause change lands in every place at once.
 
-The CEL check admits an ordering comparison between two `string` operands.
-It admits one between a `string` operand and a string literal too. A date
-field stores an ISO-8601 text, so lexical order is calendar order. The check
-also admits `!("x" in actor.roles)` and `(a || b) && c`. The scope below
+The rule builder's `ruleSentence` shares `summarizeValue`, so a date literal
+prints the same way there.
+
+The CEL check admits an ordering comparison between two `string` operands. It admits one between a `string` operand and a string literal too. A date field stores `YYYY-MM-DD`, so lexical order is calendar order. A date-time does not: its text may carry seconds and a zone offset.
+
+The check also admits `!("x" in actor.roles)` and `(a || b) && c`. The scope below
 writes nothing the check rejects. Probed on 2026-11-02 against
 `checkAgainstFields`.
 
@@ -53,6 +53,9 @@ in the merged PR.
 - A literal list ("Status is one of Approved, Pending"). A group of "or" rows
   covers it.
 - Negation of a group or of a whole condition.
+- Ordering over a date-time. Its stored text may carry seconds and a zone
+  offset, so lexical order is not calendar order. The CEL check offers no
+  zone-normalised comparison.
 - Text operators (starts with, contains a substring).
 - Folding the rule builder onto the expanded condition builder. The rule
   builder keeps its own model. It is now the narrower of the two. A later
@@ -105,9 +108,7 @@ The three layouts:
   are the machine value the owner asked to keep off the page. A screen
   reader hears one paragraph of controls with no row boundary.
 
-One difference from the mockup: the mockup's sentence puts a comma before a
-group ("1,000, and either"). The join phrase stays "{left} and {right}", with
-no comma. The sentence code then stays one fold.
+The sentence follows the mockup on one point. A group clause with a clause after it ends in a comma, as in "either A or B, and C". A comma-free join would read as "either A, or B and C". A group clause with nothing after it takes no comma.
 
 ## Decisions
 
@@ -129,8 +130,7 @@ A group holds leaves only. That is the one-level limit, in the type. The
 value side is a union, as the rule builder's already is. No row can carry a
 literal and a field at once.
 
-The function `summarizeValue` takes the literal and the operand in place of
-a row. `ruleLogic.ts` then calls it with its own literal. The `!in` operator is a comparator of its own. The row's select lists it beside
+The function `summarizeValue` takes the literal and the operand in place of a row. `ruleLogic.ts` then calls it with its own literal. The type `RowValue` replaces `ruleLogic.ts`'s `RuleValue`, which becomes an alias of it. The `!in` operator is a comparator of its own. The row's select lists it beside
 "includes", and the writer and reader treat it as one form.
 
 Alternatives: a `field?: string` beside `value`, which gives two fields for
@@ -152,8 +152,7 @@ Each conjunct reads as follows.
 - A `!_` node over a bare `bool` operand reads as `== false`, the twin of
   today's bare operand reading as `== true`.
 - A comparison whose right side is no literal may read as a field value.
-  The right side must be a member path naming a field or called-process
-  operand. That operand must have the left operand's CEL type. Any
+  The right side must be a member path naming a field or called-process operand other than the left one. That operand must have the left operand's CEL type and format. Any
   other right side leaves the node a raw row, a context operand included.
 - Everything else reads as today.
 
@@ -205,12 +204,13 @@ that count in place of `rows.length`.
 |---|---|
 | `double`, `int` | is, is not, is less than, is at most, is greater than, is at least |
 | `string` with `format: "date"` | is, is not, is before, is on or before, is after, is on or after |
-| `string` with `format: "datetime"` | is, is not, is before, is at or before, is after, is at or after |
+| `string` with `format: "datetime"` | is, is not |
 | `string` otherwise, `bool` | is, is not |
 | `list<string>` | includes, does not include |
 
-The four date words map onto `<`, `<=`, `>`, `>=`. The words are catalog keys
-of their own, picked by the operand's format. A number keeps its words. The
+The four date words map onto `<`, `<=`, `>`, `>=`. The words are catalog keys of their own, picked by the operand's format. A number keeps its words.
+
+A date-time offers no ordering. Its stored text may carry seconds and a zone, so lexical order is not its calendar order. The CEL text input stays the escape hatch for it. The
 rule builder keeps calling `operatorsFor` with the type alone and gets what
 it got.
 
@@ -221,16 +221,13 @@ type already picks. Under the editor stands one authoring command. It reads
 "Compare with a field instead" over a literal and "Type a value instead" over
 a field. Pressing it swaps the editor and empties the value.
 
-The field picker lists the operands of the fields and the called process
-groups with the row's operand's CEL type. The operand itself stays out. A
+The field picker lists the field and called-process operands with the row's operand's CEL type and format. A date row lists date fields alone, and a person row person fields alone. The operand itself stays out. A
 row on a list operand offers no command, since `in` takes a literal. A row
 whose operand has no candidate offers no command either.
 
 The date editor stays the native date input. A date in a sentence prints as a
 formatted date. `2026-12-31` reads "Dec 31, 2026", through
-`Intl.DateTimeFormat` in the catalog's English and in UTC. A date-time adds
-the time. A stored literal the formatter cannot parse prints as its stored
-text.
+`Intl.DateTimeFormat` in the catalog's English and in UTC. A zoneless date-time literal reads its components as UTC and prints them as written. The browser's zone never shifts them. A literal carrying a zone prints as its stored text. A stored literal the formatter cannot parse prints as its stored text too.
 
 ### D7. The clauses
 
@@ -241,15 +238,16 @@ text.
 | a field value | the other field's label, in place of the literal |
 | a date operand's `<` and `>` | "F is before V", "F is after V" |
 | a date operand's `<=` and `>=` | "F is on or before V", "F is on or after V" |
-| a date-time operand's `<=` and `>=` | "F is at or before V", "F is at or after V" |
+
 | a group of one complete leaf | that leaf's clause |
 | an or-group of two | "either A or B" |
 | an and-group of two | "both A and B" |
 | an or-group of three or more | "any of A, B or C" |
 | an and-group of three or more | "all of A, B and C" |
 
-A group's clause then joins its neighbours through the condition's own join
-phrase, as any clause does. The list clause puts the value first. The
+A group's clause joins its neighbours through the condition's own join phrase, with one exception. A group clause with a clause after it joins through `condition.join.andAfterGroup`, "{left}, and {right}". Under "or" it joins through `condition.join.orAfterGroup`, "{left}, or {right}". The fold over the clauses carries a flag per clause saying whether it is a group. The rule builder passes no group, so its fold stays as it is.
+
+A sentence that opens on a list clause keeps the value as written. The capital applies only when the first clause opens on a label or a group word. The list clause puts the value first. The
 sentence then conjugates nothing against the field's label. That closes
 SENTENCE-2. The row's operator select still reads "includes" and "does not
 include", since a select is a control word.
@@ -277,18 +275,15 @@ Markup: the top `<ol>` as today. A group is one `<li>` holding a `<div>`
 head and a nested `<ol>`. The nested list takes a 16px indent and a 2px left
 rule in the border role. That is the note's own idiom, on the muted ground.
 
-Inner rows take the paper ground. A row then stays one tone darker than the ground
-under it at both levels. An incomplete group takes the dashed advisory
+Each level steps one neutral role from the ground under it. A top row sits on ledger over the paper page. An inner row sits on paper over the group's ledger. The step reverses direction between light and dark, and both read as a distinct row. An incomplete group takes the dashed advisory
 border an incomplete row takes. No box lifts, and no radius appears.
 
 The group's joiner select carries the name "how the group's rows combine". It
-lists "any of these" and "all of these". The gutter joiner inside a group
-flips the group's joiner, the way the top-level one flips the condition's.
+lists "any of these" and "all of these". Inside a group the gutter prints the group's joiner as a word and no control. The head's select is the one way to set it.
 Every control keeps an accessible name. The remove control on a group reads
 "Remove group".
 
-"+ Add group" adds a group with one fresh row inside. The author never faces
-an empty group. "+ Add row to this group" adds a row inside.
+"+ Add group" adds a group with one fresh row inside. The author never faces an empty group. "+ Add row to this group" adds a row inside. Removing a group's last row removes the group; the removal counts the group and the row. All three components stay in `ConditionBuilder.tsx`. The group row's catalog keys take the prefix `condition.groupRow.`; `condition.group.*` stays the picker's headings.
 
 Focus after a removal lands by DOM order among the remove controls, the rule
 `removeFocusIndex` already states. The control now at the pressed index
@@ -316,9 +311,13 @@ it reaches the builder.
 - [The list operator's word changes from "contains" to "includes"] → The
   spec's scenarios change with it. No stored text changes, since the word
   is a label.
-- [The `Row` type change ripples into `ruleLogic.ts`] → `summarizeValue`
-  takes the literal and the operand. The rule builder's behaviour stays, and
-  its tests prove it.
+- [The `Row` type change ripples into `ruleLogic.ts`] → `summarizeValue` takes the literal and the operand. The rule builder's sentence prints a date literal formatted too; its rows, operators and tests stay.
+- [A field-valued row adds a second label-wide select and a group indents
+  16px. STEP-1's overflow at 1280px grows] → The value picker shares
+  `conditionControl`'s `maxWidth: 100%`. The browser check runs at 1280px.
+- [Nested rows repeat the names field, operator and value (SENTENCE-9)] →
+  The value-side picker carries the name "field to compare with". SENTENCE-9
+  stays open.
 - [A date literal of another shape than `YYYY-MM-DD`] → The sentence prints
   the stored text. The native input shows it empty, as today.
 - [A right-side member path the picker would not offer, such as a context
@@ -336,6 +335,4 @@ as rows and raw rows, and the text input reads it as text.
 
 ## Open Questions
 
-None that would change the specs or the tasks. The deferrals stand in
-Non-Goals. They are emptiness checks, a literal list, negated groups, text
-operators, and the rule builder's fold.
+None that would change the specs or the tasks. The deferrals stand in Non-Goals. They are emptiness checks, a literal list, negated groups, text operators, date-time ordering, and the rule builder's fold.
