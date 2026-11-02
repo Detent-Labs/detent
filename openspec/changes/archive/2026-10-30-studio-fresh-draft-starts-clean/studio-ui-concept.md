@@ -418,6 +418,9 @@ change list. This file carries the full design record with the artifact
 links. The change `studio-ui-concept-record` brought both into the
 repository.
 
+Stage 64 closed on 2026-11-02. Its entry now stands in
+`docs/roadmap-history.md`, and this file moved into the archive of change 1.
+
 ## 10. Artifacts
 
 The seven artifacts are private and date from 2026-10-30. They hold the only
