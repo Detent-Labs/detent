@@ -424,19 +424,6 @@ word. `ROADMAP.md` carries stage-by-stage status.
   that requirement back out. Deferred 2026-09-02: the sweep touches four areas
   and every one of their capability specs, and the measured defect sat on the
   publish path.
-- **The header reads "Unsaved changes" after a `PUT` that answered 200.**
-  Observed on the studio edit screen. The path looks correct on the page: a
-  defined save result makes `doSave` call `onSavedBodyChange(draft)`,
-  `EditScreen.tsx` clones that body into `savedBody`, and `dirtyNow` compares
-  the two by serializing both. So either something re-dirties the draft after
-  the save, or the save returned nothing, and both readings need a
-  reproduction. It is a dirty-state failure in `ProcessSurface`, not a publish
-  failure: it shares no cause with the three defects
-  `studio-publish-gate-and-report` fixed, and no file with them but
-  `EditScreen.tsx`. Deferred 2026-09-02, at a cost of one wasted `PUT`: a
-  permanently dirty draft makes the publish dialog always state its
-  unsaved-changes sentence and always save first, which gives no wrong
-  result.
 - **A Name column on the admin area's Users screen.** A brainstorming session
   settled the shape on 2026-08-23: a dedicated Name column before Email,
   display only, with no editor on the screen. The API side is already done.
@@ -2272,6 +2259,52 @@ to later changes. The DIALOG tag is local to this section.
 
   Upgrade entry: a `reach.isInitial`-style fact on the selection and one catalog
   sentence.
+
+## Open from studio-draft-autosave-and-save-points (needs its own OpenSpec change)
+
+The change made the draft save itself and added save points. It left five
+points to later changes. The AUTOSAVE tag is local to this section.
+
+- **AUTOSAVE-1: a lost answer, then a hand-revert, leaves the server ahead of the
+  screen.** A save commits and its answer is lost on the network. The author then
+  types the text back to the last saved version. The draft reads clean, so the
+  state line reads saved and an exit asks nothing, while the stored draft holds
+  the lost text. Publish would mint that text. Risk (Medium): an author publishes
+  a body the screen no longer shows.
+
+  Upgrade entry: when the draft turns clean while `unconfirmed` holds a pair,
+  read the stored draft once and adopt or resend. The effect is in
+  `panels/DraftToolbar.tsx`, the comparison in `screens/draftAutosaveLogic.ts`.
+  The next change the author makes heals it.
+- **AUTOSAVE-2: a 401 under a standing restore notice drops the change made
+  under it.** The stash has one slot, and the kept copy stays. The change typed
+  after the notice appeared goes, by design. Risk (Low): the kept copy is the
+  larger piece of work, and the lost change is a few edits.
+
+  Upgrade entry: a second slot in `draft/draftStash.ts`, or a merge of the two
+  copies. The rule is `stashOnUnauthorized` in `screens/EditScreen.tsx`.
+- **AUTOSAVE-3: a browser Back during a backoff keeps a copy only in the tab.**
+  The unmount writes the stash to the tab's `sessionStorage`. Closing that tab
+  loses the copy. Risk (Low): the author who closes the tab after a Back during
+  a failing network loses the change.
+
+  Upgrade entry: write the copy to `localStorage` under the actor's key, in
+  `draft/draftStash.ts`, and expire it.
+- **AUTOSAVE-4: a restore offers no preview.** The design left out a diff of a
+  save point against the draft. Risk (Low): the restore keeps the current work
+  as a point, so a wrong restore is reversible. An author still restores to
+  learn what the point holds.
+
+  Upgrade entry: a diff through `describeChanges` in the restore dialog of
+  `panels/SavePointsPanel.tsx`.
+- **AUTOSAVE-5: Try again loses its focus landing where `blur` fires on removal.**
+  The focus rule reads a ref that Try again's `blur` clears. A browser that fires
+  `blur` when a focused button leaves the page clears the ref first, and the
+  state line then takes no focus. Only Chromium was measured. Risk (Low): a
+  keyboard user in another browser loses their place after a healed retry.
+
+  Upgrade entry: clear the ref on `blur` only while the control still stands in
+  the document, in `panels/ProcessHeaderBar.tsx`.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

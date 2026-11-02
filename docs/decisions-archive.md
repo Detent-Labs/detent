@@ -1439,3 +1439,21 @@ system that resulted; this file explains why it took that shape.
   Closed by `studio-draft-autosave-and-save-points`: the Player's filled
   button reads "Test this draft" and leads the row. The outlined one reads
   "Start a case from the published version".
+
+- **The header reads "Unsaved changes" after a `PUT` that answered 200.**
+  Observed on the studio edit screen. The path looks correct on the page: a
+  defined save result makes `doSave` call `onSavedBodyChange(draft)`,
+  `EditScreen.tsx` clones that body into `savedBody`, and `dirtyNow` compares
+  the two by serializing both. So either something re-dirties the draft after
+  the save, or the save returned nothing, and both readings need a
+  reproduction. It is a dirty-state failure in `ProcessSurface`, not a publish
+  failure: it shares no cause with the three defects
+  `studio-publish-gate-and-report` fixed, and no file with them but
+  `EditScreen.tsx`. Deferred 2026-09-02, at a cost of one wasted `PUT`: a
+  permanently dirty draft makes the publish dialog always state its
+  unsaved-changes sentence and always save first, which gives no wrong
+  result.
+
+  Closed by `studio-draft-autosave-and-save-points`: the e2e settle flow is
+  green. A label, a drag, an Arrange and a JSON apply save exactly 4 times, and
+  5 idle seconds add none. No write re-dirties the draft after an answer.

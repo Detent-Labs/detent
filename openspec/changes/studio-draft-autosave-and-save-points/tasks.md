@@ -54,11 +54,11 @@
 
 ## 7. Docs
 
-- [ ] 7.1 Update `.claude/rules/ui-glossary.md`: the state line, the header bar, the sub-row, the Settings tab, the `⋮` menu and a new *save point* entry. Pass: `git grep -n 'Save stands beside' -- .claude/rules` prints nothing.
-- [ ] 7.2 Update `docs/authoring-guide.md`: its two Save passages, a save points passage, its Settings sentence and the two Player buttons in section 9. Pass: the prose gate reports no rise on the file.
-- [ ] 7.3 Sweep `docs/browser-checks.md` for steps that press Save, save the draft, or name a retired label. Rewrite the "Leave this draft?" steps around a failed save. Add one entry "Autosave and save points" holding what stays manual, with a step that waits past the minute for "Saved at". Pass: `git grep -n -i -E 'press(es)? save|save the draft|create (test|new) instance' -- docs/browser-checks.md` prints only non-studio entries, each confirmed by its section.
-- [ ] 7.4 Record open points in `docs/decisions.md`. Close the entry "The header reads Unsaved changes after a `PUT` that answered 200" only on 4.7's settled count, and otherwise keep it with the new symptom. Pass: the entry stands where that result puts it.
-- [ ] 7.5 Update `docs/current-state.md` for the new module and the new panel. Pass: `git grep -n 'draft-save-points' -- docs/current-state.md` prints a line.
+- [x] 7.1 Update `.claude/rules/ui-glossary.md`: the state line, the header bar, the sub-row, the Settings tab, the `⋮` menu and a new *save point* entry. Pass: `git grep -n 'Save stands beside' -- .claude/rules` prints nothing.
+- [x] 7.2 Update `docs/authoring-guide.md`: its two Save passages, a save points passage, its Settings sentence and the two Player buttons in section 9. Pass: the prose gate reports no rise on the file.
+- [x] 7.3 Sweep `docs/browser-checks.md` for steps that press Save, save the draft, or name a retired label. Rewrite the "Leave this draft?" steps around a failed save. Add one entry "Autosave and save points" holding what stays manual, with a step that waits past the minute for "Saved at". Pass: `git grep -n -i -E 'press(es)? save|save the draft|create (test|new) instance' -- docs/browser-checks.md` prints only non-studio entries, each confirmed by its section.
+- [x] 7.4 Record open points in `docs/decisions.md`. Close the entry "The header reads Unsaved changes after a `PUT` that answered 200" only on 4.7's settled count, and otherwise keep it with the new symptom. Pass: the entry stands where that result puts it.
+- [x] 7.5 Update `docs/current-state.md` for the new module and the new panel. Pass: `git grep -n 'draft-save-points' -- docs/current-state.md` prints a line.
 
 ## 8. Verification
 

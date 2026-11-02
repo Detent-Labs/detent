@@ -124,10 +124,10 @@ export const en = {
   "savePoints.savedByTerm": "Saved by",
   "savePoints.savedTerm": "Saved",
 
-  // The notice under the header bar that offers the work a 401 kept in the
-  // tab (`panels/RestoreNotice.tsx`). `t` takes no values, so the message
-  // names no time.
-  "restoreNotice.message": "Your session ended while this draft had unsaved changes. Detent kept them in this browser tab.",
+  // The notice under the header bar that offers the work a 401 or a browser
+  // Back kept in the tab (`panels/RestoreNotice.tsx`). `t` takes no values, so
+  // the message names no time and no cause.
+  "restoreNotice.message": "Detent kept unsaved changes to this draft in this browser tab.",
   "restoreNotice.restore": "Restore unsaved changes",
   "restoreNotice.discard": "Discard them",
 

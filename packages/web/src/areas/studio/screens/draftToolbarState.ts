@@ -19,7 +19,8 @@ export function isDirty(current: unknown, savedSnapshot: unknown): boolean {
  *
  * ponytail: compares the layouts as they stand, with no normalizer. Ceiling:
  * an edge-style round trip or a last-waypoint delete reads as unsaved until
- * the next save. Upgrade: a normalizer inside `isLayoutDirty`.
+ * the next save, which an autosave runs by itself after the typing pause.
+ * Upgrade: a normalizer inside `isLayoutDirty`.
  */
 export function isLayoutDirty(layout: Record<string, unknown>, savedLayout: Record<string, unknown>): boolean {
   return canonicalize(layout) !== canonicalize(savedLayout);

@@ -462,7 +462,8 @@ Select the initial step. Press Remove step, then Remove the step. Pass,
 measured: the start marker moves to the first remaining step. On
 `purchase_requisition` it moved from Draft Requisition to Manager Approval.
 
-Neither press saves the draft. Reload without saving once the walk ends.
+Autosave stores both presses. Use a throwaway draft for this walk, or name a
+save point before it and restore that point once the walk ends.
 
 The static-markup suite pins the menu's entries and the Remove labels. It
 computes no height or position, so those checks live in this walk.
@@ -1109,7 +1110,8 @@ pane, so the pointer follows the drawn route.
 Look at the area a five-segment route encloses. Pass: it is empty canvas. A
 filled shape there means the hit area lost its `fill: none`.
 
-Save the draft and open it again. Pass: the style you chose is the style you
+Wait until the header bar reads "Saved just now", then open the draft again.
+Pass: the style you chose is the style you
 get, and every step kept its position.
 
 A way out's sentence on a routed path stands on the route, as near its middle
@@ -1215,7 +1217,8 @@ Pass: the second waypoint lands between the right pair of points. The route
 does not fold back on itself, which is what an insert at the wrong index
 looks like.
 
-Save the draft and open it again. Pass: the path draws through the same
+Wait until the header bar reads "Saved just now", then open the draft again.
+Pass: the path draws through the same
 waypoints, and every step kept its position.
 
 Double-click a filled square. Pass: that waypoint goes. Delete the last one.
@@ -1251,7 +1254,8 @@ hidden step of any other group joins it.
 Expand. Pass: every member returns to the position it held, and every path
 draws again.
 
-Save the draft and open it again. Pass: the box, its name and its members are
+Wait until the header bar reads "Saved just now", then open the draft again.
+Pass: the box, its name and its members are
 as you left them.
 
 Ungroup. Pass: the box goes. Every step keeps its position and every path
@@ -1572,8 +1576,8 @@ checks summary.
 Activate the control. Pass: the full canvas shows, with the palette. Drag a
 Step entry onto the canvas. Pass: a new step lands at the drop point.
 
-Reload. Pass: the ribbon shows its band again. Expand it, save the draft,
-then read the saved `layout` blob. Pass: it carries no key naming the ribbon.
+Reload. Pass: the ribbon shows its band again. Expand it, wait until the header
+bar reads "Saved just now", then read the saved `layout` blob. Pass: it carries no key naming the ribbon.
 
 Choose the checks summary. Pass: its list, grouped by subject, opens in place and pushes
 the bench down. It casts no shadow, and it states the publish verdict.
@@ -1595,26 +1599,26 @@ Choose `quantity` on the Fields tab and open its Developer view. Pass: it
 reads "This field is in a published version. The label no longer sets its
 key."
 
-Rename its label, without saving. Pass: Key still reads `quantity`, since a
+Rename its label. Pass: Key still reads `quantity`, since a
 published field's key stays. Press Publish, then Show in the dialog's Changes
 row. Pass: a Fields row stands folded under the Fields heading, its stamp
 reads Changed. Press Cancel.
 
-Back on the Fields tab, rename `unit_price`'s label too, without saving. Pass:
+Back on the Fields tab, rename `unit_price`'s label too. Pass:
 open its Developer view. It reads the same sentence. Key still reads
 `unit_price`.
 
 Press Publish, then Show again. Pass: a second Fields row now stands beside
 the first. Press Cancel.
 
-Save the draft. On the Settings tab's Process view, add the `de` locale. That
+On the Settings tab's Process view, add the `de` locale. That
 makes German the content locale. Give `quantity` the German label `Menge`.
 Publish.
 
-Rename `quantity`'s German label to `Anzahl`, without saving. Press Publish,
+Rename `quantity`'s German label to `Anzahl`. Press Publish,
 then Show. Pass: `quantity`'s row reads `Menge` before and `Anzahl` after.
 Both read as German, since the content locale reads the `de` entry on both
-sides now. Press Cancel. Save the draft.
+sides now. Press Cancel.
 
 Open Versions from the `⋮` menu. Pass: it opens on the draft's changes, and
 `quantity`'s row reads `Menge` before and `Anzahl` after.
@@ -1633,7 +1637,7 @@ takes in and gives back. Tick "this process is subprocess-callable" and add
 the outcome `issued`.
 
 On the Steps tab, open the Issued end step and choose `issued` as its
-outcome. Save, and publish version 2.
+outcome. Publish version 2.
 
 Open the Versions screen. Mark version 1 as side A and version 2 as side B,
 then choose Diff selected. Pass: a waiting line stands while both bodies
@@ -1647,7 +1651,7 @@ compiles that step into both bodies. Only version 2's contract binds
 keeps them out of the list.
 
 Back on the draft, add a field on the Fields tab, label it `Condition`, and
-save. Return to the Versions screen and choose Diff draft against base. Pass:
+wait until the header bar reads "Saved just now". Return to the Versions screen and choose Diff draft against base. Pass:
 the heading reads "Draft compared with version 2". The `Condition` row stands
 under Fields, stamped Added. A compare passing the draft first would stamp it
 Removed.
@@ -1812,24 +1816,23 @@ It also exercises task 1's `EditScreen.tsx` `useState` change. The
 base-locale wiring and the `savedBody` state it feeds both had to survive
 that conversion.
 
-### Save, then a 409 conflict and reload, read the unsaved-changes gate correctly
+### A 409 conflict and reload read the unsaved-changes gate correctly
 
 Source: `ponytail-studio-small-cuts` task 5.2.
 
-Open the same draft in two tabs. In tab 2, edit the process label and save.
-That advances the revision. In tab 1, edit the process label differently
-and save.
+Open the same draft in two tabs. In tab 2, edit the process label and wait
+until its header reads "Saved just now". That advances the revision. In tab 1,
+edit the process label differently.
 
-Pass: tab 1's save answers 409. The header shows "Unsaved changes" before
-that save and after the 409 too. A conflict banner appears with a Reload
-action.
+Pass: about a second later, tab 1's autosave answers 409. The header reads
+"Unsaved changes", and a conflict banner appears with a Reload action. No
+second `PUT` follows.
 
 Click Reload. Pass: the header reads "Saved". Open the Settings tab's Process
 view and its Developer view. Pass: the revision matches tab 2's.
 
-Edit the label once more. Pass: the header reads
-"Unsaved changes" again. The reload does not turn the dirty gate off for
-good.
+Edit the label once more. Pass: the header reads "Saving…", then "Saved just
+now". The reload does not turn the dirty gate off for good.
 
 This is the regression task 1's `useReducer`-to-`useState` conversion
 exists to guard. `EditScreen.tsx` now seeds `savedBody` with
@@ -1840,12 +1843,13 @@ only through `(body: Draft) => setSavedBody(structuredClone(body))`.
 A dropped clone would leave a byte-identical draft reading dirty. So would
 a dropped advance on reload. Either bug persists for the rest of the
 session. `studio-draftToolbarState.test.ts` pins that exact bug at the unit
-level. Here the real save/conflict/reload sequence drives it in a browser
+level. Here the real conflict and reload sequence drives it in a browser
 instead.
 
 ### Unsaved draft: every exit asks first, and a 401 keeps the work (`guard-unsaved-studio-draft`)
 
-Source: `guard-unsaved-studio-draft` task 4.1.
+Source: `guard-unsaved-studio-draft` task 4.1, reworked for autosave by
+`studio-draft-autosave-and-save-points`.
 
 No `bun:test` assertion can click a menu, hold a drag or read a rendered dialog.
 Run these eight checks in a real browser. Open the production bundle on the
@@ -1853,29 +1857,44 @@ engine's own port. Sign in as `demo-superuser@example.test`, password
 `seed-demo-password`. In the Processes list, choose "Create draft" on the row
 "IT Offboarding".
 
+Autosave sends a change about a second after the pause, so a plain edit never
+stays unsaved. Each check holds a draft unsaved with a playwright route. The
+route fulfills only `PUT /drafts/:id`, with status 422. A refused save is not
+retried.
+
+While the route stands, the state line reads "Unsaved changes". A banner reads
+"Your latest changes stay in this tab, unsaved. The server refused them." beside
+Try again. To end the hold, unroute the answer and press Try again. Pass: the
+state line reads "Saved just now".
+
 Each check opens `/studio/processes/<id>/edit` for that draft, unless it names
 another route. Each prompt is the studio's own dialog, so the check reads its
 heading and presses its controls. Only the `beforeunload` prompt in check 5 is
 native.
 
-**1. The groups link.** Open `/studio/processes/<id>/edit`. On the Fields tab,
-change a field's label and do not save. Pass: the header bar reads "Unsaved
-changes".
+**1. The groups link.** Open `/studio/processes/<id>/edit`. Put the 422 route
+up. On the Fields tab, change a field's label. Pass: the header bar reads
+"Unsaved changes".
 
 Open Settings, then Access, and choose "Manage assignment groups for this
 process".
-Pass: the dialog "Leave this draft?" opens with Cancel focused. Cancel keeps
-the screen and the new label.
+Pass: the dialog "Leave this draft?" opens with Cancel focused. Its body says
+Detent could not save the latest changes. Cancel keeps the screen and the new
+label.
 
-Press Save. Pass: the header bar reads "Saved at" and the time. Choose the same link again.
+End the hold. Choose the same link again.
 Pass: the browser navigates to `/admin/groups?processId=<id>` with no prompt.
 
-Open the draft again and change the label once more. Choose the link a third
-time and press Leave without saving. Pass: the browser navigates to the same address.
+Open the draft again, put the 422 route up and change the label once more.
+Choose the link a third time and press Leave without saving. Pass: the browser
+navigates to the same address.
 
-**2. The account menu.** Open the draft and change a field's label without
-saving. Open the account menu, "Account" in the header, and choose "Tasks"
-under "Go to".
+Open the draft once more with no route. Change the label and choose the link
+at once. Pass: no dialog opens. Studio saves first, and the browser navigates.
+
+**2. The account menu.** Open the draft, put the 422 route up and change a
+field's label. Open the account menu, "Account" in the header, and choose
+"Tasks" under "Go to".
 
 Pass: the same dialog opens. Cancel keeps the draft, and the menu
 stays closed.
@@ -1883,7 +1902,7 @@ stays closed.
 Choose "Your profile", then "Log out". Pass: each one opens the same dialog,
 and Cancel keeps the draft and closes the menu.
 
-Press Save. Choose "Tasks" under "Go to". Pass: the browser navigates to `/app`
+End the hold. Choose "Tasks" under "Go to". Pass: the browser navigates to `/app`
 with no prompt.
 
 Open the draft again and choose "Your profile". Pass: the browser navigates
@@ -1891,41 +1910,43 @@ to `/profile` with no prompt. Open the draft once more and choose "Log out".
 Pass: the browser returns to `/login` with no prompt.
 
 **3. A layout-only change.** Open `/studio/processes/<id>/edit` on the
-Map tab. Drag one step to a new position and change nothing else. Pass: the
-header bar reads "Unsaved changes".
+Map tab and put the 422 route up. Drag one step to a new position and change
+nothing else. Pass: the header bar reads "Unsaved changes".
 
 Choose "← Processes". Pass: the same dialog opens. Cancel it.
 
-Press Save. Pass: the header bar reads "Saved at" and the time. Choose "← Processes"
+End the hold. Choose "← Processes"
 again. Pass: the browser navigates to the process list at `/studio` with no
 prompt.
 
-Drag a step again and change nothing else. Choose "Publish" in the header bar.
-Pass: the Publish dialog reads "This draft has unsaved changes. Publishing saves
-them first." Cancel the dialog, because confirming mints a version.
+Put the 422 route up and drag a step again, changing nothing else. Choose
+"Publish" in the header bar. Pass: the Publish dialog does not stay open, and
+the failed-save banner stands. The press publishes nothing.
 
 **4. A drag during a slow save.** Delay the answer of `PUT /drafts/:id` by a
 few seconds. A playwright route that waits before it fulfills does this. Change
-a label and press Save. Before the answer arrives, drag a step to a new
-position.
+a label and wait until the request leaves, about a second. Before the answer
+arrives, drag a step to a new position.
 
-Pass: after the answer, the step stays at the new position. The header bar
-still reads "Unsaved changes", because the layout moved during the request.
+Pass: after the answer, the step stays at the new position. The state line
+reads "Saving…" again, because the layout moved during the request. A second
+`PUT` carries the new position, and the line then reads "Saved just now".
 
 Now the conflict path. Drag a step. Make `PUT /drafts/:id` answer 409 with a
 playwright route. The route fulfills only the PUT, with status 409 and the body
-`{"error":{"type":"draft-conflict","message":"Conflict."}}`. Press Save. Pass:
-the conflict banner appears with a "Reload" button.
+`{"error":{"type":"draft-conflict","message":"Conflict."}}`. Pass: about a
+second later, the conflict banner appears with a "Reload" button.
 
 Press Reload. Pass: the header bar reads "Saved" or "Saved at". Choose "Publish". Pass: the
-dialog opens without the save-first note. Cancel the dialog and unroute the
-answer.
+dialog opens, and its confirm is live and does not read "Saving…". Cancel the
+dialog and unroute the answer.
 
-**5. Tab close and reload.** Change a label and do not save. Reload the tab.
+**5. Tab close and reload.** Put the 422 route up and change a label. Reload
+the tab.
 Pass: the browser's own leave prompt appears. Automation must accept or
 dismiss the `beforeunload` dialog.
 
-Save, then reload again. Pass: no prompt appears. The prompt text belongs to
+End the hold, then reload again. Pass: no prompt appears. The prompt text belongs to
 the browser, so the check reads only whether the dialog fires.
 
 **6. A 401 on save.** First prepare the second account. In another browser
@@ -1938,51 +1959,57 @@ Developer list's add box and press Add. Pass: the id appears in the Developer
 list. Without it, the second account meets a refusal screen at the end of this
 check.
 
-Change a label and do not save. Make the save answer 401: a playwright route
-that fulfills `PUT /drafts/:id` with status 401 does this. Press Save. Pass:
-the login screen appears.
+Make the save answer 401: a playwright route that fulfills
+`PUT /drafts/:id` with status 401 does this. Change a label. Pass: the login
+screen appears within a few seconds.
 
 Unroute the answer and log in again as `demo-superuser@example.test`. Open the
-same draft. Pass: a notice reads "Your session ended while this draft had
-unsaved changes. Detent kept them in this browser tab." It offers "Restore
-unsaved changes" and "Discard them".
+same draft. Pass: a notice reads "Detent kept unsaved changes to this draft in
+this browser tab." It offers "Restore unsaved changes" and "Discard them".
 
-Choose "Restore unsaved changes". Pass: the label returns, and the header bar
-reads "Unsaved changes". The notice is gone.
+Choose "Restore unsaved changes". Pass: the label returns, and the notice is
+gone. The state line reads "Saving…", then "Saved just now".
 
-Make the save answer 401 again and press Save. Log in and open the draft
+Make the save answer 401 again and change a label. Log in and open the draft
 once more. Choose "Discard them". Pass: the notice goes, and the draft shows
 the saved label.
 
-Change a label, make the save answer 401 and press Save. Unroute the answer,
+Change a label with the 401 route up. Unroute the answer,
 log in as `demo-superuser@example.test` and open the draft. While the notice
-shows, change another label. Pass: the header bar reads "Unsaved changes".
+shows, change another label.
+
+Pass: the header bar reads "Unsaved changes", and no `PUT` goes out. The notice
+holds the saves.
 
 Choose "Restore unsaved changes". Pass: the dialog "Replace your current
 changes?" opens. Press Cancel. Pass: the notice stays,
 and the draft keeps the newer label. Choose "Restore unsaved changes" again and
 press Replace them. Pass: the label from the 401 session returns, and the notice is gone.
 
-The restored draft reads "Unsaved changes". Make the save answer 401 and press
-Save. At the login screen, leave the first context alone. In the second
-context, open the draft, change a label and press Save. Pass: the header bar
-reads "Saved at" and the time.
+Keep the 401 route up. The restored draft saves on its own and meets the 401.
+Pass: the login screen appears. Leave the first context alone. In the second
+context, open the draft, change a label and wait until the header reads "Saved
+just now".
 
 Back in the first context, unroute the answer and log in as
-`demo-superuser@example.test`. Open the draft, choose "Restore unsaved changes"
-and press Save. Pass: the conflict banner appears, because the restore kept the
-stored revision. Press Reload. Pass: the
+`demo-superuser@example.test`. Open the draft and choose "Restore unsaved
+changes". Pass: about a second later, the conflict banner appears, because the
+restore kept the stored revision. Press Reload. Pass: the
 header bar reads "Saved" or "Saved at", and the draft holds the label from the second
 context.
 
-Change a label, make the save answer 401 and press Save. Unroute the answer,
+Change a label with the 401 route up. Unroute the answer,
 log in as `demo-superuser@example.test` and open the draft. Change another
-label. Delay the answer of `PUT /drafts/:id` by a few seconds and press Save.
-While the save runs, inspect the notice. Pass: both buttons carry the
-`disabled` attribute. After the answer arrives, the header bar reads "Saved at"
-and the time, and the notice is gone.
+label. Open Settings, then Save points, and type a name.
 
-Change the label again, make the save answer 401 and press Save. At the login
+Delay the answer of `PUT /drafts/:id` by a few seconds and press "Save this
+point". The name saves the draft first, even under the notice. While the save
+runs, inspect the notice. Pass: both buttons carry the `disabled` attribute.
+
+After the answer arrives, the header bar reads "Saved just now". The notice
+stands with both buttons live. Only a choice on the notice removes the copy.
+
+Change the label again with the 401 route up. At the login
 screen, log in as `demo-developer@example.test` on the same tab. Open the same
 draft.
 
@@ -1991,13 +2018,25 @@ draft. Only then read the notice. Pass: no notice appears, because the stored
 copy belongs to the first actor. A refusal screen instead of the header bar
 proves nothing, so repeat the Access view step.
 
+Last, a browser Back during a backoff. Make `PUT /drafts/:id` fail with a
+network error. A route that aborts it does this. Change a label. Pass: the
+banner reads "Your latest changes stay in this tab, unsaved. Detent keeps
+trying."
+
+Press the browser's Back. Unroute the answer, then return to the draft with
+the browser's Forward. Pass: the notice reads "Detent kept unsaved changes to
+this draft in this browser tab." It offers the copy.
+
+Close the tab instead of returning, then open the draft in a new tab. Pass: no
+notice appears, because the copy lived in the first tab's `sessionStorage`.
+
 **7. Discard draft after a drag.** Drag a step on the Map tab. Open the header
 bar's `⋮` menu and choose "Discard draft" under Draft. The application's own dialog,
 "Discard this draft", opens. Confirm it. Pass: no native browser prompt
 appears, and the screen returns to the process list.
 
-**8. A 401 on a clean draft.** Open the draft and change nothing. The header
-bar shows no Save button, so force the 401 on another request. Open Settings,
+**8. A 401 on a clean draft.** Open the draft and change nothing. A clean
+draft sends no save, so force the 401 on another request. Open Settings,
 then Access. Make `PUT /processes/:id/access` answer 401 with a playwright route.
 
 Type any text into the Developer list's add box and press Add. Pass: the login
@@ -2012,6 +2051,87 @@ notice puts its message and both buttons in one row. The message wraps at the
 68-character measure and the notice stacks below 40rem. Focus lands on the open
 tab after either button. Only a live render at a real width shows the first.
 Only a keyboard pass shows the second.
+
+### Autosave and save points (`studio-draft-autosave-and-save-points`)
+
+Source: `studio-draft-autosave-and-save-points` task 7.3.
+
+`e2e/draft-autosave.e2e.ts` and `e2e/save-points.e2e.ts` cover the request
+counts, the dialogs, the leave flows and the Try again focus in Chromium. Four
+things stay manual. They are a screen reader, a pointer drag across an answer,
+a width that a clock decides and a browser other than Chromium. Use the
+production build. Sign in as `demo-superuser@example.test`. Open the draft of "IT
+Offboarding".
+
+1. **Opening writes nothing.** Open the Network log, then open the draft and
+   visit each of the six tabs. Pass: no `PUT /drafts/:id` goes out, and the
+   state line reads "Saved".
+2. **The pause, then the state.** Type in a field's label and keep typing for
+   twelve seconds. Pass: the state line reads "Saving…", and a `PUT` lands
+   within ten seconds of the first key, though you never paused. Stop typing.
+   Pass: one more `PUT` follows about a second later, and the line reads "Saved
+   just now".
+3. **Past the minute.** Wait until a minute has passed since the save.
+   Pass: with no input from you, the line reads "Saved at" and the time of
+   that save. Make a change. Pass: the line leaves that wording and reads
+   "Saved just now" again.
+4. **The words keep their place.** Change a label. Watch Test, Publish and the
+   `⋮` trigger while the line moves between "Saving…" and "Saved just now".
+   Pass: none of the three moves sideways. Repeat at 1280px and at 800px.
+5. **A drag across an answer.** Delay the answer of `PUT /drafts/:id` by three
+   seconds. Change a label, then drag a step on the Map tab while the request
+   runs. Pass: the step keeps the drop position when the answer lands, and a
+   second save follows.
+6. **A screen reader.** Turn a screen reader on. Type in a label until it saves.
+   Pass: it announces nothing for "Saving…" or for "Saved just now".
+
+   Make a save fail. Pass: it announces "Unsaved changes" once. Press Try again
+   after the route clears. Pass: it announces "Saved" once.
+7. **Try again and the focus.** Make `PUT /drafts/:id` answer 422 with a
+   playwright route. Change a label, Tab to Try again and unroute the answer.
+   Press Enter. Pass: the focus ring stands on the state line when Try again
+   goes.
+
+   Repeat in Firefox and in Safari. Pass: the same. A browser that fires
+   `blur` as a focused button leaves the page may drop the focus instead.
+   `AUTOSAVE-5` in `docs/decisions.md` records that gap.
+8. **Naming a save point.** Open Settings, then Save points. Pass: the view
+   reads a label "Name this save point", one input and the button "Save this
+   point". A draft with no points reads "No save points yet."
+
+   Press the button with the input empty. Pass: the input reads "Give this save
+   point a name." and no request goes out.
+
+   Type a name and press the button. Pass: a status line reads the name in
+   curly quotes, the row appears and the input empties.
+
+   Go to the Map tab and choose "Save points" in the `⋮` menu. Pass: the view
+   opens, and the focus stands on the name input.
+9. **Restore.** Change a label so it differs from the point. Choose Restore on
+   the row. Pass: the dialog names the point and who saved it. Its note says
+   that your work becomes a save point.
+
+   Confirm. Pass: the label returns to the point's text. A second row reads
+   "Before restoring" and the first name, and the status line names both. The
+   focus stays on the control of the restored row.
+10. **Remove.** Choose Remove on the "Before restoring" row. Pass: the dialog
+    reads "The studio has no undo." Confirm. Pass: the row goes, and the focus
+    lands on the name input.
+11. **The bound.** Name fifty save points. Pass: when the fiftieth lands, the
+    input and button give way to the sentence "This draft holds 50 save
+    points." and the focus moves to that sentence. Remove one. Pass: the form
+    returns with the focus on the name input.
+12. **Discard.** Open the discard dialog from the `⋮` menu. Pass: it states that
+    the published versions stay and that the draft's save points go with it.
+    Cancel it.
+13. **The Player.** Change a label and press Test. Pass: the Player opens with
+    no dialog. "Test this draft" leads, filled. Click it. Pass: the test
+    instance shows the new label. "Start a case from the published version"
+    stands beside it, outlined.
+14. **The notice holds the saves.** Make the save answer 401, change
+    a label and log in again. Open the draft. Pass: the notice reads "Detent
+    kept unsaved changes to this draft in this browser tab." Wait ten seconds.
+    Pass: no `PUT` goes out while the notice stands.
 
 ### Selecting a path shows the source step's Ways out section with the row highlighted
 
@@ -2529,12 +2649,12 @@ label-field row shows a stale-reference warning as a sibling of the picker,
 not inside its `<label>`. The picker's own accessible name stays "label
 field", not lengthened by the warning text.
 
-Save the draft, then Publish. Use an actor holding `system:admin`, or a
+Publish. Use an actor holding `system:admin`, or a
 process-scoped `read` grant on the target; a developer with neither sees a
 real, correctly-mapped 403.
 
 Pass: the publish succeeds even though `labelFieldId` names a process with
-no live instance. The state line reads "Saved at" and the time, then "vN
+no live instance. The state line reads "Saved just now", then "vN
 published". Right below
 the header bar, a list shows one line per unresolved reference. Each reads
 "Stale reference in <data source id>: <field id> (not carried by any live
@@ -2736,7 +2856,7 @@ Fill all three. Name a published target process. Name a field of this process
 bound to an `instance.query` data source over that target process. Name a
 manual path on the target's own step.
 
-Save the draft. Publish it as an actor who holds `read` and `migrate` on the
+Publish it as an actor who holds `read` and `migrate` on the
 target process. Pass: the publish succeeds.
 
 Now change `pathId` to an id no live version of the target carries. Publish
@@ -2744,7 +2864,7 @@ again. Pass: one finding line shows below the header bar, under the state line's
 new version. That line names the action's location in the body, since an action
 carries no data source id to name instead.
 
-Last, unbind the field, save the draft, and publish again. Pass: the publish
+Last, unbind the field and publish again. Pass: the publish
 fails with a cross-process error naming the action's location and the field.
 
 `test/config-descriptor.test.ts` asserts the descriptor this form reads.
@@ -2765,8 +2885,8 @@ records the same pre-existing Studio dev-mode crash that rules that path out.
 Started one ordinary instance of Expense Approval from the app area's Start
 a process screen.
 
-The studio Player's "Create new instance" button still plays the published
-version. It does not play the draft. `draft-test-instances`
+The studio Player's "Start a case from the published version" button plays the
+published version. It does not play the draft. `draft-test-instances`
 task 4's route, `POST /drafts/:processId/instances`, belongs to Phase 3
 Track D's own screen. Wiring it up sits outside this task's scope.
 
@@ -2792,7 +2912,7 @@ Pass: the table shows the two ordinary rows and drops the test one. Picked
 see a table column render, or a `<select>` narrow a live page. This walk
 confirms both.
 
-### Player: "Create test instance" plays a draft-only process end to end
+### Player: "Test this draft" plays a draft-only process end to end
 
 Source: `studio-play-draft-instance` task 8.4.
 
@@ -2801,10 +2921,10 @@ canvas. The initial step must be non-terminal, with one manual path to a
 terminal step.
 
 That leaves the process with no published version at all, only a draft.
-Save the draft. Open its Player.
+Open its Player. Studio saves the draft first.
 
-Pass: "Create test instance" sits beside "Create new instance" in the
-instance access fieldset. Click it. A running instance renders at the
+Pass: the filled "Test this draft" leads "Start a case from the published
+version" in the instance access fieldset. Click it. A running instance renders at the
 initial step, with a `TEST` stamp beside the status line.
 
 Submit the manual path. Pass: the Player re-renders at the terminal step,
@@ -2869,8 +2989,8 @@ of `{type: "string", format: "person"}` and a `Reviewers` field of `{type:
 `options` or `dataSource`.
 
 The studio Player is the other route, and the one to take for a body no
-example covers. Put such a body in a draft. Then choose "Create test
-instance". That plays the draft body rather than a published version.
+example covers. Put such a body in a draft. Then choose "Test this
+draft". That plays the draft body rather than a published version.
 
 Pass, single person: the string field renders a `<select>`. Its first
 option is blank. Its second is the group's own name. Its remaining options
@@ -2950,9 +3070,10 @@ first control and Cancel, and never reaches the header bar behind. Click a
 fact's text, then press Tab. Pass: a control inside the dialog takes the focus.
 Confirm.
 
-Edit the label and choose Publish again. Pass: the dialog says that publishing
-saves the unsaved changes first. Confirm. Pass: one `PUT` then one `POST`, and
-no second prompt between them.
+Edit the label and choose Publish at once. Pass: the dialog's confirm reads
+"Saving…" and ignores a press until the save lands. Confirm once it reads
+its own word. Pass: one `PUT` then one `POST`, and no second prompt between
+them.
 
 Open the `⋮` menu and choose Discard draft. Pass: a dialog opens naming the
 process and its last save, and stating that the published versions stay.
@@ -2984,34 +3105,36 @@ names another account.
    Publish is the only filled control.
 2. **A draft never published.** Create a new process and open its draft.
    Pass: the state line reads "Saved" alone, with no "published" part.
-3. **A dirty draft.** Change a field's label. Pass: the state line reads
-   "Unsaved changes · v1 published" in the refusal color, and Save stands
+3. **A dirty draft.** Make `PUT /drafts/:id` answer 422 with a playwright
+   route, then change a field's label. Pass: the state line reads "Unsaved
+   changes · v1 published" in the refusal color, and no Save control stands
    beside it. Pass: Test, Publish and the `⋮` trigger have not moved.
-4. **Saving.** Delay the answer of `PUT /drafts/:id` by a few seconds. Tab
-   to Save and press Enter. Pass: Save reads "Saving…" and keeps its focus ring. Press Enter on it
-   again. Pass: no second `PUT` goes out. After the answer, the state line reads
-   "Saved at" and the time, and Save is gone.
-5. **Save's focus rule.** Change a label, Tab to Save and press Enter, with
-   the same delay. Pass: when Save vanishes, the focus ring stands on the state
-   line. The page top holds none. Change a label and press Save again. Before the
-   answer, click the name input. Pass: the focus stays in the name input.
+4. **Saving.** Delay the answer of `PUT /drafts/:id` by a few seconds, then
+   change a label. Pass: the state line reads "Saving…" in the muted tone,
+   with no second `PUT` while it waits. After the answer, the state line reads
+   "Saved just now".
+5. **The focus rule of Try again.** Make `PUT /drafts/:id` answer 422, change
+   a label and Tab to Try again. Unroute the answer and press Enter. Pass: when
+   Try again vanishes, the focus ring stands on the state line. The page top
+   holds none. Repeat, and click the name input before the answer. Pass: the
+   focus stays in the name input.
 6. **Just published.** Choose Publish and confirm. Pass: the focus returns to
-   Publish. Pass: the state line reads "Saved at" and the time, then "v2
+   Publish. Pass: the state line reads "Saved just now", then "v2
    published", in plain ink. Pass: no stamp and no toast show. Pass: a ghost
    "Versions" button follows the line.
 7. **The Versions offer.** Press "Versions". Pass: the Versions screen opens.
    Go back to the draft and publish again.
 8. **The offer ends.** Change a label. Pass: the "Versions" button is gone.
-   Press Save. Pass: it does not return. Reload the page. Pass: the line reads
+   Wait until the line reads "Saved just now". Pass: it does not return. Reload the page. Pass: the line reads
    "Saved · v2 published" and the offer stays away.
 9. **A blocked draft.** Add a step no path reaches. Pass: "Blocked by an open
    issue" leads Publish on the bar's row. Choose Publish. Pass: the dialog opens
    and states the refusal. Sign in as `demo-developer@example.test`. Pass:
    Publish reads dimmed and its reason reads "Needs the publish permission for
    this process".
-10. **A conflict.** Change a label. Make `PUT /drafts/:id` answer 409 with a
-    playwright route, then press Save. Pass: the conflict banner shows below the
-    bar, and the state line still reads "Unsaved changes".
+10. **A conflict.** Make `PUT /drafts/:id` answer 409 with a playwright
+    route, then change a label. Pass: about a second later, the conflict banner shows
+    below the bar, and the state line reads "Unsaved changes".
 11. **The Editing note on Steps.** On the Settings tab's Process view, add
     `de` and pick "German (de)" under "Language you are editing". Open the Steps tab.
     Pass: a ghost button "Editing German" stands beside the state line. Press
@@ -3046,9 +3169,10 @@ names another account.
     appear, at 1280px. Scroll the grid so its sticky headers sit under the
     menu panel, then open the menu. Pass: a press on "Discard draft" reaches
     that entry, and the dialog opens. Repeat on the Map tab at 400px wide.
-20. **Test and Back.** Change a label, then press Test. Pass: the dialog
-    "Leave this draft?" opens, and Cancel keeps the draft. Repeat with the back control.
-    Save the draft, then press Test. Pass: the Player opens without a prompt.
+20. **Test and Back.** Make `PUT /drafts/:id` answer 422, change a label,
+    then press Test. Pass: the dialog "Leave this draft?" opens, and Cancel
+    keeps the draft. Repeat with the back control. Unroute the answer and press
+    Try again, then press Test. Pass: the Player opens without a prompt.
 21. **The warning below the bar, with the placeholder.** In German, clear the
     name. Pass: the warning stands as a block under the bar, left of the
     advisory rule, and the bar keeps one row. Pass: the name input reads the
@@ -3730,7 +3854,7 @@ Pass: it reads "This field is in a published version. The label no longer
 sets its key." Change the label to `Amount`. Pass: Key still reads
 `quantity`.
 
-Save the draft.
+Wait until the header bar reads "Saved just now".
 
 Select the text in Key, type `qty` and press Tab. Pass: the unsaved mark
 appears, and the line under the label reads "Updated 2 conditions." Choose
@@ -3883,8 +4007,8 @@ dashed accent frame over an 8% accent tint.
 Open the JSON view from the header bar's `⋮` menu. Pass: the text area draws a
 1px frame, and it sits on the surface fill rather than the page ground.
 
-Force an error on the process surface. Saving a draft whose engine call fails is
-the quickest route. Pass: the banner draws a 2px refusal frame, and its stamp
+Force an error on the process surface. A save the engine refuses is the
+quickest route: a playwright route that answers `PUT /drafts/:id` with status 422. Pass: the banner draws a 2px refusal frame, and its stamp
 draws a 2px frame in the current color.
 
 Then leave the studio. Hover a row on My tasks, on the admin instances list, and
@@ -4334,8 +4458,8 @@ the pointer.
 **Processes list.** Create a draft of any process. Its row shows Discard
 draft.
 
-**Draft confirmation dialog.** Open that draft, change a label and read Save in
-the header bar. Save is the plain control here, read before the dialog opens.
+**Draft confirmation dialog.** Open that draft, change a label and read Test in
+the header bar. Test is the plain control here, read before the dialog opens.
 Then open the `⋮` menu and choose Discard draft. The dialog shows its own Discard draft beside
 Cancel. Cancel is a ghost control, and its text reads in the accent too.
 
@@ -4363,8 +4487,8 @@ Create a draft of `expense_approval` and open the JSON surface. Add an
 `http.request` action to the `submit` path of the `capture` step. Point its
 `url` at a host `HTTP_ACTION_ALLOWED_HOSTS` leaves out, such as
 `https://refused.example.test/hook`. Remove that step's assignment and its
-`required` flags, so the Player can submit it. Apply and save, then open the
-Player and choose Create test instance. Submit the path.
+`required` flags, so the Player can submit it. Apply, then open the
+Player and choose Test this draft. Submit the path.
 
 The handler refuses that host before it opens a socket. The outbox row turns
 `dead-letter` after one attempt. Open Outbox in the admin area. The row shows
@@ -4477,7 +4601,7 @@ choose "Create draft". Open its Forms tab, at
    again. Pass: the outline and the filled mark still read apart, against
    the dark scheme's own ledger ground.
 4. Open "Submit the Exit Notification" from its card's open control. In the
-   form editor, add fifteen field entries and save. Return to the Forms tab.
+   form editor, add fifteen field entries. Return to the Forms tab.
    Pass: that card's marks continue onto a second line, and every mark stays
    whole and visible.
 5. Read the accessibility tree on "Review the Exit Notification", a card
@@ -4485,8 +4609,8 @@ choose "Create draft". Open its Forms tab, at
    the form Review the Exit Notification". The foot reads "22 fields, 2
    required", with no miniature node in the tree.
 6. On its card, choose the open control for "Hold and Close the Account".
-   Remove its five field entries. Choose the breadcrumb's first crumb, Forms,
-   without pressing Save. Pass: back on the Forms tab, that card's foot holds
+   Remove its five field entries. Choose the breadcrumb's first crumb, Forms.
+   Pass: back on the Forms tab, that card's foot holds
    "Start the form" alone, at the row's trailing edge. Its accessibility
    tree reads "No fields yet".
 7. Read the legend's words above the grid. Then read its tree through
@@ -4516,8 +4640,8 @@ choose "Create draft". Open its Forms tab, at
     Choose the "Forward to this address" card again, so the strip closes and
     opens fresh for the next entry. Author the same condition on the card that
     reads "M365 backup by Fabrikam as standard". That entry is a boolean, so
-    its mark draws 8px. Choose the breadcrumb's first crumb, Forms,
-    without pressing Save. Pass: that card draws two dashed marks in both color
+    its mark draws 8px. Choose the breadcrumb's first crumb, Forms.
+    Pass: that card draws two dashed marks in both color
     schemes, and its foot still reads "16 fields".
 11. Turn forced colors on through a `run-code` call to
     `page.emulateMedia({ forcedColors: "active" })`. Pass: the legend's four
@@ -4690,7 +4814,7 @@ alpha 0.14, in `color(srgb …)` notation:
 ```
 
 Choose "← Processes" to return to the process list. Steps 6 and 10
-left the draft dirty, so press Leave without saving in its dialog. Then choose
+may leave a save waiting. The exit saves it first and opens no dialog. Then choose
 "Discard draft" on the "IT Offboarding" row, and press Discard draft in the dialog.
 
 ### The advisory role and the change list's command (`authoring-command-ink-advisory-role`)
@@ -4836,8 +4960,8 @@ A passing run returns these values:
 }
 ```
 
-Choose "← Processes" to return to the process list. Step 2 left the
-draft dirty, so press Leave without saving in its dialog. Then choose "Discard draft" on the
+Choose "← Processes" to return to the process list. Step 2 may
+leave a save waiting. The exit saves it first and opens no dialog. Then choose "Discard draft" on the
 "IT Offboarding" row, and press Discard draft in the dialog.
 
 ### The field matrix's height (`field-matrix-fill-height`)
@@ -5050,8 +5174,8 @@ async (page) => {
    `/processes/<id>/versions/<v>`. The `GET` of that URL after the edit
    screen opens is the editor's own base read, `draft/publishedFields.tsx`.
 4. Take the delay off. Under `playwright-cli`, a `run-code` call to
-   `page.unroute("**/drafts/*")` does that. Edit the process label. Press
-   Save. Pass: the header bar reads "Saved at" and the time. No conflict
+   `page.unroute("**/drafts/*")` does that. Edit the process label. Pass:
+   the header bar reads "Saved just now" within a few seconds. No conflict
    banner shows.
 5. Go back to the process list. Choose "Discard draft" on the
    "IT Offboarding" row. Press Discard draft in the dialog.
@@ -6176,8 +6300,8 @@ it reads "The person's roles".
 #### Source that does not parse opens the Developer view
 
 On the Steps tab, open any path's Developer view under "Only if". Type
-`data.quantity >` and nothing after it. Press Save. Reload the page. Open
-the same path.
+`data.quantity >` and nothing after it. Wait until the header bar reads
+"Saved just now". Reload the page. Open the same path.
 
 Pass: one line reads "This condition cannot show as rows. Fix it in the
 Developer view below." No row and no sentence stand in its place.
@@ -6718,7 +6842,7 @@ description in devtools. Pass: it reads the Changes row's sentence.
 Press Enter. Pass: the summary reads Hide, and the change list names the
 renamed field in one row. Press Cancel.
 
-**9. Versions.** Press Save. Open the `⋮` menu and choose Versions. Pass: the
+**9. Versions.** Wait until the header bar reads "Saved just now". Open the `⋮` menu and choose Versions. Pass: the
 draft's change list stands under the table with no press, and it names the
 renamed field.
 

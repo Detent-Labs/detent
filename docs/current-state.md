@@ -240,8 +240,13 @@ area administers users, groups, data lists and UI strings.
 The developer keeps drafts, publishes versions and compares them here. Other
 screens plan migrations and export a version to another environment.
 
+A draft saves itself after each change. A save point is a named copy of the
+draft. The engine keeps it in `src/engine/draft-save-points.ts`. The Settings
+tab's Save points view shows it, in `panels/SavePointsPanel.tsx`.
+
 - Paths: `packages/web/src/areas/studio/screens/`,
-  `packages/web/src/areas/studio/draft/`, `src/engine/drafts.ts`
+  `packages/web/src/areas/studio/draft/`, `src/engine/drafts.ts`,
+  `src/engine/draft-save-points.ts`
 - Specs: `studio-app`, `process-drafts`, `studio-publish`, `studio-tools`,
   `process-version-inspection`, `studio-migration-planning`,
   `studio-migration-plan-form`, `studio-player`, `environment-promotion`
