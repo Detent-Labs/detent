@@ -348,5 +348,6 @@ as rows and raw rows, and the text input reads it as text.
 None that would change the specs or the tasks. The deferrals stand in
 Non-Goals. They are emptiness checks, a literal list, negated groups, text
 operators, date-time ordering, and the rule builder's fold. The critique and
-the audit added three more, recorded in `docs/decisions.md`. They are a picker
-over the known roles, a row's move into a group, and arithmetic rows.
+the audit added four more, recorded in `docs/decisions.md`. They are a picker
+over the known roles, a row's move into a group, arithmetic rows, and a
+wrong-type literal that still reads as a row.
