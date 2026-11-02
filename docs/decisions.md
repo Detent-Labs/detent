@@ -1935,14 +1935,6 @@ HEADER tag is local to this section.
 
   Upgrade entry: add a published check to the `shouldAutoDeriveKey` call in
   `panels/ProcessHeaderBar.tsx`, reading the base version it already holds.
-- **HEADER-4: Test lands on a Player whose two buttons differ.** The Player's
-  filled create button runs the published version and its outlined one runs the
-  draft. Nothing on the bar says which Test will run. Risk (Low): an author
-  expects Test to run the draft and starts a case on the published version. The
-  Player's two buttons stay open.
-
-  Upgrade entry: name the two runs on the Player's buttons, or let Test open
-  the draft run. The handler is `onPlayer` in `panels/ProcessHeaderBar.tsx`.
 - **HEADER-5: a publish with no changes promises the next version.** The dialog
   names the next version, closes silently and mints nothing. The dialog's
   Changes row already says so. Risk (Low): an author reads "Next version" as a

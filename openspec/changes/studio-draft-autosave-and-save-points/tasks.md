@@ -49,8 +49,8 @@
 
 ## 6. The Player
 
-- [ ] 6.1 Rename and refill the two create buttons per D11, through catalog keys. Pass: a static-markup or source test pins both words and which one holds the fill.
-- [ ] 6.2 Close HEADER-4 in `docs/decisions.md`, moving its reasoning to `docs/decisions-archive.md` word for word. Pass: `git grep -n 'HEADER-4' -- docs/decisions.md` prints nothing.
+- [x] 6.1 Rename and refill the two create buttons per D11, through catalog keys. Pass: a static-markup or source test pins both words and which one holds the fill.
+- [x] 6.2 Close HEADER-4 in `docs/decisions.md`, moving its reasoning to `docs/decisions-archive.md` word for word. Pass: `git grep -n 'HEADER-4' -- docs/decisions.md` prints nothing.
 
 ## 7. Docs
 

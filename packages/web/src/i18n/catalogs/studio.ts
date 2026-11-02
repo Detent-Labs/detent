@@ -944,8 +944,11 @@ export const en = {
   // (`studio-app`). `{language}` is the language's English name.
   "headerBar.editingNote": "Editing {language}",
 
-  // The Player screen. Its own strings are still mostly inline English; this
-  // one is a catalog key because it is an accessible name.
+  // The Player screen. Its own strings are still mostly inline English. The
+  // two create buttons name their runs (`studio-player`); the tab label is an
+  // accessible name.
+  "player.testDraft": "Test this draft",
+  "player.startCase": "Start a case from the published version",
   "player.formTabsLabel": "Form tabs",
   "player.formTabOpenedOne": "Opened the {tab} tab. 1 field still needs an entry.",
   "player.formTabOpenedMany": "Opened the {tab} tab. {count} fields still need an entry.",

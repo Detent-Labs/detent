@@ -200,7 +200,7 @@ test("Test saves first and the Player runs the new label", async ({ page }) => {
   await page.getByRole("button", { name: "Test", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Player" })).toBeVisible();
   expect(saves.count()).toBe(1);
-  await page.getByRole("button", { name: "Create test instance", exact: true }).click();
+  await page.getByRole("button", { name: "Test this draft", exact: true }).click();
   await expect(page.getByText("Tag in the Player")).toBeVisible();
 });
 

@@ -355,11 +355,11 @@ export function PlayerScreen({ processId, token, navigate, onUnauthorized }: Pla
       <fieldset {...stylex.props(styles.panel)}>
         <legend>Instance access</legend>
         <div {...stylex.props(styles.studioControls)}>
-          <button type="button" className="btn btn-primary" disabled={loading} onClick={() => void doCreate()}>
-            Create new instance
+          <button type="button" className="btn btn-primary" disabled={loading} onClick={() => void doCreateTest()}>
+            {t("player.testDraft")}
           </button>
-          <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doCreateTest()}>
-            Create test instance
+          <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => void doCreate()}>
+            {t("player.startCase")}
           </button>
         </div>
         <label>
