@@ -28,13 +28,13 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Run `bun run typecheck` and `bun run build`. Verify: both exit 0.
-- [ ] 4.2 Run the full `bun test` with `DATABASE_URL` set, in the devcontainer. Verify: the summary reads 0 fail, with the skip count at the floor.
-- [ ] 4.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and the same with `whitespace.sh` on the host. Verify: both pass.
+- [x] 4.1 Run `bun run typecheck` and `bun run build`. Verify: both exit 0.
+- [x] 4.2 Run the full `bun test` with `DATABASE_URL` set, in the devcontainer. Verify: the summary reads 0 fail, with the skip count at the floor.
+- [x] 4.3 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and the same with `whitespace.sh` on the host. Verify: both pass.
 <!-- antislop: allow long-words -->
 <!-- Why: "purchase requisition" is the example process's own name. -->
-- [ ] 4.4 Browser check on the production build, at 1280px and 1440px. At a way out's Only if, build a group, a field-compared date row and an unfinished group. Add a "does not include" row there, and build a group at the field card's Only ask this when. Open the purchase requisition's "Delivered in full" way out, whose line reads "Only if Received quantity is at least Quantity". Verify: the sentence under the rows and the Map's way out line read as the spec's scenarios state. In both schemes an inner row and its group's ground are visibly distinct.
-- [ ] 4.5 Run `/impeccable critique` and `/impeccable audit` on the Steps tab. Verify: every finding has a fix or an entry in `docs/decisions.md`.
+- [x] 4.4 Browser check on the production build, at 1280px and 1440px. At a way out's Only if, build a group, a field-compared date row and an unfinished group. Add a "does not include" row there, and build a group at the field card's Only ask this when. Open the purchase requisition's "Delivered in full" way out, whose line reads "Only if Received quantity is at least Quantity". Verify: the sentence under the rows and the Map's way out line read as the spec's scenarios state. In both schemes an inner row and its group's ground are visibly distinct.
+- [x] 4.5 Run `/impeccable critique` and `/impeccable audit` on the Steps tab. Verify: every finding has a fix or an entry in `docs/decisions.md`.
 
 ## Workflow follow-up
 
