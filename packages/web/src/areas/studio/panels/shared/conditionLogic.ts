@@ -372,8 +372,17 @@ export function fieldValueCandidates(operandPath: string, operands: Operand[]): 
   );
 }
 
-/** One leaf: a comparison the builder can show, else a raw row. */
+/** One leaf: a comparison the builder can show, else a raw row. A comparison
+ * on an operator its operand does not offer stays raw, so a row's select never
+ * holds an operator it cannot list. */
 function readLeaf(node: CelNode, operands: Operand[], byPath: Map<string, Operand>): Leaf {
+  const leaf = readComparison(node, operands, byPath);
+  if (leaf.kind !== "cmp") return leaf;
+  const operand = byPath.get(leaf.operand)!;
+  return operatorsFor(operand.celType, operand.format).includes(leaf.op) ? leaf : rawRow(node);
+}
+
+function readComparison(node: CelNode, operands: Operand[], byPath: Map<string, Operand>): Leaf {
   // A bare boolean operand reads as an explicit `== true`.
   const bare = boolOperand(node, byPath);
   if (bare !== undefined) return { kind: "cmp", operand: bare, op: "==", value: { kind: "literal", value: true } };
@@ -437,6 +446,11 @@ export function conjuncts(node: CelNode, joiner: string): CelNode[] {
  * Read stored CEL into rows. `null` means the source does not parse, which is
  * the builder's one closed state: the site draws a notice in place of the rows
  * and opens its Developer view on the CEL text.
+ *
+ * A comparison reads as a row only where the picker would offer it: a known
+ * operand, an operator `operatorsFor` lists for its type and format, and a
+ * literal or a field `fieldValueCandidates` lists. Anything else is a raw row
+ * holding its own text. Nothing writes on read.
  */
 export function fromCel(src: string | undefined, operands: Operand[]): Condition | null {
   if (!src?.trim()) return { joiner: "&&", rows: [] };

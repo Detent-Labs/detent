@@ -1009,6 +1009,33 @@ describe("a row compares against another field", () => {
   });
 });
 
+describe("a comparison reads as a row only on an operator its operand offers", () => {
+  const operands = catalog([
+    labeled("starts_at", "Starts at", "string", { format: "datetime" }),
+    labeled("city", "City", "string"),
+    labeled("due_date", "Due date", "string", { format: "date" }),
+  ]);
+
+  it("leaves an ordering over a date-time a raw row holding its text", () => {
+    const src = 'data.starts_at >= "2026-01-01T00:00"';
+    const condition = fromCel(src, operands)!;
+    expect(condition.rows).toEqual([{ kind: "raw", src }]);
+    expect(toCel(condition, operands)).toBe(src);
+  });
+
+  it("leaves an ordering over plain text a raw row", () => {
+    expect(fromCel('data.city > "x"', operands)!.rows).toEqual([{ kind: "raw", src: 'data.city > "x"' }]);
+  });
+
+  it("reads an ordering over a date as a row", () => {
+    expect(fromCel('data.due_date >= "2026-01-01"', operands)!.rows).toEqual([cmpRow("data.due_date", ">=", lit("2026-01-01"))]);
+  });
+
+  it("leaves a membership in a non-list operand a raw row", () => {
+    expect(fromCel('"x" in data.city', operands)!.rows).toEqual([{ kind: "raw", src: '"x" in data.city' }]);
+  });
+});
+
 describe("a negated list membership reads and writes as one row", () => {
   const operands = catalog([labeled("approved", "Approved", "boolean"), labeled("amount", "Amount", "number")]);
 
