@@ -1,7 +1,7 @@
 /**
- * The condition builder's pure half: read CEL into a flat row model, write it
- * back out, build the operand list the picker offers, and read the rows back
- * as a sentence.
+ * The condition builder's pure half: read CEL into rows (with one grouping
+ * level), write them back out, build the operand list the picker offers, and
+ * read the rows back as a sentence.
  *
  * Read-back is by parse, never by a sidecar. A record of "how this condition
  * was built" cannot live in `ProcessBody` (it would move `definitionHash`) and
@@ -9,13 +9,12 @@
  * version uneditable in the builder. So the stored artifact stays the CEL text
  * and this model lives only between `parseAst()` and the next keystroke.
  *
- * Nothing here is persisted, hashed or versioned. A later grouping level
- * therefore changes this file alone: every condition the flat model emits is a
- * subset of what a grouping reader would accept.
+ * Nothing here is persisted, hashed or versioned. A change to the row model
+ * therefore changes no stored text.
  */
 
 import { parseAst, serializeAst, celType, INSTANCE_SCHEMA, ACTOR_SCHEMA } from "workflow-engine/cel/check";
-import type { BaseFieldType, ProcessBody } from "workflow-engine/schema";
+import { formatMatches, type BaseFieldType, type ProcessBody } from "workflow-engine/schema";
 import type { DraftField } from "../../draft/fields";
 import { flattenDraftFields } from "../../draft/fields";
 import { resolveDraftLocalizedText } from "../../draft/localized-text";
@@ -59,11 +58,24 @@ export interface Operand {
   /** A select bound to a data source: no studio route resolves its options. */
 }
 
-export type CmpOp = "==" | "!=" | "<" | "<=" | ">" | ">=" | "in";
+/** `!in` is the negated membership, `!("x" in F)`: a comparator of its own. */
+export type CmpOp = "==" | "!=" | "<" | "<=" | ">" | ">=" | "in" | "!in";
 
-export type Row =
-  | { kind: "cmp"; operand: string; op: CmpOp; value: string | number | boolean | undefined }
-  | { kind: "raw"; src: string };
+export type Literal = string | number | boolean | undefined;
+
+/** A comparison's right side: a typed literal, or another field's operand. */
+export type RowValue = { kind: "literal"; value: Literal } | { kind: "field"; path: string };
+
+export type Leaf = { kind: "cmp"; operand: string; op: CmpOp; value: RowValue } | { kind: "raw"; src: string };
+
+/** A group holds leaves only: the one-level limit lives in the type. */
+export interface GroupRow {
+  kind: "group";
+  joiner: "&&" | "||";
+  rows: Leaf[];
+}
+
+export type Row = Leaf | GroupRow;
 
 export interface Condition {
   joiner: "&&" | "||";
@@ -74,10 +86,16 @@ export interface Condition {
  * the rule-row builder writes too (it never writes `in`). */
 export const CMP_OPS: CmpOp[] = ["==", "!=", "<", "<=", ">", ">="];
 
-/** Operators offered per CEL type. A list gets `in` alone; it is the only mirrored form. */
-export function operatorsFor(celTypeName: string): CmpOp[] {
-  if (celTypeName === "list<string>") return ["in"];
+/**
+ * Operators offered per CEL type and format. A list gets the membership pair,
+ * the only mirrored form. A date orders, since its `YYYY-MM-DD` text orders as
+ * the calendar does. A date-time does not: its text may carry seconds and a
+ * zone, so it keeps equality alone. The rule builder passes the type alone.
+ */
+export function operatorsFor(celTypeName: string, format?: string): CmpOp[] {
+  if (celTypeName === "list<string>") return ["in", "!in"];
   if (celTypeName === "double" || celTypeName === "int") return CMP_OPS;
+  if (celTypeName === "string" && format === "date") return CMP_OPS;
   return ["==", "!="];
 }
 
@@ -297,7 +315,7 @@ export function memberPath(node: CelNode): string | undefined {
  * stays unread, so the comparison falls to a raw row instead of rounding.
  * Exported for `ruleLogic.ts`'s reuse.
  */
-export function literalOf(node: CelNode): string | number | boolean | undefined {
+export function literalOf(node: CelNode): Literal {
   if (node.op === "-_" && isCelNode(node.args)) {
     const inner = literalOf(node.args);
     // `0 - inner` keeps `-0.0` at 0, which `-inner` would turn into -0.
@@ -315,40 +333,145 @@ export function literalOf(node: CelNode): string | number | boolean | undefined 
  * sub-expression's own wrapping parens (see `serializeAst`'s doc), which
  * would otherwise truncate a fragment like `!(data.amount > 1000.0)`.
  */
-function rawRow(node: CelNode): Row {
+function rawRow(node: CelNode): Leaf {
   return { kind: "raw", src: serializeAst(node as never) };
 }
 
-function readRow(node: CelNode, byPath: Map<string, Operand>): Row {
+/** The operand a bare boolean member path names, else undefined. */
+function boolOperand(node: CelNode, byPath: Map<string, Operand>): string | undefined {
+  const path = memberPath(node);
+  return path !== undefined && byPath.get(path)?.celType === "bool" ? path : undefined;
+}
+
+/** `"manager" in actor.roles`: the literal sits left, mirroring the CEL text. */
+function readMembership(node: CelNode, byPath: Map<string, Operand>, op: "in" | "!in"): Leaf | undefined {
+  if (node.op !== "in" || !Array.isArray(node.args) || node.args.length !== 2) return undefined;
+  const [left, right] = node.args as [unknown, unknown];
+  if (!isCelNode(left) || !isCelNode(right)) return undefined;
+  const path = memberPath(right);
+  const value = literalOf(left);
+  if (path === undefined || !byPath.has(path) || value === undefined) return undefined;
+  return { kind: "cmp", operand: path, op, value: { kind: "literal", value } };
+}
+
+const comparesFields = (o: Operand) => o.group === "fields" || o.group === "child";
+
+/**
+ * The field and called-process operands a row on `operandPath` can compare
+ * against: the same CEL type and the same `format` (an absent format matches
+ * an absent one alone), the operand itself left out. A row on a context
+ * operand takes none, and so does a list operand, since `in` takes a literal.
+ */
+export function fieldValueCandidates(operandPath: string, operands: Operand[]): Operand[] {
+  const operand = operands.find((o) => o.path === operandPath);
+  if (!operand || !comparesFields(operand) || operand.celType === "list<string>") return [];
+  return operands.filter(
+    (o) =>
+      o.path !== operandPath &&
+      comparesFields(o) &&
+      o.celType === operand.celType &&
+      o.format === operand.format,
+  );
+}
+
+/** Two option sets match on the same values in the same order. An absent set
+ * matches an absent or empty one. */
+function sameOptions(a: OperandOption[] | undefined, b: OperandOption[] | undefined): boolean {
+  const left = a ?? [];
+  const right = b ?? [];
+  return left.length === right.length && left.every((o, i) => o.value === right[i]!.value);
+}
+
+/**
+ * A comparison moved onto the operand at `nextPath`. The operator and the
+ * value stay when the new operand offers that operator and shares the old
+ * one's CEL type, format and option set. A field value stays only when the new
+ * operand still offers that field as a candidate, so `data.a > data.b` moved
+ * onto `data.b` never writes `data.b > data.b`. Anything else resets to the new
+ * operand's first operator and an empty literal.
+ */
+export function retargetRow(row: Extract<Leaf, { kind: "cmp" }>, nextPath: string, operands: Operand[]): Extract<Leaf, { kind: "cmp" }> {
+  const from = operands.find((o) => o.path === row.operand);
+  const to = operands.find((o) => o.path === nextPath);
+  const empty: RowValue = { kind: "literal", value: undefined };
+  const fits =
+    from !== undefined &&
+    to !== undefined &&
+    from.celType === to.celType &&
+    from.format === to.format &&
+    sameOptions(from.options, to.options) &&
+    operatorsFor(to.celType, to.format).includes(row.op);
+  if (!fits) return { kind: "cmp", operand: nextPath, op: operatorsFor(to?.celType ?? "string", to?.format)[0]!, value: empty };
+  const { value } = row;
+  const keeps = value.kind === "literal" || fieldValueCandidates(nextPath, operands).some((o) => o.path === value.path);
+  return { kind: "cmp", operand: nextPath, op: row.op, value: keeps ? value : empty };
+}
+
+/** One leaf: a comparison the builder can show, else a raw row. A comparison
+ * on an operator its operand does not offer stays raw, so a row's select never
+ * holds an operator it cannot list. */
+function readLeaf(node: CelNode, operands: Operand[], byPath: Map<string, Operand>): Leaf {
+  const leaf = readComparison(node, operands, byPath);
+  if (leaf.kind !== "cmp") return leaf;
+  const operand = byPath.get(leaf.operand)!;
+  return operatorsFor(operand.celType, operand.format).includes(leaf.op) ? leaf : rawRow(node);
+}
+
+function readComparison(node: CelNode, operands: Operand[], byPath: Map<string, Operand>): Leaf {
   // A bare boolean operand reads as an explicit `== true`.
-  const bare = memberPath(node);
-  if (bare !== undefined && byPath.get(bare)?.celType === "bool") {
-    return { kind: "cmp", operand: bare, op: "==", value: true };
+  const bare = boolOperand(node, byPath);
+  if (bare !== undefined) return { kind: "cmp", operand: bare, op: "==", value: { kind: "literal", value: true } };
+
+  // `!` reads over a membership as `!in`, and over a bare boolean as `== false`.
+  if (node.op === "!_" && isCelNode(node.args)) {
+    const negated = boolOperand(node.args, byPath);
+    if (negated !== undefined) return { kind: "cmp", operand: negated, op: "==", value: { kind: "literal", value: false } };
+    return readMembership(node.args, byPath, "!in") ?? rawRow(node);
   }
 
-  if (!Array.isArray(node.args) || node.args.length !== 2) return rawRow(node);
+  if (node.op === "in") return readMembership(node, byPath, "in") ?? rawRow(node);
+
+  if (!CMP_OPS.includes(node.op as CmpOp) || !Array.isArray(node.args) || node.args.length !== 2) return rawRow(node);
   const [left, right] = node.args as [unknown, unknown];
   if (!isCelNode(left) || !isCelNode(right)) return rawRow(node);
-
-  // `"manager" in actor.roles`: the literal sits left, mirroring the CEL text.
-  if (node.op === "in") {
-    const path = memberPath(right);
-    const value = literalOf(left);
-    if (path !== undefined && byPath.has(path) && value !== undefined) {
-      return { kind: "cmp", operand: path, op: "in", value };
-    }
-    return rawRow(node);
-  }
-
-  if (!CMP_OPS.includes(node.op as CmpOp)) return rawRow(node);
   const path = memberPath(left);
+  if (path === undefined || !byPath.has(path)) return rawRow(node);
+  const op = node.op as CmpOp;
+
   const value = literalOf(right);
-  if (path === undefined || !byPath.has(path) || value === undefined) return rawRow(node);
-  return { kind: "cmp", operand: path, op: node.op as CmpOp, value };
+  if (value !== undefined) return { kind: "cmp", operand: path, op, value: { kind: "literal", value } };
+
+  // A right side the field picker would offer reads as a field value.
+  const other = memberPath(right);
+  if (other !== undefined && fieldValueCandidates(path, operands).some((o) => o.path === other)) {
+    return { kind: "cmp", operand: path, op, value: { kind: "field", path: other } };
+  }
+  return rawRow(node);
+}
+
+const isJoin = (node: CelNode): node is CelNode & { op: "&&" | "||" } => node.op === "&&" || node.op === "||";
+
+/** Flatten a chain of one operator on both sides: `a && (b && c)` is three
+ * members, since a parenthesis around the same operator has no meaning. */
+function chainOf(node: CelNode, joiner: string): CelNode[] {
+  if (node.op !== joiner || !Array.isArray(node.args) || node.args.length !== 2) return [node];
+  const [left, right] = node.args as [unknown, unknown];
+  if (!isCelNode(left) || !isCelNode(right)) return [node];
+  return [...chainOf(left, joiner), ...chainOf(right, joiner)];
+}
+
+/** One member of the condition's chain. A chain of the other operator reads as
+ * a group, whose own `&&` or `||` members read as raw rows. */
+function readRow(node: CelNode, operands: Operand[], byPath: Map<string, Operand>): Row {
+  if (!isJoin(node)) return readLeaf(node, operands, byPath);
+  const rows = chainOf(node, node.op).map((m) => (isJoin(m) ? rawRow(m) : readLeaf(m, operands, byPath)));
+  return { kind: "group", joiner: node.op, rows };
 }
 
 /** Flatten the left-associative chain of one operator; a nested other operator
- * survives whole. Exported for `ruleLogic.ts`'s reuse. */
+ * survives whole. Exported for `ruleLogic.ts`'s reuse. Unlike `chainOf`, it
+ * walks the left spine alone: a right operand on the same operator stays one
+ * member. */
 export function conjuncts(node: CelNode, joiner: string): CelNode[] {
   if (node.op !== joiner || !Array.isArray(node.args) || node.args.length !== 2) return [node];
   const [left, right] = node.args as [unknown, unknown];
@@ -360,6 +483,11 @@ export function conjuncts(node: CelNode, joiner: string): CelNode[] {
  * Read stored CEL into rows. `null` means the source does not parse, which is
  * the builder's one closed state: the site draws a notice in place of the rows
  * and opens its Developer view on the CEL text.
+ *
+ * A comparison reads as a row only where the picker would offer it: a known
+ * operand, an operator `operatorsFor` lists for its type and format, and a
+ * literal or a field `fieldValueCandidates` lists. Anything else is a raw row
+ * holding its own text. Nothing writes on read.
  */
 export function fromCel(src: string | undefined, operands: Operand[]): Condition | null {
   if (!src?.trim()) return { joiner: "&&", rows: [] };
@@ -367,9 +495,8 @@ export function fromCel(src: string | undefined, operands: Operand[]): Condition
   if (!ast || !isCelNode(ast)) return null;
 
   const byPath = new Map(operands.map((o) => [o.path, o]));
-  const joiner = ast.op === "||" ? "||" : "&&";
-  const nodes = ast.op === "&&" || ast.op === "||" ? conjuncts(ast, ast.op) : [ast];
-  return { joiner, rows: nodes.map((n) => readRow(n, byPath)) };
+  if (!isJoin(ast)) return { joiner: "&&", rows: [readLeaf(ast, operands, byPath)] };
+  return { joiner: ast.op, rows: chainOf(ast, ast.op).map((n) => readRow(n, operands, byPath)) };
 }
 
 // --- writing --------------------------------------------------------------
@@ -410,7 +537,7 @@ export function celLiteral(value: string | number | boolean, celTypeName: string
 }
 
 /** The boolean select's value for a row's literal: `""` stands for no choice yet. */
-export function boolChoiceOf(value: string | number | boolean | undefined): "" | "true" | "false" {
+export function boolChoiceOf(value: Literal): "" | "true" | "false" {
   if (value === undefined || value === "") return "";
   return value === true || value === "true" ? "true" : "false";
 }
@@ -420,13 +547,84 @@ export function boolValueOf(choice: string): boolean | undefined {
   return choice === "" ? undefined : choice === "true";
 }
 
-/** True when a row carries everything `toCel` needs to write it. */
+/** True when a row carries everything `toCel` needs to write it. A group is
+ * complete when one of its leaves is. */
 export function isComplete(row: Row, byPath: Map<string, Operand>): boolean {
+  if (row.kind === "group") return row.rows.some((r) => isComplete(r, byPath));
   if (row.kind === "raw") return row.src.trim().length > 0;
   const operand = byPath.get(row.operand);
   if (!operand) return false;
-  if (row.value === undefined || row.value === "") return false;
-  return celLiteral(row.value, operand.celType) !== undefined;
+  // `in` takes a literal: a field value has no membership form.
+  if (row.value.kind === "field") return byPath.has(row.value.path) && row.op !== "in" && row.op !== "!in";
+  const value = row.value.value;
+  if (value === undefined || value === "") return false;
+  return celLiteral(value, operand.celType) !== undefined;
+}
+
+/** The leaves plus the groups: the count `commitDecision` compares, so a
+ * removal inside a group counts as a removal. */
+export function rowCount(condition: Condition): number {
+  return condition.rows.reduce((n, r) => n + (r.kind === "group" ? 1 + r.rows.length : 1), 0);
+}
+
+/** A fresh comparison row on the first operand, with no value yet. */
+export function newLeaf(operands: Operand[]): Leaf {
+  const first = operands[0];
+  return {
+    kind: "cmp",
+    operand: first?.path ?? "",
+    op: operatorsFor(first?.celType ?? "string", first?.format)[0]!,
+    value: { kind: "literal", value: undefined },
+  };
+}
+
+/** A fresh group with one fresh row, on the joiner opposite to the one it
+ * joins: a group on the same joiner reads back flat. */
+export function newGroup(parentJoiner: Condition["joiner"], operands: Operand[]): GroupRow {
+  return { kind: "group", joiner: parentJoiner === "&&" ? "||" : "&&", rows: [newLeaf(operands)] };
+}
+
+/** A row's place: a top-level row, or with `inner` a leaf of the group there. */
+export interface RowAt {
+  row: number;
+  inner?: number;
+}
+
+/** The condition without the row at `at`. A group's last leaf takes the
+ * group with it: the author never faces an empty group. */
+export function withoutRow(condition: Condition, at: RowAt): Condition {
+  const target = condition.rows[at.row];
+  if (at.inner === undefined || target?.kind !== "group") {
+    return { ...condition, rows: condition.rows.filter((_, i) => i !== at.row) };
+  }
+  const rows = target.rows.filter((_, i) => i !== at.inner);
+  return {
+    ...condition,
+    rows: rows.length
+      ? condition.rows.map((r, i) => (i === at.row ? { ...target, rows } : r))
+      : condition.rows.filter((_, i) => i !== at.row),
+  };
+}
+
+/** The condition with a fresh group after its rows. */
+export function withGroup(condition: Condition, operands: Operand[]): Condition {
+  return { ...condition, rows: [...condition.rows, newGroup(condition.joiner, operands)] };
+}
+
+/** One complete leaf as CEL, a raw row's text as it stands. */
+function leafCel(leaf: Leaf, byPath: Map<string, Operand>): string {
+  if (leaf.kind === "raw") return leaf.src;
+  const operand = byPath.get(leaf.operand)!;
+  const value = leaf.value.kind === "field" ? leaf.value.path : celLiteral(leaf.value.value as string | number | boolean, operand.celType)!;
+  // `in` is the one mirrored form: the literal sits left, as the CEL text reads.
+  if (leaf.op === "in") return `${value} in ${operand.path}`;
+  if (leaf.op === "!in") return `!(${value} in ${operand.path})`;
+  return `${operand.path} ${leaf.op} ${value}`;
+}
+
+/** Leaves joined at one level. A raw row takes parentheses beside a second part. */
+function joinLeaves(leaves: Leaf[], joiner: Condition["joiner"], parenthesise: boolean, byPath: Map<string, Operand>): string {
+  return leaves.map((l) => (l.kind === "raw" && parenthesise ? `(${l.src})` : leafCel(l, byPath))).join(` ${joiner} `);
 }
 
 /**
@@ -438,18 +636,23 @@ export function isComplete(row: Row, byPath: Map<string, Operand>): boolean {
  */
 export function toCel(condition: Condition, operands: Operand[]): string | undefined {
   const byPath = new Map(operands.map((o) => [o.path, o]));
-  const usable = condition.rows.filter((r) => isComplete(r, byPath));
-  const parenthesise = usable.length > 1;
-
-  const parts = usable.flatMap((row) => {
-    if (row.kind === "raw") return [parenthesise ? `(${row.src})` : row.src];
-    const operand = byPath.get(row.operand)!;
-    const literal = celLiteral(row.value as string | number | boolean, operand.celType)!;
-    // `in` is the one mirrored form: the literal sits left, as the CEL text reads.
-    return [row.op === "in" ? `${literal} in ${operand.path}` : `${operand.path} ${row.op} ${literal}`];
+  // A group of one usable leaf writes as that leaf at the condition's level.
+  const parts = condition.rows.flatMap((row): (Leaf | GroupRow)[] => {
+    if (row.kind !== "group") return isComplete(row, byPath) ? [row] : [];
+    const leaves = row.rows.filter((r) => isComplete(r, byPath));
+    if (leaves.length > 1) return [{ ...row, rows: leaves }];
+    return leaves;
   });
+  if (!parts.length) return undefined;
+  const parenthesise = parts.length > 1;
 
-  return parts.length ? parts.join(` ${condition.joiner} `) : undefined;
+  return parts
+    .map((part) => {
+      if (part.kind !== "group") return joinLeaves([part], condition.joiner, parenthesise, byPath);
+      const text = joinLeaves(part.rows, part.joiner, true, byPath);
+      return parenthesise ? `(${text})` : text;
+    })
+    .join(` ${condition.joiner} `);
 }
 
 /**
@@ -476,7 +679,8 @@ export function commitDecision(
 // --- the condition in words (studio-condition-builder) --------------------
 
 /** Each operator's catalog name: `condition.op.<name>` is its select word and
- * `condition.clause.<name>` its clause. */
+ * `condition.clause.<name>` its clause. A date operand's ordering operators
+ * take the names in `DATE_OP_NAMES` instead. */
 export const OP_NAMES = {
   "==": "eq",
   "!=": "ne",
@@ -485,35 +689,96 @@ export const OP_NAMES = {
   ">": "gt",
   ">=": "ge",
   in: "in",
+  "!in": "notIn",
 } as const satisfies Record<CmpOp, string>;
+
+const DATE_OP_NAMES = { "<": "before", "<=": "onOrBefore", ">": "after", ">=": "onOrAfter" } as const;
+
+type OrderingOp = keyof typeof DATE_OP_NAMES;
+type OpName = (typeof OP_NAMES)[CmpOp] | (typeof DATE_OP_NAMES)[OrderingOp];
+
+/** An operator's catalog name, picked by the operand's format. */
+function opName(op: CmpOp, operand: Pick<Operand, "format"> | undefined): OpName {
+  if (operand?.format === "date" && op in DATE_OP_NAMES) return DATE_OP_NAMES[op as OrderingOp];
+  return OP_NAMES[op];
+}
+
+/** The operator select's word for `op` on `operand`: "is on or before" for a
+ * date, "is at most" for a number. */
+export function operatorWord(op: CmpOp, operand: Pick<Operand, "format"> | undefined): string {
+  return t(`condition.op.${opName(op, operand)}`);
+}
 
 /** No digit the author typed goes. */
 const NUMBER = new Intl.NumberFormat("en", { maximumFractionDigits: 20 });
 
-/**
- * The value half of a clause, in the author's form: an option's label for a
- * closed list, "yes" or "no" for a boolean, a formatted number, a date or a
- * date-time as its stored text, and free text in curly quotes.
- */
-export function summarizeValue(row: Extract<Row, { kind: "cmp" }>, operand: Operand | undefined): string {
-  const option = operand?.options?.find((o) => o.value === row.value);
-  if (option) return option.label;
-  if (operand?.celType === "bool") return boolChoiceOf(row.value) === "true" ? t("condition.yes") : t("condition.no");
-  if (operand?.celType === "double" || operand?.celType === "int") return NUMBER.format(Number(row.value));
-  if (operand?.format === "date" || operand?.format === "datetime") return String(row.value ?? "");
-  return `“${String(row.value ?? "")}”`;
+const DATE = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const DATE_TIME = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "UTC",
+});
+
+/** A date or date-time literal as a formatted date. A zoneless value reads its
+ * components as UTC and prints in UTC, so the printed date and time are the
+ * ones stored, whatever the browser's zone. A date-time carrying a zone, a
+ * literal outside the format's value domain, and one no `Date` can hold print
+ * as their stored text. */
+function formatDate(value: Literal, format: "date" | "datetime"): string {
+  const text = String(value ?? "");
+  if (!formatMatches({ type: "string", format }, text)) return text;
+  if (format === "datetime" && /(?:Z|[+-]\d{2}:\d{2})$/.test(text)) return text;
+  const date = new Date(format === "date" ? `${text}T00:00:00Z` : `${text}Z`);
+  if (Number.isNaN(date.getTime())) return text;
+  return (format === "date" ? DATE : DATE_TIME).format(date);
 }
 
-/** One row's clause. A boolean row takes the `eq` or `ne` clause with the
- * value "yes" or "no". A raw row reads as the catalog's phrase, never its CEL
- * text. */
-function summarizeRow(row: Row, byPath: Map<string, Operand>): string {
-  if (row.kind === "raw") return t("condition.clause.raw");
-  const operand = byPath.get(row.operand);
-  return fill(t(`condition.clause.${OP_NAMES[row.op]}`), {
-    field: operand?.clauseLabel ?? operand?.label ?? row.operand,
-    value: summarizeValue(row, operand),
+/**
+ * The value half of a clause, in the author's form: an option's label for a
+ * closed list, "yes" or "no" for a boolean, a formatted number, a formatted
+ * date or date-time, and free text in curly quotes.
+ */
+export function summarizeValue(value: Literal, operand: Operand | undefined): string {
+  const option = operand?.options?.find((o) => o.value === value);
+  if (option) return option.label;
+  if (operand?.celType === "bool") return boolChoiceOf(value) === "true" ? t("condition.yes") : t("condition.no");
+  if (operand?.celType === "double" || operand?.celType === "int") return NUMBER.format(Number(value));
+  if (operand?.format === "date" || operand?.format === "datetime") return formatDate(value, operand.format);
+  return `“${String(value ?? "")}”`;
+}
+
+/** One leaf's clause. A boolean row takes the `eq` or `ne` clause with the
+ * value "yes" or "no". A field value prints the other field's label. A raw
+ * row reads as the catalog's phrase, never its CEL text. */
+function summarizeLeaf(leaf: Leaf, byPath: Map<string, Operand>): string {
+  if (leaf.kind === "raw") return t("condition.clause.raw");
+  const operand = byPath.get(leaf.operand);
+  const value =
+    leaf.value.kind === "field"
+      ? (byPath.get(leaf.value.path)?.label ?? t("condition.unnamedField"))
+      : summarizeValue(leaf.value.value, operand);
+  return fill(t(`condition.clause.${opName(leaf.op, operand)}`), {
+    field: operand?.clauseLabel ?? operand?.label ?? leaf.operand,
+    value,
   });
+}
+
+/** A group's clause over its complete leaves: one reads as itself, two as
+ * "either A or B" or "both A and B", three or more as "any of A, B or C" or
+ * "all of A, B and C". */
+function summarizeGroup(group: GroupRow, byPath: Map<string, Operand>): string {
+  const clauses = group.rows.filter((r) => isComplete(r, byPath)).map((r) => summarizeLeaf(r, byPath));
+  const or = group.joiner === "||";
+  if (clauses.length < 2) return clauses[0] ?? "";
+  if (clauses.length === 2) {
+    return fill(t(or ? "condition.clause.either" : "condition.clause.both"), { left: clauses[0]!, right: clauses[1]! });
+  }
+  const head = clauses.slice(0, -1).reduce((left, right) => fill(t("condition.join.list"), { left, right }));
+  const list = fill(t(or ? "condition.join.or" : "condition.join.and"), { left: head, right: clauses.at(-1)! });
+  return fill(t(or ? "condition.clause.anyOf" : "condition.clause.allOf"), { clauses: list });
 }
 
 /**
@@ -527,16 +792,44 @@ function summarizeRow(row: Row, byPath: Map<string, Operand>): string {
  */
 export function summarizeCondition(condition: Condition, operands: Operand[]): string {
   const byPath = new Map(operands.map((o) => [o.path, o]));
-  const clauses = condition.rows.filter((r) => isComplete(r, byPath)).map((r) => summarizeRow(r, byPath));
-  return joinClauses(clauses, condition.joiner);
+  const rows = condition.rows.filter((r) => isComplete(r, byPath));
+  // A group of one complete leaf reads as that leaf, so it is no group here.
+  const groups = rows.map((r) => r.kind === "group" && r.rows.filter((l) => isComplete(l, byPath)).length > 1);
+  const clauses = rows.map((r) => (r.kind === "group" ? summarizeGroup(r, byPath) : summarizeLeaf(r, byPath)));
+  return joinClauses(clauses, condition.joiner, groups);
 }
 
-/** The clauses folded through the catalog's join phrase, `""` for none.
- * Exported for `ruleLogic.ruleSentence`, which reads the same phrases. */
-export function joinClauses(clauses: readonly string[], joiner: Condition["joiner"]): string {
+/**
+ * The clauses folded through the catalog's join phrase, `""` for none.
+ * `groups[i]` marks clause `i` as a group's clause: a group clause with a
+ * clause after it joins through the comma form, so "either A or B, and C"
+ * never reads as "either A or (B and C)". Exported for `ruleLogic.ruleSentence`,
+ * which reads the same phrases and passes no group.
+ */
+export function joinClauses(clauses: readonly string[], joiner: Condition["joiner"], groups: readonly boolean[] = []): string {
   if (!clauses.length) return "";
-  const join = t(joiner === "&&" ? "condition.join.and" : "condition.join.or");
-  return clauses.reduce((left, right) => fill(join, { left, right }));
+  const and = joiner === "&&";
+  const join = t(and ? "condition.join.and" : "condition.join.or");
+  const afterGroup = t(and ? "condition.join.andAfterGroup" : "condition.join.orAfterGroup");
+  return clauses.reduce((left, right, i) => fill(groups[i - 1] ? afterGroup : join, { left, right }));
+}
+
+/** True when the condition's sentence opens on a value, a list clause's: the
+ * sentence then keeps the value's case. */
+function opensOnValue(condition: Condition, operands: Operand[]): boolean {
+  const byPath = new Map(operands.map((o) => [o.path, o]));
+  const first = condition.rows.find((r) => isComplete(r, byPath));
+  const leaves = first?.kind === "group" ? first.rows.filter((l) => isComplete(l, byPath)) : first ? [first] : [];
+  // A group of two or more opens on its group word.
+  const lead = leaves.length === 1 ? leaves[0] : undefined;
+  return lead?.kind === "cmp" && (lead.op === "in" || lead.op === "!in");
+}
+
+/** A condition's clauses as a sentence: a capital at the head, unless the
+ * sentence opens on a value, and a period at the end. */
+function sentenceOf(condition: Condition, operands: Operand[], clauses: string): string {
+  const sentence = fill(t("condition.sentence"), { condition: clauses });
+  return opensOnValue(condition, operands) ? sentence : capitalize(sentence);
 }
 
 /** Exported for `ruleLogic.ruleSentence`, which opens its sentence the same way. */
@@ -556,7 +849,7 @@ export const capitalize = (s: string): string => s.charAt(0).toLocaleUpperCase("
  */
 export function conditionSentence(condition: Condition, operands: Operand[], stored: string | undefined): string {
   const clauses = summarizeCondition(condition, operands);
-  if (clauses) return capitalize(fill(t("condition.sentence"), { condition: clauses }));
+  if (clauses) return sentenceOf(condition, operands, clauses);
   const hasStored = Boolean(stored?.trim());
   if (!condition.rows.length && !hasStored) return t("condition.empty");
   const held = hasStored ? fromCel(stored, operands) : null;
@@ -574,8 +867,8 @@ export function conditionSentence(condition: Condition, operands: Operand[], sto
 export function readerSentence(src: string, operands: Operand[]): string {
   const condition = fromCel(src, operands);
   const clauses = condition ? summarizeCondition(condition, operands) : "";
-  if (!clauses) return t("condition.readerRaw");
-  return capitalize(fill(t("condition.sentence"), { condition: clauses }));
+  if (!condition || !clauses) return t("condition.readerRaw");
+  return sentenceOf(condition, operands, clauses);
 }
 
 /**
@@ -584,14 +877,17 @@ export function readerSentence(src: string, operands: Operand[]): string {
  * builder's sentence does, with no capital added: a field label keeps the
  * author's case, a context operand reads lowercase. A raw row beside a
  * readable row reads as the catalog's phrase. Source that does not parse, or
- * holds no complete comparison row, reads as a hand-written rule holding.
+ * holds no complete comparison row at either level, reads as a hand-written
+ * rule holding.
  * No CEL source prints, whatever the guard holds.
  */
 export function guardPhrase(src: string, operands: Operand[]): string {
   const condition = fromCel(src, operands);
   if (!condition) return t("condition.handWrittenHolds");
   const byPath = new Map(operands.map((o) => [o.path, o]));
-  // A raw row counts as complete, so the test reads the row kind.
-  if (!condition.rows.some((r) => r.kind === "cmp" && isComplete(r, byPath))) return t("condition.handWrittenHolds");
+  // A raw row counts as complete, so the test reads the row kind. A
+  // comparison inside a group counts as readable too.
+  const readable = (r: Row): boolean => (r.kind === "group" ? r.rows.some(readable) : r.kind === "cmp" && isComplete(r, byPath));
+  if (!condition.rows.some(readable)) return t("condition.handWrittenHolds");
   return summarizeCondition(condition, operands);
 }

@@ -7515,3 +7515,35 @@ account trigger. Repeat with Escape and get the same result.
 a step's label. Open the Publish dialog with the change list closed. Tab through
 it. Pass: the focus stands on each Developer view's summary, and on nothing
 inside a closed one. No e2e flow sees this, since its draft has never published.
+
+### Condition groups and field values (`studio-condition-builder-expansion`)
+
+Source: `studio-condition-builder-expansion` task 3.3.
+
+The unit tests read the rows, the words and the written CEL. A human eye still
+reads the indent, the grounds and the flags. Use the production build. Open the
+draft of "IT Offboarding" on the Steps tab, at a way out's "Only if". Check
+each state below at 1280px and at 1440px. Check it with the color scheme set to
+light, then to dark (`prefers-color-scheme`).
+
+- **Condition group**: press "+ Add group". The group's head holds the select
+  "how the group's rows combine", with "any of these" and "all of these".
+  Its rows stand indented under a 2px left rule, with "+ Add row to this
+  group" under them.
+- **Unfinished group**: a group with no finished row. It draws the dashed
+  border. The group has no flag of its own, and its unfinished row's flag
+  says what to do.
+- **Field-compared date row**: a date field's row. Press "Compare with a field
+  instead", then pick another date field. The command now reads "Type a value
+  instead". Press it, and the literal editor comes back empty.
+- **List row**: a row on the person's roles with "does not include" and the
+  value "manager". The sentence reads "“manager” is not one of the person's
+  roles."
+- **A lone group reads back flat**: remove every row but one group of two
+  finished rows, then reload the page. The rows stand flat, with no group
+  head, joined by the group's word.
+
+Pass: an inner row and its group's ground read as distinct in both schemes. No
+control runs under the next section at 1280px. The sentence under the rows
+reads what the rows say. Each flag reads in the refusal tone, and no border
+goes invisible in dark mode.

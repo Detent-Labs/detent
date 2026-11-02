@@ -1288,6 +1288,14 @@ system that resulted; this file explains why it took that shape.
   Resolved by `studio-checks-by-subject`: `studio-publishErrors.test.ts` covers
   the swap on a step and on the contract, with `checks.fallback.contract` behind it.
 
+- **SENTENCE-2: a list clause is not good grammar.** It reads "The person's
+  roles contains “manager”". The clause cannot know whether a label is
+  plural. Change 16 revisits the phrasing of list clauses.
+
+  Resolved by `studio-condition-builder-expansion` on 2026-11-02: the list
+  clause puts the value first, as "“manager” is one of the person's roles".
+  The sentence then conjugates nothing against the label.
+
 ## Closed by `studio-one-dialog-form`
 - Studio's native `<dialog>` confirm dialogs do not fully hold a keyboard
   user inside them. `stylex-phase-3-studio`'s own task 11.5 keyboard walk

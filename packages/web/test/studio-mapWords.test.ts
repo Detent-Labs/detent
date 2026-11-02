@@ -142,6 +142,15 @@ describe("wayOutSentence: one form per path (design D3)", () => {
     expect(sentences(step)).toEqual(["Only if a hand-written rule holds"]);
   });
 
+  it("reads a grouped guard's group after Only if", () => {
+    const grouped = { lang: "cel", src: 'data.amount > 1000.0 && (data.amount < 5000.0 || instance.status == "running")' };
+    const step = stepOf([{ id: "path_a", key: "k_a", label: "A", to: "step_x", trigger: "manual", guard: grouped }]);
+
+    expect(sentences(step)).toEqual([
+      "Only if Amount is greater than 1,000 and either Amount is less than 5,000 or the case's status is running",
+    ]);
+  });
+
   it("keeps a context operand lowercase after Only if", () => {
     const step = stepOf([
       { id: "path_a", key: "k_a", label: "A", to: "step_x", trigger: "manual", guard: { lang: "cel", src: 'instance.status == "running"' } },

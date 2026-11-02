@@ -37,6 +37,22 @@ describe("guardedManualPathNotes", () => {
     ]);
   });
 
+  it("names a grouped guard's group in words", () => {
+    const grouped = { lang: "cel", src: '(data.amount > 1000.0 || instance.status == "running") && data.amount < 5000.0' };
+    const notes = guardedManualPathNotes(
+      step([{ id: "path_1", key: "approve", label: "Approve", to: "step_b", trigger: "manual", guard: grouped }]),
+      operands,
+    );
+
+    expect(notes).toEqual([
+      {
+        pathId: "path_1",
+        label: "Approve",
+        condition: "either Amount is greater than 1,000 or the case's status is running, and Amount is less than 5,000",
+      },
+    ]);
+  });
+
   it("gives an unguarded manual path no note", () => {
     const notes = guardedManualPathNotes(
       step([{ id: "path_1", key: "approve", label: "Approve", to: "step_b", trigger: "manual" }]),

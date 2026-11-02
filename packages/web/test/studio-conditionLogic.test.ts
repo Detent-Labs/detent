@@ -4,15 +4,25 @@ import {
   buildOperands,
   celLiteral,
   conditionSentence,
+  fieldValueCandidates,
   fromCel,
   guardPhrase,
+  isComplete,
+  newGroup,
+  newLeaf,
   operandSignature,
+  operatorWord,
   readerSentence,
+  retargetRow,
   operatorsFor,
+  rowCount,
   summarizeCondition,
   toCel,
+  type CmpOp,
   type Condition,
+  type Leaf,
   type Operand,
+  type RowValue,
 } from "../src/areas/studio/panels/shared/conditionLogic.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import { t } from "../src/areas/studio/catalog.js";
@@ -39,12 +49,18 @@ const field = (key: string, type: string, extra: object = {}): DraftField =>
 const catalog = (fields: DraftField[]): Operand[] =>
   buildOperands({ fields, locale: "en", baseLocale: "en" });
 
+/** A literal row value. */
+const lit = (value: string | number | boolean | undefined) => ({ kind: "literal" as const, value });
+
 describe("fromCel / toCel round-trip over examples/", () => {
-  // The two named normalisations: single quotes become double, and a bare
-  // boolean operand becomes an explicit `== true`. Nothing else may move.
+  // The reader's four normalisations: single quotes become double, a bare
+  // boolean becomes `== true`, a negated boolean becomes `== false`, and a
+  // nested chain of the parent's own operator flattens. Nothing else may move.
   const NORMALISED: Record<string, string> = {
     "data.booking_status == 'booked'": 'data.booking_status == "booked"',
     "data.booking_status == 'failed'": 'data.booking_status == "failed"',
+    "data.po_status == 'issued'": 'data.po_status == "issued"',
+    "data.po_status == 'failed'": 'data.po_status == "failed"',
   };
 
   const cases: [string, string, ProcessBody | undefined][] = [
@@ -53,6 +69,9 @@ describe("fromCel / toCel round-trip over examples/", () => {
     ["data.amount > 1000.0", "subprocess-credit-check-child.json", undefined],
     ['child.outcome == "approved"', "subprocess-loan-parent.json", example("subprocess-credit-check-child.json")],
     ['child.outcome == "rejected"', "subprocess-loan-parent.json", example("subprocess-credit-check-child.json")],
+    ["data.po_status == 'issued'", "purchase-requisition.json", undefined],
+    ["data.po_status == 'failed'", "purchase-requisition.json", undefined],
+    ["data.received_quantity >= data.quantity", "purchase-requisition.json", undefined],
   ];
 
   for (const [src, file, child] of cases) {
@@ -67,7 +86,31 @@ describe("fromCel / toCel round-trip over examples/", () => {
   it("reads every example guard as a comparison row, never a raw fallback", () => {
     for (const [src, file, child] of cases) {
       const operands = operandsOf(example(file), child);
-      expect(fromCel(src, operands)!.rows[0].kind).toBe("cmp");
+      expect(fromCel(src, operands)!.rows[0]!.kind).toBe("cmp");
+    }
+  });
+
+  it("reads the examples' field comparison with the other field as its value", () => {
+    const operands = operandsOf(example("purchase-requisition.json"));
+    expect(fromCel("data.received_quantity >= data.quantity", operands)!.rows).toEqual([
+      { kind: "cmp", operand: "data.received_quantity", op: ">=", value: { kind: "field", path: "data.quantity" } },
+    ]);
+  });
+
+  it("keeps the examples' arithmetic guard as a raw row, written back unchanged", () => {
+    const operands = operandsOf(example("purchase-requisition.json"));
+    const src = "data.quantity * data.unit_price >= 10000.0";
+    const condition = fromCel(src, operands)!;
+    expect(condition.rows).toEqual([{ kind: "raw", src }]);
+    expect(toCel(condition, operands)).toBe(src);
+  });
+
+  it("writes text the CEL check accepts for every example guard", () => {
+    for (const [src, file, child] of cases) {
+      const body = example(file);
+      const written = toCel(fromCel(src, operandsOf(body, child))!, operandsOf(body, child))!;
+      if (child) continue; // `child` is no namespace `checkAgainstFields` declares.
+      expect(checkAgainstFields(written, body.fields)).toEqual({ ok: true });
     }
   });
 });
@@ -75,12 +118,19 @@ describe("fromCel / toCel round-trip over examples/", () => {
 describe("fromCel", () => {
   const operands = catalog([field("a", "boolean"), field("b", "boolean"), field("c", "boolean")]);
 
-  it("a && b || c yields the joiner || and a raw row holding a && b", () => {
+  it("a && b || c yields the joiner || and a group holding a and b, then c", () => {
     const condition = fromCel("data.a && data.b || data.c", operands)!;
     expect(condition.joiner).toBe("||");
     expect(condition.rows).toEqual([
-      { kind: "raw", src: "data.a && data.b" },
-      { kind: "cmp", operand: "data.c", op: "==", value: true },
+      {
+        kind: "group",
+        joiner: "&&",
+        rows: [
+          { kind: "cmp", operand: "data.a", op: "==", value: lit(true) },
+          { kind: "cmp", operand: "data.b", op: "==", value: lit(true) },
+        ],
+      },
+      { kind: "cmp", operand: "data.c", op: "==", value: lit(true) },
     ]);
   });
 
@@ -96,7 +146,7 @@ describe("fromCel", () => {
     const src = 'data.tags.exists(t, t == "vip") && data.amount > 1000.0';
     const condition = fromCel(src, ops)!;
     expect(condition.rows[0]).toEqual({ kind: "raw", src: 'data.tags.exists(t, t == "vip")' });
-    expect(condition.rows[1]).toEqual({ kind: "cmp", operand: "data.amount", op: ">", value: 1000 });
+    expect(condition.rows[1]).toEqual({ kind: "cmp", operand: "data.amount", op: ">", value: lit(1000) });
   });
 
   it("an unknown operand yields a raw row with its src untouched", () => {
@@ -121,13 +171,13 @@ describe("`in` is the one mirrored form", () => {
     const src = '"manager" in actor.roles';
     const ops = catalog([]);
     const condition = fromCel(src, ops)!;
-    expect(condition.rows).toEqual([{ kind: "cmp", operand: "actor.roles", op: "in", value: "manager" }]);
+    expect(condition.rows).toEqual([{ kind: "cmp", operand: "actor.roles", op: "in", value: lit("manager") }]);
     expect(toCel(condition, ops)).toBe(src);
   });
 
-  it("a list operand offers contains and nothing else", () => {
-    expect(operatorsFor("list<string>")).toEqual(["in"]);
-    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.tags", op: "in", value: "vip" }] };
+  it("a list operand offers the membership pair and nothing else", () => {
+    expect(operatorsFor("list<string>")).toEqual(["in", "!in"]);
+    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.tags", op: "in", value: lit("vip") }] };
     expect(toCel(condition, operands)).toBe('"vip" in data.tags');
   });
 });
@@ -136,7 +186,7 @@ describe("literals follow the operand's declared type", () => {
   const operands = catalog([field("amount", "number"), field("approved", "boolean"), field("note", "string")]);
 
   it("a number operand emits the double form, not an int", () => {
-    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: "1000" }] };
+    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: lit("1000") }] };
     expect(toCel(condition, operands)).toBe("data.amount > 1000.0");
     expect(celLiteral(1000, "double")).toBe("1000.0");
     expect(celLiteral(10.5, "double")).toBe("10.5");
@@ -146,7 +196,7 @@ describe("literals follow the operand's declared type", () => {
     const ints = catalog([field("prioritaet", "number", { format: "integer" })]);
     const operand = ints.find((o) => o.path === "data.prioritaet")!;
     expect(operand.celType).toBe("int");
-    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.prioritaet", op: ">", value: "3" }] };
+    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.prioritaet", op: ">", value: lit("3") }] };
     expect(toCel(condition, ints)).toBe("data.prioritaet > 3");
     // A decimal is no `int` literal at all, so the row stays incomplete
     // rather than emitting text the publish-time check refuses.
@@ -159,17 +209,17 @@ describe("literals follow the operand's declared type", () => {
 
   it("a bare boolean operand round-trips as an explicit comparison against true", () => {
     const condition = fromCel("data.approved", operands)!;
-    expect(condition.rows).toEqual([{ kind: "cmp", operand: "data.approved", op: "==", value: true }]);
+    expect(condition.rows).toEqual([{ kind: "cmp", operand: "data.approved", op: "==", value: lit(true) }]);
     expect(toCel(condition, operands)).toBe("data.approved == true");
   });
 
   it("a value holding a double quote and a backslash re-parses after toCel writes it", () => {
     const value = 'he said "hi" \\ bye';
-    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.note", op: "==", value }] };
+    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.note", op: "==", value: lit(value) }] };
     const src = toCel(condition, operands)!;
     expect(src).toBe('data.note == "he said \\"hi\\" \\\\ bye"');
     // The written text must read back to the identical value.
-    expect(fromCel(src, operands)!.rows).toEqual([{ kind: "cmp", operand: "data.note", op: "==", value }]);
+    expect(fromCel(src, operands)!.rows).toEqual([{ kind: "cmp", operand: "data.note", op: "==", value: lit(value) }]);
   });
 });
 
@@ -184,16 +234,16 @@ describe("the builder reads back every literal it writes", () => {
   const cmp = (src: string) => fromCel(src, operands)!.rows;
 
   it("an integer literal reads as a comparison row", () => {
-    expect(cmp("data.prioritaet > 3")).toEqual([{ kind: "cmp", operand: "data.prioritaet", op: ">", value: 3 }]);
+    expect(cmp("data.prioritaet > 3")).toEqual([{ kind: "cmp", operand: "data.prioritaet", op: ">", value: lit(3) }]);
   });
 
   it("a negative double reads as a comparison row", () => {
-    expect(cmp("data.amount > -5.0")).toEqual([{ kind: "cmp", operand: "data.amount", op: ">", value: -5 }]);
+    expect(cmp("data.amount > -5.0")).toEqual([{ kind: "cmp", operand: "data.amount", op: ">", value: lit(-5) }]);
   });
 
   it("a double with an exponent is written as valid CEL and reads back", () => {
     expect(celLiteral(1e21, "double")).toBe("1e+21");
-    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: 1e21 }] };
+    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: lit(1e21) }] };
     const src = toCel(condition, operands)!;
     expect(src).toBe("data.amount > 1e+21");
     expect(cmp(src)).toEqual(condition.rows);
@@ -202,7 +252,7 @@ describe("the builder reads back every literal it writes", () => {
   });
 
   it("a nested minus folds twice", () => {
-    expect(cmp("data.prioritaet > --5")).toEqual([{ kind: "cmp", operand: "data.prioritaet", op: ">", value: 5 }]);
+    expect(cmp("data.prioritaet > --5")).toEqual([{ kind: "cmp", operand: "data.prioritaet", op: ">", value: lit(5) }]);
   });
 
   it("an integer beyond the safe range stays a raw row", () => {
@@ -229,17 +279,17 @@ describe("the builder reads back every literal it writes", () => {
 
   // One row per type, written with `toCel` and read with `fromCel`.
   const roundTrip: [string, Condition["rows"][number]][] = [
-    ["string", { kind: "cmp", operand: "data.note", op: "==", value: "he said \"hi\"" }],
-    ["bool true", { kind: "cmp", operand: "data.approved", op: "==", value: true }],
-    ["bool false", { kind: "cmp", operand: "data.approved", op: "!=", value: false }],
-    ["int", { kind: "cmp", operand: "data.prioritaet", op: ">=", value: 3 }],
-    ["negative int", { kind: "cmp", operand: "data.prioritaet", op: "<", value: -3 }],
-    ["double", { kind: "cmp", operand: "data.amount", op: "<=", value: 1000 }],
-    ["negative double", { kind: "cmp", operand: "data.amount", op: ">", value: -5 }],
-    ["fractional double", { kind: "cmp", operand: "data.amount", op: "==", value: 10.5 }],
-    ["double with an exponent", { kind: "cmp", operand: "data.amount", op: "<", value: 1e21 }],
-    ["small double with an exponent", { kind: "cmp", operand: "data.amount", op: ">", value: 1.5e-7 }],
-    ["list contains", { kind: "cmp", operand: "actor.roles", op: "in", value: "manager" }],
+    ["string", { kind: "cmp", operand: "data.note", op: "==", value: lit("he said \"hi\"") }],
+    ["bool true", { kind: "cmp", operand: "data.approved", op: "==", value: lit(true) }],
+    ["bool false", { kind: "cmp", operand: "data.approved", op: "!=", value: lit(false) }],
+    ["int", { kind: "cmp", operand: "data.prioritaet", op: ">=", value: lit(3) }],
+    ["negative int", { kind: "cmp", operand: "data.prioritaet", op: "<", value: lit(-3) }],
+    ["double", { kind: "cmp", operand: "data.amount", op: "<=", value: lit(1000) }],
+    ["negative double", { kind: "cmp", operand: "data.amount", op: ">", value: lit(-5) }],
+    ["fractional double", { kind: "cmp", operand: "data.amount", op: "==", value: lit(10.5) }],
+    ["double with an exponent", { kind: "cmp", operand: "data.amount", op: "<", value: lit(1e21) }],
+    ["small double with an exponent", { kind: "cmp", operand: "data.amount", op: ">", value: lit(1.5e-7) }],
+    ["list contains", { kind: "cmp", operand: "actor.roles", op: "in", value: lit("manager") }],
   ];
 
   for (const [name, row] of roundTrip) {
@@ -255,15 +305,15 @@ describe("toCel", () => {
   const operands = catalog([field("amount", "number"), field("note", "string")]);
 
   it("skips an incomplete row, and no usable row yields undefined", () => {
-    const half: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: undefined }] };
+    const half: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: lit(undefined) }] };
     expect(toCel(half, operands)).toBeUndefined();
     expect(toCel({ joiner: "&&", rows: [] }, operands)).toBeUndefined();
 
     const mixed: Condition = {
       joiner: "&&",
       rows: [
-        { kind: "cmp", operand: "data.amount", op: ">", value: 1000 },
-        { kind: "cmp", operand: "data.note", op: "==", value: "" },
+        { kind: "cmp", operand: "data.amount", op: ">", value: lit(1000) },
+        { kind: "cmp", operand: "data.note", op: "==", value: lit("") },
       ],
     };
     expect(toCel(mixed, operands)).toBe("data.amount > 1000.0");
@@ -275,7 +325,7 @@ describe("toCel", () => {
 
     const two: Condition = {
       joiner: "&&",
-      rows: [{ kind: "raw", src: "data.a || data.b" }, { kind: "cmp", operand: "data.amount", op: ">", value: 1000 }],
+      rows: [{ kind: "raw", src: "data.a || data.b" }, { kind: "cmp", operand: "data.amount", op: ">", value: lit(1000) }],
     };
     expect(toCel(two, operands)).toBe("(data.a || data.b) && data.amount > 1000.0");
   });
@@ -283,7 +333,7 @@ describe("toCel", () => {
   it("a raw row keeps its exact text when the joiner flips", () => {
     const rows: Condition["rows"] = [
       { kind: "raw", src: "data.a && data.b" },
-      { kind: "cmp", operand: "data.amount", op: ">", value: 1000 },
+      { kind: "cmp", operand: "data.amount", op: ">", value: lit(1000) },
     ];
     expect(toCel({ joiner: "||", rows }, operands)).toBe("(data.a && data.b) || data.amount > 1000.0");
   });
@@ -397,7 +447,7 @@ describe("the operand picker", () => {
     expect(operatorsFor("double")).toEqual(["==", "!=", "<", "<=", ">", ">="]);
     expect(operatorsFor("string")).toEqual(["==", "!="]);
     expect(operatorsFor("bool")).toEqual(["==", "!="]);
-    expect(operatorsFor("list<string>")).toEqual(["in"]);
+    expect(operatorsFor("list<string>")).toEqual(["in", "!in"]);
   });
 });
 
@@ -451,7 +501,7 @@ describe("a subprocess step's child operands", () => {
   it("a child.outcome guard reads back as a comparison row against the parent's operands", () => {
     const operands = operandsOf(parent, child);
     const condition = fromCel('child.outcome == "approved"', operands)!;
-    expect(condition.rows).toEqual([{ kind: "cmp", operand: "child.outcome", op: "==", value: "approved" }]);
+    expect(condition.rows).toEqual([{ kind: "cmp", operand: "child.outcome", op: "==", value: lit("approved") }]);
   });
 });
 
@@ -528,15 +578,16 @@ describe("summarizeCondition", () => {
     expect(read("data.amount <= 5.0")).toBe("amount is at most 5");
     expect(read("data.amount > 5.0")).toBe("amount is greater than 5");
     expect(read("data.amount >= 5.0")).toBe("amount is at least 5");
-    expect(read('"manager" in actor.roles')).toBe("the person's roles contains “manager”");
+    expect(read('"manager" in actor.roles')).toBe("“manager” is one of the person's roles");
+    expect(read('!("manager" in actor.roles)')).toBe("“manager” is not one of the person's roles");
   });
 
-  it("formats a number with no digit lost, and keeps a date's stored text", () => {
+  it("formats a number with no digit lost, and a date as a date", () => {
     const operands = catalog([field("amount", "number"), field("due", "string", { format: "date" })]);
     const read = (src: string) => summarizeCondition(fromCel(src, operands)!, operands);
     expect(read("data.amount > 1234567.125")).toBe("amount is greater than 1,234,567.125");
     expect(read("data.amount > 1.5e-7")).toBe("amount is greater than 0.00000015");
-    expect(read('data.due == "2026-10-31"')).toBe("due is 2026-10-31");
+    expect(read('data.due == "2026-10-31"')).toBe("due is Oct 31, 2026");
   });
 
   it("puts free text in curly quotes", () => {
@@ -566,7 +617,7 @@ describe("summarizeCondition", () => {
 
   it("fills a value holding a placeholder or a $ pattern as written", () => {
     const operands = catalog([field("note", "string")]);
-    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.note", op: "==", value: "{right} $& {field}" }] };
+    const condition: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.note", op: "==", value: lit("{right} $& {field}") }] };
     expect(summarizeCondition(condition, operands)).toBe("note is “{right} $& {field}”");
   });
 
@@ -645,7 +696,7 @@ describe("conditionSentence", () => {
       "Amount is greater than 1,000 and the case's status is running.",
     );
     expect(read('data.amount > 1000.0 || "manager" in actor.roles')).toBe(
-      "Amount is greater than 1,000 or the person's roles contains “manager”.",
+      "Amount is greater than 1,000 or “manager” is one of the person's roles.",
     );
   });
 
@@ -655,19 +706,19 @@ describe("conditionSentence", () => {
   });
 
   it("holds the stored condition while no row is finished", () => {
-    const unfinished: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.city", op: "==", value: undefined }] };
+    const unfinished: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.city", op: "==", value: lit(undefined) }] };
     expect(conditionSentence(unfinished, operands, "data.amount > 1000.0")).toBe(
       "Until you finish the row, the condition stays: Amount is greater than 1,000.",
     );
   });
 
   it("asks for a finished row when nothing is stored", () => {
-    const unfinished: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: undefined }] };
+    const unfinished: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: lit(undefined) }] };
     expect(conditionSentence(unfinished, operands, undefined)).toBe("Finish a row to set the condition.");
   });
 
   it("asks for a finished row when the stored source does not parse", () => {
-    const unfinished: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: undefined }] };
+    const unfinished: Condition = { joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: lit(undefined) }] };
     expect(conditionSentence(unfinished, operands, "data.amount >")).toBe("Finish a row to set the condition.");
   });
 });
@@ -704,5 +755,521 @@ describe("readerSentence", () => {
   it("reads source with no row, or with a raw row alone, as a hand-written rule", () => {
     expect(readerSentence("", operands)).toBe("A hand-written rule.");
     expect(readerSentence('data.unknown == "x"', operands)).toBe("A hand-written rule.");
+  });
+});
+
+// --- studio-condition-builder: groups, field values, negation, dates -------
+
+const cmpRow = (operand: string, op: CmpOp, value: RowValue): Leaf => ({ kind: "cmp", operand, op, value });
+
+/** The engine-side catalog for `checkAgainstFields`, from the same stand-alone fields. */
+const fieldDefs = (fields: DraftField[]): FieldDef[] => fields as unknown as FieldDef[];
+
+const labeled = (key: string, label: string, type: string, extra: object = {}): DraftField =>
+  ({ id: `field_${key}`, key, label: { en: label }, type, ...extra }) as unknown as DraftField;
+
+const DEPARTMENT = labeled("department", "Department", "string", {
+  options: [
+    { value: "sales", label: { en: "Sales" } },
+    { value: "marketing", label: { en: "Marketing" } },
+  ],
+});
+const GROUP_FIELDS = [
+  labeled("amount", "Amount", "number"),
+  DEPARTMENT,
+  labeled("region", "Region", "string"),
+  labeled("tier", "Tier", "string"),
+];
+const GROUPED = 'data.amount > 1000.0 && (data.department == "sales" || data.department == "marketing")';
+
+describe("a group holds rows of its own, one level deep", () => {
+  const operands = catalog(GROUP_FIELDS);
+  const sales = cmpRow("data.department", "==", lit("sales"));
+  const marketing = cmpRow("data.department", "==", lit("marketing"));
+  const amount = cmpRow("data.amount", ">", lit(1000));
+
+  it("writes an or-group under and in parentheses", () => {
+    const condition: Condition = { joiner: "&&", rows: [amount, { kind: "group", joiner: "||", rows: [sales, marketing] }] };
+    const src = toCel(condition, operands)!;
+    expect(src).toBe(GROUPED);
+    expect(checkAgainstFields(src, fieldDefs(GROUP_FIELDS))).toEqual({ ok: true });
+  });
+
+  it("reads a parenthesised or-chain back as a group of two comparison rows", () => {
+    const condition = fromCel(GROUPED, operands)!;
+    expect(condition.joiner).toBe("&&");
+    expect(condition.rows).toEqual([amount, { kind: "group", joiner: "||", rows: [sales, marketing] }]);
+  });
+
+  it("reads an or over an and-chain as a row and an and-group", () => {
+    const ops = catalog([field("a", "string"), field("b", "string"), field("c", "number")]);
+    const condition = fromCel('data.a == "x" || data.b == "y" && data.c > 1.0', ops)!;
+    expect(condition.joiner).toBe("||");
+    expect(condition.rows[0]).toEqual(cmpRow("data.a", "==", lit("x")));
+    expect(condition.rows[1]).toEqual({
+      kind: "group",
+      joiner: "&&",
+      rows: [cmpRow("data.b", "==", lit("y")), cmpRow("data.c", ">", lit(1))],
+    });
+  });
+
+  it("flattens a nested chain of the condition's own operator on either side", () => {
+    const ops = catalog([field("a", "string"), field("b", "string"), field("c", "number")]);
+    for (const src of ['data.a == "x" && (data.b == "y" && data.c > 1.0)', '(data.a == "x" && data.b == "y") && data.c > 1.0']) {
+      const condition = fromCel(src, ops)!;
+      expect(condition.rows.map((r) => r.kind)).toEqual(["cmp", "cmp", "cmp"]);
+    }
+  });
+
+  it("reads a group inside a group as a raw row inside the group, and writes it back unchanged", () => {
+    const src = '(data.department == "sales" || (data.region == "eu" && data.tier == "gold")) && data.amount > 1000.0';
+    const condition = fromCel(src, operands)!;
+    expect(condition.rows).toEqual([
+      { kind: "group", joiner: "||", rows: [sales, { kind: "raw", src: 'data.region == "eu" && data.tier == "gold"' }] },
+      amount,
+    ]);
+    expect(toCel(condition, operands)).toBe(src);
+    expect(conditionSentence(condition, operands, src)).toBe(
+      "Either Department is Sales or a hand-written rule, and Amount is greater than 1,000.",
+    );
+  });
+
+  it("writes a group of one complete row as that row, bare", () => {
+    const half = cmpRow("data.department", "==", lit(undefined));
+    const beside: Condition = { joiner: "&&", rows: [amount, { kind: "group", joiner: "||", rows: [sales, half] }] };
+    expect(toCel(beside, operands)).toBe('data.amount > 1000.0 && data.department == "sales"');
+    const alone: Condition = { joiner: "&&", rows: [{ kind: "group", joiner: "||", rows: [sales, half] }] };
+    const bare = toCel(alone, operands)!;
+    expect(bare).toBe('data.department == "sales"');
+    expect(checkAgainstFields(bare, fieldDefs(GROUP_FIELDS))).toEqual({ ok: true });
+  });
+
+  it("writes a raw row in a one-row group as a raw row at the group's level", () => {
+    const raw: Leaf = { kind: "raw", src: "data.a || data.b" };
+    const condition: Condition = { joiner: "&&", rows: [amount, { kind: "group", joiner: "||", rows: [raw] }] };
+    expect(toCel(condition, operands)).toBe("data.amount > 1000.0 && (data.a || data.b)");
+  });
+
+  it("writes a group with no complete row as nothing", () => {
+    const empty: Condition = { joiner: "&&", rows: [{ kind: "group", joiner: "||", rows: [cmpRow("data.amount", ">", lit(undefined))] }] };
+    expect(toCel(empty, operands)).toBeUndefined();
+  });
+
+  it("parenthesises a raw row inside a group of two written rows", () => {
+    const condition: Condition = {
+      joiner: "&&",
+      rows: [amount, { kind: "group", joiner: "||", rows: [sales, { kind: "raw", src: "data.a && data.b" }] }],
+    };
+    expect(toCel(condition, operands)).toBe('data.amount > 1000.0 && (data.department == "sales" || (data.a && data.b))');
+  });
+
+  it("writes a group of two with no parentheses when it is the only part", () => {
+    const condition: Condition = { joiner: "&&", rows: [{ kind: "group", joiner: "||", rows: [sales, marketing] }] };
+    expect(toCel(condition, operands)).toBe('data.department == "sales" || data.department == "marketing"');
+  });
+
+  it("writes a group on the condition's own joiner in parentheses, which reads back flat", () => {
+    const condition: Condition = { joiner: "&&", rows: [amount, { kind: "group", joiner: "&&", rows: [sales, marketing] }] };
+    const src = toCel(condition, operands)!;
+    expect(src).toBe('data.amount > 1000.0 && (data.department == "sales" && data.department == "marketing")');
+    expect(checkAgainstFields(src, fieldDefs(GROUP_FIELDS))).toEqual({ ok: true });
+    expect(fromCel(src, operands)!.rows).toEqual([amount, sales, marketing]);
+  });
+
+  it("marks a group with no complete row incomplete, and one with a complete row complete", () => {
+    const byPath = new Map(operands.map((o) => [o.path, o]));
+    expect(isComplete({ kind: "group", joiner: "||", rows: [cmpRow("data.amount", ">", lit(undefined))] }, byPath)).toBe(false);
+    expect(isComplete({ kind: "group", joiner: "||", rows: [] }, byPath)).toBe(false);
+    expect(isComplete({ kind: "group", joiner: "||", rows: [sales, cmpRow("data.amount", ">", lit(undefined))] }, byPath)).toBe(true);
+  });
+
+  it("holds the stored condition while a new group has no finished row", () => {
+    const stored = "data.amount > 1000.0";
+    const condition = fromCel(stored, operands)!;
+    const next: Condition = { ...condition, rows: [...condition.rows, newGroup(condition.joiner, operands)] };
+    expect(toCel(next, operands)).toBe(stored);
+  });
+
+  it("counts the leaves and the groups", () => {
+    expect(rowCount({ joiner: "&&", rows: [] })).toBe(0);
+    expect(rowCount(fromCel(GROUPED, operands)!)).toBe(4);
+    expect(rowCount({ joiner: "&&", rows: [{ kind: "group", joiner: "||", rows: [] }] })).toBe(1);
+  });
+
+  it("starts a new group with one fresh row, on the joiner opposite to the one it joins", () => {
+    expect(newGroup("&&", operands)).toEqual({ kind: "group", joiner: "||", rows: [newLeaf(operands)] });
+    expect(newGroup("||", operands).joiner).toBe("&&");
+    expect(newLeaf(operands)).toEqual(cmpRow("data.amount", "==", lit(undefined)));
+    expect(newLeaf([])).toEqual(cmpRow("", "==", lit(undefined)));
+  });
+
+  it("round-trips the examples' grouped shapes through the CEL check", () => {
+    const shapes = [
+      GROUPED,
+      'data.department == "sales" || (data.amount > 5.0 && data.region == "eu")',
+      '(data.department == "sales" || data.region == "eu") && (data.amount > 5.0 || data.tier == "gold")',
+    ];
+    for (const src of shapes) {
+      const written = toCel(fromCel(src, operands)!, operands)!;
+      expect(written).toBe(src);
+      expect(checkAgainstFields(written, fieldDefs(GROUP_FIELDS))).toEqual({ ok: true });
+    }
+  });
+});
+
+describe("a row compares against another field", () => {
+  const DATES = [
+    labeled("start_date", "Start date", "string", { format: "date" }),
+    labeled("end_date", "End date", "string", { format: "date" }),
+  ];
+  const PEOPLE = [
+    labeled("approver", "Approver", "string", { format: "person" }),
+    labeled("requester", "Requester", "string", { format: "person" }),
+  ];
+
+  it("writes a date against another date field, and reads it as a sentence", () => {
+    const operands = catalog(DATES);
+    const condition: Condition = { joiner: "&&", rows: [cmpRow("data.end_date", ">", { kind: "field", path: "data.start_date" })] };
+    const src = toCel(condition, operands)!;
+    expect(src).toBe("data.end_date > data.start_date");
+    expect(checkAgainstFields(src, fieldDefs(DATES))).toEqual({ ok: true });
+    expect(conditionSentence(condition, operands, undefined)).toBe("End date is after Start date.");
+    expect(fromCel(src, operands)!.rows).toEqual(condition.rows);
+  });
+
+  it("reads a field comparison back as a row whose value is the other field", () => {
+    const operands = catalog(PEOPLE);
+    expect(fromCel("data.approver == data.requester", operands)!.rows).toEqual([
+      cmpRow("data.approver", "==", { kind: "field", path: "data.requester" }),
+    ]);
+  });
+
+  it("leaves a context operand on the right a raw row", () => {
+    const operands = catalog([labeled("status", "Status", "string")]);
+    expect(fromCel("data.status == instance.status", operands)!.rows).toEqual([{ kind: "raw", src: "data.status == instance.status" }]);
+  });
+
+  it("leaves a context operand on the left a raw row", () => {
+    const operands = catalog([labeled("note", "Note", "string")]);
+    expect(fromCel("instance.status == data.note", operands)!.rows).toEqual([{ kind: "raw", src: "instance.status == data.note" }]);
+  });
+
+  it("offers a context operand no candidate, and never a context operand as one", () => {
+    const operands = catalog([labeled("note", "Note", "string"), labeled("city", "City", "string")]);
+    expect(operands.some((o) => o.path === "instance.status" && o.celType === "string")).toBe(true);
+    expect(fieldValueCandidates("instance.status", operands)).toEqual([]);
+    expect(fieldValueCandidates("data.note", operands).map((o) => o.path)).toEqual(["data.city"]);
+  });
+
+  it("leaves a right side of another CEL type, an unknown field and the operand itself a raw row", () => {
+    const operands = catalog([labeled("amount", "Amount", "number"), labeled("note", "Note", "string")]);
+    for (const src of ["data.amount == data.note", "data.amount == data.gone", "data.amount == data.amount"]) {
+      expect(fromCel(src, operands)!.rows).toEqual([{ kind: "raw", src }]);
+    }
+  });
+
+  it("offers a date row date fields alone, and a person row person fields alone", () => {
+    const operands = catalog([
+      labeled("start", "Start", "string", { format: "date" }),
+      labeled("end", "End", "string", { format: "date" }),
+      labeled("at", "At", "string", { format: "datetime" }),
+      labeled("note", "Note", "string"),
+      labeled("approver", "Approver", "string", { format: "person" }),
+      labeled("requester", "Requester", "string", { format: "person" }),
+      labeled("count", "Count", "number", { format: "integer" }),
+      labeled("amount", "Amount", "number"),
+    ]);
+    const paths = (path: string) => fieldValueCandidates(path, operands).map((o) => o.path);
+    expect(paths("data.end")).toEqual(["data.start"]);
+    expect(paths("data.approver")).toEqual(["data.requester"]);
+    expect(paths("data.note")).toEqual([]);
+    expect(paths("data.count")).toEqual([]);
+  });
+
+  it("leaves a right-side field of another format a raw row", () => {
+    const operands = catalog([labeled("end", "End", "string", { format: "date" }), labeled("note", "Note", "string")]);
+    expect(fromCel("data.end == data.note", operands)!.rows).toEqual([{ kind: "raw", src: "data.end == data.note" }]);
+  });
+
+  it("offers the fields and called-process operands of the operand's CEL type, the operand excluded", () => {
+    const parent = example("subprocess-loan-parent.json");
+    const child = example("subprocess-credit-check-child.json");
+    const fields = [
+      labeled("amount", "Amount", "number"),
+      labeled("budget", "Budget", "number"),
+      labeled("note", "Note", "string"),
+      labeled("due", "Due", "string", { format: "date" }),
+      labeled("tags", "Tags", "list"),
+    ];
+    const operands = [...catalog(fields), ...operandsOf(parent, child).filter((o) => o.group === "child")];
+    expect(fieldValueCandidates("data.amount", operands).map((o) => o.path)).toEqual(["data.budget", "child.data.amount"]);
+  });
+
+  it("offers no candidate for a list operand, an unknown operand or one with no same-type field", () => {
+    const operands = catalog([labeled("tags", "Tags", "list"), labeled("other", "Other", "list"), labeled("amount", "Amount", "number")]);
+    expect(fieldValueCandidates("data.tags", operands)).toEqual([]);
+    expect(fieldValueCandidates("actor.roles", operands)).toEqual([]);
+    expect(fieldValueCandidates("data.gone", operands)).toEqual([]);
+    expect(fieldValueCandidates("data.amount", operands)).toEqual([]);
+  });
+
+  it("holds a field value naming no operand incomplete", () => {
+    const operands = catalog(DATES);
+    const byPath = new Map(operands.map((o) => [o.path, o]));
+    expect(isComplete(cmpRow("data.end_date", ">", { kind: "field", path: "data.gone" }), byPath)).toBe(false);
+    expect(isComplete(cmpRow("data.end_date", ">", { kind: "field", path: "data.start_date" }), byPath)).toBe(true);
+  });
+});
+
+describe("a comparison reads as a row only on an operator its operand offers", () => {
+  const operands = catalog([
+    labeled("starts_at", "Starts at", "string", { format: "datetime" }),
+    labeled("city", "City", "string"),
+    labeled("due_date", "Due date", "string", { format: "date" }),
+  ]);
+
+  it("leaves an ordering over a date-time a raw row holding its text", () => {
+    const src = 'data.starts_at >= "2026-01-01T00:00"';
+    const condition = fromCel(src, operands)!;
+    expect(condition.rows).toEqual([{ kind: "raw", src }]);
+    expect(toCel(condition, operands)).toBe(src);
+  });
+
+  it("leaves an ordering over plain text a raw row", () => {
+    expect(fromCel('data.city > "x"', operands)!.rows).toEqual([{ kind: "raw", src: 'data.city > "x"' }]);
+  });
+
+  it("reads an ordering over a date as a row", () => {
+    expect(fromCel('data.due_date >= "2026-01-01"', operands)!.rows).toEqual([cmpRow("data.due_date", ">=", lit("2026-01-01"))]);
+  });
+
+  it("leaves a membership in a non-list operand a raw row", () => {
+    expect(fromCel('"x" in data.city', operands)!.rows).toEqual([{ kind: "raw", src: '"x" in data.city' }]);
+  });
+});
+
+describe("a negated list membership reads and writes as one row", () => {
+  const operands = catalog([labeled("approved", "Approved", "boolean"), labeled("amount", "Amount", "number")]);
+
+  it("writes does not include as a negated membership", () => {
+    const condition: Condition = { joiner: "&&", rows: [cmpRow("actor.roles", "!in", lit("manager"))] };
+    const src = toCel(condition, operands)!;
+    expect(src).toBe('!("manager" in actor.roles)');
+    expect(checkAgainstFields(src, [])).toEqual({ ok: true });
+  });
+
+  it("reads a negated membership back as one does-not-include row", () => {
+    const condition = fromCel('!("manager" in actor.roles)', operands)!;
+    expect(condition.rows).toEqual([cmpRow("actor.roles", "!in", lit("manager"))]);
+    expect(operatorWord("!in", operands.find((o) => o.path === "actor.roles"))).toBe("does not include");
+  });
+
+  it("reads a negated boolean as a comparison against false", () => {
+    const condition = fromCel("!data.approved", operands)!;
+    expect(condition.rows).toEqual([cmpRow("data.approved", "==", lit(false))]);
+    expect(conditionSentence(condition, operands, "!data.approved")).toBe("Approved is no.");
+    const written = toCel(condition, operands)!;
+    expect(written).toBe("data.approved == false");
+    expect(checkAgainstFields(written, fieldDefs([labeled("approved", "Approved", "boolean")]))).toEqual({ ok: true });
+  });
+
+  it("leaves a negated comparison and a negated non-boolean a raw row", () => {
+    expect(fromCel("!(data.amount > 1000.0)", operands)!.rows).toEqual([{ kind: "raw", src: "!(data.amount > 1000.0)" }]);
+    expect(fromCel("!data.amount", operands)!.rows).toEqual([{ kind: "raw", src: "!data.amount" }]);
+  });
+});
+
+describe("operators follow the operand's type and format", () => {
+  const operands = catalog([
+    labeled("due", "Due", "string", { format: "date" }),
+    labeled("at", "At", "string", { format: "datetime" }),
+    labeled("who", "Who", "string", { format: "person" }),
+    labeled("count", "Count", "number", { format: "integer" }),
+  ]);
+  const operand = (path: string) => operands.find((o) => o.path === path)!;
+  const words = (path: string) => operatorsFor(operand(path).celType, operand(path).format).map((op) => operatorWord(op, operand(path)));
+
+  it("offers a date six operators in date words, with is on or before writing <=", () => {
+    expect(words("data.due")).toEqual(["is", "is not", "is before", "is on or before", "is after", "is on or after"]);
+    expect(operatorsFor("string", "date")[3]).toBe("<=");
+  });
+
+  it("offers a date-time is and is not alone, since its text does not order as its calendar", () => {
+    expect(operatorsFor("string", "datetime")).toEqual(["==", "!="]);
+    expect(words("data.at")).toEqual(["is", "is not"]);
+  });
+
+  it("offers a person field is and is not alone", () => {
+    expect(operatorsFor("string", "person")).toEqual(["==", "!="]);
+    expect(words("data.who")).toEqual(["is", "is not"]);
+  });
+
+  it("offers an integer the number's six operators in the number's words", () => {
+    expect(words("data.count")).toEqual(["is", "is not", "is less than", "is at most", "is greater than", "is at least"]);
+  });
+
+  it("offers a list includes and does not include, and includes emits the mirrored form", () => {
+    expect(operatorsFor("list<string>")).toEqual(["in", "!in"]);
+    const roles = catalog([]).find((o) => o.path === "actor.roles")!;
+    expect(operatorsFor(roles.celType).map((op) => operatorWord(op, roles))).toEqual(["includes", "does not include"]);
+    expect(toCel({ joiner: "&&", rows: [cmpRow("actor.roles", "in", lit("manager"))] }, catalog([]))).toBe('"manager" in actor.roles');
+  });
+
+  it("keeps the rule builder's call with the type alone as it was", () => {
+    expect(operatorsFor("string")).toEqual(["==", "!="]);
+    expect(operatorsFor("double")).toEqual(["==", "!=", "<", "<=", ">", ">="]);
+  });
+});
+
+describe("the clauses", () => {
+  const operands = catalog([
+    labeled("amount", "Amount", "number"),
+    DEPARTMENT,
+    labeled("a", "A", "string"),
+    labeled("b", "B", "string"),
+    labeled("c", "C", "number"),
+    labeled("due_date", "Due date", "string", { format: "date" }),
+    labeled("starts_at", "Starts at", "string", { format: "datetime" }),
+  ]);
+  const read = (src: string) => conditionSentence(fromCel(src, operands)!, operands, src);
+
+  it("names the value first in a list clause", () => {
+    expect(read('"manager" in actor.roles')).toBe("“manager” is one of the person's roles.");
+  });
+
+  it("names the value first in a negated list clause", () => {
+    expect(read('!("manager" in actor.roles)')).toBe("“manager” is not one of the person's roles.");
+  });
+
+  it("reads an or-group of two as either or", () => {
+    expect(read(GROUPED)).toBe("Amount is greater than 1,000 and either Department is Sales or Department is Marketing.");
+  });
+
+  it("reads an or-group of three as any of", () => {
+    expect(read('data.amount > 1000.0 && (data.department == "sales" || data.department == "marketing" || "manager" in actor.roles)')).toBe(
+      "Amount is greater than 1,000 and any of Department is Sales, Department is Marketing or “manager” is one of the person's roles.",
+    );
+  });
+
+  it("reads an and-group of two as both, and of three as all of", () => {
+    expect(read('data.a == "x" || data.b == "y" && data.c > 1.0')).toBe("A is “x” or both B is “y” and C is greater than 1.");
+    expect(read('data.c > 1.0 || data.a == "x" && data.b == "y" && data.c < 9.0')).toBe(
+      "C is greater than 1 or all of A is “x”, B is “y” and C is less than 9.",
+    );
+  });
+
+  it("ends a group clause in a comma when a clause follows it, under and and under or", () => {
+    expect(read('(data.a == "x" || data.b == "y") && data.c > 1.0')).toBe("Either A is “x” or B is “y”, and C is greater than 1.");
+    expect(read('(data.a == "x" && data.b == "y") || data.c > 1.0')).toBe("Both A is “x” and B is “y”, or C is greater than 1.");
+    expect(read('data.c > 1.0 && (data.a == "x" || data.b == "y") && data.c < 9.0')).toBe(
+      "C is greater than 1 and either A is “x” or B is “y”, and C is less than 9.",
+    );
+  });
+
+  it("keeps the value's case when the sentence opens on a list clause", () => {
+    const tags = catalog([labeled("tags", "Tags", "list", { options: [{ value: "vip", label: { en: "vip" } }] })]);
+    const src = '"vip" in data.tags';
+    expect(conditionSentence(fromCel(src, tags)!, tags, src)).toBe("vip is one of Tags.");
+    expect(readerSentence(src, tags)).toBe("vip is one of Tags.");
+    expect(readerSentence('"vip" in data.tags || ("x" in actor.roles && "y" in actor.roles)', tags)).toBe(
+      "vip is one of Tags or both “x” is one of the person's roles and “y” is one of the person's roles.",
+    );
+    expect(readerSentence('("vip" in data.tags || "x" in actor.roles) && "y" in actor.roles', tags)).toBe(
+      "Either vip is one of Tags or “x” is one of the person's roles, and “y” is one of the person's roles.",
+    );
+  });
+
+  it("reads a group of one complete row as that row's clause", () => {
+    const condition: Condition = {
+      joiner: "&&",
+      rows: [{ kind: "group", joiner: "||", rows: [cmpRow("data.a", "==", lit("x")), cmpRow("data.b", "==", lit(undefined))] }],
+    };
+    expect(conditionSentence(condition, operands, undefined)).toBe("A is “x”.");
+  });
+
+  it("prints a date value as a formatted date in date words", () => {
+    expect(read('data.due_date <= "2026-12-31"')).toBe("Due date is on or before Dec 31, 2026.");
+    expect(read('data.due_date < "2026-12-31"')).toBe("Due date is before Dec 31, 2026.");
+    expect(read('data.due_date >= "2026-01-05"')).toBe("Due date is on or after Jan 5, 2026.");
+  });
+
+  it("prints a zoneless date-time value with its time as written", () => {
+    expect(read('data.starts_at == "2026-12-31T17:30"')).toBe("Starts at is Dec 31, 2026, 5:30 PM.");
+    expect(read('data.starts_at != "2026-12-31T23:59:30"')).toBe("Starts at is not Dec 31, 2026, 11:59 PM.");
+  });
+
+  it("prints a date-time value carrying a zone as its stored text, never converted", () => {
+    expect(read('data.starts_at == "2026-12-31T17:30:00Z"')).toBe("Starts at is 2026-12-31T17:30:00Z.");
+    expect(read('data.starts_at == "2026-12-31T17:30+02:00"')).toBe("Starts at is 2026-12-31T17:30+02:00.");
+  });
+
+  it("prints a date literal the formatter cannot read as its stored text", () => {
+    expect(read('data.due_date == "2026-02-30"')).toBe("Due date is 2026-02-30.");
+    expect(read('data.due_date == "next week"')).toBe("Due date is next week.");
+  });
+
+  it("prints a date-time literal whose offset no date can hold as its stored text", () => {
+    expect(read('data.starts_at == "2026-01-01T00:00+24:00"')).toBe("Starts at is 2026-01-01T00:00+24:00.");
+    expect(read('data.starts_at == "2026-01-01T00:00+99:99"')).toBe("Starts at is 2026-01-01T00:00+99:99.");
+  });
+});
+
+describe("an operand switch keeps what still fits", () => {
+  const num = (key: string): Operand => ({ path: `data.${key}`, label: key, celType: "double", declaredType: "number", group: "fields" });
+  const text = (key: string, extra: Partial<Operand> = {}): Operand => ({ path: `data.${key}`, label: key, celType: "string", group: "fields", ...extra });
+  const opts = (...values: string[]) => values.map((value) => ({ value, label: value.toUpperCase() }));
+  const AMOUNT = num("amount");
+  const LIMIT = num("limit");
+  const BUDGET = num("budget");
+  const NOTE = text("note");
+  const DUE = text("due", { format: "date" });
+  const START = text("start", { format: "date" });
+  const STARTS_AT = text("starts_at", { format: "datetime" });
+  const TIER = text("tier", { options: opts("gold", "silver") });
+  const LEVEL = text("level", { options: opts("gold", "silver") });
+  const RANK = text("rank", { options: opts("gold", "bronze") });
+  const ORDER = text("order", { options: opts("silver", "gold") });
+  const operands = [AMOUNT, LIMIT, BUDGET, NOTE, DUE, START, STARTS_AT, TIER, LEVEL, RANK, ORDER];
+  const empty = lit(undefined);
+  const row = (operand: string, op: CmpOp, value: RowValue) => cmpRow(operand, op, value) as Extract<Leaf, { kind: "cmp" }>;
+
+  it("keeps the operator and the literal on an operand of the same type, format and options", () => {
+    expect(retargetRow(row("data.amount", ">", lit(1000)), "data.limit", operands)).toEqual(row("data.limit", ">", lit(1000)));
+    expect(retargetRow(row("data.due", "<", lit("2026-12-31")), "data.start", operands)).toEqual(row("data.start", "<", lit("2026-12-31")));
+    expect(retargetRow(row("data.tier", "!=", lit("gold")), "data.level", operands)).toEqual(row("data.level", "!=", lit("gold")));
+    expect(retargetRow(row("data.note", "==", lit("x")), "data.note", operands)).toEqual(row("data.note", "==", lit("x")));
+  });
+
+  it("resets both on an operand of another CEL type", () => {
+    expect(retargetRow(row("data.amount", ">", lit(1000)), "data.note", operands)).toEqual(row("data.note", "==", empty));
+    expect(retargetRow(row("data.note", "!=", lit("x")), "data.amount", operands)).toEqual(row("data.amount", "==", empty));
+  });
+
+  it("resets both on an operand of another format", () => {
+    expect(retargetRow(row("data.due", "==", lit("2026-12-31")), "data.note", operands)).toEqual(row("data.note", "==", empty));
+    expect(retargetRow(row("data.due", "<", lit("2026-12-31")), "data.starts_at", operands)).toEqual(row("data.starts_at", "==", empty));
+  });
+
+  it("resets both when the option sets differ in a value, in order, or in presence", () => {
+    expect(retargetRow(row("data.tier", "!=", lit("gold")), "data.rank", operands)).toEqual(row("data.rank", "==", empty));
+    expect(retargetRow(row("data.tier", "!=", lit("gold")), "data.order", operands)).toEqual(row("data.order", "==", empty));
+    expect(retargetRow(row("data.tier", "!=", lit("gold")), "data.note", operands)).toEqual(row("data.note", "==", empty));
+    expect(retargetRow(row("data.note", "!=", lit("gold")), "data.tier", operands)).toEqual(row("data.tier", "==", empty));
+  });
+
+  it("resets both when no operand is picked", () => {
+    expect(retargetRow(row("data.amount", ">", lit(1000)), "", operands)).toEqual(row("", "==", empty));
+  });
+
+  it("keeps a field value the new operand still offers as a candidate", () => {
+    expect(retargetRow(row("data.amount", ">", { kind: "field", path: "data.budget" }), "data.limit", operands)).toEqual(
+      row("data.limit", ">", { kind: "field", path: "data.budget" }),
+    );
+  });
+
+  it("resets a field value the new operand does not offer, so data.a > data.b never becomes data.b > data.b", () => {
+    const next = retargetRow(row("data.amount", ">", { kind: "field", path: "data.budget" }), "data.budget", operands);
+    expect(next).toEqual(row("data.budget", ">", empty));
+    expect(toCel({ joiner: "&&", rows: [next] }, operands)).toBeUndefined();
   });
 });

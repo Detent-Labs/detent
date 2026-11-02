@@ -115,6 +115,32 @@ describe("readByRows", () => {
     ]);
   });
 
+  it("reads a field comparison in the Read by row of either field", () => {
+    const draft = {
+      baseLocale: "en",
+      fields: [
+        { id: "field_start", key: "start_date", label: { en: "Start date" }, type: "string", format: "date" },
+        { id: "field_end", key: "end_date", label: { en: "End date" }, type: "string", format: "date" },
+      ],
+      workflow: {
+        initialStep: "step_review",
+        steps: [
+          {
+            id: "step_review",
+            key: "review",
+            label: { en: "Review" },
+            type: "task",
+            paths: [{ id: "path_ok", key: "ok", label: "Accept", to: "step_done", trigger: "manual", guard: cel("data.end_date > data.start_date") }],
+          },
+          { id: "step_done", key: "done", label: { en: "Done" }, type: "task" },
+        ],
+      },
+    } as unknown as Draft;
+    for (const key of ["start_date", "end_date"]) {
+      expect(readByRows(draft, key, "en").map((r) => r.sentence)).toEqual(["End date is after Start date."]);
+    }
+  });
+
   it("reads a guard as its way out and its sentence", () => {
     const row = readByRows(everyPlace(), "amount", "en").find((r) => r.place.startsWith("On Review: way out"));
     expect(row).toEqual({

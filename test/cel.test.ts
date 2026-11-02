@@ -560,6 +560,17 @@ test("equality and arithmetic mixing an integer field with a decimal field find 
   expect(checkAgainstFields("data.anzahl > data.betrag", both).ok).toBe(true);
 });
 
+// `cel-expressions`: the studio's date ordering operators write these two
+// shapes, so the check must keep admitting ordering over `string`.
+test("the check admits ordering between two date fields", () => {
+  const dates = [fieldDef("start_date", "string", "date"), fieldDef("end_date", "string", "date")];
+  expect(checkAgainstFields("data.end_date > data.start_date", dates)).toEqual({ ok: true });
+});
+
+test("the check admits ordering between a date field and a date literal", () => {
+  expect(checkAgainstFields('data.due_date <= "2026-12-31"', [fieldDef("due_date", "string", "date")])).toEqual({ ok: true });
+});
+
 // parse-only entry point
 test("parseExpression flags syntax but not unknown vars", () => {
   expect(parseExpression("data.x == 1").ok).toBe(true);

@@ -13,6 +13,8 @@ const NOTE: Operand = { path: "data.note", label: "Note", celType: "string", gro
 const OUTCOME: Operand = { path: "child.outcome", label: "How the called process ended", celType: "string", group: "child" };
 const STATUS: Operand = { path: "instance.status", label: "The case's status", celType: "string", group: "case" };
 const ROLES: Operand = { path: "actor.roles", label: "The person's roles", celType: "list<string>", group: "person" };
+const DUE: Operand = { path: "data.due", label: "Due", celType: "string", format: "date", group: "fields" };
+const STARTS: Operand = { path: "data.starts", label: "Starts", celType: "string", format: "datetime", group: "fields" };
 
 const render = (condition: Condition, operands: Operand[]) =>
   renderToStaticMarkup(<ConditionBuilder condition={condition} operands={operands} onChange={() => {}} />);
@@ -28,7 +30,7 @@ const optionTexts = (select: string) => [...select.matchAll(/<option[^>]*>([^<]*
 
 describe("the operator select", () => {
   it("prints words for a number", () => {
-    const html = render({ joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: 5 }] }, [AMOUNT]);
+    const html = render({ joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: { kind: "literal" as const, value: 5 } }] }, [AMOUNT]);
     expect(optionTexts(selectLabelled(html, "operator"))).toEqual([
       "is",
       "is not",
@@ -40,23 +42,35 @@ describe("the operator select", () => {
   });
 
   it("prints no CEL symbol and keeps the symbol as the option value", () => {
-    const html = render({ joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: 5 }] }, [AMOUNT]);
+    const html = render({ joiner: "&&", rows: [{ kind: "cmp", operand: "data.amount", op: ">", value: { kind: "literal" as const, value: 5 } }] }, [AMOUNT]);
     const select = selectLabelled(html, "operator");
     expect(select).toContain('value="&gt;"');
     expect(select).toMatch(/<option value="&gt;" selected="">is greater than<\/option>/);
     expect(optionTexts(select).some((text) => /[=<>!]/.test(text ?? ""))).toBe(false);
   });
 
-  it("prints contains for a list", () => {
-    const html = render({ joiner: "&&", rows: [{ kind: "cmp", operand: "actor.roles", op: "in", value: undefined }] }, [ROLES]);
-    expect(optionTexts(selectLabelled(html, "operator"))).toEqual(["contains"]);
+  it("prints includes and does not include for a list", () => {
+    const html = render({ joiner: "&&", rows: [{ kind: "cmp", operand: "actor.roles", op: "in", value: { kind: "literal" as const, value: undefined } }] }, [ROLES]);
+    expect(optionTexts(selectLabelled(html, "operator"))).toEqual(["includes", "does not include"]);
+  });
+
+  it("prints the date words for a date, with is on or before on <=", () => {
+    const html = render({ joiner: "&&", rows: [{ kind: "cmp", operand: "data.due", op: "<=", value: { kind: "literal" as const, value: undefined } }] }, [DUE]);
+    const select = selectLabelled(html, "operator");
+    expect(optionTexts(select)).toEqual(["is", "is not", "is before", "is on or before", "is after", "is on or after"]);
+    expect(select).toMatch(/<option value="&lt;=" selected="">is on or before<\/option>/);
+  });
+
+  it("prints is and is not alone for a date-time", () => {
+    const html = render({ joiner: "&&", rows: [{ kind: "cmp", operand: "data.starts", op: "==", value: { kind: "literal" as const, value: undefined } }] }, [STARTS]);
+    expect(optionTexts(selectLabelled(html, "operator"))).toEqual(["is", "is not"]);
   });
 });
 
 describe("the joiner", () => {
   const rows: Condition["rows"] = [
-    { kind: "cmp", operand: "data.amount", op: ">", value: 5 },
-    { kind: "cmp", operand: "data.note", op: "==", value: "x" },
+    { kind: "cmp", operand: "data.amount", op: ">", value: { kind: "literal" as const, value: 5 } },
+    { kind: "cmp", operand: "data.note", op: "==", value: { kind: "literal" as const, value: "x" } },
   ];
   const joiner = (html: string) => html.match(/<button[^>]*title="How the rows combine[^>]*>([^<]*)<\/button>/);
 
@@ -76,7 +90,7 @@ describe("the joiner", () => {
 });
 
 describe("the operand picker", () => {
-  const row: Condition["rows"] = [{ kind: "cmp", operand: "", op: "==", value: undefined }];
+  const row: Condition["rows"] = [{ kind: "cmp", operand: "", op: "==", value: { kind: "literal" as const, value: undefined } }];
   const picker = (operands: Operand[]) => selectLabelled(render({ joiner: "&&", rows: row }, operands), "field");
 
   it("groups the operands under headings, in order", () => {

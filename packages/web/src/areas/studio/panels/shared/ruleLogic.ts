@@ -32,11 +32,12 @@ import {
   type CelNode,
   type CmpOp,
   type Operand,
+  type RowValue,
 } from "./conditionLogic";
 
 export type RuleOperand = Operand;
 
-export type RuleValue = { kind: "literal"; value: string | number | boolean | undefined } | { kind: "field"; path: string };
+export type RuleValue = RowValue;
 
 export type RuleRow = { kind: "cmp"; operand: string; op: CmpOp; value: RuleValue } | { kind: "raw"; src: string };
 
@@ -45,8 +46,8 @@ export interface RuleCondition {
 }
 
 /** `celType` reads a `list` field as `list<string>`, which
- * `operatorsFor` offers `in` alone for — a comparator this builder never
- * writes. Excluding it here, once, keeps every call site (the operand
+ * `operatorsFor` offers `in` and `!in` alone for — comparators this builder
+ * never writes. Excluding it here, once, keeps every call site (the operand
  * picker, `addRow`'s default comparator) from needing its own guard. */
 function isSupportedCelType(t: string): boolean {
   return t !== "list<string>";
@@ -203,7 +204,7 @@ function ruleClause(row: RuleRow, byPath: Map<string, RuleOperand>): string {
   const value =
     row.value.kind === "field"
       ? (byPath.get(row.value.path)?.label ?? t("condition.unnamedField"))
-      : summarizeValue({ kind: "cmp", operand: row.operand, op: row.op, value: row.value.value }, operand);
+      : summarizeValue(row.value.value, operand);
   return fill(t(`condition.clause.${OP_NAMES[row.op]}`), { field: operand?.clauseLabel ?? operand?.label ?? row.operand, value });
 }
 

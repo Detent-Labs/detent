@@ -887,26 +887,30 @@ recorded rather than fixed. The RAIL tags are local to this section.
   2026-09-14. The IT Offboarding draft's first path had a condition row.
   - The "Only if" fieldset keeps the default `min-inline-size: min-content`
     (`panels/PathsPanel.tsx:332`). The row's field select takes its longest
-    option's width, 647px (`panels/shared/ConditionBuilder.tsx:209`). The
+    option's width, 647px (`panels/shared/ConditionBuilder.tsx:313`). The
     fieldset then ends at x=1028, past the Path to section's edge at x=863.
   - The On exit section covers the row's last 107px, its remove control
     included. At 1600px the row fits.
   - Risk (Medium): a pointer cannot reach the row's remove control at 1280px,
     and the dashed box runs under another section.
+  - Measured again on 2026-11-02, after `studio-condition-builder-expansion`.
+    At 1280px the operand select renders about 380px wide, and the row no
+    longer overflows its column. In the 806px step column the × remove
+    control wraps onto its own line at 1280px and at 1440px.
 - **STEP-2: the guard's label wraps the whole condition builder.** One
   `<label>` holds the guard text and the builder (`panels/PathsPanel.tsx:348`).
   - Before a row exists, "+ Add row" is that label's first labelable control
-    (`panels/shared/ConditionBuilder.tsx:176`). Measured 2026-09-14, a click on
+    (`panels/shared/ConditionBuilder.tsx:540`). Measured 2026-09-14, a click on
     the label's own text added a row. The button's accessible name then reads
     every word inside the label, from "guard" to "Developer view".
   - An empty row's hint links to no control. The value input has no
-    `aria-describedby` pointing at it (`:134`).
+    `aria-describedby` pointing at it (`:238`).
   - Risk (Medium): a stray click adds a row, and a screen reader hears a name
     without the visible words (WCAG 2.5.3 and 1.3.1).
 - **STEP-3: three literal sizes sit off the type ramp.** The detector flagged
   them on 2026-09-14. The step page's `hint` sets written text at 0.8rem
   (`panels/StepPage.tsx:164`). A condition row's remove glyph sets 1.1rem
-  (`panels/shared/ConditionBuilder.tsx:63`). The header bar's name sets 1rem,
+  (`panels/shared/ConditionBuilder.tsx:150`). The header bar's name sets 1rem,
   where the Headline role asks 1.25rem (`panels/ProcessHeaderBar.tsx:60`).
   - Four more flags on the step page mark mono machine values at 0.8rem.
     The Hierarchy in `DESIGN.md` allows that size for them.
@@ -1619,13 +1623,10 @@ this section.
 
 ## Open from studio-condition-sentence (needs its own OpenSpec change)
 
-The change made the condition builder read as a sentence. It left eleven
+The change made the condition builder read as a sentence. It left ten
 points to later changes. Its critique and audit of 2026-10-31 raised the
 last six. The SENTENCE tag is local to this section.
 
-- **SENTENCE-2: a list clause is not good grammar.** It reads "The person's
-  roles contains “manager”". The clause cannot know whether a label is
-  plural. Change 16 revisits the phrasing of list clauses.
 - **SENTENCE-5: a boolean `!=` row reads "Approved is not yes".** The `ne`
   clause takes the value word "yes" or "no" from the value select. The phrase
   is stiff but exact. A later wording pass can give booleans their own pair
@@ -1842,7 +1843,8 @@ tag is local to this section.
 - **ACCORDION-16: at 1366x768 and 1100x800 the Steps tab nests three scroll
   boxes.** The cause is the `minHeight: 36rem` that `stepsTab` keeps, older
   than this change. Risk (Low): a wheel scrolls the wrong box first.
-  `studio-checks-by-subject` leaves it: `docs/studio-ui-concept.md` section 8
+  `studio-checks-by-subject` leaves it: section 8 of
+  `openspec/changes/archive/2026-10-30-studio-fresh-draft-starts-clean/studio-ui-concept.md`
   left it out, as M14.
 
 ## Open from studio-map-labels (needs its own OpenSpec change)
@@ -2105,7 +2107,8 @@ come from those two reports.
   `data.quantity * data.unit_price >= 10000.0`. Risk (Low): the row names its
   place and says nothing about the rule.
 
-  Upgrade entry: change 16's expansion of the sentence reader.
+  Upgrade entry: the arithmetic rows deferral under "Open from
+  studio-condition-builder-expansion" below.
 - **FIELDCARD-27: both entity rails carry the accessible name "Editors".** The
   Catalog view's rail and the Where values come from view's rail share it.
   Risk (Low): a screen reader user cannot tell the two apart.
@@ -2375,6 +2378,64 @@ points below to later changes. The AUTOSAVE tag is local to this section.
   or a banner sentence that names the loss, in the catalog's
   `draftToolbar.saveFailedRefused`.
 
+## Open from studio-condition-builder-expansion (needs its own OpenSpec change)
+
+The change gave the condition builder groups, field values and date order. It
+left the ten points below to later changes. The CEL input covers the first
+four until a builder row does.
+
+- **An emptiness check.** "Is empty" and "has a value" have no row. An
+  unwritten field raises, so `data.x == ""` matches nothing when nobody wrote
+  the field. The correct form needs `has()` and words of its own.
+- **A literal list.** "Status is one of Approved, Pending" has no row. A group
+  of "or" rows covers it today.
+- **Negation of a group or of a whole condition.** Only a list row negates, as
+  "does not include". The text `!(a || b)` reads as a hand-written rule.
+- **Text operators.** "Starts with" and a substring "contains" have no row.
+- **Ordering over a date-time.** Its stored text may carry seconds and a zone
+  offset, so lexical order is not calendar order. The CEL check offers no
+  zone-normalised comparison. A date-time row offers "is" and "is not" alone.
+- **Folding the rule builder onto the condition builder.** The rule builder
+  keeps its own model, and it is now the narrower of the two. Refused
+  simplification 11 below names the fold.
+- **A picker over the known roles for `actor.roles`.** The value is free text
+  today. A typo publishes a guard that never matches.
+- **Moving an existing row into a group.** A new group starts with a fresh
+  row. To put an existing row inside, an author removes it and builds it again.
+- **Arithmetic rows.** A guard such as
+  `data.quantity * data.unit_price >= 10000.0` has no row. It reads as a
+  hand-written rule, the case FIELDCARD-26 above records.
+- **A literal of the wrong type.** A literal whose JavaScript type does not fit
+  the operand still reads as a row. On a date, `data.d > 5` reads "D is after
+  5". The next authoring action writes `data.d > "5"`, and the publish check
+  rejects it.
+
+The critique and the audit of 2026-11-02 left the observations below. Each one
+waits for an owner ruling or for the change it names.
+
+- **The Map clamps a long grouped sentence at six lines.** A cut at a clause
+  boundary, with the full text in the accessible name, is `studio-canvas`
+  work.
+- **The add commands take two styles.** At the top level "+ Add row" and
+  "+ Add group" keep the ghost accent. Inside a group, "+ Add row to this
+  group" takes the slate authoring command.
+- **A group added to an empty builder reads back flat.** Its one finished row
+  writes bare, so the next read shows a plain row.
+- **Each keystroke commits to the draft.** A value input writes through the
+  autosave on every key.
+- **The × remove control wraps alone at 1280px and at 1024px.** It stands on
+  a line of its own under the row's other controls.
+- **Row 0 has no gutter.** Its controls sit left of the later rows' controls,
+  which follow the joiner.
+- **The value placeholder reads 4.12:1 in light and 3.60:1 in dark.**
+- **The incomplete flag has no `aria-describedby` link.** A screen reader
+  hears the row's controls without it.
+- **Rows repeat the names field, operator and value.** SENTENCE-9 above
+  records it.
+- **The operand switch keeps a pair between operands of one shape alone.**
+  Arrowing from a number field through a text field and back still resets the
+  operator and the value.
+
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 
 Each entry below names a cut somebody proposed, the reason a reviewer refused
@@ -2433,8 +2494,11 @@ audit of 2026-09-10.
 11. **Finding 5, merge `RuleInput` into `ConditionInput`.** Rejected
     2026-08-16. A `git diff --no-index` run that day reported 51 insertions
     and 84 deletions over the two files, then 267 combined lines. The default
-    operand and the field-against-field comparison have no counterpart on a
-    path guard. [`packages/web/src/areas/studio/panels/shared/RuleInput.tsx`
+    operand has no counterpart on a path guard. Since
+    `studio-condition-builder-expansion`, both builders compare against a
+    field. The merge stays refused. Folding the rule builder's model onto the
+    condition builder's is a separate deferral, recorded in that change's
+    entry above. [`packages/web/src/areas/studio/panels/shared/RuleInput.tsx`
     and `ConditionInput.tsx` beside it]
 12. **Finding 22, `Intl.NumberFormat` for `formatDuration`.** Rejected
     2026-08-16. The test file

@@ -28,8 +28,9 @@ describe("the guard fieldset", () => {
 
 describe("the builder row's controls", () => {
   for (const [file, controls] of [
-    // operand, operator, and the value editor's bool select, option select and input.
-    ["shared/ConditionBuilder.tsx", 5],
+    // operand, operator, the value editor's bool select, option select and
+    // input, the field picker, and a group's joiner select.
+    ["shared/ConditionBuilder.tsx", 7],
     // the same five, plus the "a field" value select.
     ["shared/RuleBuilder.tsx", 6],
   ] as const) {
@@ -41,7 +42,12 @@ describe("the builder row's controls", () => {
       expect(block).toContain("minWidth: 0");
       expect([...source.matchAll(/\{\.\.\.stylex\.props\(styles\.conditionControl\)\}/g)].length).toBe(controls);
       if (file.endsWith("RuleBuilder.tsx")) expect(styleBlock(source, "conditionRaw")).toContain('maxWidth: "100%"');
-      if (file.endsWith("ConditionBuilder.tsx")) expect(styleBlock(source, "conditionRawSentence")).toContain('maxWidth: "100%"');
+      if (file.endsWith("ConditionBuilder.tsx")) {
+        expect(styleBlock(source, "conditionRawSentence")).toContain('maxWidth: "100%"');
+        // The value side holds the field picker, so a long label cannot widen the row.
+        expect(styleBlock(source, "valueSide")).toContain('maxWidth: "100%"');
+        expect(styleBlock(source, "valueSide")).toContain("minWidth: 0");
+      }
     });
   }
 });
