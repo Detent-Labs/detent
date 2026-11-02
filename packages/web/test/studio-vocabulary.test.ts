@@ -165,6 +165,33 @@ describe("flag vocabulary", () => {
   });
 });
 
+describe("condition builder vocabulary", () => {
+  it("names the list, date and date-time operators in words", () => {
+    expectRows([
+      ["condition.op.in", "includes"],
+      ["condition.op.notIn", "does not include"],
+      ["condition.op.before", "is before"],
+      ["condition.op.onOrBefore", "is on or before"],
+      ["condition.op.after", "is after"],
+      ["condition.op.onOrAfter", "is on or after"],
+      ["condition.op.atOrBefore", "is at or before"],
+      ["condition.op.atOrAfter", "is at or after"],
+    ]);
+  });
+
+  it("names the list clauses value first, and the group clauses by their joiner", () => {
+    expectRows([
+      ["condition.clause.in", "{value} is one of {field}"],
+      ["condition.clause.notIn", "{value} is not one of {field}"],
+      ["condition.clause.either", "either {left} or {right}"],
+      ["condition.clause.both", "both {left} and {right}"],
+      ["condition.clause.anyOf", "any of {clauses}"],
+      ["condition.clause.allOf", "all of {clauses}"],
+      ["condition.groupIncomplete", "Needs a finished row before it is written."],
+    ]);
+  });
+});
+
 describe("Change list vocabulary", () => {
   it("names the change list's properties in the way-out words", () => {
     expectRows([

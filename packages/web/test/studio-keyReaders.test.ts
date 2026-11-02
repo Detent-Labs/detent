@@ -161,6 +161,14 @@ describe("rewriteFieldRead", () => {
     expect(rewriteFieldRead("data.amount > 1.0", "amount", "amount")).toBe("data.amount > 1.0");
   });
 
+  // `studio-condition-builder`: a field-valued row and a group follow a key change.
+  it("changes a key on the right side of a comparison and inside a group's parentheses", () => {
+    expect(rewriteFieldRead("data.end_date > data.start_date", "start_date", "begin")).toBe("data.end_date > data.begin");
+    expect(
+      rewriteFieldRead('data.amount > 1000.0 && (data.start_date < "2026-12-31" || data.end_date >= data.start_date)', "start_date", "begin"),
+    ).toBe('data.amount > 1000.0 && (data.begin < "2026-12-31" || data.end_date >= data.begin)');
+  });
+
   it("changes a key into a longer and a shorter one alike", () => {
     expect(rewriteFieldRead("data.a > 1.0 && data.a < 9.0", "a", "amount_total")).toBe("data.amount_total > 1.0 && data.amount_total < 9.0");
     expect(rewriteFieldRead("data.amount_total > 1.0 && data.amount_total < 9.0", "amount_total", "a")).toBe("data.a > 1.0 && data.a < 9.0");

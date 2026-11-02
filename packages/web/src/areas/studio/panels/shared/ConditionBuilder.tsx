@@ -7,10 +7,13 @@ import {
   boolValueOf,
   inputTypeFor,
   isComplete,
+  newLeaf,
   operatorsFor,
-  OP_NAMES,
+  operatorWord,
   type CmpOp,
   type Condition,
+  type Leaf,
+  type Literal,
   type Operand,
   type OperandGroup,
   type Row,
@@ -119,11 +122,12 @@ function ValueEditor({
   operand,
   onChange,
 }: {
-  row: Extract<Row, { kind: "cmp" }>;
+  row: Extract<Leaf, { kind: "cmp" }>;
   operand: Operand | undefined;
-  onChange: (value: string | number | boolean | undefined) => void;
+  onChange: (value: Literal) => void;
 }) {
   const label = t("condition.valueLabel");
+  const value = row.value.kind === "literal" ? row.value.value : undefined;
 
   if (!operand) return null;
 
@@ -132,7 +136,7 @@ function ValueEditor({
       <select
         {...stylex.props(styles.conditionControl)}
         aria-label={label}
-        value={boolChoiceOf(row.value)}
+        value={boolChoiceOf(value)}
         onChange={(e) => onChange(boolValueOf(e.target.value))}
       >
         <option value="">{t("condition.selectValue")}</option>
@@ -148,7 +152,7 @@ function ValueEditor({
       <select
         {...stylex.props(styles.conditionControl)}
         aria-label={label}
-        value={String(row.value ?? "")}
+        value={String(value ?? "")}
         onChange={(e) => onChange(e.target.value || undefined)}
       >
         <option value="">{t("condition.selectValue")}</option>
@@ -167,7 +171,7 @@ function ValueEditor({
       type={inputTypeFor(operand)}
       aria-label={label}
       placeholder={t("condition.valuePlaceholder")}
-      value={String(row.value ?? "")}
+      value={String(value ?? "")}
       spellCheck={false}
       autoComplete="off"
       onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)}
@@ -221,10 +225,7 @@ export function ConditionBuilder({ condition, operands, onChange, describedBy }:
     (at === null ? root.querySelector<HTMLElement>("button.condition-add") : removes.item(at))?.focus();
   }, [focusAfterRemove]);
 
-  const addRow = () => {
-    const first = operands[0];
-    setRows([...condition.rows, { kind: "cmp", operand: first?.path ?? "", op: operatorsFor(first?.celType ?? "string")[0], value: undefined }]);
-  };
+  const addRow = () => setRows([...condition.rows, newLeaf(operands)]);
 
   const flipJoiner = () => onChange({ ...condition, joiner: condition.joiner === "&&" ? "||" : "&&" });
 
@@ -243,7 +244,10 @@ export function ConditionBuilder({ condition, operands, onChange, describedBy }:
                   </button>
                 )}
 
-                {row.kind === "raw" ? (
+                {/* ponytail: a group row draws as a hand-written rule until the
+                    group row component lands; ceiling: its leaves cannot be
+                    edited here; upgrade: render GroupRow in ConditionBuilder. */}
+                {row.kind !== "cmp" ? (
                   <span {...stylex.props(styles.conditionRawSentence)}>{t("condition.rawRowSentence")}</span>
                 ) : (
                   <>
@@ -258,8 +262,8 @@ export function ConditionBuilder({ condition, operands, onChange, describedBy }:
                         updateRow(index, {
                           kind: "cmp",
                           operand: e.target.value,
-                          op: operatorsFor(next?.celType ?? "string")[0],
-                          value: undefined,
+                          op: operatorsFor(next?.celType ?? "string", next?.format)[0]!,
+                          value: { kind: "literal", value: undefined },
                         });
                       }}
                     >
@@ -273,14 +277,18 @@ export function ConditionBuilder({ condition, operands, onChange, describedBy }:
                       value={row.op}
                       onChange={(e) => updateRow(index, { ...row, op: e.target.value as CmpOp })}
                     >
-                      {operatorsFor(operand?.celType ?? "string").map((op) => (
+                      {operatorsFor(operand?.celType ?? "string", operand?.format).map((op) => (
                         <option key={op} value={op}>
-                          {t(`condition.op.${OP_NAMES[op]}`)}
+                          {operatorWord(op, operand)}
                         </option>
                       ))}
                     </select>
 
-                    <ValueEditor row={row} operand={operand} onChange={(value) => updateRow(index, { ...row, value })} />
+                    <ValueEditor
+                      row={row}
+                      operand={operand}
+                      onChange={(value) => updateRow(index, { ...row, value: { kind: "literal", value } })}
+                    />
                   </>
                 )}
 

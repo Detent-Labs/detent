@@ -122,6 +122,17 @@ describe("the sentence under the rows", () => {
     expect(sentence(render(cel('data.city == "Bern"')))).toBe("City is “Bern”.");
   });
 
+  it("names the value first in a list clause and its negation", () => {
+    expect(sentence(render(cel('"manager" in actor.roles')))).toBe("“manager” is one of the person's roles.");
+    expect(sentence(render(cel('!("manager" in actor.roles)')))).toBe("“manager” is not one of the person's roles.");
+  });
+
+  it("reads a group of two as either or", () => {
+    expect(sentence(render(cel('data.amount > 1000.0 && (data.status == "approved" || data.city == "Bern")')))).toBe(
+      "Amount is greater than 1,000 and either Status is Approved or City is “Bern”.",
+    );
+  });
+
   it("reads a raw row as a hand-written rule, and keeps its text in the Developer view alone", () => {
     const html = render(cel('data.tags.exists(t, t == "vip") && data.amount > 1000.0'));
 

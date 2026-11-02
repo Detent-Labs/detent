@@ -97,7 +97,7 @@ describe("a rewritten guard re-reads on the new key", () => {
   it("reads the rewritten source as a comparison row on the renamed field", () => {
     const after = renamed();
     const condition = fromCel(after.workflow.steps[0]!.paths[0]!.guard.src, operandsOf(after));
-    expect(condition!.rows).toEqual([{ kind: "cmp", operand: "data.total", op: ">", value: 1000 }]);
+    expect(condition!.rows).toEqual([{ kind: "cmp", operand: "data.total", op: ">", value: { kind: "literal" as const, value: 1000 } }]);
   });
 
   it("draws a comparison row with the renamed field picked, and no raw row", () => {

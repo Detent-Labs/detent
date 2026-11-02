@@ -13,6 +13,7 @@ import {
   conditionSentence,
   fromCel,
   operandSignature,
+  rowCount,
   toCel,
   type Condition,
 } from "./conditionLogic";
@@ -209,7 +210,7 @@ export function ConditionInput({
   const commit = (next: Condition) => {
     setCondition(next);
     const written = toCel(next, operands);
-    const decision = commitDecision(written, condition?.rows.length ?? 0, next.rows.length, src);
+    const decision = commitDecision(written, condition ? rowCount(condition) : 0, rowCount(next), src);
     // `seededFrom` stays put on a hold, so the unfinished row survives the render.
     if (decision === "hold") return;
     seededFrom.current = { src: written, signature };

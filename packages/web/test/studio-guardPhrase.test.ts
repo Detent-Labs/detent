@@ -11,6 +11,16 @@ import { buildOperands, guardPhrase } from "../src/areas/studio/panels/shared/co
 const FIELDS = [
   { id: "field_00000000-0000-4000-8000-0000000000a1", key: "amount", type: "number", label: { en: "Amount" } },
   { id: "field_00000000-0000-4000-8000-0000000000a2", key: "tags", type: "list", label: { en: "Tags" } },
+  {
+    id: "field_00000000-0000-4000-8000-0000000000a3",
+    key: "department",
+    type: "string",
+    label: { en: "Department" },
+    options: [
+      { value: "sales", label: { en: "Sales" } },
+      { value: "marketing", label: { en: "Marketing" } },
+    ],
+  },
 ] as unknown as DraftField[];
 
 const operands = buildOperands({ fields: FIELDS, locale: "en", baseLocale: "en" });
@@ -41,5 +51,18 @@ describe("guardPhrase", () => {
 
   it("reads source that does not parse as a hand-written rule holding", () => {
     expect(guardPhrase("data.amount >", operands)).toBe("a hand-written rule holds");
+  });
+
+  it("reads a grouped guard's group in the builder's clause words", () => {
+    expect(guardPhrase('data.amount > 1000.0 && (data.department == "sales" || data.department == "marketing")', operands)).toBe(
+      "Amount is greater than 1,000 and either Department is Sales or Department is Marketing",
+    );
+  });
+
+  it("counts a comparison inside a group as a readable row", () => {
+    expect(guardPhrase('size(data.tags) > 3 && (data.amount > 1.0 || size(data.tags) > 9)', operands)).toBe(
+      "a hand-written rule and either Amount is greater than 1 or a hand-written rule",
+    );
+    expect(guardPhrase("size(data.tags) > 3 && (size(data.tags) > 1 || size(data.tags) > 9)", operands)).toBe("a hand-written rule holds");
   });
 });

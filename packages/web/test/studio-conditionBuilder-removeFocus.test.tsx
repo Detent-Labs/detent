@@ -49,8 +49,8 @@ describe("focus after a row removal", () => {
         condition={{
           joiner: "&&",
           rows: [
-            { kind: "cmp", operand: "data.amount", op: ">", value: 5 },
-            { kind: "cmp", operand: "data.amount", op: "<", value: 9 },
+            { kind: "cmp", operand: "data.amount", op: ">", value: { kind: "literal" as const, value: 5 } },
+            { kind: "cmp", operand: "data.amount", op: "<", value: { kind: "literal" as const, value: 9 } },
           ],
         }}
         operands={[AMOUNT]}

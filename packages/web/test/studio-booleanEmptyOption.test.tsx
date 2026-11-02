@@ -49,7 +49,7 @@ describe("boolean value select helpers", () => {
   });
 
   it("writes data.approved == false once No is chosen on a new row", () => {
-    const row = { kind: "cmp" as const, operand: "data.approved", op: "==" as const, value: boolValueOf("false") };
+    const row = { kind: "cmp" as const, operand: "data.approved", op: "==" as const, value: { kind: "literal" as const, value: boolValueOf("false") } };
     expect(toCel({ joiner: "&&", rows: [row] }, OPERANDS)).toBe("data.approved == false");
   });
 });
@@ -57,7 +57,7 @@ describe("boolean value select helpers", () => {
 describe("ConditionBuilder on a new boolean row", () => {
   const condition = {
     joiner: "&&" as const,
-    rows: [{ kind: "cmp" as const, operand: "data.approved", op: "==" as const, value: undefined }],
+    rows: [{ kind: "cmp" as const, operand: "data.approved", op: "==" as const, value: { kind: "literal" as const, value: undefined } }],
   };
   const html = renderToStaticMarkup(<ConditionBuilder condition={condition} operands={OPERANDS} onChange={() => {}} />);
 
@@ -72,7 +72,7 @@ describe("ConditionBuilder on a new boolean row", () => {
   });
 
   it("keeps a stored true on the yes option, and the row complete", () => {
-    const stored = { ...condition, rows: [{ ...condition.rows[0]!, value: true }] };
+    const stored = { ...condition, rows: [{ ...condition.rows[0]!, value: { kind: "literal" as const, value: true } }] };
     const out = renderToStaticMarkup(<ConditionBuilder condition={stored} operands={OPERANDS} onChange={() => {}} />);
     expect(valueSelect(out)).toMatch(/<option value="true" selected="">/);
     expect(out).not.toContain("Needs a value before it is written.");
