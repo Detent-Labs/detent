@@ -86,17 +86,16 @@ export interface Condition {
  * the rule-row builder writes too (it never writes `in`). */
 export const CMP_OPS: CmpOp[] = ["==", "!=", "<", "<=", ">", ">="];
 
-const isDateFormat = (format: string | undefined) => format === "date" || format === "datetime";
-
 /**
  * Operators offered per CEL type and format. A list gets the membership pair,
- * the only mirrored form. A date or date-time orders, since its ISO-8601 text
- * orders as the calendar does. The rule builder passes the type alone.
+ * the only mirrored form. A date orders, since its `YYYY-MM-DD` text orders as
+ * the calendar does. A date-time does not: its text may carry seconds and a
+ * zone, so it keeps equality alone. The rule builder passes the type alone.
  */
 export function operatorsFor(celTypeName: string, format?: string): CmpOp[] {
   if (celTypeName === "list<string>") return ["in", "!in"];
   if (celTypeName === "double" || celTypeName === "int") return CMP_OPS;
-  if (celTypeName === "string" && isDateFormat(format)) return CMP_OPS;
+  if (celTypeName === "string" && format === "date") return CMP_OPS;
   return ["==", "!="];
 }
 
@@ -357,14 +356,19 @@ function readMembership(node: CelNode, byPath: Map<string, Operand>, op: "in" | 
 
 /**
  * The field and called-process operands a row on `operandPath` can compare
- * against: the same CEL type, the operand itself left out. A list operand
- * takes none, since `in` takes a literal.
+ * against: the same CEL type and the same `format` (an absent format matches
+ * an absent one alone), the operand itself left out. A list operand takes
+ * none, since `in` takes a literal.
  */
 export function fieldValueCandidates(operandPath: string, operands: Operand[]): Operand[] {
   const operand = operands.find((o) => o.path === operandPath);
   if (!operand || operand.celType === "list<string>") return [];
   return operands.filter(
-    (o) => o.path !== operandPath && (o.group === "fields" || o.group === "child") && o.celType === operand.celType,
+    (o) =>
+      o.path !== operandPath &&
+      (o.group === "fields" || o.group === "child") &&
+      o.celType === operand.celType &&
+      o.format === operand.format,
   );
 }
 
@@ -610,20 +614,14 @@ export const OP_NAMES = {
   "!in": "notIn",
 } as const satisfies Record<CmpOp, string>;
 
-const DATE_OP_NAMES = {
-  date: { "<": "before", "<=": "onOrBefore", ">": "after", ">=": "onOrAfter" },
-  datetime: { "<": "before", "<=": "atOrBefore", ">": "after", ">=": "atOrAfter" },
-} as const;
+const DATE_OP_NAMES = { "<": "before", "<=": "onOrBefore", ">": "after", ">=": "onOrAfter" } as const;
 
-type OrderingOp = keyof (typeof DATE_OP_NAMES)["date"];
-type OpName = (typeof OP_NAMES)[CmpOp] | (typeof DATE_OP_NAMES)[keyof typeof DATE_OP_NAMES][OrderingOp];
+type OrderingOp = keyof typeof DATE_OP_NAMES;
+type OpName = (typeof OP_NAMES)[CmpOp] | (typeof DATE_OP_NAMES)[OrderingOp];
 
 /** An operator's catalog name, picked by the operand's format. */
 function opName(op: CmpOp, operand: Pick<Operand, "format"> | undefined): OpName {
-  const format = operand?.format;
-  if ((format === "date" || format === "datetime") && op in DATE_OP_NAMES[format]) {
-    return DATE_OP_NAMES[format][op as OrderingOp];
-  }
+  if (operand?.format === "date" && op in DATE_OP_NAMES) return DATE_OP_NAMES[op as OrderingOp];
   return OP_NAMES[op];
 }
 
@@ -646,15 +644,16 @@ const DATE_TIME = new Intl.DateTimeFormat("en", {
   timeZone: "UTC",
 });
 
-/** A date or date-time literal as a formatted date, in UTC. A literal outside
- * the format's value domain, or one no `Date` can hold (an offset such as
- * `+24:00` passes the format check), prints as its stored text. A date-time
- * with no zone reads as UTC, so the printed time is the one the author typed. */
+/** A date or date-time literal as a formatted date. A zoneless value reads its
+ * components as UTC and prints in UTC, so the printed date and time are the
+ * ones stored, whatever the browser's zone. A date-time carrying a zone, a
+ * literal outside the format's value domain, and one no `Date` can hold print
+ * as their stored text. */
 function formatDate(value: Literal, format: "date" | "datetime"): string {
   const text = String(value ?? "");
   if (!formatMatches({ type: "string", format }, text)) return text;
-  const zoned = format === "date" ? `${text}T00:00:00Z` : /(?:Z|[+-]\d{2}:\d{2})$/.test(text) ? text : `${text}Z`;
-  const date = new Date(zoned);
+  if (format === "datetime" && /(?:Z|[+-]\d{2}:\d{2})$/.test(text)) return text;
+  const date = new Date(format === "date" ? `${text}T00:00:00Z` : `${text}Z`);
   if (Number.isNaN(date.getTime())) return text;
   return (format === "date" ? DATE : DATE_TIME).format(date);
 }
@@ -715,18 +714,44 @@ function summarizeGroup(group: GroupRow, byPath: Map<string, Operand>): string {
  */
 export function summarizeCondition(condition: Condition, operands: Operand[]): string {
   const byPath = new Map(operands.map((o) => [o.path, o]));
-  const clauses = condition.rows
-    .filter((r) => isComplete(r, byPath))
-    .map((r) => (r.kind === "group" ? summarizeGroup(r, byPath) : summarizeLeaf(r, byPath)));
-  return joinClauses(clauses, condition.joiner);
+  const rows = condition.rows.filter((r) => isComplete(r, byPath));
+  // A group of one complete leaf reads as that leaf, so it is no group here.
+  const groups = rows.map((r) => r.kind === "group" && r.rows.filter((l) => isComplete(l, byPath)).length > 1);
+  const clauses = rows.map((r) => (r.kind === "group" ? summarizeGroup(r, byPath) : summarizeLeaf(r, byPath)));
+  return joinClauses(clauses, condition.joiner, groups);
 }
 
-/** The clauses folded through the catalog's join phrase, `""` for none.
- * Exported for `ruleLogic.ruleSentence`, which reads the same phrases. */
-export function joinClauses(clauses: readonly string[], joiner: Condition["joiner"]): string {
+/**
+ * The clauses folded through the catalog's join phrase, `""` for none.
+ * `groups[i]` marks clause `i` as a group's clause: a group clause with a
+ * clause after it joins through the comma form, so "either A or B, and C"
+ * never reads as "either A or (B and C)". Exported for `ruleLogic.ruleSentence`,
+ * which reads the same phrases and passes no group.
+ */
+export function joinClauses(clauses: readonly string[], joiner: Condition["joiner"], groups: readonly boolean[] = []): string {
   if (!clauses.length) return "";
-  const join = t(joiner === "&&" ? "condition.join.and" : "condition.join.or");
-  return clauses.reduce((left, right) => fill(join, { left, right }));
+  const and = joiner === "&&";
+  const join = t(and ? "condition.join.and" : "condition.join.or");
+  const afterGroup = t(and ? "condition.join.andAfterGroup" : "condition.join.orAfterGroup");
+  return clauses.reduce((left, right, i) => fill(groups[i - 1] ? afterGroup : join, { left, right }));
+}
+
+/** True when the condition's sentence opens on a value, a list clause's: the
+ * sentence then keeps the value's case. */
+function opensOnValue(condition: Condition, operands: Operand[]): boolean {
+  const byPath = new Map(operands.map((o) => [o.path, o]));
+  const first = condition.rows.find((r) => isComplete(r, byPath));
+  const leaves = first?.kind === "group" ? first.rows.filter((l) => isComplete(l, byPath)) : first ? [first] : [];
+  // A group of two or more opens on its group word.
+  const lead = leaves.length === 1 ? leaves[0] : undefined;
+  return lead?.kind === "cmp" && (lead.op === "in" || lead.op === "!in");
+}
+
+/** A condition's clauses as a sentence: a capital at the head, unless the
+ * sentence opens on a value, and a period at the end. */
+function sentenceOf(condition: Condition, operands: Operand[], clauses: string): string {
+  const sentence = fill(t("condition.sentence"), { condition: clauses });
+  return opensOnValue(condition, operands) ? sentence : capitalize(sentence);
 }
 
 /** Exported for `ruleLogic.ruleSentence`, which opens its sentence the same way. */
@@ -746,7 +771,7 @@ export const capitalize = (s: string): string => s.charAt(0).toLocaleUpperCase("
  */
 export function conditionSentence(condition: Condition, operands: Operand[], stored: string | undefined): string {
   const clauses = summarizeCondition(condition, operands);
-  if (clauses) return capitalize(fill(t("condition.sentence"), { condition: clauses }));
+  if (clauses) return sentenceOf(condition, operands, clauses);
   const hasStored = Boolean(stored?.trim());
   if (!condition.rows.length && !hasStored) return t("condition.empty");
   const held = hasStored ? fromCel(stored, operands) : null;
@@ -764,8 +789,8 @@ export function conditionSentence(condition: Condition, operands: Operand[], sto
 export function readerSentence(src: string, operands: Operand[]): string {
   const condition = fromCel(src, operands);
   const clauses = condition ? summarizeCondition(condition, operands) : "";
-  if (!clauses) return t("condition.readerRaw");
-  return capitalize(fill(t("condition.sentence"), { condition: clauses }));
+  if (!condition || !clauses) return t("condition.readerRaw");
+  return sentenceOf(condition, operands, clauses);
 }
 
 /**

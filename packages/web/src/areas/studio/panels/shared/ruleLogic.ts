@@ -32,11 +32,12 @@ import {
   type CelNode,
   type CmpOp,
   type Operand,
+  type RowValue,
 } from "./conditionLogic";
 
 export type RuleOperand = Operand;
 
-export type RuleValue = { kind: "literal"; value: string | number | boolean | undefined } | { kind: "field"; path: string };
+export type RuleValue = RowValue;
 
 export type RuleRow = { kind: "cmp"; operand: string; op: CmpOp; value: RuleValue } | { kind: "raw"; src: string };
 

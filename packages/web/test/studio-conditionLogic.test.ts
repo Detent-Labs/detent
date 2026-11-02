@@ -829,7 +829,7 @@ describe("a group holds rows of its own, one level deep", () => {
     ]);
     expect(toCel(condition, operands)).toBe(src);
     expect(conditionSentence(condition, operands, src)).toBe(
-      "Either Department is Sales or a hand-written rule and Amount is greater than 1,000.",
+      "Either Department is Sales or a hand-written rule, and Amount is greater than 1,000.",
     );
   });
 
@@ -887,7 +887,7 @@ describe("a group holds rows of its own, one level deep", () => {
     const condition = fromCel(stored, operands)!;
     const next: Condition = { ...condition, rows: [...condition.rows, newGroup(condition.joiner, operands)] };
     expect(toCel(next, operands)).toBe(stored);
-    expect(t("condition.groupIncomplete")).toBe("Needs a finished row before it is written.");
+    expect(t("condition.groupRow.incomplete")).toBe("Needs a finished row before it is written.");
   });
 
   it("counts the leaves and the groups", () => {
@@ -954,6 +954,29 @@ describe("a row compares against another field", () => {
     for (const src of ["data.amount == data.note", "data.amount == data.gone", "data.amount == data.amount"]) {
       expect(fromCel(src, operands)!.rows).toEqual([{ kind: "raw", src }]);
     }
+  });
+
+  it("offers a date row date fields alone, and a person row person fields alone", () => {
+    const operands = catalog([
+      labeled("start", "Start", "string", { format: "date" }),
+      labeled("end", "End", "string", { format: "date" }),
+      labeled("at", "At", "string", { format: "datetime" }),
+      labeled("note", "Note", "string"),
+      labeled("approver", "Approver", "string", { format: "person" }),
+      labeled("requester", "Requester", "string", { format: "person" }),
+      labeled("count", "Count", "number", { format: "integer" }),
+      labeled("amount", "Amount", "number"),
+    ]);
+    const paths = (path: string) => fieldValueCandidates(path, operands).map((o) => o.path);
+    expect(paths("data.end")).toEqual(["data.start"]);
+    expect(paths("data.approver")).toEqual(["data.requester"]);
+    expect(paths("data.note")).toEqual([]);
+    expect(paths("data.count")).toEqual([]);
+  });
+
+  it("leaves a right-side field of another format a raw row", () => {
+    const operands = catalog([labeled("end", "End", "string", { format: "date" }), labeled("note", "Note", "string")]);
+    expect(fromCel("data.end == data.note", operands)!.rows).toEqual([{ kind: "raw", src: "data.end == data.note" }]);
   });
 
   it("offers the fields and called-process operands of the operand's CEL type, the operand excluded", () => {
@@ -1032,8 +1055,9 @@ describe("operators follow the operand's type and format", () => {
     expect(operatorsFor("string", "date")[3]).toBe("<=");
   });
 
-  it("offers a date-time the at-or words and none of the date's on-or words", () => {
-    expect(words("data.at")).toEqual(["is", "is not", "is before", "is at or before", "is after", "is at or after"]);
+  it("offers a date-time is and is not alone, since its text does not order as its calendar", () => {
+    expect(operatorsFor("string", "datetime")).toEqual(["==", "!="]);
+    expect(words("data.at")).toEqual(["is", "is not"]);
   });
 
   it("offers a person field is and is not alone", () => {
@@ -1095,6 +1119,27 @@ describe("the clauses", () => {
     );
   });
 
+  it("ends a group clause in a comma when a clause follows it, under and and under or", () => {
+    expect(read('(data.a == "x" || data.b == "y") && data.c > 1.0')).toBe("Either A is “x” or B is “y”, and C is greater than 1.");
+    expect(read('(data.a == "x" && data.b == "y") || data.c > 1.0')).toBe("Both A is “x” and B is “y”, or C is greater than 1.");
+    expect(read('data.c > 1.0 && (data.a == "x" || data.b == "y") && data.c < 9.0')).toBe(
+      "C is greater than 1 and either A is “x” or B is “y”, and C is less than 9.",
+    );
+  });
+
+  it("keeps the value's case when the sentence opens on a list clause", () => {
+    const tags = catalog([labeled("tags", "Tags", "list", { options: [{ value: "vip", label: { en: "vip" } }] })]);
+    const src = '"vip" in data.tags';
+    expect(conditionSentence(fromCel(src, tags)!, tags, src)).toBe("vip is one of Tags.");
+    expect(readerSentence(src, tags)).toBe("vip is one of Tags.");
+    expect(readerSentence('"vip" in data.tags || ("x" in actor.roles && "y" in actor.roles)', tags)).toBe(
+      "vip is one of Tags or both “x” is one of the person's roles and “y” is one of the person's roles.",
+    );
+    expect(readerSentence('("vip" in data.tags || "x" in actor.roles) && "y" in actor.roles', tags)).toBe(
+      "Either vip is one of Tags or “x” is one of the person's roles, and “y” is one of the person's roles.",
+    );
+  });
+
   it("reads a group of one complete row as that row's clause", () => {
     const condition: Condition = {
       joiner: "&&",
@@ -1109,9 +1154,14 @@ describe("the clauses", () => {
     expect(read('data.due_date >= "2026-01-05"')).toBe("Due date is on or after Jan 5, 2026.");
   });
 
-  it("prints a date-time value with its time in the at-or words", () => {
-    expect(read('data.starts_at >= "2026-12-31T17:30"')).toBe("Starts at is at or after Dec 31, 2026, 5:30 PM.");
-    expect(read('data.starts_at <= "2026-12-31T17:30:00Z"')).toBe("Starts at is at or before Dec 31, 2026, 5:30 PM.");
+  it("prints a zoneless date-time value with its time as written", () => {
+    expect(read('data.starts_at == "2026-12-31T17:30"')).toBe("Starts at is Dec 31, 2026, 5:30 PM.");
+    expect(read('data.starts_at != "2026-12-31T23:59:30"')).toBe("Starts at is not Dec 31, 2026, 11:59 PM.");
+  });
+
+  it("prints a date-time value carrying a zone as its stored text, never converted", () => {
+    expect(read('data.starts_at == "2026-12-31T17:30:00Z"')).toBe("Starts at is 2026-12-31T17:30:00Z.");
+    expect(read('data.starts_at == "2026-12-31T17:30+02:00"')).toBe("Starts at is 2026-12-31T17:30+02:00.");
   });
 
   it("prints a date literal the formatter cannot read as its stored text", () => {
@@ -1120,7 +1170,7 @@ describe("the clauses", () => {
   });
 
   it("prints a date-time literal whose offset no date can hold as its stored text", () => {
-    expect(read('data.starts_at >= "2026-01-01T00:00+24:00"')).toBe("Starts at is at or after 2026-01-01T00:00+24:00.");
-    expect(read('data.starts_at >= "2026-01-01T00:00+99:99"')).toBe("Starts at is at or after 2026-01-01T00:00+99:99.");
+    expect(read('data.starts_at == "2026-01-01T00:00+24:00"')).toBe("Starts at is 2026-01-01T00:00+24:00.");
+    expect(read('data.starts_at == "2026-01-01T00:00+99:99"')).toBe("Starts at is 2026-01-01T00:00+99:99.");
   });
 });

@@ -166,7 +166,7 @@ describe("flag vocabulary", () => {
 });
 
 describe("condition builder vocabulary", () => {
-  it("names the list, date and date-time operators in words", () => {
+  it("names the list and date operators in words", () => {
     expectRows([
       ["condition.op.in", "includes"],
       ["condition.op.notIn", "does not include"],
@@ -174,8 +174,6 @@ describe("condition builder vocabulary", () => {
       ["condition.op.onOrBefore", "is on or before"],
       ["condition.op.after", "is after"],
       ["condition.op.onOrAfter", "is on or after"],
-      ["condition.op.atOrBefore", "is at or before"],
-      ["condition.op.atOrAfter", "is at or after"],
     ]);
   });
 
@@ -187,7 +185,9 @@ describe("condition builder vocabulary", () => {
       ["condition.clause.both", "both {left} and {right}"],
       ["condition.clause.anyOf", "any of {clauses}"],
       ["condition.clause.allOf", "all of {clauses}"],
-      ["condition.groupIncomplete", "Needs a finished row before it is written."],
+      ["condition.join.andAfterGroup", "{left}, and {right}"],
+      ["condition.join.orAfterGroup", "{left}, or {right}"],
+      ["condition.groupRow.incomplete", "Needs a finished row before it is written."],
     ]);
   });
 });

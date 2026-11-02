@@ -283,6 +283,14 @@ describe("ruleSentence", () => {
     expect(ruleSentence(c, ops, undefined)).toBe("This answer is at most Budget.");
   });
 
+  it("prints a date literal as a formatted date, in the rule builder's own operator words", () => {
+    const own = field("end", "string", { format: "date" });
+    const due = field("due", "string", { format: "date", label: { en: "Due" } });
+    const dateOps = operandsFor(own, [due]);
+    const src = 'data.due <= "2026-12-31"';
+    expect(ruleSentence(fromRuleCel(src, dateOps)!, dateOps, src)).toBe("Due is at most Dec 31, 2026.");
+  });
+
   it("prints (unnamed field) for a field value no operand names, never its path", () => {
     const c: RuleCondition = { rows: [cmp("<=", { kind: "field", path: "data.gone" })] };
     expect(ruleSentence(c, ops, undefined)).toBe("This answer is at most (unnamed field).");

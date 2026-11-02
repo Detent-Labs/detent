@@ -61,9 +61,9 @@ describe("the operator select", () => {
     expect(select).toMatch(/<option value="&lt;=" selected="">is on or before<\/option>/);
   });
 
-  it("prints the at-or words for a date-time", () => {
+  it("prints is and is not alone for a date-time", () => {
     const html = render({ joiner: "&&", rows: [{ kind: "cmp", operand: "data.starts", op: "==", value: { kind: "literal" as const, value: undefined } }] }, [STARTS]);
-    expect(optionTexts(selectLabelled(html, "operator"))).toEqual(["is", "is not", "is before", "is at or before", "is after", "is at or after"]);
+    expect(optionTexts(selectLabelled(html, "operator"))).toEqual(["is", "is not"]);
   });
 });
 

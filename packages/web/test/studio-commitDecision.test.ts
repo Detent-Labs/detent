@@ -100,11 +100,12 @@ describe("commitDecision", () => {
 describe("commitDecision over a group", () => {
   const leaf = (value: number | undefined) => ({ kind: "cmp" as const, operand: "data.amount", op: ">" as const, value: { kind: "literal" as const, value } });
 
+  // Removing a group's last row removes the group: the removal counts both.
   it("clears the stored source when the last row inside a group goes", () => {
     const before: Condition = { joiner: "&&", rows: [{ kind: "group", joiner: "||", rows: [leaf(1000)] }] };
-    const after: Condition = { joiner: "&&", rows: [{ kind: "group", joiner: "||", rows: [] }] };
+    const after: Condition = { joiner: "&&", rows: [] };
     expect(rowCount(before)).toBe(2);
-    expect(rowCount(after)).toBe(1);
+    expect(rowCount(after)).toBe(0);
     expect(commitDecision(undefined, rowCount(before), rowCount(after), "data.amount > 1000.0")).toBe("clear");
   });
 

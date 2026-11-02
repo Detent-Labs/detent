@@ -68,6 +68,6 @@ describe("guardPhrase", () => {
   });
 
   it("reads a date-time literal no date can hold as its stored text, never a throw", () => {
-    expect(guardPhrase('data.starts_at >= "2026-01-01T00:00+24:00"', operands)).toBe("Starts at is at or after 2026-01-01T00:00+24:00");
+    expect(guardPhrase('data.starts_at == "2026-01-01T00:00+24:00"', operands)).toBe("Starts at is 2026-01-01T00:00+24:00");
   });
 });
