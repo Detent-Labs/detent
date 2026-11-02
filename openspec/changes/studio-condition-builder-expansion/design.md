@@ -154,6 +154,10 @@ Each conjunct reads as follows.
 - A comparison whose right side is no literal may read as a field value.
   The right side must be a member path naming a field or called-process operand other than the left one. That operand must have the left operand's CEL type and format. Any
   other right side leaves the node a raw row, a context operand included.
+- A comparison whose operator the operand does not offer reads as a raw
+  row, with its text unchanged. The reader and the operator select then never
+  disagree: a text ordering and a date-time ordering read raw, a date ordering
+  reads as a row.
 - Everything else reads as today.
 
 The reader applies four normalisations. Single quotes become double. A bare

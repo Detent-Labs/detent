@@ -275,8 +275,7 @@ reads as a single row.
 A conjunct may not match a comparison the builder can show. The builder
 SHALL then keep it as a raw row holding the exact source text of that
 fragment. It SHALL NOT drop the fragment. It SHALL NOT push the whole
-condition out of the builder. A `&&` or `||` node inside a group is such a
-fragment.
+condition out of the builder. A `&&` or `||` node inside a group is such a fragment. So is a comparison whose operator the operand does not offer.
 
 A raw row SHALL gain parentheses when its level holds a second row.
 
@@ -291,6 +290,12 @@ A raw row SHALL gain parentheses when its level holds a second row.
 - **WHEN** a guard names an operand the catalog no longer declares
 - **THEN** the builder shows it as a raw row with its text unchanged
 - **AND** the existing validation reports the unknown variable as it does today
+
+#### Scenario: An ordering on a text field reads as a raw row
+
+- **WHEN** a guard reads `data.city > "Bern"` on a text field
+- **THEN** the builder shows one raw row with that text
+- **AND** `data.due_date > "2026-01-01"` on a date field still reads as a comparison row
 
 #### Scenario: A group inside a group reads as a raw row
 
