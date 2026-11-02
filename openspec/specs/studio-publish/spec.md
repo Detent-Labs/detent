@@ -361,11 +361,18 @@ number, and the screen already reports the assigned version after a
 successful publish. The dialog SHALL render a valid version label even when
 nobody has published the draft before.
 
-One dialog SHALL cover the unsaved-changes case as well. When the draft
-carries unsaved work, the dialog SHALL say that publishing saves it first.
-Confirming SHALL save the draft and then publish it. The studio SHALL NOT
-raise a second prompt for the save. Declining SHALL leave the draft unsaved
-and unpublished.
+A publish SHALL NOT save first. Pressing Publish SHALL hurry a change that has
+not landed. While that save runs, the confirm SHALL read "Saving…", carry
+`aria-disabled="true"` and ignore a press, and Cancel SHALL stay usable. Declining
+SHALL send no publish request.
+
+A save that fails SHALL keep the dialog open, and the dialog SHALL print why inside
+itself. While no save runs, its confirm SHALL read "Publish", keep
+`aria-disabled="true"` and ignore a press. A conflict that save raises SHALL close
+the dialog, and the conflict banner SHALL report it.
+
+Publish pressed while a conflict stands SHALL open no dialog. The focus SHALL
+move to the conflict banner's Reload control.
 
 A publish that the engine refuses SHALL render its reason inside the open
 dialog, and SHALL leave the dialog open. A modal dialog puts everything
@@ -408,8 +415,8 @@ restarts their traversal from the top of the screen.
 #### Scenario: The same dialog covers an unsaved change
 
 - **WHEN** the developer chooses Publish while unsaved work remains
-- **THEN** the dialog says that publishing saves it first
-- **AND** confirming saves the draft and then publishes it
+- **THEN** the dialog opens and the waiting change saves at once
+- **AND** the confirm reads "Saving…" and ignores a press until that save answers
 - **AND** no second prompt appears between the save and the publish
 
 #### Scenario: Declining publishes nothing
@@ -417,8 +424,8 @@ restarts their traversal from the top of the screen.
 - **WHEN** the developer cancels that dialog, or dismisses it with Escape
 <!-- antislop: allow passive-voice -->
 <!-- Fixed Gherkin THEN/AND grammar; the clause is structurally passive. -->
-- **THEN** no save request and no publish request is sent
-- **AND** the draft keeps every unsaved change
+- **THEN** no publish request leaves
+- **AND** the draft keeps every change
 
 #### Scenario: A refused publish reports inside the dialog
 
@@ -462,6 +469,24 @@ restarts their traversal from the top of the screen.
 
 - **WHEN** the publish dialog opens on a draft holding one language
 - **THEN** the dialog prints no language fact
+
+#### Scenario: A failed save stops the dialog
+
+- **WHEN** an author presses Publish and the waiting change's save answers 500
+- **THEN** the dialog stays open and prints "Detent cannot publish yet, because your latest changes have not saved. Cancel and press Try again."
+- **AND** the confirm reads "Publish" with `aria-disabled="true"`, and a press sends no publish request
+- **AND** Cancel returns the focus to Publish, and the banner reports the failed save
+
+#### Scenario: A conflict during that save closes the dialog
+
+- **WHEN** an author presses Publish and the waiting change's save answers 409
+- **THEN** the dialog closes and the conflict banner stands
+
+#### Scenario: A standing conflict sends Publish to Reload
+
+- **WHEN** a conflict stands and an author presses Publish
+- **THEN** no dialog opens and no request leaves
+- **AND** the focus stands on the conflict banner's Reload
 
 ### Requirement: After a publish the header bar states the version and offers Versions
 

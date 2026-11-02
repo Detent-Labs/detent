@@ -69,146 +69,224 @@ the role authoritatively.
 <!-- antislop: allow synonym-rotation -->
 <!-- A MODIFIED header cannot change, so the header keeps the base words. -->
 
-<!-- antislop: allow synonym-rotation -->
-<!-- Base wording stays verbatim in a MODIFIED block. -->
-### Requirement: Leaving the edit screen with unsaved changes prompts first
+### Requirement: A draft saves itself after each change
 
-<!-- antislop: allow sentence-length -->
-<!-- Base wording stays verbatim in a MODIFIED block. -->
-Every control that navigates away from an open draft SHALL check the dirty
-state before navigating. The requirement "A layout change counts as an unsaved
-change" defines that state. The check covers the header bar's back control, Test and
-Versions offer, the `⋮` menu's Versions and Player entries, and the Access view's
-groups link. It
-also covers the "Processes", "Tools" and "Templates" tabs, and the account
-menu's area switch, profile entry and logout.
+The studio SHALL send `PUT /drafts/:processId` about 1200 milliseconds after the
+last change to an open draft's body or layout. A run of changes with no pause SHALL
+still save within 10 seconds. At most one such request SHALL run at a time.
 
-<!-- antislop: allow negation-habit -->
-<!-- Base wording stays verbatim in a MODIFIED block. -->
-When the draft carries no unsaved change, a control SHALL navigate exactly
-as it does today, with no prompt.
+Any write to the layout counts as a change. A layout with the same values in another
+key order SHALL NOT count as one. Reading a draft SHALL send no save. No tab, screen
+or bar SHALL carry a Save control.
 
-When the draft carries an unsaved change, a control SHALL ask for
-confirmation before navigating. The question stands in the studio's dialog
-form.
+#### Scenario: A label saves after a pause
 
-Confirming SHALL proceed with the navigation; the navigation drops the
-unsaved edits, exactly as an explicit Discard already drops them. Canceling
-SHALL leave the developer on the edit screen with the draft untouched.
+- **WHEN** an author changes a field's label and stops typing
+- **THEN** one `PUT /drafts/:processId` carries the change
+- **AND** the state line reads "Saved just now" after the answer
 
-While the draft has an unsaved change, closing the tab or reloading SHALL raise
-the browser's own leave prompt. A `401` answer is not a navigation control. It
-SHALL end the session with no dialog and no leave prompt.
-
-This requirement covers the in-app controls named above, tab close and reload.
-A Back or Forward step between entries of this page is out of scope.
-
-#### Scenario: A clean draft navigates without a prompt
-
-- **WHEN** the developer has an unchanged draft and chooses "Back to
-  processes", "Versions", "Player", or a top-level studio tab
-- **THEN** the screen navigates immediately, with no confirmation prompt
-
-#### Scenario: An unsaved change on the edit screen's own nav prompts first
-
-- **WHEN** the developer has an unsaved change on the open draft and
-  chooses the back control, Test, Versions or Player
-- **THEN** the screen asks for confirmation before navigating
-
-#### Scenario: An unsaved change on the studio area's top-level nav prompts first
-
-- **WHEN** the developer has an unsaved change and chooses the
-  "Processes", "Tools" or "Templates" tab in the studio area's navigation
-- **THEN** the screen asks for confirmation before navigating
-
-#### Scenario: The groups link prompts first
-
-- **WHEN** the developer has an unsaved change and chooses "Manage assignment
-  groups for this process" on the Access view
-- **THEN** the screen asks for confirmation before navigating to the admin
-  area
-
-#### Scenario: The account menu's exits prompt first
-
-- **WHEN** the developer has an unsaved change and chooses another area, the
-  profile entry or logout in the account menu
-- **THEN** the screen asks for confirmation before the shell runs the exit
-
-#### Scenario: Canceling the prompt keeps the draft and the screen
-
-- **WHEN** the developer has an unsaved change and cancels the
-  confirmation prompt raised by a navigation control
-- **THEN** the edit screen stays open and every unsaved change remains in
-  the draft
-
-#### Scenario: Confirming the prompt navigates and drops the unsaved change
-
-- **WHEN** the developer has an unsaved change and confirms the prompt
-  raised by a navigation control
-- **THEN** the screen navigates away and the unsaved change is not
-  recovered
-
-#### Scenario: Closing the tab with an unsaved change prompts
-
-- **WHEN** the developer has an unsaved change and closes the tab or reloads
-- **THEN** the browser raises its leave prompt
-
-#### Scenario: Closing the tab with a clean draft does not prompt
-
-- **WHEN** the developer has no unsaved change and closes the tab or reloads
-- **THEN** the browser raises no leave prompt
-
-### Requirement: A layout change counts as an unsaved change
-
-An open draft SHALL read as unsaved when its body or layout differs from the
-last save. Any write to the layout counts, such as a step move, a group change
-or a new waypoint. The header bar, every leave prompt and the Publish dialog
-SHALL read this one state. A layout with the same values in another key order
-SHALL NOT count as different.
-
-#### Scenario: Moving a step marks the draft unsaved
+#### Scenario: Moving a step saves too
 
 - **WHEN** the developer drags a step and changes nothing else
-- **THEN** the header bar prints the dirty indicator
-- **AND** "Back to processes" asks for confirmation before it navigates
+- **THEN** one `PUT /drafts/:processId` carries the new layout
 
-#### Scenario: A save clears the unsaved state of a layout
+#### Scenario: A long run of typing still saves
 
-- **WHEN** the developer moves a step and saves successfully
-- **THEN** the header bar prints the saved state
-- **AND** "Back to processes" navigates with no prompt
+- **WHEN** an author types for longer than 10 seconds with no pause
+- **THEN** a save runs before the typing ends
 
-#### Scenario: A layout-only difference makes Publish save first
+#### Scenario: A change during a save saves next
 
-- **WHEN** the developer moves a step, changes nothing else and chooses
-  Publish
-- **THEN** the dialog says that publishing saves the unsaved work first
-- **AND** confirming saves the draft and then publishes it
+- **WHEN** an author changes the draft while a save request runs
+- **THEN** a second request carries that change after the first answers
 
-#### Scenario: The same layout in another key order reads as saved
+#### Scenario: Opening a draft sends nothing
+
+- **WHEN** an author opens a draft and reads every tab
+- **THEN** no `PUT /drafts/:processId` leaves the browser
+- **AND** the draft's revision and saved-by entry do not move
+
+#### Scenario: The same layout in another key order sends nothing
 
 - **WHEN** a save answers with the layout's values in another key order
-- **THEN** the header bar prints the saved state
+- **THEN** the state line reads as saved and no further request leaves
+
+### Requirement: A failed save says so and offers Try again
+
+A save that fails with anything but a 401 or a 409 SHALL raise a banner under the
+header bar, stamped "Not saved". The banner SHALL say that the latest changes stay in
+the tab, unsaved. The caught text SHALL stand in a closed Developer view. The banner
+SHALL carry a "Try again" control, and the state line SHALL read "Unsaved changes".
+
+A successful save SHALL remove this banner. It SHALL leave a banner another act
+raised.
+
+#### Scenario: A failed save keeps the work and says so
+
+- **WHEN** a save answers 500
+- **THEN** the banner stands with "Try again"
+- **AND** the state line reads "Unsaved changes"
+- **AND** the draft keeps the change
+
+#### Scenario: A save leaves another act's banner standing
+
+- **WHEN** Arrange's layout library fails to load and a later change saves
+- **THEN** the Arrange banner still stands
+
+#### Scenario: A clean draft clears the failure
+
+- **WHEN** a save fails and the author then takes the change back by hand
+- **THEN** the banner leaves and the state line reads as saved
+
+### Requirement: A refused save points to the JSON surface
+
+A refused save's banner SHALL say that trying again may not help and name the JSON
+surface. The JSON surface SHALL hold the draft as the tab holds it.
+
+#### Scenario: A refused save points to the JSON surface
+
+- **WHEN** a save answers 400 and the author opens the JSON surface
+- **THEN** the banner reads "Your latest changes stay in this tab, unsaved. The server refused them, so trying again may not help. To keep them, copy the text from the JSON surface."
+- **AND** the surface's text holds the change no save took
+
+### Requirement: A failed save retries where an answer may heal
+
+A network failure or a 5xx answer SHALL retry by itself after 5, 15 and 30 seconds,
+then every 60 seconds. The banner SHALL say so. Any other answer SHALL wait for the
+next change or for Try again. A later change SHALL start the ordinary pause.
+
+#### Scenario: A lost connection heals by itself
+
+- **WHEN** a save fails on the network and the connection then returns
+- **THEN** a later retry succeeds with no press
+- **AND** the banner leaves and the state line reads "Saved just now"
+
+#### Scenario: A refused save waits
+
+- **WHEN** a save answers 400
+- **THEN** no further request leaves until the author changes the draft or presses
+  "Try again"
+
+#### Scenario: A hung save counts as a failed one
+
+- **WHEN** a save request has no answer after 30 seconds
+- **THEN** the banner stands and the retry runs
+
+### Requirement: Leaving the draft saves first
+
+Every control that navigates away from an open draft SHALL save a waiting change
+first and ask no question. That holds for the header bar's back control, Test and
+Versions offer, and the `⋮` menu's Versions and Player. It holds for the groups link,
+the area nav, and the account menu's area switch, profile entry and logout.
+
+A change made during that wait SHALL save too. A second exit pressed during the wait
+SHALL replace the first. A confirmed discard SHALL navigate with no save.
+
+#### Scenario: A clean draft navigates at once
+
+- **WHEN** an author with no change waiting chooses a control the rule covers
+- **THEN** the screen navigates immediately and sends no request
+
+#### Scenario: A waiting change saves, then the screen leaves
+
+- **WHEN** an author changes a label and presses the back control within the pause
+- **THEN** one `PUT /drafts/:processId` carries the change
+- **AND** the process list opens after its answer, with no dialog
+
+#### Scenario: Two exits run one navigation
+
+- **WHEN** an author presses the back control, then Tools, during that wait
+- **THEN** the Tools screen opens and the process list does not
 
 #### Scenario: Discarding the draft raises no leave prompt
 
-- **WHEN** the developer moves a step, chooses Discard draft and confirms the
-  dialog
-- **THEN** the screen navigates to the process list and no leave dialog opens
+- **WHEN** the developer moves a step, chooses Discard draft and confirms the dialog
+- **THEN** the screen navigates to the process list
+- **AND** no leave dialog opens and no save request follows the discard
+
+### Requirement: An exit asks only after a failed save
+
+When the save before an exit fails, or a conflict stands, the control SHALL ask in the
+studio's dialog form. The dialog SHALL say the latest changes could not reach the
+server. Confirming SHALL navigate and drop them. Canceling SHALL leave the author on
+the draft with every change kept. No automatic save SHALL run while the dialog stands.
+Text the JSON surface has not applied asks first, with no save (`studio-json-view`).
+
+#### Scenario: A failed save asks first
+
+- **WHEN** an author presses the back control and the save answers 500
+- **THEN** the dialog says the latest changes could not reach the server
+- **AND** canceling keeps the author on the draft with the change
+
+#### Scenario: A conflict asks first
+
+- **WHEN** a conflict stands over a change that has not landed, and an author presses
+  the back control
+- **THEN** the dialog opens and no save request leaves
+
+#### Scenario: A conflict on a clean draft leaves with no question
+
+- **WHEN** a save point act answered 409 on a clean draft, and an author presses the
+  back control
+- **THEN** the process list opens with no dialog
+
+#### Scenario: Confirming the dialog drops the change
+
+- **WHEN** an author confirms that dialog
+- **THEN** the screen navigates and the draft on the server lacks the change
+
+#### Scenario: A retry waits behind the dialog
+
+- **WHEN** a save failed on the network and the dialog stands past the retry's time
+- **THEN** no request leaves until the author answers the dialog
+
+### Requirement: The browser's prompt stands while a change has not landed
+
+While a change has not landed, closing the tab or reloading SHALL raise the browser's
+own leave prompt. A `401` answer SHALL end the session with no dialog and no leave
+prompt. A Back or Forward step between entries of this page SHALL raise no prompt. It
+SHALL send a waiting change once where no failure, conflict or notice stands, and
+otherwise keep it as a copy where none stands.
+
+#### Scenario: Closing the tab while a change waits prompts
+
+- **WHEN** an author changes a label and closes the tab within the pause
+- **THEN** the browser raises its leave prompt
+
+#### Scenario: Closing the tab on a saved draft raises nothing
+
+- **WHEN** the state line reads as saved and an author closes the tab or reloads
+- **THEN** the browser raises no leave prompt
+
+#### Scenario: Browser Back within the pause still saves
+
+- **WHEN** an author changes a label and presses the browser's Back within the pause
+- **THEN** one `PUT /drafts/:processId` carries the change
+
+#### Scenario: Browser Back during a backoff keeps a copy
+
+- **WHEN** a save failed on the network and an author presses the browser's Back
+- **THEN** the tab's copy holds the change
+- **AND** a later visit to that draft shows the notice
+
+#### Scenario: Browser Back after a discard sends nothing
+
+- **WHEN** an author confirms the discard and then presses the browser's Back
+- **THEN** no `PUT /drafts/:processId` leaves
 
 ### Requirement: A save keeps a layout change made while it runs
 
 A successful save SHALL adopt the answer's revision. It SHALL adopt the
 answer's layout only when the developer changed no layout during the request.
-A layout change made during the request SHALL stay in the editor and keep the
-draft unsaved. A save that answers 409 SHALL leave the current layout as it is.
+A layout change made during the request SHALL stay in the editor, and a later
+save SHALL carry it. A save that answers 409 SHALL leave the current layout as it is.
 
 #### Scenario: A drag during a running save survives the answer
 
 - **WHEN** the developer drags a step while a save request runs and the save
   then succeeds
 - **THEN** the step stays at its new position
-- **AND** the header bar prints the dirty indicator
+- **AND** a second save carries that position after the answer
 
 #### Scenario: A conflict does not roll the layout back
 
@@ -219,8 +297,8 @@ draft unsaved. A save that answers 409 SHALL leave the current layout as it is.
 
 ### Requirement: A session that ends with unsaved changes keeps the draft
 
-When a request answers 401, the studio SHALL store an unsaved draft in the
-tab's `sessionStorage`. The copy holds the body, layout and revision. Its key
+When a request answers 401 and no copy stands for that actor and process, the
+studio SHALL store an unsaved draft in the tab's `sessionStorage`. The copy holds the body, layout and revision. Its key
 holds the actor id and the process id. The session SHALL still end as the
 session requirement states, even when the write fails.
 
@@ -243,24 +321,22 @@ session requirement states, even when the write fails.
   answers 401
 - **THEN** the login screen appears
 
-### Requirement: A kept draft gets a restore notice
+### Requirement: A kept copy waits for the author's answer
 
-<!-- antislop: allow synonym-rotation -->
-<!-- Discard draft names a studio control; the copy is a different object. -->
-When the same actor reopens a draft with a differing copy, a notice SHALL offer
-two controls. "Restore unsaved changes" puts the stored body and layout in the
-editor, keeps the stored revision and deletes the copy. "Discard them" deletes
-the copy too. A restore over newer unsaved changes SHALL ask for confirmation
-first. A successful save or a
-discard of the draft SHALL delete the copy. Both controls SHALL wait while a
-save or publish runs.
+When the same actor reopens a draft with a differing copy, a notice SHALL offer two
+controls. "Restore unsaved changes" puts the stored body and layout in the editor,
+keeps the stored revision and deletes the copy. "Discard them" deletes the copy too.
+
+A restore over a change made since the draft opened SHALL ask first, saved or not.
+Both controls SHALL wait while a save or publish runs. Discarding the draft SHALL
+delete the copy.
 
 #### Scenario: The same actor can restore after logging in again
 
 - **WHEN** the actor logs in again and opens the draft that has a copy
 - **THEN** a notice offers "Restore unsaved changes" and "Discard them"
 - **AND** restoring puts the stored body and layout in the editor
-- **AND** the header bar prints the dirty indicator
+- **AND** a save carries them after the pause
 
 #### Scenario: A copy equal to the loaded draft shows no notice
 
@@ -273,10 +349,16 @@ save or publish runs.
   chooses "Restore unsaved changes"
 - **THEN** the screen asks for confirmation before it replaces the draft
 
+#### Scenario: Restoring after this tab saved asks first
+
+- **WHEN** the author saved a change here under the notice, by naming a save point,
+  and chooses "Restore unsaved changes"
+- **THEN** the screen asks for confirmation before it replaces the draft
+
 #### Scenario: A restored draft saved against a moved revision conflicts
 
 - **WHEN** someone else saved the draft after the copy existed, and the
-  developer restores the copy and saves
+  developer restores the copy
 - **THEN** the save answers 409 and the conflict message appears
 - **AND** the draft on the server keeps its content
 
@@ -296,11 +378,6 @@ save or publish runs.
 - **THEN** the notice closes
 - **AND** a later visit to that draft shows no notice
 
-#### Scenario: A successful save deletes the copy
-
-- **WHEN** the notice shows and the developer saves successfully
-- **THEN** the notice closes
-
 #### Scenario: Discarding the draft deletes the copy
 
 - **WHEN** the developer discards the draft that has a copy
@@ -310,6 +387,281 @@ save or publish runs.
 
 - **WHEN** a save or publish is running and the notice shows
 - **THEN** the screen disables both buttons until the answer arrives
+
+### Requirement: A standing notice holds the automatic saves
+
+While the notice stands, no automatic save SHALL run. A change made then SHALL stay in
+the tab, and the state line SHALL read "Unsaved changes". An exit, a Publish, or naming
+or restoring a save point still saves that change. The copy SHALL then stay, and its revision SHALL
+follow that save, so a later restore can still land. Answering the notice SHALL let
+the saves run. A 401 SHALL keep that copy and drop the change made under the notice.
+
+#### Scenario: A change under the notice sends nothing
+
+- **WHEN** the notice shows and the author changes a label
+- **THEN** no save leaves after the pause
+- **AND** the notice still stands and the state line reads "Unsaved changes"
+
+#### Scenario: Answering the notice lets the saves run
+
+- **WHEN** the author changed a label under the notice and chooses "Discard them"
+- **THEN** a save carries the change after the pause
+
+#### Scenario: An exit under the notice keeps the copy
+
+- **WHEN** the notice shows, the author changes a label and presses the back control
+- **THEN** a save carries the change and the process list opens
+- **AND** a later visit to that draft shows the notice
+
+#### Scenario: A copy restores after an exit under the notice
+
+- **WHEN** an exit under the notice saved a change, and the author later restores
+  the copy
+- **THEN** the editor holds the copy and a save carries it with no conflict
+
+#### Scenario: A 401 under the notice keeps the copy
+
+- **WHEN** the notice shows, the author changes a label, and a request answers 401
+- **THEN** the stored copy still holds what the notice offered
+
+### Requirement: The Save points view lists a draft's save points
+
+The Settings tab's Save points view SHALL hold one labelled input, "Name this save
+point", with a "Save this point" control, over the draft's save points. A row SHALL
+print the name, who saved it and how long ago, with Restore and Remove. An empty list
+SHALL say so in a sentence. No key, id, revision or hash SHALL print on the view.
+
+The view SHALL fetch its list each time it turns visible. A failed fetch SHALL report
+where the rows would stand.
+
+#### Scenario: A return visit reads the rows again
+
+- **WHEN** an author leaves the view and comes back to it
+- **THEN** the list reads the server's rows again, and their ages move
+
+#### Scenario: A draft with no save point says so
+
+- **WHEN** an author opens the view on a draft with none
+- **THEN** a sentence says no save points exist yet
+
+#### Scenario: The view prints no machine value
+
+- **WHEN** an author reads the view
+- **THEN** no key, id, revision or hash prints on it
+
+### Requirement: A save point row's commands stay quiet
+
+Restore and Remove SHALL take the authoring command style, so Remove reaches the accent
+only in its dialog.
+
+#### Scenario: A row's commands stay quiet
+
+- **WHEN** an author reads a row
+- **THEN** Restore and Remove print as authoring commands, with no accent
+- **AND** an unavailable Restore carries `aria-disabled="true"` and draws dimmed
+
+### Requirement: An empty status line takes no room
+
+The Save points view's status line SHALL stay mounted for the live region. While empty it
+SHALL take no room.
+
+#### Scenario: An empty status line leaves no gap
+
+- **WHEN** no act has printed a status
+- **THEN** the rows stand one column gap under the form
+
+### Requirement: Naming a save point holds what the author sees
+
+A press on "Save this point" SHALL save a waiting change first. A failed save SHALL
+stop the act, leave the banner standing and say so at the input. A 409 SHALL raise the
+conflict banner. An empty name SHALL print a sentence at the input and send no request.
+Another refusal SHALL print at the input.
+
+A successful create SHALL clear the input, add the row and say so in a status line.
+The focus SHALL stay in the input. A create that reaches the bound SHALL move it to
+the bound's sentence.
+
+#### Scenario: Naming a save point
+
+- **WHEN** an author types "Before the review step" and presses "Save this point"
+- **THEN** a row reads "Before the review step" and who saved it, just now
+- **AND** the input is empty and holds the focus
+
+#### Scenario: A failed save stops a create at the input
+
+- **WHEN** an author presses "Save this point" and the waiting change's save answers 500
+- **THEN** the input prints "This save point cannot hold your latest changes until they save. Try again above."
+- **AND** the name stays typed and no create request leaves
+- **AND** the sentence leaves when a timed retry succeeds
+
+#### Scenario: A standing conflict says nothing at the input
+
+- **WHEN** a conflict stands over a dirty draft and an author presses "Save this point"
+- **THEN** the conflict banner stands, the name stays typed and no create request leaves
+
+#### Scenario: A waiting change lands in the save point
+
+- **WHEN** an author changes a label and at once saves a point
+- **THEN** the draft's save lands first
+- **AND** restoring that point later brings the label back as typed
+
+#### Scenario: An empty name asks for a name
+
+- **WHEN** an author presses "Save this point" with an empty input
+- **THEN** a sentence at the input asks for a name
+- **AND** no request leaves
+
+#### Scenario: A create whose answer is lost shows its row
+
+- **WHEN** a create commits and its answer is lost
+- **THEN** the sentence prints at the input, and the list reads the server's rows again
+
+#### Scenario: A refused create prints at the input
+
+- **WHEN** a create answers 500
+- **THEN** the reason prints at the input and the name stays typed
+
+#### Scenario: The last create moves the focus to the bound's sentence
+
+- **WHEN** a create brings the draft to the bound
+- **THEN** the bound's sentence holds the focus
+
+### Requirement: The Save points view states the engine's bound
+
+At the bound the list states, the view SHALL replace the form with a sentence naming
+that bound. Restore SHALL carry `aria-disabled="true"` and keep its focus, and Remove
+SHALL stay available. A remove at the bound SHALL land the focus on the input that
+returns. A refetch SHALL keep the rows on screen until its answer.
+
+#### Scenario: The bound replaces the form
+
+- **WHEN** a draft holds the most save points the engine admits
+- **THEN** a sentence names that bound in place of the form
+- **AND** Remove stays available
+
+#### Scenario: A remove at the bound lands on the input
+
+- **WHEN** an author removes a point at the bound
+- **THEN** the form returns and its input holds the focus
+
+### Requirement: Restoring a save point asks first and names what it kept
+
+Restore SHALL open the studio's dialog form. The heading SHALL read "Restore “{name}”?"
+and the confirm "Restore". The dialog SHALL name who saved the point and when. It SHALL
+say that the draft goes back and that the current work becomes a save point.
+
+Confirming SHALL save a waiting change, then restore. The editor SHALL hold the
+restored draft, clean, and no save SHALL follow. A status line SHALL name both points.
+The focus SHALL return to that row's Restore.
+
+#### Scenario: The dialog says what a restore does
+
+- **WHEN** an author opens the Restore dialog
+- **THEN** its note reads "The draft goes back to this point. Your work as it stands now becomes a save point, so you can come back to it."
+
+#### Scenario: A restore brings the old draft back
+
+- **WHEN** an author confirms the restore of a point whose label differs from the
+  draft's
+- **THEN** the step page and the map print the point's content
+- **AND** the state line reads as saved and no `PUT` follows
+
+#### Scenario: A restore can come undone
+
+- **WHEN** an author restores a point and then restores the point it kept
+- **THEN** the draft holds the work it held before the first restore
+
+#### Scenario: A restore over a moved draft conflicts
+
+- **WHEN** another tab saved the draft, and an author confirms a restore here
+- **THEN** the dialog closes and the conflict banner stands
+- **AND** the draft on the server keeps its content
+
+#### Scenario: A failed save stops the Restore dialog
+
+- **WHEN** an author confirms a restore and the waiting change's save answers 500
+- **THEN** the dialog stays open and prints "Detent cannot restore yet, because your latest changes have not saved. Cancel and press Try again, then restore."
+- **AND** no restore request leaves
+- **AND** the sentence leaves when a timed retry succeeds
+
+#### Scenario: A standing conflict closes the Restore dialog
+
+- **WHEN** a conflict stands over a dirty draft and an author confirms a restore
+- **THEN** the dialog closes, the conflict banner stands and no restore request leaves
+
+#### Scenario: A refused restore prints in the dialog
+
+- **WHEN** a restore answers 500
+- **THEN** the dialog stays open and prints the reason inside itself
+
+#### Scenario: A stale row refetches
+
+- **WHEN** a restore or a remove answers 404
+- **THEN** the dialog closes and the list reads the server's rows again
+- **AND** the focus lands on the name input
+
+#### Scenario: A restore retires the Versions offer
+
+- **WHEN** the header bar offers Versions after a publish, and an author restores a point
+- **THEN** the offer leaves
+
+#### Scenario: A restore at 49 points needs a Remove to come undone
+
+- **WHEN** an author restores a point on a draft holding 49
+- **THEN** the kept point is the fiftieth and Restore stands unavailable
+- **AND** a press on Remove makes Restore available again
+
+### Requirement: A kept point's name stays flat
+
+The kept point's name SHALL read "Before restoring “{name}”". A name that already reads
+that way SHALL stay as it is, so two points may share a name.
+
+#### Scenario: Repeated restores keep a flat name
+
+- **WHEN** an author restores a point named "Before restoring “A”"
+- **THEN** the point it keeps reads "Before restoring “A”" too
+
+### Requirement: A restore whose answer is lost reads the stored draft
+
+A restore whose answer is lost SHALL read the stored draft under the same time limit. A
+revision past the one the restore carried SHALL land as a restore, in the same way.
+Otherwise the dialog SHALL print the reason. The list SHALL read the server's rows again
+in both cases.
+
+#### Scenario: A restore whose answer is lost still lands
+
+- **WHEN** a restore commits and its answer is lost
+- **THEN** the editor holds the restored draft, clean, and the status line names both points
+- **AND** no conflict banner stands
+
+#### Scenario: A restore that never arrived stays in its dialog
+
+- **WHEN** a restore's request fails on the network and the stored revision has not moved
+- **THEN** the dialog stays open and prints the reason
+- **AND** the list reads the server's rows again
+
+### Requirement: A running save point request holds the rows' controls
+
+A row's Restore and Remove SHALL stand unavailable while a save point request runs, so a
+second request cannot move the revision the first one carries.
+
+#### Scenario: A running request holds the rows' controls
+
+- **WHEN** a save point request runs
+- **THEN** each row's Restore and Remove stand `aria-disabled`, and a press starts nothing
+
+### Requirement: Removing a save point asks first
+
+Remove SHALL open the studio's dialog form, with the heading "Remove “{name}”?" and the
+confirm "Remove". Its note SHALL read "This save point goes for good. The draft stays as
+it is." A refusal SHALL print inside the open dialog. After a remove, the status line
+SHALL read "Removed “{name}”." and the focus SHALL land on the name input.
+
+#### Scenario: Removing a point
+
+- **WHEN** an author confirms the removal of a point
+- **THEN** the row leaves and the focus stands on the name input
+- **AND** the status line names the point that went
 
 ### Requirement: Discarding a draft confirms in a modal dialog
 
@@ -332,7 +684,7 @@ SHALL NOT. Document order alone puts the destructive control first.
 The dialog SHALL state the process it will drop the draft of. It SHALL print
 no revision. It SHALL state that the published versions stay. It SHALL state
 that only the unpublished draft goes. That last sentence is the one fact a
-developer needs.
+developer needs. It SHALL also state that the draft's save points go with it.
 
 <!-- antislop: allow synonym-rotation -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
@@ -378,6 +730,17 @@ The publish dialog reports a refusal the same way.
 - **WHEN** the developer closes the discard dialog by any route that keeps the draft
 - **THEN** focus stands on the `⋮` trigger
 - **AND** focus does not drop to the document body
+
+#### Scenario: The dialog names the save points
+
+- **WHEN** the discard dialog opens
+- **THEN** it says the draft's save points go with it
+
+#### Scenario: A discard waits for a running save
+
+- **WHEN** a save request runs while the discard dialog stands
+- **THEN** both controls stand disabled until that save answers
+- **AND** no save leaves while the dialog stands
 
 ### Requirement: One dialog form serves every studio confirmation
 
@@ -474,8 +837,9 @@ A confirmation's heading SHALL name the act, and its confirming control SHALL na
 
 #### Scenario: Leaving a draft
 
-- **WHEN** an author with unsaved changes presses the back control
+- **WHEN** an author presses the back control and the save of the latest change fails
 - **THEN** a dialog reads "Leave this draft?" with the control "Leave without saving"
+- **AND** the body says the latest changes could not be saved
 - **AND** declining returns the focus to the back control and keeps the changes
 
 #### Scenario: Arrange
@@ -983,9 +1347,9 @@ canvas stands on the Map tab. A steps rail and a step page stand on the
 Steps tab, and the `studio-step-page` capability states both.
 
 Four tabs carry a process-wide subject. They are Fields, Forms, Checks and
-Settings. Fields holds the catalog and the field matrix as two views.
-Settings holds four views: the process settings, the data sources, the
-contract and the access lists. Each tab stays reachable whether or not the
+Settings. Fields holds the catalog, the field matrix and the data sources as three views.
+Settings holds four views: the process settings, the contract, the access lists
+and the save points. Each tab stays reachable whether or not the
 author has picked a step.
 
 The Settings tab SHALL carry `baseLocale`. This capability requires an author
@@ -1033,9 +1397,9 @@ same visual tone. The rest of the studio area already takes that tone for issues
 <!-- Base wording stays verbatim in a MODIFIED block. -->
 The header bar SHALL offer a **Publish** action (see the `studio-publish`
 capability). It calls `POST /drafts/:processId/publish` against the currently
-persisted draft, not the in-browser draft state. When local changes remain
-unsaved, the dialog SHALL say that publishing saves them first. It must not
-publish stale or ahead-of-server content. On success, the header bar SHALL state
+persisted draft, not the in-browser draft state. While a local change has not
+landed, the dialog's confirm SHALL wait for that save. It must not publish stale
+or ahead-of-server content. On success, the header bar SHALL state
 the new version number. The Settings tab's Developer view SHALL hold its
 `definitionHash`.
 
@@ -1054,7 +1418,7 @@ the new version number. The Settings tab's Developer view SHALL hold its
 #### Scenario: An invalid draft is still saveable
 
 - **WHEN** live validation reports issues for a draft carrying unsaved work
-- **THEN** the surface prints the issues, offers Save, and the save succeeds
+- **THEN** the surface prints the issues, and the automatic save succeeds
 
 #### Scenario: A Structure-surface link opens the panels screen
 
@@ -1070,7 +1434,7 @@ the new version number. The Settings tab's Developer view SHALL hold its
 #### Scenario: The JSON surface renders no link into the panels screen
 
 - **WHEN** the author opens the JSON surface from the overflow menu
-- **THEN** the tab row stands away, and no control on screen reaches a tab
+- **THEN** no tab body stands open, and a press on a tab leaves the JSON surface
 
 #### Scenario: A path's issue counts on the Paths head
 
@@ -1082,8 +1446,8 @@ the new version number. The Settings tab's Developer view SHALL hold its
 
 - **WHEN** the author picks Publish in the header bar while local changes
   remain unsaved
-- **THEN** the dialog says publishing saves them first, and the studio does
-  not call `POST /drafts/:processId/publish` until the save completes
+- **THEN** the dialog's confirm waits for that save, and the studio does not
+  call `POST /drafts/:processId/publish` until the save completes
 
 #### Scenario: The screen confirms a successful publish
 
@@ -1206,12 +1570,13 @@ body, and no empty band sits below it.
 <!-- The area nav's Discard control drops every unsaved change; a panel's Remove control drops one entity. -->
 No tab SHALL carry a Save control. Every change an author makes on a tab SHALL
 write straight into the in-browser draft. That is how the panels write today. The
-area nav's Save and Publish controls SHALL remain the only ones that persist.
+draft's automatic save carries each one to the server, and Publish SHALL remain
+the one act that mints a version.
 
 <!-- antislop: allow synonym-rotation -->
 <!-- "surface" here names the process surface, a noun, and no verb of display. -->
-Leaving a tab SHALL discard nothing. The surface SHALL state that plainly, so
-leaving a tab never reads as a discard.
+Leaving a tab SHALL discard nothing. The header bar's state line SHALL report
+each save, so leaving a tab never reads as a discard.
 
 A tab's own unsubmitted input SHALL survive a switch between tabs. The contract
 panel holds a half-typed outcome name in component state. The data sources panel
@@ -1308,8 +1673,8 @@ empty-key field did before.
 
 - **WHEN** the author adds a field on the Fields tab and then opens the
   Map tab
-- **THEN** the draft still carries that field, and the area nav still reports
-  unsaved changes
+- **THEN** the draft still carries that field, and the header bar's state line
+  reports its save
 
 #### Scenario: Switching views keeps a half-typed outcome name
 
@@ -1327,8 +1692,8 @@ empty-key field did before.
 #### Scenario: The screen offers no Save of its own
 
 - **WHEN** the author inspects an open tab
-- **THEN** it has no Save control, and it states that it keeps every
-  change
+- **THEN** it has no Save control, and the header bar's state line reports each
+  save
 
 #### Scenario: The rail lists each view with its entity count
 
@@ -3071,7 +3436,15 @@ part-typed value would otherwise become a real locale key.
 When `PUT /drafts/:processId` answers 409, the studio SHALL tell the user that
 the draft was changed elsewhere and SHALL offer reloading the stored draft. It
 SHALL NOT merge, SHALL NOT silently retry with the newer revision, and SHALL
-NOT discard the conflict.
+NOT discard the conflict. No automatic save SHALL run while a conflict stands.
+
+One 409 is no conflict. A send after a lost answer SHALL read the stored draft. Where
+its body and layout equal what a failed request sent, that save SHALL count as landed
+at the stored revision. Equal content means this tab made the only write. A network
+failure loses an answer, and so does a gateway's 502, 503 or 504.
+
+The banner over a dirty draft SHALL say that Reload drops the unsaved changes. Reload
+SHALL report a draft that no longer exists.
 
 <!-- antislop: allow sentence-length run-ons passive-voice em-dash -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
@@ -3085,11 +3458,9 @@ same invariant the initial seed and the post-save advance already encode.
 <!-- Base wording stays verbatim in a MODIFIED block. -->
 Without this the unsaved-changes comparison is made against the discarded
 local edits, so a draft byte-identical to the stored one reads as dirty for
-the rest of the session (the toolbar is not remounted by a reload). Publishing
-then always prompts to save first: accepting re-writes the just-fetched body
-and bumps the stored revision for nothing, invalidating a concurrent editor's
-in-flight revision, and declining aborts a publish the user was entitled to
-make.
+the rest of the session (the toolbar is not remounted by a reload). An
+automatic save would then re-write the just-fetched body and bump the stored
+revision for nothing, invalidating a concurrent editor's in-flight revision.
 
 <!-- antislop: allow sentence-length run-ons passive-voice em-dash -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
@@ -3119,8 +3490,8 @@ make.
 <!-- Base wording stays verbatim in a MODIFIED block. -->
 - **WHEN** the user reloads after a conflict and immediately publishes,
   without editing
-- **THEN** the publish proceeds without the unsaved-changes prompt, because
-  the draft is identical to the stored one
+- **THEN** the publish proceeds with no wait for a save, because the draft is
+  identical to the stored one
 
 <!-- antislop: allow sentence-length run-ons passive-voice em-dash -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
@@ -3129,8 +3500,7 @@ make.
 <!-- antislop: allow sentence-length run-ons passive-voice em-dash -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
 - **WHEN** the user reloads after a conflict and then makes an edit
-- **THEN** the unsaved-changes prompt reappears on publish, so the fix does
-  not turn the gate off
+- **THEN** the draft saves itself again, so the fix does not turn saving off
 
 <!-- antislop: allow sentence-length run-ons passive-voice em-dash -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
@@ -3141,7 +3511,29 @@ make.
 - **WHEN** the developer drags a step, a save answers 409, and the developer
   reloads
 - **THEN** the header bar prints the saved state
-- **AND** Publish raises no save-first note
+- **AND** Publish's confirm waits for no save
+
+#### Scenario: A lost answer on a landed save is no conflict
+
+- **WHEN** a save lands, its answer is lost, and the retry answers 409
+- **THEN** the studio reads the stored draft and finds what it sent
+- **AND** no conflict banner stands, and the state line reads as saved
+
+#### Scenario: The banner says what Reload costs
+
+- **WHEN** a conflict stands over a dirty draft
+- **THEN** the banner reads "This draft was changed elsewhere. Reload loads the stored draft and drops your unsaved changes."
+- **AND** over a clean draft it reads "This draft was changed elsewhere."
+
+#### Scenario: A Reload of a draft that went says so
+
+- **WHEN** an author presses Reload and the stored draft no longer exists
+- **THEN** a banner reads "Not found."
+
+#### Scenario: A conflict stops the automatic saves
+
+- **WHEN** a save answers 409 and the author keeps changing the draft
+- **THEN** no further save leaves until the author presses Reload
 
 <!-- antislop: allow passive-voice -->
 
@@ -3624,7 +4016,6 @@ SHALL close the card. The view SHALL draw no half, no zone and no tab set.
 - **THEN** each heading after Kind carries a 1px hairline above it
 - **AND** Remove field stands last, under a hairline of its own
 
-
 ### Requirement: A group's card adds a field inside it
 
 A group field's "Fields inside this group" section SHALL draw none of the
@@ -3664,7 +4055,6 @@ visible part. It SHALL use no animated scroll and SHALL scroll no further.
 - **THEN** the group's card shows "Fields inside this group" before More
 - **AND** the `string` field's card shows no such section
 
-
 ### Requirement: The Choices section shows for a field that can take choices
 
 The card SHALL draw the Choices section for a field whose `control` is a
@@ -3693,7 +4083,6 @@ instead." above the add control.
   format: "date"}` field with no `options`
 - **THEN** no Choices heading renders
 
-
 ### Requirement: A choice reads by its name alone
 
 Each choice SHALL draw as one row holding the choice's name input and a
@@ -3715,7 +4104,6 @@ A new choice SHALL start with an empty name and an empty value.
 - **WHEN** the developer opens the Choices section's Developer view
 - **THEN** it lists "Stored value" inputs reading `open` and `closed`, in
   the mono face
-
 
 ### Requirement: A choice's value follows its name until the first publish
 
@@ -3773,7 +4161,6 @@ own `default` along where it equals the old value.
 - **AND** the developer renames that choice "Under review"
 - **THEN** the field's `default` reads `under_review`
 
-
 ### Requirement: A field bound to a source states where its choices come from
 
 A field carrying a `dataSource` SHALL draw no choice row and no add control.
@@ -3785,7 +4172,6 @@ source's name, then "Pick another source under More."
 - **WHEN** a field binds the data source named "Cost centres"
 - **THEN** its Choices section reads "The choices come from Cost centres."
 - **AND** no name input and no "+ Add a choice" renders
-
 
 ### Requirement: Asked on lists each step's marks as words
 
@@ -3814,7 +4200,6 @@ SHALL print a flag key or the mono face.
 - **WHEN** a field's entry on Review carries `required: data.amount > 0.0`
 - **THEN** the Review row prints no Required mark and no sentence for it
 
-
 ### Requirement: An Asked on row reads a step's own condition as a sentence
 
 Where a step's entry carries a `visible` expression, its Asked on row SHALL
@@ -3836,7 +4221,6 @@ therefore read each step's condition while the steps disagree.
 - **AND** the Only ask this when control under them states that the steps
   disagree
 
-
 ### Requirement: An Asked on row opens the form and the map
 
 Each Asked on row SHALL carry two authoring commands at its trailing edge.
@@ -3852,7 +4236,6 @@ open the Map tab with that step selected.
 
 - **WHEN** the developer presses "Show on the map" on the Review row
 - **THEN** the Map tab opens with Review selected
-
 
 ### Requirement: A Read by row opens the place it names
 
@@ -3879,7 +4262,6 @@ command.
 
 - **WHEN** a Read by row reads "Another rule in this process"
 - **THEN** that row has no "Open" command
-
 
 ### Requirement: More folds the rest of the card
 
@@ -3910,7 +4292,6 @@ a check inside it stands. The author's own toggle SHALL hold otherwise.
 - **WHEN** the selected field's validation pattern does not compile
 - **THEN** More stands open, and the check shows under Validation
 
-
 ### Requirement: The source picker names each source
 
 The "Values come from" picker in More SHALL print its first option as
@@ -3925,7 +4306,6 @@ data source's name, or "(unnamed source)". No option SHALL print an id.
   "Cost centres" and "(unnamed source)"
 - **AND** no option prints a `ds_` id
 
-
 ### Requirement: The Technical marker reads as a sentence in More
 
 The Technical checkbox SHALL stand in More, labelled "Technical: the
@@ -3937,7 +4317,6 @@ its confirmation. A group field SHALL still disable it.
 - **WHEN** the developer opens More on a `string` field
 - **THEN** a checkbox labelled "Technical: the process fills this in by
   itself" stands after Validation
-
 
 ### Requirement: Where values come from names a source in the author's words
 
@@ -3951,7 +4330,6 @@ dialog SHALL print the name in the body face too.
 - **WHEN** the developer opens the source named "Cost centres"
 - **THEN** the editor's heading reads "Cost centres"
 - **AND** the input under "Name" reads "Cost centres" in the body face
-
 
 ### Requirement: The source's kind picker prints names
 
@@ -3971,7 +4349,6 @@ process". A type the table does not name SHALL print its registry type.
 - **WHEN** a draft holds a source named "Cost centres" and one with no name
 - **THEN** the entity rail reads "Cost centres" and "(unnamed source)"
 
-
 ### Requirement: The matrix badges print each mark's word
 
 Each bulk badge SHALL print the flag's one name: Asked, Required or
@@ -3982,7 +4359,6 @@ Read-only. No badge SHALL print a letter code.
 - **WHEN** the developer reads a column header's badges
 - **THEN** they read Asked, Required and Read-only
 - **AND** none reads `VIS`, `REQ` or `RO`
-
 
 ### Requirement: A condition mark reads Condition
 
@@ -3996,7 +4372,6 @@ stay in the mark's tooltip and its muted source span, and nowhere else.
 - **THEN** the cell shows "Condition" where the Required box would stand
 - **AND** no cell prints the word "CEL"
 
-
 ### Requirement: The Fields tab's editor scrolls with the tab body below 64rem
 
 Below 64rem the entity rail SHALL stand above the card, capped at 20rem.
@@ -4009,7 +4384,6 @@ view body, and no third.
 - **WHEN** the developer opens the Fields view at 1024px wide
 - **THEN** the card's container reads `overflow-y: visible`
 - **AND** the view body scrolls the whole card
-
 
 ### Requirement: A field's checks stand at the zone each one belongs to
 

@@ -179,7 +179,8 @@ screen. The retired `/edit/panels/:view` addresses SHALL follow the same map.
 <!-- Base wording stays verbatim in a MODIFIED block. -->
 The header bar's `⋮` menu SHALL carry two groups, "Views" and "Draft". The Views
 group SHALL hold the JSON surface, Versions and Player. The Draft group SHALL
-hold Discard draft. No process setting SHALL stand in the menu. The Settings tab holds those. The tab row SHALL have no
+hold Save points and Discard draft. Save points SHALL open the Settings tab's Save
+points view. The focus SHALL land on its name input, or at the bound on its sentence. No process setting SHALL stand in the menu. The Settings tab holds those. The tab row SHALL have no
 trailing control of its own. Its trailing edge is the last tab.
 
 The open panel SHALL stand above every tab body, so a press on an entry reaches
@@ -204,7 +205,7 @@ the entry opens the JSON surface or leaves it.
 #### Scenario: The menu has no process setting
 
 - **WHEN** an author opens the header bar's `⋮` menu
-- **THEN** it holds the JSON entry, Versions, Player and Discard draft
+- **THEN** it holds the JSON entry, Versions, Player, Save points and Discard draft
 - **AND** no key, language, cancellable or collaboration control stands in it
 
 #### Scenario: Discard draft answers over the field matrix
@@ -212,6 +213,27 @@ the entry opens the JSON surface or leaves it.
 - **WHEN** an author opens the menu on the Where fields appear view at 1280 wide
 - **THEN** every point of the open panel belongs to the panel
 - **AND** a press on Discard draft opens the discard dialog
+
+#### Scenario: The menu opens Save points
+
+- **WHEN** an author chooses Save points in the `⋮` menu
+- **THEN** the Save points view is open and its name input holds the focus
+
+#### Scenario: The menu at the bound lands on the sentence
+
+- **WHEN** an author chooses Save points on a draft at the bound
+- **THEN** the bound's sentence holds the focus once the list answers
+
+#### Scenario: The menu leaves the JSON surface for Save points
+
+- **WHEN** an author chooses Save points while the JSON surface stands open with no
+  unapplied text
+- **THEN** the JSON surface leaves and the Save points view is open
+
+#### Scenario: The menu leaves the form editor for Save points
+
+- **WHEN** an author chooses Save points in the form editor
+- **THEN** the form editor leaves and the Save points view is open
 
 ### Requirement: A sub-row holds a tab's views
 
@@ -265,13 +287,15 @@ count SHALL count the catalog's fields.
 <!-- antislop: allow paragraph-length sentence-length -->
 <!-- Base wording stays verbatim in a MODIFIED block. -->
 The Settings tab's sub-row SHALL read Process, What it takes in and gives
-back, and Access. The data sources stand on the Fields tab. The Process view SHALL hold five settings. They are the base
+back, Access, and Save points. The data sources stand on the Fields tab. The Process view SHALL hold five settings. They are the base
 language, the content-locale switcher, the add-a-language control, the
 cancellable setting and the two collaboration defaults. The content-locale
 switcher and the add-a-language control set the language the studio edits in
 this session and write no draft body. Every other control writes the draft
 body. The process key SHALL stand in a closed Developer view there. The
-Access view SHALL also carry the link to manage assignment groups.
+Access view SHALL also carry the link to manage assignment groups. The Save
+points view stands at the view address `points`, and `studio-app` states what it
+holds.
 
 #### Scenario: Setting the process to not cancellable
 
@@ -313,6 +337,11 @@ Access view SHALL also carry the link to manage assignment groups.
 - **WHEN** the JSON surface is the active surface
 - **THEN** no Settings control is reachable until the author leaves it
 
+#### Scenario: The sub-row opens Save points
+
+- **WHEN** an author opens `/studio/processes/p1/edit/settings/points`
+- **THEN** the Settings tab is open on its Save points view
+
 ### Requirement: The contract view reads in the author's words
 
 The What it takes in and gives back view SHALL open on one checkbox,
@@ -340,7 +369,6 @@ read "+ Add an ending".
 
 - **WHEN** the contract declares the outcome `approved`
 - **THEN** "How it can end" lists `approved` in the mono face
-
 
 ### Requirement: The Developer view on Settings holds the draft's machine values
 
@@ -398,7 +426,7 @@ admin-area-entry role SHALL get the shell's `area.forbidden` message.
 ### Requirement: The area nav stands empty of draft controls
 
 The studio's area nav SHALL stand empty of draft controls while a draft
-stands open. Save, Test and Publish stand in the header bar, as this
+stands open. Test and Publish stand in the header bar, as this
 capability's own requirements below state. The Checks tab's own count
 reports the checks state, as the count requirement above states. No control
 outside the tab row SHALL duplicate that state.
@@ -414,7 +442,8 @@ outside the tab row SHALL duplicate that state.
 The header bar SHALL carry three controls, right-aligned in its row: Test,
 Publish and the `⋮` menu trigger. All three SHALL stay visible and usable on
 every tab and while the JSON surface is active. Test SHALL open the Player,
-through the same leave guard as the menu's Player entry.
+through the same exit rule as the menu's Player entry. A waiting change saves
+first, with no question.
 
 #### Scenario: The three controls stand in the header bar
 
@@ -431,47 +460,54 @@ through the same leave guard as the menu's Player entry.
 - **WHEN** an author presses Test on a saved draft
 - **THEN** the Player opens on this process
 
-### Requirement: Save stands beside the state while the draft is dirty
+### Requirement: The header bar has no Save
 
-A Save control SHALL stand beside the header bar's state while the draft carries
-unsaved work. That holds on every tab and over the JSON surface. A clean draft
-SHALL show no Save. It SHALL read "Saving…" and carry `aria-disabled="true"`
-while a save runs, ignoring a press. Its coming and going SHALL move no control
-in the trailing cluster.
+No Save control SHALL stand in the header bar, on any tab, over the JSON surface or
+in the `⋮` menu. A failed save's Try again SHALL stand in its banner under the bar.
 
-#### Scenario: A clean draft offers no Save
+#### Scenario: A dirty draft's bar has no Save
 
-- **WHEN** an author opens a saved draft
+- **WHEN** an author changes the draft
 - **THEN** no Save control stands in the header bar
-
-#### Scenario: An edit brings Save
-
-- **WHEN** an author alters the draft
-- **THEN** Save stands beside the state
 - **AND** Publish keeps the position it held
 
-#### Scenario: A refused save keeps the control
+### Requirement: Try again keeps the keyboard's place
 
-- **WHEN** the save request fails
-- **THEN** Save still stands and the draft reads "Unsaved changes"
+A running retry SHALL leave the focus on Try again. The control SHALL carry
+`aria-disabled="true"` while any save runs. It SHALL read "Saving…" only after a press,
+and a timed retry SHALL leave its label as "Try again". When a retry's answer removes the
+control while it holds the focus, focus SHALL move to the state line. Focus an author
+moved elsewhere in the meantime SHALL stay there.
 
-### Requirement: A keyboard save keeps its place
+#### Scenario: A timed retry keeps the label
 
-A running save SHALL leave the focus on Save. When a save's answer removes the
-control while it holds the focus, focus SHALL move to the state line. It SHALL
-stay out of the document body. Focus an author moved elsewhere in the meantime
-SHALL stay there.
+- **WHEN** a timed retry runs
+- **THEN** the control reads "Try again" and carries `aria-disabled="true"`
 
-#### Scenario: A successful keyboard save lands on the state
+#### Scenario: A press reads as saving
 
-- **WHEN** a keyboard user presses Save and the save succeeds
+- **WHEN** an author presses Try again
+- **THEN** the control reads "Saving…" until that save answers
+
+#### Scenario: A successful keyboard retry lands on the state
+
+- **WHEN** a keyboard user presses Try again and the save succeeds
 - **THEN** focus stands on the state line
-- **AND** the next Tab reaches the control after it
 
-#### Scenario: A refused save keeps the focus on Save
+#### Scenario: A refused retry keeps the focus
 
-- **WHEN** a keyboard user presses Save and the save request fails
-- **THEN** focus stands on Save
+- **WHEN** a keyboard user presses Try again and the save fails
+- **THEN** focus stands on Try again
+
+#### Scenario: A retry answered 409 moves the focus from Try again
+
+- **WHEN** a keyboard user presses Try again and the save answers 409
+- **THEN** focus stands on the state line
+
+#### Scenario: An automatic retry that heals moves the focus from Try again
+
+- **WHEN** focus stands on Try again and a timed retry succeeds
+- **THEN** focus stands on the state line
 
 ### Requirement: A check's Fix control lands on its place on Steps
 
@@ -588,8 +624,6 @@ SHALL take focus where no finer place exists, and it SHALL carry
 
 - **WHEN** a keyboard user presses Fix on a contract check
 - **THEN** keyboard focus stands on the Settings tab in the tab row
-
-
 
 ### Requirement: The tab row follows the area's roving-tabindex pattern
 
