@@ -217,7 +217,7 @@ once an instance is open.
 | Term | Names | Lives in |
 |---|---|---|
 | player | the routed screen that drives one instance for preview | `screens/PlayerScreen.tsx` |
-| instance access | the `<fieldset>` above the panes: create a new instance, or open one by id | `PlayerScreen.tsx` |
+| instance access | the `<fieldset>` above the panes: the two start buttons, or open one by id | `PlayerScreen.tsx` |
 | form pane | the left pane: the status line, the step form, the claim controls, the path buttons | `PlayerScreen.tsx` |
 | step form | the field-by-field renderer both the player and the app area's Task screen mount | `FieldForm`, `packages/form-ui` |
 | path buttons | the manual-path submit controls below the step form | `PathButtons`, `packages/form-ui` |

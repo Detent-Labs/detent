@@ -1878,9 +1878,9 @@ up. On the Fields tab, change a field's label. Pass: the header bar reads
 
 Open Settings, then Access, and choose "Manage assignment groups for this
 process".
-Pass: the dialog "Leave this draft?" opens with Cancel focused. Its body says
-Detent could not save the latest changes. Cancel keeps the screen and the new
-label.
+Pass: the dialog "Leave this draft?" opens with Cancel focused. Its body reads
+"Detent could not save your latest changes, so they go with it. The saved draft
+stays." Cancel keeps the screen and the new label.
 
 End the hold. Choose the same link again.
 Pass: the browser navigates to `/admin/groups?processId=<id>` with no prompt.
@@ -2130,8 +2130,9 @@ Offboarding".
     stands beside it, outlined.
 14. **The notice holds the saves.** Make the save answer 401, change
     a label and log in again. Open the draft. Pass: the notice reads "Detent
-    kept unsaved changes to this draft in this browser tab." Wait ten seconds.
-    Pass: no `PUT` goes out while the notice stands.
+    kept unsaved changes to this draft in this browser tab." Change a label while
+    the notice stands, then wait ten seconds. Pass: the header bar reads
+    "Unsaved changes", and no `PUT` goes out while the notice stands.
 
 ### Selecting a path shows the source step's Ways out section with the row highlighted
 
@@ -5048,11 +5049,10 @@ See this file's "Before you start" section for the build and the address.
 Seed the database and sign in as `demo-superuser@example.test`, password
 `seed-demo-password`.
 
-Open the IT Offboarding draft on the Map tab
-(`docs/browser-checks.md:3251`). Add a step from the canvas bar. Leave it
+Open the IT Offboarding draft on the Map tab. Add a step from the canvas bar. Leave it
 unconnected, so the Checks tab counts a blocker. Narrow the window to
-400px. Run the probe on every tab in turn. A reload drops the unsaved step,
-so add it again after one.
+400px. Run the probe on every tab in turn. Autosave stores the step about a
+second after you add it, so a reload keeps it.
 
 Pass: `scrollWidth` equals `clientWidth` on every tab. The Checks tab's
 hidden "blocking a publish" text scrolled the page to 900–912 of 400 before

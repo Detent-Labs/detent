@@ -1070,9 +1070,16 @@ saves the draft for you.
 
 The draft's state stands beside its name. It reads **Saving…** while a change
 waits for the save, and **Saved just now** once the save lands. After a
-minute it reads **Saved at** and the time. It reads **Unsaved changes** only
-when a save failed. A banner then says Studio keeps your changes in the tab,
-and **Try again** sends them at once.
+minute it reads **Saved at** and the time. It reads **Unsaved changes** in
+three cases.
+
+- A save failed. A banner says Studio keeps your changes in the tab, and
+  **Try again** sends them at once.
+- Somebody else changed the draft. A banner says so, and **Reload** loads the
+  stored draft. Reload drops the changes you made since your last save, so copy
+  any you want to keep first.
+- A notice offers a copy of earlier unsaved work. Studio saves nothing until
+  you answer the notice.
 
 Studio saves about a second after you stop typing. Opening a draft saves
 nothing. Publish waits for the save before it publishes. When you leave the
