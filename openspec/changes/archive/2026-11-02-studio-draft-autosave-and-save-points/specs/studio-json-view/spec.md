@@ -116,7 +116,7 @@ An exit SHALL ask in the leave dialog with no flush. A tab press and each menu e
 
 #### Scenario: Text back at its seed clears the state
 
-- **WHEN** an author types the text back to what the surface was seeded with
+- **WHEN** an author types the text back to what the surface opened with
 - **THEN** the state line follows the draft again, and closing the tab does not prompt
 
 #### Scenario: The Publish dialog says what it leaves out

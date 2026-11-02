@@ -47,7 +47,7 @@ or bar SHALL carry a Save control.
 
 ### Requirement: A failed save says so and offers Try again
 
-A save that fails with anything but a 401 or a 409 SHALL raise a banner under the
+Any save failure but a 401 or a 409 SHALL raise a banner under the
 header bar, stamped "Not saved". The banner SHALL say that the latest changes stay in
 the tab, unsaved. The caught text SHALL stand in a closed Developer view. The banner
 SHALL carry a "Try again" control, and the state line SHALL read "Unsaved changes".
@@ -67,6 +67,8 @@ raised.
 - **WHEN** Arrange's layout library fails to load and a later change saves
 - **THEN** the Arrange banner still stands
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: a failed save, a validation issue and an HTTP error are three things here. -->
 #### Scenario: A clean draft clears the failure
 
 - **WHEN** a save fails and the author then takes the change back by hand
@@ -179,8 +181,8 @@ Text the JSON surface has not applied asks first, with no save (`studio-json-vie
 While a change has not landed, closing the tab or reloading SHALL raise the browser's
 own leave prompt. A `401` answer SHALL end the session with no dialog and no leave
 prompt. A Back or Forward step between entries of this page SHALL raise no prompt. It
-SHALL send a waiting change once where no failure, conflict or notice stands, and
-otherwise keep it as a copy where none stands.
+SHALL send a waiting change once where no failure, conflict or notice stands. It
+SHALL otherwise keep a copy where none stands.
 
 #### Scenario: Closing the tab while a change waits prompts
 
@@ -279,9 +281,11 @@ delete the copy.
 
 While the notice stands, no automatic save SHALL run. A change made then SHALL stay in
 the tab, and the state line SHALL read "Unsaved changes". An exit, a Publish, or naming
-or restoring a save point still saves that change. The copy SHALL then stay, and its revision SHALL
+or restoring a save point still saves that change. The copy SHALL then stay. Its revision SHALL
 follow that save, so a later restore can still land. Answering the notice SHALL let
-the saves run. A 401 SHALL keep that copy and drop the change made under the notice.
+the saves run.
+
+A 401 SHALL keep that copy and drop the change made under the notice.
 
 #### Scenario: A change under the notice sends nothing
 
@@ -313,8 +317,9 @@ the saves run. A 401 SHALL keep that copy and drop the change made under the not
 
 ### Requirement: The Save points view lists a draft's save points
 
-The Settings tab's Save points view SHALL hold one labelled input, "Name this save
-point", with a "Save this point" control, over the draft's save points. A row SHALL
+The Settings tab's Save points view SHALL hold one input, "Name this save
+point", and a "Save this point" control.
+The draft's save points SHALL stand under them. A row SHALL
 print the name, who saved it and how long ago, with Restore and Remove. An empty list
 SHALL say so in a sentence. No key, id, revision or hash SHALL print on the view.
 
@@ -398,9 +403,9 @@ the bound's sentence.
 - **THEN** a sentence at the input asks for a name
 - **AND** no request leaves
 
-#### Scenario: A create whose answer is lost shows its row
+#### Scenario: A create whose answer never arrives shows its row
 
-- **WHEN** a create commits and its answer is lost
+- **WHEN** a create commits and its answer never arrives
 - **THEN** the sentence prints at the input, and the list reads the server's rows again
 
 #### Scenario: A refused create prints at the input
@@ -508,16 +513,16 @@ that way SHALL stay as it is, so two points may share a name.
 - **WHEN** an author restores a point named "Before restoring “A”"
 - **THEN** the point it keeps reads "Before restoring “A”" too
 
-### Requirement: A restore whose answer is lost reads the stored draft
+### Requirement: A restore whose answer never arrives reads the stored draft
 
-A restore whose answer is lost SHALL read the stored draft under the same time limit. A
+A restore whose answer never arrives SHALL read the stored draft under the same time limit. A
 revision past the one the restore carried SHALL land as a restore, in the same way.
 Otherwise the dialog SHALL print the reason. The list SHALL read the server's rows again
 in both cases.
 
-#### Scenario: A restore whose answer is lost still lands
+#### Scenario: A restore whose answer never arrives still lands
 
-- **WHEN** a restore commits and its answer is lost
+- **WHEN** a restore commits and its answer never arrives
 - **THEN** the editor holds the restored draft, clean, and the status line names both points
 - **AND** no conflict banner stands
 
@@ -529,8 +534,8 @@ in both cases.
 
 ### Requirement: A running save point request holds the rows' controls
 
-A row's Restore and Remove SHALL stand unavailable while a save point request runs, so a
-second request cannot move the revision the first one carries.
+A row's Restore and Remove SHALL stand unavailable while a save point request runs.
+A second request then cannot move the revision the first one carries.
 
 #### Scenario: A running request holds the rows' controls
 
@@ -575,8 +580,8 @@ save SHALL carry it. A save that answers 409 SHALL leave the current layout as i
 
 ### Requirement: A session that ends with unsaved changes keeps the draft
 
-When a request answers 401 and no copy stands for that actor and process, the
-studio SHALL store an unsaved draft in the tab's `sessionStorage`. The copy holds the body, layout and revision. Its key
+A request may answer 401 while no copy stands for that actor and process. The
+studio SHALL then store an unsaved draft in the tab's `sessionStorage`. The copy holds the body, layout and revision. Its key
 holds the actor id and the process id. The session SHALL still end as the
 session requirement states, even when the write fails.
 
@@ -609,7 +614,7 @@ SHALL NOT merge, SHALL NOT silently retry with the newer revision, and SHALL
 NOT discard the conflict. No automatic save SHALL run while a conflict stands.
 
 One 409 is no conflict. A send after a lost answer SHALL read the stored draft. Where
-its body and layout equal what a failed request sent, that save SHALL count as landed
+its body and layout equal a failed request's, that save SHALL count as landed
 at the stored revision. Equal content means this tab made the only write. A network
 failure loses an answer, and so does a gateway's 502, 503 or 504.
 
@@ -685,7 +690,7 @@ revision for nothing, invalidating a concurrent editor's in-flight revision.
 
 #### Scenario: A lost answer on a landed save is no conflict
 
-- **WHEN** a save lands, its answer is lost, and the retry answers 409
+- **WHEN** a save lands, its answer never arrives, and the retry answers 409
 - **THEN** the studio reads the stored draft and finds what it sent
 - **AND** no conflict banner stands, and the state line reads as saved
 
@@ -1168,7 +1173,7 @@ A confirmation's heading SHALL name the act, and its confirming control SHALL na
 
 - **WHEN** an author presses the back control and the save of the latest change fails
 - **THEN** a dialog reads "Leave this draft?" with the control "Leave without saving"
-- **AND** the body says the latest changes could not be saved
+- **AND** the body says Detent could not save the latest changes
 - **AND** declining returns the focus to the back control and keeps the changes
 
 #### Scenario: Arrange

@@ -257,10 +257,14 @@ An exit SHALL ask in the leave dialog with no flush. A tab press and each menu e
 
 - **WHEN** an author presses a tab, or the menu's entry that leaves the surface, over unapplied text
 - **THEN** the same dialog opens
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: Cancel names a control and a change names the author's work. -->
 - **AND** Cancel keeps the surface and the text
 
 #### Scenario: Confirming drops the text alone
 
+<!-- antislop: allow synonym-rotation -->
+<!-- Why: Cancel names a control and a change names the author's work. -->
 - **WHEN** an author applied a change, typed more, and confirms the dialog at an exit
 - **THEN** the typed text goes and the applied change still saves
 
@@ -276,7 +280,7 @@ An exit SHALL ask in the leave dialog with no flush. A tab press and each menu e
 
 #### Scenario: Text back at its seed clears the state
 
-- **WHEN** an author types the text back to what the surface was seeded with
+- **WHEN** an author types the text back to what the surface opened with
 - **THEN** the state line follows the draft again, and closing the tab does not prompt
 
 #### Scenario: The Publish dialog says what it leaves out
