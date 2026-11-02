@@ -156,8 +156,8 @@ Each conjunct reads as follows.
   other right side leaves the node a raw row, a context operand included.
 - A comparison whose operator the operand does not offer reads as a raw
   row, with its text unchanged. The reader and the operator select then never
-  disagree: a text ordering and a date-time ordering read raw, a date ordering
-  reads as a row.
+  disagree. A text ordering and a date-time ordering read raw, and a date
+  ordering reads as a row.
 - Everything else reads as today.
 
 The reader applies four normalisations. Single quotes become double. A bare
