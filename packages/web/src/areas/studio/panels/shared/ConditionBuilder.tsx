@@ -244,9 +244,11 @@ export function ConditionBuilder({ condition, operands, onChange, describedBy }:
                   </button>
                 )}
 
-                {/* ponytail: a group row draws as a hand-written rule until the
-                    group row component lands; ceiling: its leaves cannot be
-                    edited here; upgrade: render GroupRow in ConditionBuilder. */}
+                {/* ponytail: a group row draws as a hand-written rule, and a
+                    field-valued row shows an empty literal editor; ceiling: a
+                    group's leaves cannot be edited here, and typing replaces a
+                    field value; upgrade: render GroupRow in ConditionBuilder
+                    and add task 2.2's swap command. */}
                 {row.kind !== "cmp" ? (
                   <span {...stylex.props(styles.conditionRawSentence)}>{t("condition.rawRowSentence")}</span>
                 ) : (

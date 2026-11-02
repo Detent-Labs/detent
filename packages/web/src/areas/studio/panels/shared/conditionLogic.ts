@@ -10,7 +10,7 @@
  * and this model lives only between `parseAst()` and the next keystroke.
  *
  * Nothing here is persisted, hashed or versioned. A change to the row model
- * therefore changes this file alone.
+ * therefore changes no stored text.
  */
 
 import { parseAst, serializeAst, celType, INSTANCE_SCHEMA, ACTOR_SCHEMA } from "workflow-engine/cel/check";
@@ -647,14 +647,16 @@ const DATE_TIME = new Intl.DateTimeFormat("en", {
 });
 
 /** A date or date-time literal as a formatted date, in UTC. A literal outside
- * the format's value domain prints as its stored text. A date-time with no
- * zone reads as UTC, so the printed time is the one the author typed. */
+ * the format's value domain, or one no `Date` can hold (an offset such as
+ * `+24:00` passes the format check), prints as its stored text. A date-time
+ * with no zone reads as UTC, so the printed time is the one the author typed. */
 function formatDate(value: Literal, format: "date" | "datetime"): string {
   const text = String(value ?? "");
   if (!formatMatches({ type: "string", format }, text)) return text;
-  if (format === "date") return DATE.format(new Date(`${text}T00:00:00Z`));
-  const zoned = /(?:Z|[+-]\d{2}:\d{2})$/.test(text) ? text : `${text}Z`;
-  return DATE_TIME.format(new Date(zoned));
+  const zoned = format === "date" ? `${text}T00:00:00Z` : /(?:Z|[+-]\d{2}:\d{2})$/.test(text) ? text : `${text}Z`;
+  const date = new Date(zoned);
+  if (Number.isNaN(date.getTime())) return text;
+  return (format === "date" ? DATE : DATE_TIME).format(date);
 }
 
 /**

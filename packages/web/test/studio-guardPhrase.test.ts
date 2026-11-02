@@ -21,6 +21,7 @@ const FIELDS = [
       { value: "marketing", label: { en: "Marketing" } },
     ],
   },
+  { id: "field_00000000-0000-4000-8000-0000000000a4", key: "starts_at", type: "string", format: "datetime", label: { en: "Starts at" } },
 ] as unknown as DraftField[];
 
 const operands = buildOperands({ fields: FIELDS, locale: "en", baseLocale: "en" });
@@ -64,5 +65,9 @@ describe("guardPhrase", () => {
       "a hand-written rule and either Amount is greater than 1 or a hand-written rule",
     );
     expect(guardPhrase("size(data.tags) > 3 && (size(data.tags) > 1 || size(data.tags) > 9)", operands)).toBe("a hand-written rule holds");
+  });
+
+  it("reads a date-time literal no date can hold as its stored text, never a throw", () => {
+    expect(guardPhrase('data.starts_at >= "2026-01-01T00:00+24:00"', operands)).toBe("Starts at is at or after 2026-01-01T00:00+24:00");
   });
 });

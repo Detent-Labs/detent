@@ -52,8 +52,9 @@ const catalog = (fields: DraftField[]): Operand[] =>
 const lit = (value: string | number | boolean | undefined) => ({ kind: "literal" as const, value });
 
 describe("fromCel / toCel round-trip over examples/", () => {
-  // The two named normalisations: single quotes become double, and a bare
-  // boolean operand becomes an explicit `== true`. Nothing else may move.
+  // The reader's four normalisations: single quotes become double, a bare
+  // boolean becomes `== true`, a negated boolean becomes `== false`, and a
+  // nested chain of the parent's own operator flattens. Nothing else may move.
   const NORMALISED: Record<string, string> = {
     "data.booking_status == 'booked'": 'data.booking_status == "booked"',
     "data.booking_status == 'failed'": 'data.booking_status == "failed"',
@@ -756,7 +757,7 @@ describe("readerSentence", () => {
   });
 });
 
-// --- studio-condition-builder-expansion -----------------------------------
+// --- studio-condition-builder: groups, field values, negation, dates -------
 
 const cmpRow = (operand: string, op: CmpOp, value: RowValue): Leaf => ({ kind: "cmp", operand, op, value });
 
@@ -837,7 +838,9 @@ describe("a group holds rows of its own, one level deep", () => {
     const beside: Condition = { joiner: "&&", rows: [amount, { kind: "group", joiner: "||", rows: [sales, half] }] };
     expect(toCel(beside, operands)).toBe('data.amount > 1000.0 && data.department == "sales"');
     const alone: Condition = { joiner: "&&", rows: [{ kind: "group", joiner: "||", rows: [sales, half] }] };
-    expect(toCel(alone, operands)).toBe('data.department == "sales"');
+    const bare = toCel(alone, operands)!;
+    expect(bare).toBe('data.department == "sales"');
+    expect(checkAgainstFields(bare, fieldDefs(GROUP_FIELDS))).toEqual({ ok: true });
   });
 
   it("writes a raw row in a one-row group as a raw row at the group's level", () => {
@@ -868,6 +871,7 @@ describe("a group holds rows of its own, one level deep", () => {
     const condition: Condition = { joiner: "&&", rows: [amount, { kind: "group", joiner: "&&", rows: [sales, marketing] }] };
     const src = toCel(condition, operands)!;
     expect(src).toBe('data.amount > 1000.0 && (data.department == "sales" && data.department == "marketing")');
+    expect(checkAgainstFields(src, fieldDefs(GROUP_FIELDS))).toEqual({ ok: true });
     expect(fromCel(src, operands)!.rows).toEqual([amount, sales, marketing]);
   });
 
@@ -1002,7 +1006,9 @@ describe("a negated list membership reads and writes as one row", () => {
     const condition = fromCel("!data.approved", operands)!;
     expect(condition.rows).toEqual([cmpRow("data.approved", "==", lit(false))]);
     expect(conditionSentence(condition, operands, "!data.approved")).toBe("Approved is no.");
-    expect(toCel(condition, operands)).toBe("data.approved == false");
+    const written = toCel(condition, operands)!;
+    expect(written).toBe("data.approved == false");
+    expect(checkAgainstFields(written, fieldDefs([labeled("approved", "Approved", "boolean")]))).toEqual({ ok: true });
   });
 
   it("leaves a negated comparison and a negated non-boolean a raw row", () => {
@@ -1111,5 +1117,10 @@ describe("the clauses", () => {
   it("prints a date literal the formatter cannot read as its stored text", () => {
     expect(read('data.due_date == "2026-02-30"')).toBe("Due date is 2026-02-30.");
     expect(read('data.due_date == "next week"')).toBe("Due date is next week.");
+  });
+
+  it("prints a date-time literal whose offset no date can hold as its stored text", () => {
+    expect(read('data.starts_at >= "2026-01-01T00:00+24:00"')).toBe("Starts at is at or after 2026-01-01T00:00+24:00.");
+    expect(read('data.starts_at >= "2026-01-01T00:00+99:99"')).toBe("Starts at is at or after 2026-01-01T00:00+99:99.");
   });
 });

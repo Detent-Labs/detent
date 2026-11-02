@@ -45,8 +45,8 @@ export interface RuleCondition {
 }
 
 /** `celType` reads a `list` field as `list<string>`, which
- * `operatorsFor` offers `in` alone for — a comparator this builder never
- * writes. Excluding it here, once, keeps every call site (the operand
+ * `operatorsFor` offers `in` and `!in` alone for — comparators this builder
+ * never writes. Excluding it here, once, keeps every call site (the operand
  * picker, `addRow`'s default comparator) from needing its own guard. */
 function isSupportedCelType(t: string): boolean {
   return t !== "list<string>";
