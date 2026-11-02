@@ -492,7 +492,7 @@ them. Each outcome has one home:
 |---|---|
 | False flush from a failed save | the Restore dialog stays open and prints "Detent cannot restore yet, because your latest changes have not saved. Cancel and press Try again, then restore." A create prints its sentence at the input with the name still typed. No request leaves. A timed retry that heals clears either sentence |
 | 409, or a false flush from a standing conflict | any open dialog closes, a create prints nothing, and the conflict banner stands |
-| 404 on restore or remove | the dialog closes, and the list refetches |
+| 404 on restore or remove | the dialog closes, the list refetches, and the focus lands on the name input |
 | Lost answer on a restore | reads the stored draft under the same timeout. A revision past the flushed one lands as done, and otherwise the next row applies. The list refetches either way |
 | Other refused restore or remove | inside the open dialog, through `StudioDialog`'s `refusal` |
 | Refused create | at the input, with the name still typed. A lost answer also refetches the list |

@@ -83,6 +83,7 @@ function scan(src: Sources): string[] {
   if (!inOrder(answer, ["document.activeElement === inputRef.current", "setBoundMoves(", "setList(answer)"]))
     out.push("the bound check reads the focus after the list commit, when the input is gone");
   if (!answer.includes("atBound: atBound(listRef.current)")) out.push("the bound check compares with the answer's own list");
+  if (!answer.includes("setNow(Date.now())")) out.push("a refetch leaves the rows' ages at the earlier read");
   if (!p.includes("restoreLanding(await actions.restoreSavePoint(point), point.name)")) out.push("restore does not go through the hook's act");
   if (!p.includes("actions.removeSavePoint(point.savePointId)")) out.push("remove does not go through the hook's act");
   if (/\b(createSavePoint|restoreSavePoint|removeSavePoint)\(/.test(p.replace(/actions\.\w+\(/g, ""))) out.push("the panel calls the client itself");
@@ -143,6 +144,7 @@ describe("the Save points view's wiring", () => {
     ["a fetch whose stale answer lands", "panel", "if (mine !== latest.current) return;\n        setFetching(false);", "setFetching(false);", "stale fetch answer"],
     ["a refetch that clears the rows first", "panel", "setFetching(true);\n    listSavePoints", "setFetching(true);\n    setList(undefined);\n    listSavePoints", "drops the old rows"],
     ["a bound check that reads the focus after the commit", "panel", "document.activeElement === inputRef.current", "false", "reads the focus after"],
+    ["a refetch that keeps the ages", "panel", "        setNow(Date.now());\n        setFetching(false);", "        setFetching(false);", "rows' ages"],
     ["a bound check against the wrong list", "panel", "atBound: atBound(listRef.current)", "atBound: false", "own list"],
     ["a restore that skips the hook", "panel", "restoreLanding(await actions.restoreSavePoint(point), point.name)", "restoreLanding({ kind: \"gone\" }, point.name)", "restore does not go through"],
     ["a remove that skips the hook", "panel", "actions.removeSavePoint(point.savePointId)", "Promise.resolve({ kind: \"gone\" } as const)", "remove does not go through"],

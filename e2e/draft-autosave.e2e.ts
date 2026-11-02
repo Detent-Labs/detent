@@ -557,6 +557,72 @@ test("Publish waits on a slow save with Cancel live, and the confirm ignores a p
   expect(published).toBe(0);
 });
 
+test("a conflict during Publish's save closes the dialog and leaves the banner", async ({ page }) => {
+  let answer = () => {};
+  const answered = new Promise<void>((resolve) => {
+    answer = resolve;
+  });
+  await page.route("**/drafts/*", async (route) => {
+    if (!isSave(route.request())) return route.fallback();
+    await answered;
+    await route.fulfill({ status: 409, json: { error: { type: "draft-conflict", message: "Stubbed by the smoke suite." } } });
+  });
+  let published = 0;
+  await page.route("**/drafts/*/publish", (route) => {
+    published += 1;
+    return route.abort();
+  });
+  await openDraft(page);
+  await (await fieldName(page)).fill("Tag under a Publish conflict");
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Publish this draft" });
+  await expect(dialog.getByRole("button", { name: "Saving…", exact: true })).toHaveAttribute("aria-disabled", "true");
+
+  // The 409 answers after the press, so the dialog was open when it came.
+  answer();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("button", { name: "Reload", exact: true })).toBeVisible();
+  await expect(stateLine(page, STATE_UNSAVED)).toBeVisible();
+  expect(published).toBe(0);
+});
+
+/** The form editor's rows in order, read off their Move up controls. */
+function formRows(page: Page): Promise<string[]> {
+  return page.locator('button[aria-label^="Move up: "]').evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label") ?? ""));
+}
+
+async function openShelfForm(page: Page): Promise<void> {
+  await page.getByRole("tab", { name: /^Forms/ }).click();
+  await page.getByRole("button", { name: /^Open the form.*On the Shelf/ }).click();
+  await expect(page.locator('button[aria-label^="Move up: "]').first()).toBeVisible();
+}
+
+test("a field moved in the form editor saves when a tab press leaves it, and the order stands on return", async ({ page }) => {
+  await openDraft(page);
+  await openShelfForm(page);
+  const before = await formRows(page);
+  expect(before).toHaveLength(2);
+
+  const saves = countSaves(page);
+  const saved = page.waitForResponse((response) => isSave(response.request()));
+  await page.locator('button[aria-label^="Move down: "]').first().click();
+  expect(await formRows(page)).toEqual([...before].reverse());
+  await page.getByRole("tab", { name: /^Map/ }).click();
+  await saved;
+  await expect(stateLine(page, STATE_SAVED)).toBeVisible();
+  expect(saves.count()).toBe(1);
+
+  // The same draft, back in the editor, with no save between.
+  await openShelfForm(page);
+  expect(await formRows(page)).toEqual([...before].reverse());
+  await page.waitForTimeout(IDLE_MS);
+  expect(saves.count()).toBe(1);
+
+  await page.reload();
+  await openShelfForm(page);
+  expect(await formRows(page)).toEqual([...before].reverse());
+});
+
 /** Browser Back during a backoff keeps a copy, so the next visit shows the notice. */
 async function raiseNotice(page: Page, label: string): Promise<void> {
   await stubSaves(page, ["abort"]);
@@ -642,7 +708,12 @@ function closeWouldPrompt(page: Page): Promise<boolean> {
 test("JSON no Apply has taken reads as unsaved work, sends nothing and asks at every way off", async ({ page }) => {
   await openDraft(page);
   const saves = countSaves(page);
+  // The Settings body stands open, and the JSON surface hides it.
+  await page.getByRole("tab", { name: /^Settings/ }).click();
+  const settingsBody = page.getByRole("tabpanel", { name: /^Settings/ });
+  await expect(settingsBody).toBeVisible();
   const json = await openJson(page);
+  await expect(settingsBody).toBeHidden();
   const seed = await json.inputValue();
   expect(await closeWouldPrompt(page)).toBe(false);
   await json.fill(`${seed} `);

@@ -1071,7 +1071,7 @@ saves the draft for you.
 The draft's state stands beside its name. It reads **Saving…** while a change
 waits for the save, and **Saved just now** once the save lands. After a
 minute it reads **Saved at** and the time. It reads **Unsaved changes** in
-three cases.
+four cases.
 
 - A save failed. A banner says Studio keeps your changes in the tab, and
   **Try again** sends them at once. If the server refused them, trying again may
@@ -1083,6 +1083,7 @@ three cases.
   any you want to keep first.
 - A notice offers a copy of earlier unsaved work. Studio saves nothing until
   you answer the notice.
+- You typed JSON that you have not applied. See the JSON passage below.
 
 Studio saves about a second after you stop typing. Opening a draft saves
 nothing. Publish waits for the save before it publishes. When you leave the

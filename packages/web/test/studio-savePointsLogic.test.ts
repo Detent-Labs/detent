@@ -132,8 +132,8 @@ describe("a restore's outcome", () => {
     });
   });
 
-  it("closes the dialog and refetches on a 404", () => {
-    expect(restoreLanding({ kind: "gone" }, "A")).toEqual({ dialog: "close", refetch: true, focusInputAfter: false });
+  it("closes the dialog, refetches and sends the focus to the input on a 404, since the row goes", () => {
+    expect(restoreLanding({ kind: "gone" }, "A")).toEqual({ dialog: "close", refetch: true, focusInputAfter: true });
   });
 
   it("keeps the dialog open and prints the reason inside it on another refusal", () => {

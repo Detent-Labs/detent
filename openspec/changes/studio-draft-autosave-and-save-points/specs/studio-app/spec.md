@@ -485,7 +485,7 @@ The focus SHALL return to that row's Restore.
 
 - **WHEN** a restore or a remove answers 404
 - **THEN** the dialog closes and the list reads the server's rows again
-- **AND** after a remove, the focus lands on the name input
+- **AND** the focus lands on the name input
 
 #### Scenario: A restore retires the Versions offer
 
@@ -809,7 +809,7 @@ the new version number. The Settings tab's Developer view SHALL hold its
 #### Scenario: The JSON surface renders no link into the panels screen
 
 - **WHEN** the author opens the JSON surface from the overflow menu
-- **THEN** the tab row stands away, and no control on screen reaches a tab
+- **THEN** no tab body stands open, and a press on a tab leaves the JSON surface
 
 #### Scenario: A path's issue counts on the Paths head
 

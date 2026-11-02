@@ -42,7 +42,7 @@ import type { Draft } from "../src/areas/studio/draft/types.js";
  * arguments it was called with were.
  */
 describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
-  it("conflict (409) -> reload -> publish: reload leaves the draft clean, so isDirty is false and publish would not prompt", () => {
+  it("conflict (409) -> reload -> publish: reload leaves the draft clean, so isDirty is false and publish has nothing to save", () => {
     const original: Draft = { key: "expense-approval", label: { en: "Expense approval" } };
     let savedBody = structuredClone(original);
 
@@ -97,7 +97,7 @@ describe("DraftToolbar's savedBody transition (draftToolbarState.ts)", () => {
     expect(isDraftDirty(body, structuredClone(body), saveState.layout, savedLayout)).toBe(false);
   });
 
-  it("a layout-only difference reads dirty, so Publish saves first", () => {
+  it("a layout-only difference reads dirty, so Publish has a change to save", () => {
     // runPublish's gate: `isDraftDirty(draft, savedBody, saveState.layout, savedLayout)`.
     const body: Draft = { key: "p" };
     const savedLayout = { step_a: { x: 0, y: 0 } };
@@ -534,16 +534,8 @@ describe("justPublishedAfter", () => {
 describe("saveFocusTarget", () => {
   const answered = { heldControl: true, controlGone: true, focusOnBody: true };
 
-  it("a press on Try again that heals lands on the state line", () => {
+  it("a press that heals, a timed retry that heals and a retry answered 409 all land on the state line", () => {
     expect(saveFocusTarget(answered)).toBe("stateLine");
-  });
-
-  it("a timed retry that heals under the resting focus lands there too, so it reads no press", () => {
-    expect(saveFocusTarget({ heldControl: true, controlGone: true, focusOnBody: true })).toBe("stateLine");
-  });
-
-  it("a retry answered 409 removes the control on a dirty draft, and lands there too", () => {
-    expect(saveFocusTarget({ heldControl: true, controlGone: true, focusOnBody: true })).toBe("stateLine");
   });
 
   it("a refused retry keeps the control and the focus on it", () => {

@@ -263,6 +263,30 @@ test("a standing conflict keeps its route: a create says nothing, and the Restor
   expect(acts.count()).toBe(0);
 });
 
+test("a restore the server answers 409 closes its dialog, raises the conflict, and a clean draft leaves with no question", async ({ page }) => {
+  await stubBoundedList(page);
+  // Registered after the list stub, so this route answers a restore first.
+  await page.route("**/drafts/*/save-points/*/restore", (route) =>
+    route.fulfill({ status: 409, json: { error: { type: "draft-conflict", message: "Stubbed by the smoke suite." } } }),
+  );
+  await page.goto("/studio");
+  await page.getByRole("link", { name: DRAFT_NAME, exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Process name" })).toHaveValue(DRAFT_NAME);
+  await openSavePoints(page);
+
+  await page.getByRole("button", { name: "Restore “Alpha”", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Restore “Alpha”?" });
+  await dialog.getByRole("button", { name: "Restore", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("button", { name: "Reload", exact: true })).toBeVisible();
+  await expect(page.getByText(/^Restored /)).toHaveCount(0);
+
+  // Nothing waits unsaved, so the exit asks nothing.
+  await page.getByRole("button", { name: "Back to processes" }).click();
+  await expect(page.getByRole("link", { name: DRAFT_NAME, exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
 /** Lets one request of each act through to the server and loses its answer, or sends nothing at all. */
 async function loseAnswer(page: Page, path: RegExp, reach: boolean): Promise<void> {
   let done = false;

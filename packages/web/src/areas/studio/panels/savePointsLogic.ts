@@ -106,7 +106,7 @@ export function restoreLanding(outcome: SavePointOutcome<{ kept: string }>, name
     case "done":
       return { dialog: "close", refetch: true, status: restoredLine(name, outcome.value.kept), focusInputAfter: false };
     case "gone":
-      return { dialog: "close", refetch: true, focusInputAfter: false };
+      return { dialog: "close", refetch: true, focusInputAfter: true };
     case "refused":
       return { dialog: "stay", refusal: outcome.message, refetch: outcome.lost === true, focusInputAfter: false };
     case "unsaved":

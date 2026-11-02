@@ -871,7 +871,7 @@ Map `price` onto the same field. Pass: the editor keeps both rows, and the
 checks rail names the duplicate. The panel refuses no keystroke, and the rail
 is where a publish rule reports.
 
-In Operations, drop `sku` from the list. Save the draft, then reload the
+In Operations, drop `sku` from the list. Wait for Saved just now, then reload the
 editor. Pass: the `sku` row stays, keeps its target, and carries a warning. It
 does not vanish. The data list screen reports the same key under "Used by".
 
@@ -1793,6 +1793,18 @@ only remaining entry, becomes selected.
 Reload the page: a fresh navigation to the same URL. Pass: selection resets
 to the first field, `line_item`. That matches the reset a canvas round
 trip already gives every other screen-owned selection here.
+
+Open Where values come from with two data sources, select the second, then
+reload the page. Pass: the rail marks the first data source alone, and the
+view shows its editor.
+
+Give a data source a key longer than the rail is wide. Pass: the rail entry
+shows the key cut off on its one line. No character of it wraps onto a line
+of its own.
+
+Open Where fields appear. Move roving focus to a live cell and press Space to
+activate it. Open the Settings tab, then press the Fields tab again. Pass:
+the same cell still holds roving focus and still reads activated.
 
 Throughout: zero console errors or warnings. `playwright-cli console`
 reported 0/0. A screenshot confirmed the field CSS: label above control, the

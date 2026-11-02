@@ -84,7 +84,7 @@ describe("what the surface no longer carries", () => {
     // Publish stands in the header row itself, so the "clear of"
     // assertion reads the menu's own slice. A whole-file search would find them.
     // The slice ends where the confirmation dialogs begin, not at </header>:
-    // PublishConfirmDialog's own `busy={actions.saving || actions.publishing}`
+    // PublishConfirmDialog's own `busy={actions.publishing}`
     // prop sits between the menu and </header>, and "actions.publishing"
     // contains "actions.publish" as a substring.
     const menuAt = code.indexOf("styles.headerBarMenu)} ref={menuRef}");

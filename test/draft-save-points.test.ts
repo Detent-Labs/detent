@@ -5,6 +5,7 @@
  * DATABASE_URL is unset.
  */
 import { test, expect, beforeAll, beforeEach } from "bun:test";
+import type { SQL } from "bun";
 import { sql, initSchema, withTransaction } from "../src/engine/store.js";
 import { publishBody } from "../src/engine/definitions.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
@@ -331,21 +332,45 @@ test.skipIf(!DB)("discarding a draft removes its two save points and leaves anot
   expect(await getDraft(other, sql)).toBeDefined();
 });
 
-test.skipIf(!DB)("discarding a draft is atomic: a failure after the draft delete rolls the draft back", async () => {
+/**
+ * A `db` whose second statement throws. `begin` hands the callback a wrapped
+ * transaction, and a direct tagged call runs on the pool, so a `deleteDraft`
+ * that skips its transaction commits the first statement before the failure.
+ */
+function failingSecondStatement(): SQL {
+  let calls = 0;
+  const wrap = (target: SQL): SQL =>
+    ((strings: TemplateStringsArray, ...values: unknown[]) => {
+      if (++calls === 2) return Promise.reject(new Error("abort"));
+      return target(strings, ...values);
+    }) as unknown as SQL;
+  const db = wrap(sql) as unknown as { begin: (fn: (tx: SQL) => Promise<unknown>) => Promise<unknown> };
+  db.begin = (fn) => sql.begin((tx) => fn(wrap(tx as unknown as SQL)));
+  return db as unknown as SQL;
+}
+
+/** `deleteDraft` with the transaction dropped: the in-memory mutation the proof below must reject. */
+async function deleteDraftWithoutTransaction(processId: ProcessId, db: SQL): Promise<boolean> {
+  const rows = (await db`DELETE FROM drafts WHERE process_id = ${processId} RETURNING process_id`) as unknown[];
+  await db`DELETE FROM draft_save_points WHERE process_id = ${processId}`;
+  return rows.length > 0;
+}
+
+test.skipIf(!DB)("discarding a draft is atomic: a failure on the second statement rolls the draft back", async () => {
   const processId = pid();
   await seedDraft(processId);
   await createSavePoint(processId, { name: "a", revision: 0, createdBy: "u" }, sql);
-  let err: unknown;
-  try {
-    await withTransaction(sql, async (tx) => {
-      await deleteDraft(processId, tx);
-      throw new Error("abort");
-    });
-  } catch (e) {
-    err = e;
-  }
-  expect((err as Error).message).toBe("abort");
+  await expectRejects(deleteDraft(processId, failingSecondStatement()), Error);
   expect(await getDraft(processId, sql)).toBeDefined();
+  expect(await countPoints(processId)).toBe(1);
+});
+
+test.skipIf(!DB)("the atomicity harness fails a deleteDraft that drops its transaction", async () => {
+  const processId = pid();
+  await seedDraft(processId);
+  await createSavePoint(processId, { name: "a", revision: 0, createdBy: "u" }, sql);
+  await expectRejects(deleteDraftWithoutTransaction(processId, failingSecondStatement()), Error);
+  expect(await getDraft(processId, sql)).toBeUndefined();
   expect(await countPoints(processId)).toBe(1);
 });
 

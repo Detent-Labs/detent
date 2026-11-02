@@ -174,7 +174,7 @@ describe("the rows", () => {
     expect(html).toContain('aria-label="Remove “Alpha”"');
   });
 
-  it("styles Remove destructive and Restore secondary", () => {
+  it("styles Restore and Remove as the ghost command, neither secondary nor destructive", () => {
     const tags = buttonTags(render({ list: listOf(1) }));
     const restore = tags.find((b) => b.includes("Restore"))!;
     const remove = tags.find((b) => b.includes("Remove"))!;
