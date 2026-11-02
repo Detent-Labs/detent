@@ -60,6 +60,15 @@ function effectHolding(code: string, marker: string): string {
   return start < 0 ? "" : callText(code, start);
 }
 
+/** The dependency list closing an effect call. */
+function dependencies(effect: string): string[] {
+  const list = /\[([^\]]*)\]\s*,?\s*\)$/.exec(effect)?.[1] ?? "";
+  return list.split(",").map((dep) => dep.trim()).filter(Boolean);
+}
+
+const TIMER_DEPENDENCIES = ["draft", "saveState.layout", "saveState.revision", "saveState.conflict", "dirty", "saving", "held", "failure", "flushTick", "processId", "token"];
+const SETTLE_DEPENDENCIES = ["flushTick", "dirty", "saving", "failure", "saveState.conflict", "saveState.revision"];
+
 interface Sources {
   toolbar: string;
   screen: string;
@@ -75,13 +84,16 @@ function scan({ toolbar, screen, header }: Sources): string[] {
   // The timer (3.2).
   const timer = effectHolding(toolbar, "autosaveWait(");
   flag(/\bconflict:\s*saveState\.conflict\b/.test(timer), "the timer effect does not read the conflict");
-  flag(/\bdirty,/.test(timer) && /\bsaving,/.test(timer) && /\bheld,/.test(timer), "the timer effect drops dirty, saving or held");
+  const waitAt = timer.indexOf("autosaveWait(");
+  const waitCall = waitAt < 0 ? "" : callText(timer, waitAt);
+  flag(/\bdirty,/.test(waitCall) && /\bsaving,/.test(waitCall) && /\bheld,/.test(waitCall), "the timer effect drops dirty, saving or held");
   flag(/\bflushAsked:\s*flushWaiters\.current\.length\s*>\s*0/.test(timer), "the timer effect does not read the waiting flushes");
   flag(/\bnextDirtySince\(/.test(timer), "the timer effect does not advance dirtySince");
   flag(/draft !== lastSent\.current\.draft\s*\|\|\s*saveState\.layout !== lastSent\.current\.layout/.test(timer), "dirtySince does not compare with the last sent pair");
   flag(/draft !== failure\.draft\s*\|\|\s*saveState\.layout !== failure\.layout/.test(timer), "changedSinceFailure does not compare with the failed pair");
   flag(/setTimeout\([^;]*\bdoSave\(\)[^;]*,\s*wait\s*\)/.test(timer) && /\bclearTimeout\(timer\)/.test(timer), "the timer effect does not arm and clear its timer");
-  flag(/\[[^\]]*\bdraft\b[^\]]*\bsaveState\.layout\b[^\]]*\bflushTick\b[^\]]*\]/.test(timer), "the timer effect does not rerun on the draft, the layout and a flush");
+  const timerDeps = dependencies(timer);
+  for (const dep of TIMER_DEPENDENCIES) flag(timerDeps.includes(dep), `the timer effect does not rerun on ${dep}`);
   flag(/\bif\s*\(\s*dropped\.current\s*\)\s*return;/.test(timer), "the timer effect arms on a dropped draft");
 
   // `held` names its four cases (3.2, 3.7).
@@ -101,6 +113,7 @@ function scan({ toolbar, screen, header }: Sources): string[] {
   flag(/\bsetFailure\(\(prior\) => [\s\S]*\bfinally\s*\{[\s\S]*\bsetSaving\(false\)/.test(save), "the failure does not land ahead of the finally");
   flag(/\bis401\(e\)[\s\S]*\bfail\(e\)/.test(save), "a 401 on a save does not end the session");
   flag(/\bonSavedBodyChange\(landed\.draft\)/.test(save), "savedBody does not take the landed entry's draft");
+  flag(/\bgetDraft\(processId, token, AbortSignal\.timeout\(SAVE_TIMEOUT_MS\)\)/.test(save), "the 409's stored read carries no timeout");
   flag(/\bunconfirmed\.current\.length > 0[\s\S]*\bgetDraft\(/.test(save) && /\blandedEntry\(/.test(save), "a 409 does not read the stored draft for a lost send");
   flag(/"lost" : "failed"/.test(save), "a failed send does not sort itself into lost or failed");
 
@@ -117,6 +130,8 @@ function scan({ toolbar, screen, header }: Sources): string[] {
   flag(!/\bunconfirmed\b/.test(flush), "a flush touches the unconfirmed list");
   const settle = effectHolding(toolbar, "flushAnswer(");
   flag(/\bflushWaiters\.current = \[\];/.test(settle), "the settling effect keeps its waiters");
+  const settleDeps = dependencies(settle);
+  for (const dep of SETTLE_DEPENDENCIES) flag(settleDeps.includes(dep), `the settling effect does not rerun on ${dep}`);
   flag(toolbar.indexOf("flushAnswer(") < toolbar.indexOf("autosaveWait(") && toolbar.indexOf("flushAnswer(") > 0, "the settling effect runs after the timer effect");
 
   // `retry` keeps the failure (D2).
@@ -207,8 +222,113 @@ describe("the autosave's wiring", () => {
     expect(scan(mutate("toolbar", "return () => clearTimeout(timer);", "return undefined;"))).toEqual(["the timer effect does not arm and clear its timer"]);
   });
 
-  it("a timer effect that misses a flush's counter is flagged", () => {
-    expect(scan(mutate("toolbar", "failure, flushTick, processId", "failure, processId"))).toEqual(["the timer effect does not rerun on the draft, the layout and a flush"]);
+  it("a timer effect that misses any dependency is flagged", () => {
+    const list = dependencies(effectHolding(real.toolbar, "autosaveWait(")).join(", ");
+    for (const dep of TIMER_DEPENDENCIES) {
+      const kept = TIMER_DEPENDENCIES.filter((other) => other !== dep).join(", ");
+      expect(scan(mutate("toolbar", list, kept))).toEqual([`the timer effect does not rerun on ${dep}`]);
+    }
+  });
+
+  it("a settling effect that misses any dependency is flagged", () => {
+    const list = dependencies(effectHolding(real.toolbar, "flushAnswer(")).join(", ");
+    for (const dep of SETTLE_DEPENDENCIES) {
+      const kept = SETTLE_DEPENDENCIES.filter((other) => other !== dep).join(", ");
+      expect(scan(mutate("toolbar", list, kept))).toEqual([`the settling effect does not rerun on ${dep}`]);
+    }
+  });
+
+  it("a wait that drops dirty, saving or held is flagged, and nextDirtySince's own dirty does not hide it", () => {
+    for (const [from, to] of [["dirty,\n      saving,", "dirty: true,\n      saving,"], ["saving,\n      conflict:", "saving: false,\n      conflict:"], ["held,\n      flushAsked:", "held: false,\n      flushAsked:"]] as const) {
+      expect(scan(mutate("toolbar", from, to))).toEqual(["the timer effect drops dirty, saving or held"]);
+    }
+  });
+
+  it("a timer effect that ignores the waiting flushes is flagged", () => {
+    expect(scan(mutate("toolbar", "flushAsked: flushWaiters.current.length > 0,", "flushAsked: false,"))).toEqual(["the timer effect does not read the waiting flushes"]);
+  });
+
+  it("a timer effect that does not advance dirtySince is flagged", () => {
+    expect(scan(mutate("toolbar", "nextDirtySince(dirtySince.current, {", "((_c: unknown, _s: unknown) => undefined)(dirtySince.current, {"))).toEqual(["the timer effect does not advance dirtySince"]);
+  });
+
+  it("a later change that does not read as one is flagged", () => {
+    expect(scan(mutate("toolbar", "(draft !== failure.draft || saveState.layout !== failure.layout)", "false"))).toEqual(["changedSinceFailure does not compare with the failed pair"]);
+  });
+
+  it("a timer armed on a dropped draft is flagged", () => {
+    expect(scan(mutate("toolbar", /if \(dropped\.current\) return;\s*const now/, "const now"))).toEqual(["the timer effect arms on a dropped draft"]);
+  });
+
+  it("an answer that keeps the failure is flagged", () => {
+    expect(scan(mutate("toolbar", /setFailure\(undefined\);\s*onSaveState\(\(current\)/, "onSaveState((current)"))).toEqual(["a save's answer does not clear the failure"]);
+  });
+
+  it("a failure that does not record what was thrown is flagged", () => {
+    expect(scan(mutate("toolbar", "nextFailure(prior, sent, e)", "nextFailure(prior, sent, undefined)"))).toEqual(["a failed save does not record its failure"]);
+  });
+
+  it("a 401 on a save that does not end the session is flagged", () => {
+    expect(scan(mutate("toolbar", /fail\(e\);\s*return \{ saved: false \};/, "return { saved: false };"))).toEqual(["a 401 on a save does not end the session"]);
+  });
+
+  it("a send that does not sort itself into lost or failed is flagged", () => {
+    expect(scan(mutate("toolbar", 'classifySaveFailure(e).lost ? "lost" : "failed"', '"failed"'))).toEqual(["a failed send does not sort itself into lost or failed"]);
+  });
+
+  it("a 409 read with no timeout is flagged, since it would hold saving for good", () => {
+    expect(scan(mutate("toolbar", "getDraft(processId, token, AbortSignal.timeout(SAVE_TIMEOUT_MS))", "getDraft(processId, token)"))).toEqual(["the 409's stored read carries no timeout"]);
+  });
+
+  it("a flush that bumps no counter is flagged", () => {
+    expect(scan(mutate("toolbar", "setFlushTick((tick) => tick + 1);", ""))).toEqual(["a flush does not bump its counter"]);
+  });
+
+  it("a settling effect that keeps its waiters is flagged", () => {
+    expect(scan(mutate("toolbar", "flushWaiters.current = [];", ""))).toEqual(["the settling effect keeps its waiters"]);
+  });
+
+  it("a settling effect placed after the timer effect is flagged", () => {
+    const settling = effectHolding(real.toolbar, "flushAnswer(");
+    const moved = real.toolbar.replace(`${settling};`, "").replace("const commit =", `${settling};\nconst commit =`);
+    expect(moved).not.toBe(real.toolbar);
+    expect(scan({ ...real, toolbar: moved })).toEqual(["the settling effect runs after the timer effect"]);
+  });
+
+  it("an unmount that ignores the running request is flagged", () => {
+    expect(scan(mutate("toolbar", "running: request !== undefined,", "running: false,"))).toEqual(["the unmount does not read the running request"]);
+  });
+
+  it("a publish that opens no dialog is flagged", () => {
+    expect(scan(mutate("toolbar", 'setPendingDialog("publish");', ""))).toEqual(["publish opens no dialog"]);
+  });
+
+  it("an adopted draft that does not read clean is flagged", () => {
+    expect(scan(mutate("toolbar", "onSavedBodyChange(body);", ""))).toEqual(["adoptDraft does not leave the draft clean"]);
+    expect(scan(mutate("toolbar", "replace(body);", ""))).toEqual(["adoptDraft does not leave the draft clean"]);
+  });
+
+  it("an adopted draft that starts a save is flagged", () => {
+    expect(scan(mutate("toolbar", "replace(body);", "replace(body);\nvoid doSave();"))).toEqual(["adoptDraft starts a save"]);
+  });
+
+  it("a restore that does not name its kept point is flagged", () => {
+    expect(scan(mutate("toolbar", "keptPointName(point.name)", "point.name"))).toEqual(["a restore does not name its kept point"]);
+  });
+
+  it("a false flush that does not stop the act is flagged", () => {
+    expect(scan(mutate("toolbar", /("create", async \(\) => \{\s*const flushed = await flush\(\);)\s*if \(!flushed\.saved\) return \{ kind: "unsaved" \};/, "$1"))).toEqual(["a false flush does not stop the act"]);
+    expect(scan(mutate("toolbar", /("restore", async \(\) => \{\s*const flushed = await flush\(\);)\s*if \(!flushed\.saved\) return \{ kind: "unsaved" \};/, "$1"))).toEqual(["a false flush does not stop the act"]);
+  });
+
+  it("a 401 on a save point request that does not end the session is flagged", () => {
+    expect(scan(mutate("toolbar", /fail\(e\);\s*return \{ kind: "ended" \};/, 'return { kind: "ended" };'))).toEqual(["a 401 on a save point request does not end the session"]);
+  });
+
+  it("a save point 409 that raises no conflict is flagged, at each of its three sites", () => {
+    expect(scan(mutate("toolbar", 'if (outcome.kind === "conflict") raiseConflict();', ""))).toEqual(["a save point 409 raises no conflict"]);
+    expect(scan(mutate("toolbar", /(if \(point === undefined\) \{)\s*raiseConflict\(\);/, "$1"))).toEqual(["a save point 409 raises no conflict"]);
+    expect(scan(mutate("toolbar", /(if \(record === undefined\) \{)\s*raiseConflict\(\);/, "$1"))).toEqual(["a save point 409 raises no conflict"]);
   });
 
   it("dirtySince measured from any commit is flagged", () => {

@@ -9,10 +9,11 @@ import { describe, expect, it } from "bun:test";
  *
  * 1. `doSave` advances the saved layout on the success branch. Without it, a
  *    layout-only save reads "Unsaved changes" for the rest of the session.
- * 2. The save-state update receives an updater that passes `sentLayout`, the
- *    layout the request sent, to `applySaveResult`. A plain value, or the
+ * 2. The save-state update receives an updater that passes `landed.layout`, the
+ *    layout that reached the server, to `applySaveResult`. A plain value, or the
  *    state read when the answer arrives, drops a drag made during the request.
- *    `onSaveState` is a `Dispatch<SetStateAction<...>>`, so a plain value
+ *    The sent layout drops a drag whose send answered 409 over a lost send that
+ *    landed. `onSaveState` is a `Dispatch<SetStateAction<...>>`, so a plain value
  *    still type-checks.
  * 3. `publish` flushes on `dirty`, built from `isDraftDirty`. The body-only
  *    `isDirty` lets a layout-only difference publish without landing. `runPublish`
@@ -67,8 +68,8 @@ function scan(source: string): string[] {
       violations.push("doSave success branch does not call onSavedLayoutChange(result.layout)");
     }
     if (!/\bsaveDraft\s*\([^;]*\blayout:\s*sentLayout\b/.test(save)) violations.push("doSave does not send sentLayout");
-    if (!/\bonSaveState\s*\(\s*\(\s*(\w+)\s*\)\s*=>\s*applySaveResult\s*\(\s*\1\s*,\s*result\s*,\s*sentLayout\s*\)\s*\)/.test(save)) {
-      violations.push("doSave does not hand onSaveState an updater that passes sentLayout to applySaveResult");
+    if (!/\bonSaveState\s*\(\s*\(\s*(\w+)\s*\)\s*=>\s*applySaveResult\s*\(\s*\1\s*,\s*result\s*,\s*landed\.layout\s*\)\s*\)/.test(save)) {
+      violations.push("doSave does not hand onSaveState an updater that passes the landed layout to applySaveResult");
     }
   }
 
@@ -147,18 +148,23 @@ describe("DraftToolbar.tsx wires the saved layout", () => {
   });
 
   it("a save state that takes a plain value is flagged", () => {
-    const plain = mutate(real, /onSaveState\(\(current\) => applySaveResult\(current, result, sentLayout\)\)/, "onSaveState(applySaveResult(saveState, result, sentLayout))");
-    expect(scan(plain)).toEqual(["doSave does not hand onSaveState an updater that passes sentLayout to applySaveResult"]);
+    const plain = mutate(real, /onSaveState\(\(current\) => applySaveResult\(current, result, landed\.layout\)\)/, "onSaveState(applySaveResult(saveState, result, landed.layout))");
+    expect(scan(plain)).toEqual(["doSave does not hand onSaveState an updater that passes the landed layout to applySaveResult"]);
   });
 
-  it("an updater that drops sentLayout is flagged", () => {
-    const dropped = mutate(real, /applySaveResult\(current, result, sentLayout\)/, "applySaveResult(current, result)");
-    expect(scan(dropped)).toEqual(["doSave does not hand onSaveState an updater that passes sentLayout to applySaveResult"]);
+  it("an updater that drops the landed layout is flagged", () => {
+    const dropped = mutate(real, /applySaveResult\(current, result, landed\.layout\)/, "applySaveResult(current, result)");
+    expect(scan(dropped)).toEqual(["doSave does not hand onSaveState an updater that passes the landed layout to applySaveResult"]);
+  });
+
+  it("an updater that passes the sent layout is flagged, since a landed lost send would overwrite a newer drag", () => {
+    const sent = mutate(real, /applySaveResult\(current, result, landed\.layout\)/, "applySaveResult(current, result, sentLayout)");
+    expect(scan(sent)).toEqual(["doSave does not hand onSaveState an updater that passes the landed layout to applySaveResult"]);
   });
 
   it("an updater that reads another state than its own parameter is flagged", () => {
-    const other = mutate(real, /applySaveResult\(current, result, sentLayout\)/, "applySaveResult(saveState, result, sentLayout)");
-    expect(scan(other)).toEqual(["doSave does not hand onSaveState an updater that passes sentLayout to applySaveResult"]);
+    const other = mutate(real, /applySaveResult\(current, result, landed\.layout\)/, "applySaveResult(saveState, result, landed.layout)");
+    expect(scan(other)).toEqual(["doSave does not hand onSaveState an updater that passes the landed layout to applySaveResult"]);
   });
 
   it("a save request that sends another layout than sentLayout is flagged", () => {

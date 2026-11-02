@@ -200,18 +200,37 @@ describe("the lost-answer rule", () => {
     expect(landedEntry([], stored(pair("a")))).toBeUndefined();
   });
 
-  it("a change made since stays dirty and saves next", () => {
+  it("a body change made since stays dirty and saves next", () => {
     const lost = pair("a", { x: 1 });
-    const newer = pair("b", { x: 1 });
+    const newer: SentPair = { draft: { key: "b" } as Draft, layout: lost.layout };
     const record = stored(lost);
     expect(landedEntry([lost], record)).toBe(lost);
 
-    // The newer send answered 409, and the landed pair is what the server holds.
-    const state = applySaveResult({ ...initialSaveState(7, newer.layout) }, { revision: record.revision, layout: record.layout }, newer.layout);
+    const state = applySaveResult(initialSaveState(7, newer.layout), { revision: record.revision, layout: record.layout }, lost.layout);
     expect(state.revision).toBe(8);
     expect(state.conflict).toBe(false);
     expect(isDraftDirty(newer.draft, lost.draft, state.layout, record.layout)).toBe(true);
-    expect(autosaveWait({ ...idle, dirty: true })).toBe(1200);
+  });
+
+  it("a layout change made since keeps its layout, stays dirty and holds a flush", () => {
+    const lost = pair("a", { step_1: { x: 1 } });
+    const newer: SentPair = { draft: lost.draft, layout: { step_1: { x: 2 } } };
+    const record = stored(lost);
+    const answer = { revision: record.revision, layout: record.layout };
+
+    // The third argument is the landed entry's layout, so the newer one survives.
+    const state = applySaveResult(initialSaveState(7, newer.layout), answer, lost.layout);
+    expect(state.layout).toBe(newer.layout);
+    const dirty = isDraftDirty(newer.draft, lost.draft, state.layout, record.layout);
+    expect(dirty).toBe(true);
+    expect(wait({ dirty })).toBe(1200);
+    expect(wait({ dirty, flushAsked: true })).toBe(0);
+    expect(flushAnswer({ dirty, saving: false, failed: false, conflict: false, revision: state.revision })).toBeUndefined();
+
+    // The sent layout would adopt the stored one over the drag, and read clean.
+    const wrong = applySaveResult(initialSaveState(7, newer.layout), answer, newer.layout);
+    expect(wrong.layout).toBe(record.layout);
+    expect(isDraftDirty(newer.draft, lost.draft, wrong.layout, record.layout)).toBe(false);
   });
 
   it("an equal draft reads clean after the landing, against the entry's own draft", () => {

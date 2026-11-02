@@ -8,6 +8,7 @@ import {
   SAVE_TIMEOUT_MS,
   StudioClientError,
   createSavePoint,
+  getDraft,
   listSavePoints,
   removeSavePoint,
   restoreSavePoint,
@@ -95,6 +96,28 @@ describe("save point client calls", () => {
     expect(err).toBeInstanceOf(StudioClientError);
     expect((err as StudioClientError).error.type).toBe("not-found");
     expect((err as StudioClientError).status).toBe(404);
+  });
+});
+
+describe("getDraft's optional signal", () => {
+  it("reaches the request, and an aborted read reads as the network error", async () => {
+    const seen = answer(200, { processId: "proc_a", body: {}, layout: {}, revision: 1 });
+    const signal = new AbortController().signal;
+    expect((await getDraft("proc_a", "tok", signal))?.revision).toBe(1);
+    expect(seen[0]!.init?.signal).toBe(signal);
+
+    globalThis.fetch = (() => Promise.reject(new DOMException("timed out", "TimeoutError"))) as unknown as typeof fetch;
+    const caught = await getDraft("proc_a", "tok", signal).catch((e: unknown) => e);
+    expect(caught).toBeInstanceOf(StudioClientError);
+    expect((caught as InstanceType<typeof StudioClientError>).status).toBeUndefined();
+  });
+
+  it("sends no signal where the caller passes none, and a 404 still reads as undefined", async () => {
+    const seen = answer(200, { processId: "proc_a", body: {}, layout: {}, revision: 1 });
+    await getDraft("proc_a", "tok");
+    expect(seen[0]!.init?.signal ?? undefined).toBeUndefined();
+    answer(404, { error: { type: "not-found", message: "no" } });
+    expect(await getDraft("proc_a", "tok")).toBeUndefined();
   });
 });
 

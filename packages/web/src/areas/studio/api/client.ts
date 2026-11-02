@@ -74,9 +74,10 @@ export async function deleteAccessPrincipal(
 }
 
 /** `undefined` for a process with no draft (404), never thrown — a missing draft is an expected, not exceptional, shape for this call. */
-export async function getDraft(processId: string, token: string): Promise<DraftRecord | undefined> {
+export async function getDraft(processId: string, token: string, signal?: AbortSignal): Promise<DraftRecord | undefined> {
   try {
-    return await getJson(`/drafts/${encodeURIComponent(processId)}`, token);
+    const res = await request(`/drafts/${encodeURIComponent(processId)}`, token, signal ? { signal } : undefined);
+    return (await res.json()) as DraftRecord;
   } catch (err) {
     if (err instanceof AppClientError && err.error.type === "not-found") return undefined;
     throw err;

@@ -7,6 +7,7 @@ import {
   publishDraft,
   removeSavePoint as requestRemoveSavePoint,
   restoreSavePoint as requestRestoreSavePoint,
+  SAVE_TIMEOUT_MS,
   saveDraft,
 } from "../api/client.js";
 import { applySaveResult, applyReload, type DraftSaveState } from "../screens/draftSaveLogic.js";
@@ -222,7 +223,8 @@ export function useDraftToolbarActions({
    * none reads "dirty, not saving, no failure" and arms a second timer. A 409 while
    * `unconfirmed` holds an entry reads the stored draft first: a lost send may have
    * committed. `savedBody` then takes the entry's draft, since `isDirty` compares
-   * with `JSON.stringify` and `jsonb` reorders keys. It never rejects.
+   * with `JSON.stringify` and `jsonb` reorders keys. The answer's layout replaces
+   * only the entry's own, so a newer one stays dirty and saves next. It never rejects.
    */
   const doSave = (): Promise<SaveAnswer> => {
     if (running.current !== undefined) return running.current;
@@ -239,7 +241,8 @@ export function useDraftToolbarActions({
         answered = true;
         let landed = sent;
         if (result === undefined && unconfirmed.current.length > 0) {
-          const stored = await getDraft(processId, token);
+          // A hung read would hold `saving`, and every save and flush behind it, for good.
+          const stored = await getDraft(processId, token, AbortSignal.timeout(SAVE_TIMEOUT_MS));
           const entry = stored && landedEntry(unconfirmed.current, stored);
           if (entry) {
             result = stored;
@@ -254,7 +257,7 @@ export function useDraftToolbarActions({
         }
         // Only the failure's own banner leaves. `error` may hold another act's.
         setFailure(undefined);
-        onSaveState((current) => applySaveResult(current, result, sentLayout));
+        onSaveState((current) => applySaveResult(current, result, landed.layout));
         return result ? { saved: true, revision: result.revision, ...landed } : { saved: false };
       } catch (e) {
         if (is401(e)) {
