@@ -1814,10 +1814,10 @@ tag is local to this section.
   edge. `studio-checks-by-subject` leaves it: a visual detail with no bearing
   on checks.
 - **ACCORDION-8: the Who acts body is the inline form of
-  `PluginEnvelopeEditor`.** It prints schema-key labels, "Edit as JSON" and a
-  "Settings (JSON)" box outside a Developer view. This needs its own change.
-  Risk (Medium): an author meets machine words where the guided vocabulary
-  promises plain ones. `studio-checks-by-subject` leaves it: the plugin
+  `PluginEnvelopeEditor`.** A plugin strategy prints schema-key labels. The
+  unstyled envelope and "Edit as JSON" stay outside a Developer view. This
+  needs its own change. Risk (Medium): an author meets machine words where the
+  guided vocabulary promises plain ones. `studio-checks-by-subject` leaves it: the plugin
   envelope editor needs its own change.
 - **ACCORDION-10: the masthead stands about 300px tall before the first
   header at 1440x900.** "Set as the process's first step" shows on every step
@@ -2435,6 +2435,25 @@ waits for an owner ruling or for the change it names.
 - **The operand switch keeps a pair between operands of one shape alone.**
   Arrowing from a number field through a text field and back still resets the
   operator and the value.
+
+## Open from studio-who-acts-fixes (needs its own OpenSpec change)
+
+The change repaired the Who acts section and left three points to a later change.
+
+- **WHOACTS-1: no studio control edits `allowedGroups`.** The group picker
+  keeps the list for a group step. A process with no group step has no way to
+  declare one. Risk (Medium): a bare person field then offers nobody, and a
+  participant meets a plain text input for the id.
+
+  Upgrade entry: an `allowedGroups` editor on the Settings tab's Access view.
+- **WHOACTS-2: a bare person field offers nobody on a body with no
+  `allowedGroups`.** "Add a person field" can create one. The
+  unwritten-field warning covers the first stall only. Risk (Medium): the
+  participant meets a plain text input and may type any well-formed id.
+- **WHOACTS-3: the kind switch to a call keeps `assignment`.** The step then
+  has no Who acts section, and every who-acts sentence aims at the JSON
+  surface. Risk (Low): a stale assignment stays on the step. Removing it on
+  the switch is the cleaner end.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

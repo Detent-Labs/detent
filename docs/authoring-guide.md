@@ -1289,19 +1289,23 @@ never arrives waits forever.
 ### 7. Set assignment
 
 For every step a person must act on, open its **Who acts** section and pick
-a strategy. A step nobody acts on needs no assignment, and the section says so.
+a strategy. The picker opens on "Nobody in particular", which removes the
+assignment. An empty section shows the picker alone.
 
 The strategy is a plugin, like an action or a data source. It carries a `type`
 and a `config`. The picker lists the strategies your deployment registers,
 under the plain name each one takes. A `type` nobody registered is a publish
-error, not a surprise at run time.
+error, not a surprise at run time. The studio checks a strategy's config keys
+and value kinds before publish. Actions and data sources stay verified at
+publish.
 
 Four strategies ship. The section prints a plain name and a short note for
 each. The step's Developer view carries the registry `type` beside it.
 
-**A fixed list of people** is `static`, the one you get by default. Studio
-generates a form for it: one candidates field, `finance-approver` for example.
-The engine uses that list unchanged.
+**A fixed list of people** is `static`. Studio shows one list captioned
+"People or roles, one per line", `finance-approver` for example. Enter and
+spaces stay in the text as you type. The list matches roles as well as people.
+The engine uses it unchanged.
 
 **The starter's manager** is `org.manager-of-starter`. It resolves the manager
 of whoever started the instance. It takes no config, so its form is empty. Use it for the approval
@@ -1318,7 +1322,7 @@ Use delegation for the one-off case.
 
 **Everyone in a group** is `org.group-members`. It resolves the current
 member list of one group, an operator administers on the admin Groups screen.
-Its config carries one key, `groupId`.
+Its config carries one key, `groupId`. The section picks the group by name.
 
 Like the two strategies above, this list resolves at step entry. A
 membership change reaches the next entry with no republish. An instance
@@ -1331,10 +1335,21 @@ Declare the group's id in the process's own `allowedGroups` list too. A
 publish, naming the step and the group id. That same list is what a person
 field's picker offers, so one entry serves both readers.
 
+The picker keeps `allowedGroups` for you. Choosing a group adds its id. Leaving
+a group drops the entry when no other step names it and no bare person field
+reads the list. The section notes when a people picker offers the group too.
+
+Raw JSON leaves the list alone. A hand-author still declares it. Publish
+still enforces the rule above.
+
 **The person a field names** is `org.actor-from-field`. It routes the step to
 whoever the instance's own data names. Its config carries one key, `fieldId`.
 Use it for the approver a requester picks, which no fixed list and no group
 can express.
+
+The section picks a single-person field by label. "Add a person field" adds one
+in place and puts it on no form. A note warns while nothing in the process
+writes the field before this step.
 
 The field's value decides, read fresh at every step entry. A `user_` value
 makes that account the sole candidate. A `group_` value expands to that
