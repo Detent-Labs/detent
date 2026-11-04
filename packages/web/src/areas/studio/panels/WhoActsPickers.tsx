@@ -84,7 +84,6 @@ export function FixedListEditor({
 }) {
   return (
     <LinesInput
-      label={t("steps.assignmentLabel")}
       caption={t("whoActs.listCaption")}
       value={config.candidates}
       error={validateField(CANDIDATES, config.candidates)}

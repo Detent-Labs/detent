@@ -30,10 +30,24 @@ describe("FixedListEditor", () => {
     expect(html).not.toContain("candidates");
   });
 
-  it("stands a label above the control, not the caption twice", () => {
+  it("stands the caption as the label above the control, printed once", () => {
     const html = markup({ candidates: ["alice"] });
     expect(html.split(LIST_CAPTION)).toHaveLength(2);
-    expect(html.indexOf("<label")).toBeLessThan(html.indexOf("<textarea"));
+    expect(html).toContain(`>${LIST_CAPTION}</label>`);
+    expect(html.indexOf("</label>")).toBeLessThan(html.indexOf("<textarea"));
+  });
+
+  it("repeats no legend and adds no second hint", () => {
+    const html = markup({ candidates: ["alice"] });
+    expect(html).not.toContain("Who can act on this step");
+    expect(html).not.toContain("<small");
+  });
+
+  it("names the label as the control's description", () => {
+    const html = markup({ candidates: ["alice"] });
+    const labelId = new RegExp(`<label id="([^"]+)"[^>]*>${LIST_CAPTION}</label>`).exec(html)?.[1];
+    expect(labelId).toBeDefined();
+    expect(/aria-describedby="([^"]+)"/.exec(html)?.[1]).toBe(labelId!);
   });
 
   it("shows the wrong-kind error beside the control", () => {
