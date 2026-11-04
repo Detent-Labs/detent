@@ -1,11 +1,13 @@
-import { useState, type ReactNode } from "react";
+import { useContext, useRef, useState, type ReactNode } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { space } from "form-ui/tokens.stylex";
 import type { Plugin } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
 import type { ConfigFieldDescriptor } from "../../api/types.js";
 import { t, type CatalogKey } from "../../catalog.js";
-import { parsedConfigBase, shownConfig, type ConfigEdit } from "./pluginConfigText.js";
+import { LinesInput } from "./LinesInput.js";
+import { DraftContext } from "../../draft/store.js";
+import { memoryAt, parsedConfigBase, shownConfig, switchedConfig, type ConfigEdit, type PluginMemory } from "./pluginConfigText.js";
 
 const styles = stylex.create({
   pluginField: {
@@ -51,19 +53,29 @@ interface Props {
    */
   typeLabel?: (type: string) => string;
   /**
-   * A purpose-built editor for one type whose config nests past what the
-   * generator covers (a list of objects, for instance) — `"instance.query"`
-   * is the first. Takes precedence over both the generated form and the raw
-   * JSON fallback for `type` alone; the raw JSON escape hatch stays reachable
-   * through the same `showRawJson` switch every other type already uses. See
-   * `studio-plugin-config-form`'s "A purpose-built form serves the
-   * instance.query data source type".
+   * Purpose-built editors for types whose config nests past what the
+   * generator covers (a list of objects, for instance), keyed by type.
+   * An entry takes precedence over both the generated form and the raw
+   * JSON fallback for its type alone; the raw JSON escape hatch stays
+   * reachable through the same `showRawJson` switch every other type
+   * already uses. See `studio-plugin-config-form`'s "A purpose-built form
+   * serves the instance.query data source type".
    */
-  customConfigEditor?: {
-    type: string;
-    render: (config: Record<string, unknown>, onChange: (next: Record<string, unknown>) => void) => ReactNode;
-  };
+  customConfigEditors?: Record<
+    string,
+    (config: Record<string, unknown>, onChange: (next: Record<string, unknown>) => void) => ReactNode
+  >;
+  /**
+   * A first option meaning "no plugin here". While set, the select always
+   * draws (never the free-text input), `onChoose` runs on that option, and no
+   * config control or Description stands while `type` is empty. Choosing it
+   * stores the outgoing config and description under their type first.
+   */
+  noneOption?: { label: string; onChoose: () => void };
 }
+
+/** The select value of the none option. A stored empty type keeps the `""` placeholder. */
+const NONE_VALUE = "\u0000none";
 
 /** A catalog sentence with its placeholders filled. The function replacer keeps a `$` in a value literal. */
 function fill(key: CatalogKey, values: Record<string, string | number>): string {
@@ -79,6 +91,7 @@ export function validateField(descriptor: ConfigFieldDescriptor, value: unknown)
   const isEmpty = value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
   if (descriptor.required && isEmpty) return t("plugin.fieldRequired");
   if (isEmpty) return undefined;
+  if (descriptor.kind === "string-array" && !Array.isArray(value)) return t("plugin.notAList");
   if (descriptor.kind === "string" && typeof value === "string") {
     if (descriptor.minLength !== undefined && value.length < descriptor.minLength) return fill("plugin.minLength", { n: descriptor.minLength });
     if (descriptor.maxLength !== undefined && value.length > descriptor.maxLength) return fill("plugin.maxLength", { n: descriptor.maxLength });
@@ -152,6 +165,9 @@ function GeneratedField({
     return <EnumArrayField descriptor={descriptor} value={value} onChange={onChange} />;
   }
   const error = validateField(descriptor, value);
+  if (descriptor.kind === "string-array") {
+    return <LinesInput label={descriptor.key} value={value} onChange={onChange} error={error} />;
+  }
   return (
     <label {...stylex.props(styles.pluginField)}>
       {descriptor.key}
@@ -175,21 +191,6 @@ function GeneratedField({
             </option>
           ))}
         </select>
-      )}
-      {descriptor.kind === "string-array" && (
-        <textarea
-          rows={3}
-          aria-label={`${descriptor.key} (${t("plugin.arrayHint")})`}
-          value={Array.isArray(value) ? value.join("\n") : ""}
-          onChange={(e) =>
-            onChange(
-              e.target.value
-                .split("\n")
-                .map((s) => s.trim())
-                .filter((s) => s.length > 0),
-            )
-          }
-        />
       )}
       {error && <span className="error">{error}</span>}
     </label>
@@ -216,10 +217,30 @@ export function PluginEnvelopeEditor({
   registryTypes,
   registrySchemas,
   typeLabel,
-  customConfigEditor,
+  customConfigEditors,
+  noneOption,
 }: Props) {
   const [edit, setEdit] = useState<ConfigEdit | null>(null);
   const [showRawJson, setShowRawJson] = useState(false);
+  const generation = useContext(DraftContext)?.loadGeneration ?? 0;
+  const memoryRef = useRef<{ generation: number; held: PluginMemory }>({ generation, held: {} });
+  const held = memoryAt(memoryRef.current.held, memoryRef.current.generation, generation);
+
+  const changeType = (nextType: string) => {
+    const switched = switchedConfig(held, value, nextType);
+    memoryRef.current = { generation, held: switched.memory };
+    setEdit(null);
+    setShowRawJson(false);
+    if (nextType === NONE_VALUE) {
+      noneOption?.onChoose();
+      return;
+    }
+    onChange(
+      switched.description === undefined
+        ? { type: nextType, config: switched.config }
+        : { type: nextType, config: switched.config, description: switched.description },
+    );
+  };
   const { text: configText, error: configError } = shownConfig(edit, value?.config);
 
   const commitConfig = (text: string) => {
@@ -239,8 +260,10 @@ export function PluginEnvelopeEditor({
   // (registerSubprocessHandlers), so GET /registry still lists them; the
   // picker just declines to offer them.
   const selectableTypes = registryTypes?.filter((rt) => !rt.startsWith("core."));
-  const descriptorList = registrySchemas?.[currentType];
-  const hasCustomEditor = customConfigEditor?.type === currentType;
+  // A stored type can name an `Object.prototype` member, so both reads stay on own keys.
+  const descriptorList = registrySchemas && Object.hasOwn(registrySchemas, currentType) ? registrySchemas[currentType] : undefined;
+  const customEditor = customConfigEditors && Object.hasOwn(customConfigEditors, currentType) ? customConfigEditors[currentType] : undefined;
+  const hasCustomEditor = customEditor !== undefined;
   const useCustomEditor = hasCustomEditor && !showRawJson;
   const useGeneratedForm = !useCustomEditor && descriptorList !== undefined && !showRawJson;
 
@@ -259,21 +282,16 @@ export function PluginEnvelopeEditor({
       <legend>{label}</legend>
       <label>
         {t("plugin.typeCaption")}
-        {selectableTypes ? (
-          <select
-            value={currentType}
-            onChange={(e) => {
-              setShowRawJson(false);
-              onChange({ ...value, type: e.target.value, config: value?.config ?? {} });
-            }}
-          >
-            <option value="">{t("plugin.selectType")}</option>
-            {currentType && !selectableTypes.includes(currentType) && (
+        {selectableTypes || noneOption ? (
+          <select value={noneOption && value === undefined ? NONE_VALUE : currentType} onChange={(e) => changeType(e.target.value)}>
+            {noneOption && <option value={NONE_VALUE}>{noneOption.label}</option>}
+            {(!noneOption || (value !== undefined && currentType === "")) && <option value="">{t("plugin.selectType")}</option>}
+            {currentType && !(selectableTypes ?? []).includes(currentType) && (
               <option value={currentType}>
-                {currentType} {t("plugin.unregisteredType")}
+                {selectableTypes ? `${currentType} ${t("plugin.unregisteredType")}` : typeLabel ? typeLabel(currentType) : currentType}
               </option>
             )}
-            {selectableTypes.map((rt) => (
+            {(selectableTypes ?? []).map((rt) => (
               <option key={rt} value={rt}>
                 {typeLabel ? typeLabel(rt) : rt}
               </option>
@@ -289,9 +307,9 @@ export function PluginEnvelopeEditor({
         )}
       </label>
 
-      {useCustomEditor ? (
+      {noneOption && currentType === "" ? null : useCustomEditor ? (
         <>
-          {customConfigEditor.render((value?.config as Record<string, unknown> | undefined) ?? {}, (config) => {
+          {customEditor((value?.config as Record<string, unknown> | undefined) ?? {}, (config) => {
             onChange({ ...value, type: currentType, config });
           })}
           <button type="button" className="btn btn-secondary" onClick={switchToJson}>
@@ -331,14 +349,16 @@ export function PluginEnvelopeEditor({
         </>
       )}
 
-      <label>
-        {t("plugin.descriptionCaption")}
-        <input
-          type="text"
-          value={value?.description ?? ""}
-          onChange={(e) => onChange({ ...value, type: currentType, config: value?.config ?? {}, description: e.target.value })}
-        />
-      </label>
+      {!(noneOption && currentType === "") && (
+        <label>
+          {t("plugin.descriptionCaption")}
+          <input
+            type="text"
+            value={value?.description ?? ""}
+            onChange={(e) => onChange({ ...value, type: currentType, config: value?.config ?? {}, description: e.target.value })}
+          />
+        </label>
+      )}
     </fieldset>
   );
 }

@@ -336,7 +336,7 @@ const LITERAL_RULES: readonly LiteralRule[] = [
   { match: /^pattern does not compile as a JavaScript RegExp$/, aim: patternAim },
   { match: /^outputMapping key does not resolve to a field in this process: .*$/, aim: inSection("checks.call.outputGone", "subprocess") },
   { match: /^contract\.(inputFields|outputFields) entry does not resolve to a field: .*$/, aim: inJson("checks.contract.fieldGone") },
-  { match: /^step '.*' references group '.*' via org\.group-members, but it is not in allowedGroups$/, aim: inJson("checks.assignment.group") },
+  { match: /^step '.*' references group '.*' via org\.group-members, but it is not in allowedGroups$/, aim: inSection("checks.assignment.group", "assignment") },
   { match: /^step '.*' references field '.*' via org\.actor-from-field, but it does not declare format: "person"$/, aim: inSection("checks.assignment.personField", "assignment") },
   {
     match: /^columnMapping needs a dataSource: an inline options array declares no columns$/,
@@ -556,8 +556,17 @@ function sourceName(site: Site): string {
   return typeof source?.key === "string" && source.key.trim() ? source.key : t("panelsScreen.unnamedDataSource");
 }
 
-function settle(site: Site, aim: Aim, tier: CheckAnswer["tier"]): CheckAnswer {
+/** A kind switch to a call keeps the step's `assignment`, and that step stands
+ * no Who acts section. Every who-acts check there names the JSON surface. */
+function withoutWhoActs(site: Site, aim: Aim): Aim {
   const { step } = site;
+  if (!step || sectionsFor(kindOf(step)).includes("assignment")) return aim;
+  return aim.section === "assignment" || site.names[0] === "assignment" ? inJson("checks.assignment.noSection") : aim;
+}
+
+function settle(site: Site, picked: Aim, tier: CheckAnswer["tier"]): CheckAnswer {
+  const { step } = site;
+  const aim = withoutWhoActs(site, picked);
   const section = aim.section;
   if (section !== undefined && (section === null || !step || !sectionsFor(kindOf(step)).includes(section))) return fallback(site, true);
 

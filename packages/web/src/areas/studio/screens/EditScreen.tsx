@@ -1403,6 +1403,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                 key={pageStep?.id ?? "none"}
                 fields={fields}
                 token={token}
+                processId={processId}
                 step={pageStep}
                 stepNumber={pageIndex + 1}
                 previous={walkNeighbour(pageIndex - 1)}

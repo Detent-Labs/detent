@@ -67,12 +67,13 @@ import {
 // The org-aware set (static + org.manager-of-starter), not the static-only leaf
 // factory of the same name in registry.js. This is the composition root.
 import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies.js";
-import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
+import { describeConfigSchema, isClosedConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
 import type { ZodTypeAny } from "zod";
 import type { ActorResolver } from "../auth/resolve.js";
 import type { Actor } from "../cel/eval.js";
 import { requireRole, requirePermission, can, AuthorizationError, DEVELOPER_ROLE, TEMPLATES_ROLE, AUTHOR_ROLE, ADMIN_ROLE, CREATE_ROLE } from "../auth/authorize.js";
 import { displayNamesForUserIds } from "../auth/users.js";
+import { listGroupsPermitting } from "../auth/groups.js";
 import { addAccessPrincipal, deleteAccessPrincipal, getAccessLists, processesMatchingAccessList, matchesAccessList, requireDeveloperListOrAdmin, requirePublishListAccess, type AccessKind } from "../auth/process-access.js";
 import { notFound, RequestShapeError, type HttpResult } from "./errors.js";
 import { route, readJson, parseVersion } from "./routes.js";
@@ -246,6 +247,18 @@ function draftGate(processId: string, db: SQL): (actor: Actor) => Promise<void> 
       await requireDeveloperListOrAdmin(actor, processId as ProcessId, db);
     }
   };
+}
+
+/**
+ * The groups whose scope permits the process, as `{ groupId, name }` alone, for
+ * the step page's group picker. The gate is `handleGetDraft`'s, so an author on
+ * the Developer list reads what `GET /admin/groups` keeps to operators.
+ */
+export async function handleListAssignableGroups(processId: string, req: Request, resolver: ActorResolver, db: SQL): Promise<HttpResult> {
+  return route(req, resolver, db, draftGate(processId, db), async () => {
+    if (!(await getDraft(processId as ProcessId, db))) return notFound(`no draft: ${processId}`);
+    return { status: 200, body: { groups: await listGroupsPermitting(processId, db) } };
+  });
 }
 
 /** One `GET /drafts/:processId/save-points` entry: the engine's summary plus the creating account's resolved name, `null` when no local account carries `createdBy`. */
@@ -554,6 +567,9 @@ export async function handleGetRegistry(
         actionSchemas: describeRegistry(registry),
         dataSourceSchemas: describeRegistry(dataSourceRegistry),
         assignmentStrategySchemas: describeRegistry(assignmentRegistry),
+        closedAssignmentStrategyTypes: [...assignmentRegistry]
+          .filter(([, def]) => def.configSchema !== undefined && isClosedConfigSchema(def.configSchema))
+          .map(([type]) => type),
       },
     };
   });

@@ -6,6 +6,7 @@ import type { DraftOf, Draft } from "../src/areas/studio/draft/types.js";
 import type { EditorIssue } from "../src/areas/studio/draft/issues.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import type { ValidationResult } from "../src/areas/studio/draft/validation.js";
+import type { RegistryInfo } from "../src/areas/studio/api/types.js";
 import { DraftContext, type DraftContextValue, type Mutate } from "../src/areas/studio/draft/store.js";
 import { parseChildProcessJson } from "../src/areas/studio/draft/io.js";
 import { updateInDraftArray } from "../src/areas/studio/draft/draft-array-crud.js";
@@ -52,7 +53,7 @@ function validation(issues: EditorIssue[]): ValidationResult {
   };
 }
 
-function contextValue(draft: Draft, issues: EditorIssue[]): DraftContextValue {
+function contextValue(draft: Draft, issues: EditorIssue[], registry?: RegistryInfo): DraftContextValue {
   return {
     draft,
     mutate: () => {},
@@ -60,7 +61,7 @@ function contextValue(draft: Draft, issues: EditorIssue[]): DraftContextValue {
     validation: validation(issues),
     loadedChildren: {},
     setChildForStep: () => {},
-    registry: undefined,
+    registry,
     loadedChainingTargets: {},
     contentLocale: "en",
     setContentLocale: () => {},
@@ -90,15 +91,17 @@ interface Over {
   previous?: { id: string; label: string };
   next?: { id: string; label: string };
   selectedPathId?: string;
+  registry?: RegistryInfo;
 }
 
 function render(over: Over = {}): string {
   const step = over.step ?? TASK_STEP;
   return renderToStaticMarkup(
-    <DraftContext.Provider value={contextValue(over.draft ?? draftWith(step), over.issues ?? [])}>
+    <DraftContext.Provider value={contextValue(over.draft ?? draftWith(step), over.issues ?? [], over.registry)}>
       <StepPage
         fields={over.fields ?? []}
         token="t"
+        processId="proc_x"
         step={step}
         stepNumber={over.stepNumber ?? 1}
         previous={over.previous}
@@ -289,6 +292,67 @@ describe("The step page opens on the section that needs the author", () => {
     const issues: EditorIssue[] = [{ entityType: "timer", entityId: "timer_1", message: "too long", source: "duration", loc: "" }];
 
     expect(openNames(render({ step: timed, issues }))).toEqual(["Time limit"]);
+  });
+
+  describe("reads the provider's registry on its first render", () => {
+    const REGISTRY: RegistryInfo = {
+      actionTypes: [],
+      dataSourceTypes: [],
+      assignmentStrategyTypes: ["static"],
+      actionSchemas: {},
+      dataSourceSchemas: {},
+      assignmentStrategySchemas: { static: [{ key: "candidates", kind: "string-array", required: true }] },
+      closedAssignmentStrategyTypes: [],
+    };
+    const emptied = (entry: Record<string, unknown>) =>
+      ({ ...TASK_STEP, assignment: { strategy: { type: "static", config: { candidates: [] } } }, ...entry }) as unknown as DraftStep;
+
+    it("marks an emptied list To do, with no Done mark", () => {
+      const { header } = section(render({ step: emptied({}), registry: REGISTRY }), "Who acts");
+
+      expect(header).toContain("To do");
+      expect(header).not.toContain("Done");
+    });
+
+    it("marks a filled list Done", () => {
+      const step = emptied({ assignment: { strategy: { type: "static", config: { candidates: ["requester"] } } } });
+      const { header } = section(render({ step, registry: REGISTRY }), "Who acts");
+
+      expect(header).toContain("Done");
+      expect(header).not.toContain("To do");
+    });
+
+    it("marks a person field nothing writes To do on the first render, with no Done mark", () => {
+      const step = { ...TASK_STEP, assignment: { strategy: { type: "org.actor-from-field", config: { fieldId: "field_p" } } } } as unknown as DraftStep;
+      const draft = {
+        baseLocale: "en",
+        fields: [{ id: "field_p", key: "owner", type: "string", format: "person" }],
+        workflow: { initialStep: "step_a", steps: [step] },
+      } as unknown as Draft;
+      const { header } = section(render({ step, draft, registry: REGISTRY }), "Who acts");
+
+      expect(header).toContain("To do");
+      expect(header).not.toContain("Done");
+    });
+
+    it("opens Who acts for an emptied list on an automatic step", () => {
+      const paths = [
+        { id: "path_1", to: "step_b", trigger: "automatic", priority: 1, guard: { lang: "cel", src: "data.ok" } },
+        { id: "path_2", to: "step_b", trigger: "automatic", priority: 2 },
+      ];
+      const html = render({ step: emptied({ paths }), registry: REGISTRY });
+
+      expect(openNames(html)).toEqual(["Who acts"]);
+      expect(section(html, "Who acts").header).toContain("To do");
+    });
+
+    it("opens Who acts ahead of How the case ends for an emptied list on an end step", () => {
+      const step = emptied({ terminal: true, paths: undefined });
+      const draft = { ...draftWith(step), contract: { outcomes: ["approved"] } } as unknown as Draft;
+
+      expect(openNames(render({ step, draft, registry: REGISTRY }))).toEqual(["Who acts"]);
+      expect(openNames(render({ step, draft }))).toEqual(["How the case ends"]);
+    });
   });
 
   it("opens Ways out where a way out is selected", () => {

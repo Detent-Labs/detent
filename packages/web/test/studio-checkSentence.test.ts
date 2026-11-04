@@ -7,6 +7,7 @@ import { t, type CatalogKey } from "../src/areas/studio/catalog.js";
 import { checkAnswer, checkPlace, checkSentence, literalRuleFor, type CheckPlace } from "../src/areas/studio/draft/checkSentence.js";
 import { issueText, resolveLoc } from "../src/areas/studio/draft/issues.js";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
+import { checkTarget } from "../src/areas/studio/draft/process-tabs.js";
 import { checkUnwrittenTechnicalFields, checkViewFlags } from "../src/areas/studio/draft/view-flags.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 import type { PerformedBy } from "../src/areas/studio/draft/performedBy.js";
@@ -154,9 +155,10 @@ const ROWS: readonly Row[] = [
 
   { key: "checks.assignment.unknownType", loc: "steps[0].assignment", message: "assignment strategy type 'x' is not registered", section: "assignment" },
   { key: "checks.assignment.config", loc: "steps[0].assignment.config.groupId", message: "Plugin says no", section: "assignment" },
-  { key: "checks.assignment.group", loc: "S.assignment.strategy.config.groupId", message: "step 's0' references group 'g' via org.group-members, but it is not in allowedGroups", place: "json" },
+  { key: "checks.assignment.group", loc: "S.assignment.strategy.config.groupId", message: "step 's0' references group 'g' via org.group-members, but it is not in allowedGroups", section: "assignment" },
   { key: "checks.assignment.personField", loc: "S.assignment.strategy.config.fieldId", message: "step 's0' references field 'f' via org.actor-from-field, but it does not declare format: \"person\"", section: "assignment" },
   { key: "checks.assignment.general", loc: "S.assignment.strategy", message: "Invalid input: expected object, received undefined", section: "assignment" },
+  { key: "checks.assignment.noSection", loc: "S.assignment.strategy.config", message: "Plugin says no", on: 1, place: "json" },
 
   { key: "checks.call.version", loc: "S.subprocess.pinnedVersion", message: "pinnedVersion is present iff versionBinding is 'pinned'", on: 1, section: "subprocess" },
   { key: "checks.call.outputGone", loc: "steps[1].subprocess.outputMapping", message: "outputMapping key does not resolve to a field in this process: field_x", on: 1, section: "subprocess" },
@@ -281,7 +283,7 @@ describe("checkPlace", () => {
         "checks.process.unknownEntry",
         "checks.step.reservedId",
         "checks.action.duration",
-        "checks.assignment.group",
+        "checks.assignment.noSection",
         "checks.form.tabsDeclared",
         "checks.form.tabDuplicate",
         "checks.form.group",
@@ -300,6 +302,20 @@ describe("checkPlace", () => {
       const loc = locOf(row);
       expect(`${row.key}: ${checkPlace(body, { ...resolveLoc(body, loc), loc, message: row.message })}`).toBe(`${row.key}: json`);
     }
+  });
+
+  it("sends a group outside the process's list to Who acts", () => {
+    const body = makeDraft();
+    const message = "step 's0' references group 'g' via org.group-members, but it is not in allowedGroups";
+    const loc = "workflow.steps[0].assignment.strategy.config.groupId";
+    const answer = answerFor(body, loc, message);
+    const step = body.workflow!.steps![0]!;
+    const name = (step.label as Record<string, string>).en;
+
+    expect(t("checks.assignment.group")).toBe("“{step}” names a group this process may not use. Under {section}, choose a group.");
+    expect(answer.sentence).toBe(`“${name}” names a group this process may not use. Under Who acts, choose a group.`);
+    expect(answer.place).toBe("assignment");
+    expect(checkTarget({ ...resolveLoc(body, loc), loc, message }, body)).toEqual({ tab: "steps", stepId: step.id, section: "assignment", focusId: "step-section-assignment" });
   });
 
   it("reads a `.id` location on any entity as a malformed id", () => {
@@ -376,6 +392,9 @@ describe("a section the step's kind leaves out", () => {
         const stands = sectionsFor(kind).includes(row.section);
         if (stands) {
           expect(`${row.key}: ${answer.sentence}`).toContain(t(sectionLabel(row.section, kind)));
+        } else if (row.section === "assignment") {
+          // A kind switch to a call keeps the step's `assignment`.
+          expect(`${row.key}: ${answer.key} ${answer.place}`).toBe(`${row.key}: checks.assignment.noSection json`);
         } else {
           expect(`${row.key}: ${answer.key}`).toBe(`${row.key}: checks.fallback.step`);
           expect(answer.tier).toBe(4);

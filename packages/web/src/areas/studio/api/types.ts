@@ -56,6 +56,12 @@ export interface SavePointList {
   limit: number;
 }
 
+/** Mirrors src/auth/groups.ts::AssignableGroup, the entry of `GET /drafts/:processId/assignable-groups`. */
+export interface AssignableGroup {
+  groupId: string;
+  name: string;
+}
+
 /** Mirrors src/http/studio-routes.ts::DraftListEntry, without the body. */
 export interface DraftSummary {
   processId: string;
@@ -159,6 +165,8 @@ export interface RegistryInfo {
   actionSchemas: Record<string, ConfigFieldDescriptor[]>;
   dataSourceSchemas: Record<string, ConfigFieldDescriptor[]>;
   assignmentStrategySchemas: Record<string, ConfigFieldDescriptor[]>;
+  /** Assignment strategy types whose config schema refuses an unknown key. */
+  closedAssignmentStrategyTypes: string[];
 }
 
 /** Mirrors src/runtime/api.ts::InstanceView (studio-player spec). */

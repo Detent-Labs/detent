@@ -309,16 +309,16 @@ export function checkViewFlags(body: Draft): EditorIssue[] {
  * position-unconditional — action output at any position, subprocess
  * `outputMapping`, `columnMapping`, `contract.inputFields` — mirroring the
  * pre-dominance `computeWriterSet`'s own unconditional accumulation.
- * `checkUnwrittenTechnicalFields` alone reads this (task 3.5): a
- * `technical` field's requiredness is forced engine-wide, not per-step, so
- * its "does anything write it" check stays body-wide even after
+ * `checkUnwrittenTechnicalFields` and `assignmentConfig.ts::fieldHasWriter`
+ * read this. A `technical` field's requiredness is forced engine-wide, not
+ * per-step, so its "does anything write it" check stays body-wide even after
  * `writtenFieldCounts`'s return shape became step-aware. Folding across
  * every step's dominance-scoped, own-step-reminder-timer-excluded count
  * would wrongly miss a technical field whose sole writer is a same-step
  * reminder timer: that timer's output is real (it fires and writes the
  * field every time), and the reminder-timer exclusion exists only to serve
  * the required+readonly "guaranteed before submission" rule. */
-function structuralWriterIds(body: Draft): Set<string> {
+export function structuralWriterIds(body: Draft): Set<string> {
   const steps = body.workflow?.steps ?? [];
   const written = new Set<string>();
 

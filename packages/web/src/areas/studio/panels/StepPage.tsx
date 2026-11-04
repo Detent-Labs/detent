@@ -11,13 +11,23 @@ import { useDraft } from "../draft/store";
 import { t, type CatalogKey } from "../catalog.js";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import { performedByEdit, performedByFor, performedByReach, outcomePatch, pressDecision, type PerformedBy } from "../draft/performedBy";
+import {
+  addPersonField,
+  changeStrategy,
+  clearAssignment,
+  hasBarePersonField,
+  pickGroup,
+  pickPersonField,
+  strategyWriteRoute,
+} from "../draft/assignmentWrites";
 import { assignmentWord, isCuratedAssignmentStrategy, stepKindPhrase, assignmentStrategyLabel } from "../draft/guided-labels";
 import { ActionListEditor } from "./ActionListEditor";
 import { SubprocessSpecEditor } from "./SubprocessSpecEditor";
 import { KindSwitchDialog } from "./KindSwitchDialog";
 import { RemoveStepDialog } from "./RemoveStepDialog";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
-import { useRegistry } from "./shared/useRegistry.js";
+import { FixedListEditor, GroupPicker, PersonFieldPicker } from "./WhoActsPickers.js";
+import { mintPersonField, personPickerState } from "./whoActsLogic.js";
 import { useChildInputFields } from "./shared/useChildInputFields";
 import { childVersionFor } from "../draft/subprocessSpec";
 import { PathsPanel } from "./PathsPanel";
@@ -556,6 +566,8 @@ export interface WalkNeighbour {
 interface Props {
   fields: DraftField[];
   token: string;
+  /** The process the draft belongs to; the group picker reads the groups open to it. */
+  processId: string;
   /** The step the page holds, and its 1-based place in the rail's order. */
   step: DraftStep | undefined;
   stepNumber: number;
@@ -607,6 +619,7 @@ export function ChildLoadError({ message }: { message: string }) {
 export function StepPage({
   fields,
   token,
+  processId,
   step,
   stepNumber,
   previous,
@@ -621,10 +634,9 @@ export function StepPage({
   processes,
   visible = true,
 }: Props) {
-  const { draft, mutate, validation, setChildForStep, contentLocale } = useDraft();
+  const { draft, mutate, validation, setChildForStep, contentLocale, registry } = useDraft();
   const steps = draft.workflow?.steps ?? [];
   const baseLocale = draft.baseLocale ?? "en";
-  const registry = useRegistry(token);
   const [childLoadError, setChildLoadError] = useState<string | null>(null);
   // The kind a press waits on while the dialog confirms, and the button that
   // opened it. The edit does not remount that button, so focus returns to it.
@@ -652,7 +664,17 @@ export function StepPage({
     step
       ? sections.map((section) => [
           section,
-          sectionSummary(section, { step, draft, fields, steps, processes, contentLocale, baseLocale }),
+          sectionSummary(section, {
+            step,
+            draft,
+            fields,
+            steps,
+            processes,
+            contentLocale,
+            baseLocale,
+            assignmentSchemas: registry?.assignmentStrategySchemas,
+            closedAssignmentTypes: registry?.closedAssignmentStrategyTypes,
+          }),
         ])
       : [],
   );
@@ -792,10 +814,40 @@ export function StepPage({
             <PluginEnvelopeEditor
               label={t("steps.assignmentLabel")}
               value={step.assignment?.strategy}
-              onChange={(strategy) => updateStep({ assignment: { strategy } })}
+              onChange={(strategy) => {
+                if (strategyWriteRoute(step.assignment?.strategy, strategy) === "direct") {
+                  updateStep({ assignment: { strategy } });
+                } else {
+                  mutate((d) => changeStrategy(d, step.id!, strategy));
+                }
+              }}
+              noneOption={{ label: t("assignment.none"), onChoose: () => mutate((d) => clearAssignment(d, step.id!)) }}
               registryTypes={registry?.assignmentStrategyTypes}
               registrySchemas={registry?.assignmentStrategySchemas}
               typeLabel={strategyOptionLabel}
+              customConfigEditors={{
+                static: (config, onChange) => <FixedListEditor config={config} onChange={onChange} />,
+                "org.group-members": (config) => (
+                  <GroupPicker
+                    token={token}
+                    processId={processId}
+                    held={config.groupId}
+                    allowedGroups={draft.allowedGroups}
+                    barePerson={hasBarePersonField(draft)}
+                    onPick={(groupId) => mutate((d) => pickGroup(d, step.id!, groupId))}
+                  />
+                ),
+                "org.actor-from-field": (config) => (
+                  <PersonFieldPicker
+                    state={personPickerState(draft, config.fieldId, step.id!, contentLocale, baseLocale)}
+                    onPick={(fieldId) => mutate((d) => pickPersonField(d, step.id!, fieldId))}
+                    onAdd={(name) => {
+                      const field = mintPersonField(draft, name, contentLocale, baseLocale);
+                      mutate((d) => addPersonField(d, step.id!, field));
+                    }}
+                  />
+                ),
+              }}
             />
             {showAssignmentWarning && <p {...stylex.props(styles.warning)}>{t("stepSections.noAssignmentWarning")}</p>}
           </>

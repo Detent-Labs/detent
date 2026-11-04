@@ -172,6 +172,7 @@ shipped strategies read a static list, a group, the starter's manager or a
 person field.
 
 - Paths: `src/engine/assignment-strategies.ts`, `src/auth/groups.ts`
+  (lists the groups a process may use for the studio's group picker)
 - Specs: `assignment-strategy-registry`, `group-based-assignment`,
   `manager-of-starter-assignment`, `actor-from-field-assignment`,
   `escalation-pattern`
@@ -275,6 +276,11 @@ Guided editors write conditions, validation rules, plugin config and column
 maps. Each one prints the author's words and writes the same JSON.
 
 - Paths: `packages/web/src/areas/studio/panels/shared/`
+  (`useAssignableGroups.ts` reads the route `GET /drafts/:processId/assignable-groups`),
+  `packages/web/src/areas/studio/panels/WhoActsPickers.tsx`,
+  `packages/web/src/areas/studio/panels/whoActsLogic.ts`,
+  `packages/web/src/areas/studio/draft/assignmentWrites.ts`,
+  `packages/web/src/areas/studio/draft/assignmentConfig.ts`
 - Specs: `studio-condition-builder`, `studio-field-validation-form`,
   `studio-plugin-config-form`, `studio-column-mapping-form`,
   `studio-guided-vocabulary`

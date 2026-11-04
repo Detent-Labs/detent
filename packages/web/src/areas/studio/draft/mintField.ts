@@ -37,7 +37,9 @@ export function baseTypeForPaletteKind(kind: FieldKindName): (typeof FIELD_KINDS
  * The key derives from the base-locale label and dedupes against `taken`,
  * the caller's `fieldCatalogLogic.ts::takenFieldKeys`, so a second Date mints
  * `date_2`. A later label edit compares the key with that same deduped
- * derivation (`nextFieldKey`), so the key keeps following the label.
+ * derivation (`nextFieldKey`), so the key keeps following the label. A label
+ * that derives no key, one with no Latin letter or digit, takes the key of the
+ * kind's name, and a later label edit leaves that key as it stands.
  */
 export function mintCatalogField(
   kind: FieldKindName,
@@ -47,7 +49,7 @@ export function mintCatalogField(
 ): DraftField {
   const { type, format, control } = baseTypeForPaletteKind(kind);
   const seeded = label?.[baseLocale] ? label : { ...label, [baseLocale]: fieldKindLabel(kind).name };
-  const key = dedupeKey(deriveKey(seeded[baseLocale] ?? ""), taken);
+  const key = dedupeKey(deriveKey(seeded[baseLocale] ?? "") || deriveKey(fieldKindLabel(kind).name), taken);
   const field: DraftField = { id: mintId("field"), key, label: seeded, type };
   if (format !== undefined) field.format = format;
   if (control !== undefined) field.control = control;

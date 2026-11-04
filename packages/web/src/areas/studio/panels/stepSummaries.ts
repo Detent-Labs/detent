@@ -9,7 +9,9 @@
 import type { Draft } from "../draft/types.js";
 import type { DraftStep } from "../draft/createStep.js";
 import type { DraftField } from "../draft/fields.js";
-import type { ProcessSummary } from "../api/types.js";
+import type { ProcessSummary, RegistryInfo } from "../api/types.js";
+import { personStrategyReachesNobody } from "./whoActsLogic.js";
+import { assignmentConfigHolds } from "../draft/assignmentConfig.js";
 import { performedByFor, type PerformedBy } from "../draft/performedBy.js";
 import { assignmentWord, processLabel } from "../draft/guided-labels.js";
 import { t, type CatalogKey } from "../catalog.js";
@@ -18,7 +20,9 @@ import { fill, plainStepTextMap, stepTextMap, wayOutHeading } from "./shared/opt
 import type { SectionName } from "./sectionsFor.js";
 
 /** `done`: the section holds what it asks for. `todo`: it is empty and the
- * step needs it. `optional`: it is empty and the step works without it. */
+ * step needs it, or Who acts holds a strategy whose config does not hold, on any
+ * step kind that stands the section. `optional`: it is empty and the step works
+ * without it. */
 export type SectionState = "done" | "todo" | "optional";
 
 /** One header's summary. `mono` marks a machine value, which prints in the
@@ -38,6 +42,10 @@ export interface SummaryInput {
   processes: readonly ProcessSummary[];
   contentLocale: string;
   baseLocale: string;
+  /** The registry's who-acts descriptions. Absent while it has not loaded, so a
+   * strategy then reads on its type alone. */
+  assignmentSchemas?: RegistryInfo["assignmentStrategySchemas"];
+  closedAssignmentTypes?: RegistryInfo["closedAssignmentStrategyTypes"];
 }
 
 const plain = (text: string, state: SectionState): SectionSummary => ({ text, mono: false, state });
@@ -68,7 +76,7 @@ function overrideWords(step: DraftStep, performedBy: PerformedBy): string[] {
  * (D3). A `{slot}` fills through `fill`'s replacer function, so a `$`
  * pattern in a label prints as written. */
 export function sectionSummary(section: SectionName, input: SummaryInput): SectionSummary {
-  const { step, draft, fields, steps, processes, contentLocale, baseLocale } = input;
+  const { step, draft, fields, steps, processes, contentLocale, baseLocale, assignmentSchemas, closedAssignmentTypes } = input;
   const performedBy = performedByFor(step.type, step.terminal);
   switch (section) {
     case "assignment": {
@@ -80,7 +88,13 @@ export function sectionSummary(section: SectionName, input: SummaryInput): Secti
       const paths = step.paths ?? [];
       const waitsOnPerson = paths.length === 0 || paths.some((p) => p.trigger !== "automatic");
       const needed = performedBy === "participant" && waitsOnPerson;
-      return { text: word.text, mono: word.mono, state: held ? "done" : needed ? "todo" : "optional" };
+      const holds = assignmentConfigHolds(step.assignment?.strategy, assignmentSchemas, closedAssignmentTypes);
+      const reachesNobody = personStrategyReachesNobody(draft, step.assignment?.strategy, step.id ?? "");
+      return {
+        text: word.text,
+        mono: word.mono,
+        state: held ? (holds && !reachesNobody ? "done" : "todo") : needed ? "todo" : "optional",
+      };
     }
     case "form": {
       const { fieldCount, requiredCount } = formCounts(step, fields);

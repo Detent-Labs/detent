@@ -3,7 +3,7 @@ import type { Draft } from "../src/areas/studio/draft/types.js";
 import type { DraftStep } from "../src/areas/studio/draft/createStep.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import type { ProcessSummary } from "../src/areas/studio/api/types.js";
-import type { SectionName } from "../src/areas/studio/panels/sectionsFor.js";
+import { sectionsFor, type SectionName } from "../src/areas/studio/panels/sectionsFor.js";
 import {
   defaultOpenSection,
   nextOpenSection,
@@ -35,6 +35,8 @@ function input(step: DraftStep, over: Partial<SummaryInput> = {}): SummaryInput 
     processes: over.processes ?? [],
     contentLocale: "en",
     baseLocale: "en",
+    ...(over.assignmentSchemas === undefined ? {} : { assignmentSchemas: over.assignmentSchemas }),
+    ...(over.closedAssignmentTypes === undefined ? {} : { closedAssignmentTypes: over.closedAssignmentTypes }),
   };
 }
 
@@ -243,6 +245,119 @@ describe("sectionSummary fills a slot as written", () => {
     const step = task({ paths: [{ id: "path_1", label: "Pay $& now", to: "step_b" }] });
 
     expect(sectionSummary("paths", input(step)).text).toBe("Pay $& now → Review");
+  });
+});
+
+describe("sectionSummary: Who acts reads Done only when its config holds", () => {
+  const GROUP = "org.group-members";
+  const assignmentSchemas = {
+    [GROUP]: [{ key: "groupId", kind: "string" as const, required: true }],
+    "org.manager-of-starter": [],
+    static: [{ key: "candidates", kind: "string-array" as const, required: true }],
+  };
+  const closedAssignmentTypes = [GROUP, "org.manager-of-starter"];
+  const described = { assignmentSchemas, closedAssignmentTypes };
+  const held = (type: string, config?: unknown) => ({ assignment: { strategy: { type, ...(config === undefined ? {} : { config }) } } });
+  const state = (step: DraftStep, over: Partial<SummaryInput> = described) => sectionSummary("assignment", input(step, over)).state;
+  const AUTOMATIC = [
+    { id: "path_1", label: "Approve", to: "step_b", trigger: "automatic", priority: 1, guard: { lang: "cel", src: "data.ok" } },
+    { id: "path_2", label: "Reject", to: "step_c", trigger: "automatic", priority: 2 },
+  ];
+
+  it("reads to do on an empty group", () => {
+    expect(state(task(held(GROUP, {})))).toBe("todo");
+    expect(state(task(held(GROUP, { groupId: "" })))).toBe("todo");
+  });
+
+  it("reads to do on an emptied list", () => {
+    expect(state(task(held("static", { candidates: [] })))).toBe("todo");
+  });
+
+  it("reads done on a held config", () => {
+    expect(state(task(held(GROUP, { groupId: "group_it" })))).toBe("done");
+    expect(state(task(held("static", { candidates: ["requester"] })))).toBe("done");
+    expect(state(task(held("org.manager-of-starter", {})))).toBe("done");
+  });
+
+  it("reads done on an undescribed strategy, whatever its config holds", () => {
+    expect(state(task(held("acme.round-robin", { anything: 1 })))).toBe("done");
+    expect(state(task(held("acme.round-robin", null)))).toBe("done");
+  });
+
+  it("reads done on an undescribed type with no config", () => {
+    expect(state(task(held("acme.round-robin")))).toBe("done");
+  });
+
+  it("reads to do on a null config under a description, and does not throw", () => {
+    expect(state(task(held("static", null)))).toBe("todo");
+  });
+
+  it("reads to do on a stale key, which needs no compiling draft", () => {
+    expect(state(task(held("org.manager-of-starter", { fieldId: "x" })))).toBe("todo");
+  });
+
+  it("reads to do on an emptied list on an end step", () => {
+    expect(state(end(held("static", { candidates: [] })))).toBe("todo");
+  });
+
+  it("reads to do on an emptied list on a step that never waits on a person", () => {
+    expect(state(task({ ...held("static", { candidates: [] }), paths: AUTOMATIC }))).toBe("todo");
+  });
+
+  it("reads done on its type alone while no description has loaded", () => {
+    expect(state(task(held(GROUP, {})), {})).toBe("done");
+  });
+
+  const statesOf = (step: DraftStep, sections: readonly SectionName[], over: Partial<SummaryInput>) =>
+    new Map<SectionName, SectionState>(sections.map((s) => [s, sectionSummary(s, input(step, over)).state]));
+
+  it("opens Who acts for an incomplete strategy on an automatic step", () => {
+    const step = task({ ...held("static", { candidates: [] }), paths: AUTOMATIC });
+    const sections = sectionsFor("participant");
+    const states = statesOf(step, sections, described);
+
+    expect(states.get("assignment")).toBe("todo");
+    expect(defaultOpenSection(sections, new Map(), states, undefined)).toBe("assignment");
+  });
+
+  it("opens Who acts ahead of How the case ends for an incomplete strategy on an end step", () => {
+    const step = end(held("static", { candidates: [] }));
+    const sections = sectionsFor("terminal");
+    const draft = { baseLocale: "en", contract: { outcomes: ["approved"] }, workflow: { initialStep: step.id, steps: [step] } } as unknown as Draft;
+
+    expect(defaultOpenSection(sections, new Map(), statesOf(step, sections, { ...described, draft }), undefined)).toBe("assignment");
+    expect(defaultOpenSection(sections, new Map(), statesOf(step, sections, { draft }), undefined)).toBe("howItEnds");
+  });
+});
+
+describe("sectionSummary: Who acts reads To do while the step reaches nobody", () => {
+  const FIELD = "org.actor-from-field";
+  const person = (entry: Record<string, unknown>) => ({ id: "field_p", key: "owner", type: "string", format: "person", ...entry });
+  const withFields = (step: DraftStep, fields: unknown[], over: Record<string, unknown> = {}): Partial<SummaryInput> => ({
+    draft: { baseLocale: "en", fields, workflow: { initialStep: step.id, steps: [step, REVIEW, REWORK] }, ...over } as unknown as Draft,
+  });
+  const pick = (fieldId: unknown) => task({ assignment: { strategy: { type: FIELD, config: { fieldId } } } });
+  const state = (step: DraftStep, over: Partial<SummaryInput>) => sectionSummary("assignment", input(step, over)).state;
+
+  it("reads to do on a person field nothing writes", () => {
+    const step = pick("field_p");
+    expect(state(step, withFields(step, [person({})]))).toBe("todo");
+  });
+
+  it("reads to do on a held list field", () => {
+    const step = pick("field_p");
+    expect(state(step, withFields(step, [person({ type: "list" })]))).toBe("todo");
+  });
+
+  it("reads done on a person field with a default", () => {
+    const step = pick("field_p");
+    expect(state(step, withFields(step, [person({ default: "alice" })]))).toBe("done");
+  });
+
+  it("reads done on a chosen field that is no person field", () => {
+    const step = pick("field_q");
+    expect(state(step, withFields(step, [{ id: "field_q", key: "q", type: "string" }]))).toBe("done");
+    expect(state(pick("gone"), withFields(pick("gone"), []))).toBe("done");
   });
 });
 

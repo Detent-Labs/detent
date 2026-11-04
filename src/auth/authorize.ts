@@ -42,7 +42,7 @@ export const DATALISTS_ROLE = "system:datalists";
 /** Required to write a process template (`PUT`/`DELETE /templates/:key`); reads also accept `DEVELOPER_ROLE` and `AUTHOR_ROLE`, so every author can seed a process from one. Implies nothing else: staff who curate templates must not gain the power to publish a process. */
 export const TEMPLATES_ROLE = "system:templates";
 /**
- * The no-code authoring subset of the studio surface: the four draft routes,
+ * The no-code authoring subset of the studio surface: the draft routes,
  * the publish route (beside `PUBLISH_ROLE`), `GET /registry`, the two template
  * reads and the published version body. Two routes outside the studio prefix
  * join it, because studio screens call them — the data list read (the
