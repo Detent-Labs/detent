@@ -158,6 +158,7 @@ const ROWS: readonly Row[] = [
   { key: "checks.assignment.group", loc: "S.assignment.strategy.config.groupId", message: "step 's0' references group 'g' via org.group-members, but it is not in allowedGroups", section: "assignment" },
   { key: "checks.assignment.personField", loc: "S.assignment.strategy.config.fieldId", message: "step 's0' references field 'f' via org.actor-from-field, but it does not declare format: \"person\"", section: "assignment" },
   { key: "checks.assignment.general", loc: "S.assignment.strategy", message: "Invalid input: expected object, received undefined", section: "assignment" },
+  { key: "checks.assignment.noSection", loc: "S.assignment.strategy.config", message: "Plugin says no", on: 1, place: "json" },
 
   { key: "checks.call.version", loc: "S.subprocess.pinnedVersion", message: "pinnedVersion is present iff versionBinding is 'pinned'", on: 1, section: "subprocess" },
   { key: "checks.call.outputGone", loc: "steps[1].subprocess.outputMapping", message: "outputMapping key does not resolve to a field in this process: field_x", on: 1, section: "subprocess" },
@@ -282,6 +283,7 @@ describe("checkPlace", () => {
         "checks.process.unknownEntry",
         "checks.step.reservedId",
         "checks.action.duration",
+        "checks.assignment.noSection",
         "checks.form.tabsDeclared",
         "checks.form.tabDuplicate",
         "checks.form.group",
@@ -390,6 +392,9 @@ describe("a section the step's kind leaves out", () => {
         const stands = sectionsFor(kind).includes(row.section);
         if (stands) {
           expect(`${row.key}: ${answer.sentence}`).toContain(t(sectionLabel(row.section, kind)));
+        } else if (row.section === "assignment") {
+          // A kind switch to a call keeps the step's `assignment`.
+          expect(`${row.key}: ${answer.key} ${answer.place}`).toBe(`${row.key}: checks.assignment.noSection json`);
         } else {
           expect(`${row.key}: ${answer.key}`).toBe(`${row.key}: checks.fallback.step`);
           expect(answer.tier).toBe(4);

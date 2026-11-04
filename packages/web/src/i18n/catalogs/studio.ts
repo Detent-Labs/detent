@@ -1090,6 +1090,7 @@ export const en = {
   "checks.assignment.group": "“{step}” names a group this process may not use. Under {section}, choose a group.",
   "checks.assignment.personField": "“{step}” takes its person from a field that holds no person. Under {section}, choose a person field.",
   "checks.assignment.general": "Who acts on “{step}” is not complete. Under {section}, finish it.",
+  "checks.assignment.noSection": "“{step}” still holds a who-acts setting that does not pass. Correct it in the JSON surface.",
   "checks.call.version": "“{step}” does not say which version of the process it calls. Under {section}, choose one.",
   "checks.call.outputGone": "“{step}” copies a result into a field that was removed. Under {section}, choose another.",
   "checks.call.mapping": "A value “{step}” passes to or takes from the other process cannot be read. Under {section}, correct it.",

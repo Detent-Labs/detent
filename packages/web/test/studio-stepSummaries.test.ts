@@ -3,7 +3,7 @@ import type { Draft } from "../src/areas/studio/draft/types.js";
 import type { DraftStep } from "../src/areas/studio/draft/createStep.js";
 import type { DraftField } from "../src/areas/studio/draft/fields.js";
 import type { ProcessSummary } from "../src/areas/studio/api/types.js";
-import type { SectionName } from "../src/areas/studio/panels/sectionsFor.js";
+import { sectionsFor, type SectionName } from "../src/areas/studio/panels/sectionsFor.js";
 import {
   defaultOpenSection,
   nextOpenSection,
@@ -308,13 +308,25 @@ describe("sectionSummary: Who acts reads Done only when its config holds", () =>
     expect(state(task(held(GROUP, {})), {})).toBe("done");
   });
 
+  const statesOf = (step: DraftStep, sections: readonly SectionName[], over: Partial<SummaryInput>) =>
+    new Map<SectionName, SectionState>(sections.map((s) => [s, sectionSummary(s, input(step, over)).state]));
+
   it("opens Who acts for an incomplete strategy on an automatic step", () => {
     const step = task({ ...held("static", { candidates: [] }), paths: AUTOMATIC });
-    const sections: SectionName[] = ["form", "assignment", "paths"];
-    const states = new Map<SectionName, SectionState>(sections.map((s) => [s, sectionSummary(s, input(step, described)).state]));
+    const sections = sectionsFor("participant");
+    const states = statesOf(step, sections, described);
 
     expect(states.get("assignment")).toBe("todo");
     expect(defaultOpenSection(sections, new Map(), states, undefined)).toBe("assignment");
+  });
+
+  it("opens Who acts ahead of How the case ends for an incomplete strategy on an end step", () => {
+    const step = end(held("static", { candidates: [] }));
+    const sections = sectionsFor("terminal");
+    const draft = { baseLocale: "en", contract: { outcomes: ["approved"] }, workflow: { initialStep: step.id, steps: [step] } } as unknown as Draft;
+
+    expect(defaultOpenSection(sections, new Map(), statesOf(step, sections, { ...described, draft }), undefined)).toBe("assignment");
+    expect(defaultOpenSection(sections, new Map(), statesOf(step, sections, { draft }), undefined)).toBe("howItEnds");
   });
 });
 

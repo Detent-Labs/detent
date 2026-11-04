@@ -1,13 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import { assignmentConfigGaps, assignmentConfigHolds } from "../src/areas/studio/draft/assignmentConfig.js";
-import { checkPlace } from "../src/areas/studio/draft/checkSentence.js";
-import { checkTarget } from "../src/areas/studio/draft/process-tabs.js";
+import { checkPlace, checkSentence } from "../src/areas/studio/draft/checkSentence.js";
+import { checkTarget, JSON_SURFACE_INPUT_ID } from "../src/areas/studio/draft/process-tabs.js";
 import { groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
 import { runValidation } from "../src/areas/studio/draft/validation.js";
 import { issuesBySection } from "../src/areas/studio/panels/sectionIssues.js";
 import { sectionsFor } from "../src/areas/studio/panels/sectionsFor.js";
 import type { ConfigFieldDescriptor, RegistryInfo } from "../src/areas/studio/api/types.js";
 import type { DraftStep } from "../src/areas/studio/draft/createStep.js";
+import type { IssueSource } from "../src/areas/studio/draft/issues.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 /** `studio-checks-rail`, "The studio checks a who-acts config". The fixture
@@ -244,5 +245,99 @@ describe("runValidation raises a who-acts gap", () => {
     const result = runValidation(draft(strategy(GROUP, { groupId: "group_elsewhere" })), REGISTRY, {}, {});
 
     expect(result.issues.map((i) => i.source)).toEqual(["structural"]);
+  });
+});
+
+describe("a who-acts check on a step with no Who acts section", () => {
+  const SENTENCE = "“Call” still holds a who-acts setting that does not pass. Correct it in the JSON surface.";
+  const OPENS_JSON = { tab: "checks", json: true, focusId: JSON_SURFACE_INPUT_ID } as const;
+  const callDraft = (assignment: unknown): Draft =>
+    ({
+      key: "k",
+      label: { en: "Process" },
+      baseLocale: "en",
+      fields: [{ id: "field_text", key: "text", label: { en: "Text" }, type: "string" }],
+      workflow: {
+        initialStep: STEP_A,
+        steps: [
+          {
+            id: STEP_A,
+            key: "a",
+            label: { en: "Call" },
+            type: "subprocess",
+            subprocess: { processId: "proc_child", versionBinding: "pinned", pinnedVersion: 1, inputMapping: {}, outputMapping: {} },
+            paths: [{ ...WAY, trigger: "automatic" }],
+            assignment,
+          },
+          { id: STEP_B, key: "b", label: { en: "End" }, type: "task", terminal: true },
+        ],
+      },
+    }) as unknown as Draft;
+
+  const expectOneRowOnJson = (assignment: unknown, source: IssueSource) => {
+    const body = callDraft(assignment);
+    const issues = runValidation(body, REGISTRY, {}, {}).issues;
+
+    expect(issues.map((i) => i.source)).toEqual([source]);
+    expect(issues[0]!.loc).toContain("assignment");
+    expect(issues[0]!.sentence).toBe(SENTENCE);
+    expect(checkSentence(body, issues[0]!)).toBe(SENTENCE);
+    expect(checkPlace(body, issues[0]!)).toBe("json");
+    expect(checkTarget(issues[0]!, body)).toEqual(OPENS_JSON);
+  };
+
+  it("sends a config gap to the JSON surface", () => {
+    expectOneRowOnJson(strategy(GROUP, {}), "registry");
+  });
+
+  it("sends a group outside the process's list to the JSON surface", () => {
+    expectOneRowOnJson(strategy(GROUP, { groupId: "group_elsewhere" }), "structural");
+  });
+
+  it("sends a field that holds no person to the JSON surface", () => {
+    expectOneRowOnJson(strategy(PERSON, { fieldId: "field_text" }), "structural");
+  });
+
+  it("sends a type this server does not offer to the JSON surface", () => {
+    expectOneRowOnJson(strategy("acme.gone", {}), "registry");
+  });
+
+  it("sends an incomplete assignment to the JSON surface", () => {
+    expectOneRowOnJson({}, "zod");
+  });
+
+  it("sends a config that is not an object to the JSON surface", () => {
+    expectOneRowOnJson(strategy("static", null), "zod");
+  });
+
+  const WHO_ACTS = { tab: "steps", stepId: STEP_A, section: "assignment", focusId: "step-section-assignment" } as const;
+
+  it("still lands a task step's checks on Who acts", () => {
+    for (const assignment of [strategy(GROUP, {}), strategy(GROUP, { groupId: "group_elsewhere" })]) {
+      const body = draft(assignment);
+      const issues = runValidation(body, REGISTRY, {}, {}).issues;
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0]!.sentence).not.toContain("JSON surface");
+      expect(issues[0]!.sentence).toContain("Who acts");
+      expect(checkTarget(issues[0]!, body)).toEqual(WHO_ACTS);
+    }
+  });
+
+  it("still lands an end step's checks on Who acts", () => {
+    for (const assignment of [strategy(GROUP, {}), strategy(GROUP, { groupId: "group_elsewhere" })]) {
+      const body = {
+        key: "k",
+        label: { en: "Process" },
+        baseLocale: "en",
+        fields: [],
+        workflow: { initialStep: STEP_A, steps: [{ id: STEP_A, key: "a", label: { en: "Done" }, type: "task", terminal: true, assignment }] },
+      } as unknown as Draft;
+      const issues = runValidation(body, REGISTRY, {}, {}).issues;
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0]!.sentence).not.toContain("JSON surface");
+      expect(checkTarget(issues[0]!, body)).toEqual(WHO_ACTS);
+    }
   });
 });

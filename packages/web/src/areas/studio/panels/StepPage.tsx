@@ -26,7 +26,6 @@ import { SubprocessSpecEditor } from "./SubprocessSpecEditor";
 import { KindSwitchDialog } from "./KindSwitchDialog";
 import { RemoveStepDialog } from "./RemoveStepDialog";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
-import { useRegistry } from "./shared/useRegistry.js";
 import { FixedListEditor, GroupPicker, PersonFieldPicker } from "./WhoActsPickers.js";
 import { mintPersonField, personPickerState } from "./whoActsLogic.js";
 import { useChildInputFields } from "./shared/useChildInputFields";
@@ -635,10 +634,9 @@ export function StepPage({
   processes,
   visible = true,
 }: Props) {
-  const { draft, mutate, validation, setChildForStep, contentLocale } = useDraft();
+  const { draft, mutate, validation, setChildForStep, contentLocale, registry } = useDraft();
   const steps = draft.workflow?.steps ?? [];
   const baseLocale = draft.baseLocale ?? "en";
-  const registry = useRegistry(token);
   const [childLoadError, setChildLoadError] = useState<string | null>(null);
   // The kind a press waits on while the dialog confirms, and the button that
   // opened it. The edit does not remount that button, so focus returns to it.
