@@ -450,10 +450,10 @@ word. `ROADMAP.md` carries stage-by-stage status.
   email. Building it waits on the owner's go-ahead.
 - **The hand-rolled router in `src/http/server.ts` reimplements
   `Bun.serve({ routes })`.** Finding 11 of the ponytail audit, verified at the
-  code on 2026-09-10. The `Route` type sits at `src/http/server.ts:234`, `seg`
+  code on 2026-09-10. The `Route` type sits at `src/http/server.ts:235`, `seg`
   at `:307` and `match` at `:340`. The OPTIONS branch at `:849-852` collects the
   allowed methods by filtering the same table. `Bun.serve` takes
-  `{ fetch, port, maxRequestBodySize }` at `src/http/server.ts:951`, with no
+  `{ fetch, port, maxRequestBodySize }` at `src/http/server.ts:954`, with no
   `routes` key. Two facts make the cut risky. `createServer` at `:559`
   returns the `fetch` function itself, and the test suite drives that return
   value directly. The per-request tenant resolve runs inside the dispatch
@@ -609,7 +609,7 @@ word. `ROADMAP.md` carries stage-by-stage status.
 - **`initSchema` takes no lock at startup.** `initSchema`
   (`src/engine/store.ts:76`) runs its `CREATE ... IF NOT EXISTS` statements
   with no lock, and the server calls it at startup
-  (`src/http/server.ts:940`). Two processes that start together against a
+  (`src/http/server.ts:943`). Two processes that start together against a
   new or upgraded schema can race on those statements. One process that
   finishes startup first leaves the others no table to add. The runbook's
   "Running more than one engine process" section names the workaround
@@ -653,7 +653,7 @@ build.
 - **SEC-8: attachment `contentType` is caller-supplied and echoed on
   download.** The upload schema at `src/http/routes.ts:113` constrains it to
   `MIME_TOKEN_PAIR` (`:112`), and the download handler at `:394` returns it
-  as `Content-Type` through `toBinaryResponse` (`src/http/server.ts:201`).
+  as `Content-Type` through `toBinaryResponse` (`src/http/server.ts:202`).
   Every binary response carries `X-Content-Type-Options: nosniff`, and
   `BINARY_ROUTES` gives this route `Content-Disposition: attachment`, so a
   stored `text/html` downloads rather than renders. Risk (Low): a later change that drops one of those layers turns a
@@ -664,7 +664,7 @@ build.
   layers stop a stored file from rendering, starting with the download
   route's own bearer-header requirement, so a plain link cannot open it.
   The API response carries `X-Content-Type-Options: nosniff` and
-  `Content-Disposition: attachment` (`src/http/server.ts:201-214`), guarded
+  `Content-Disposition: attachment` (`src/http/server.ts:202-215`), guarded
   by `test/http-disposition.test.ts`. The SPA fetches the file and saves it
   through `<a download>`
   (`packages/web/src/areas/app/screens/TaskScreen.tsx:404-410`) and revokes
@@ -677,7 +677,7 @@ build.
   The Pod spec `scripts/dev-pod.sh` generates sets `ALLOW_INSECURE_DEV_AUTH`
   to `"1"` and `POSTGRES_PASSWORD` to `postgres`. Both serve a disposable
   local stack, the server prints `AUTH DISABLED` at startup
-  (`src/http/server.ts:409`) whenever the first applies, and the production
+  (`src/http/server.ts:410`) whenever the first applies, and the production
   image in `deploy/engine.Dockerfile` inherits neither. Risk (Informational): a pod
   played from the generated spec outside the devcontainer runs with auth
   disabled. The review recorded it for completeness and recommends nothing.
@@ -741,7 +741,7 @@ the anchor that holds today. The owner decided the other three on
 2026-09-23. See "Decided, not yet built" and "Accepted risks" above. The
 four Low ones stay open.
 - **ARCH-2: `BINARY_ROUTES` is a hand-kept ledger.** The
-  list sits at `src/http/server.ts:273`, and `test/http-disposition.test.ts`
+  list sits at `src/http/server.ts:274`, and `test/http-disposition.test.ts`
   drives every declared entry. TEST-1 above covers the review's second
   ledger, the per-handler role checks. Risk (Low, narrowed): a binary route added and never
   declared ships without `Content-Disposition`, and no test notices. That
@@ -867,7 +867,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
 
   Resolved in part by `studio-step-accordion`: Remove this step now draws
   outlined in the accent (`btn btn-secondary btn-destructive`,
-  `packages/web/src/areas/studio/panels/StepPage.tsx:1051`) and opens
+  `packages/web/src/areas/studio/panels/StepPage.tsx:1103`) and opens
   `RemoveStepDialog` first. The field catalog's Remove field trigger stays open.
 - **A span-1 card's label collapses to zero width in a two-column form.**
   Measured at 1440x900 on the form editor canvas: `cost_center` draws eleven
@@ -909,14 +909,14 @@ recorded rather than fixed. The RAIL tags are local to this section.
     without the visible words (WCAG 2.5.3 and 1.3.1).
 - **STEP-3: three literal sizes sit off the type ramp.** The detector flagged
   them on 2026-09-14. The step page's `hint` sets written text at 0.8rem
-  (`panels/StepPage.tsx:164`). A condition row's remove glyph sets 1.1rem
+  (`panels/StepPage.tsx:174`). A condition row's remove glyph sets 1.1rem
   (`panels/shared/ConditionBuilder.tsx:150`). The header bar's name sets 1rem,
   where the Headline role asks 1.25rem (`panels/ProcessHeaderBar.tsx:60`).
   - Four more flags on the step page mark mono machine values at 0.8rem.
     The Hierarchy in `DESIGN.md` allows that size for them.
   - Risk (Low): type drifts outside the roles `DESIGN.md` names.
 - **STEP-5: a step's description takes a one-line input.** The masthead's
-  description uses `LocalizedTextInput` (`panels/StepPage.tsx:808`), which
+  description uses `LocalizedTextInput` (`panels/StepPage.tsx:860`), which
   renders an `<input>`. Measured 2026-09-24 at 1300x900, IT Offboarding's
   first step holds an 857-character description. The 944px input shows
   about a sixth of it. Risk (Low): the author edits a paragraph through a
@@ -1057,7 +1057,7 @@ of a fix. The `FIELDS-n` tags are local to this section; paths under
   counts. `checkInstanceQueryValueFromField` (`src/engine/definitions.ts:228`)
   and `validateInstanceTransitionReferences` (`:424`) reject an unresolved
   one, but only `publishBody` calls them. The studio's own checks rail,
-  `draft/validation.ts::runValidation` (`:82`), calls `validateStructure` and
+  `draft/validation.ts::runValidation` (`:84`), calls `validateStructure` and
   `validateReferences` alone, so neither check runs before publish. Risk
   (Medium): an author sees no warning from the checks rail before publish.
 - **FIELDS-18: a reused key rebinds an old expression with no message.** A
