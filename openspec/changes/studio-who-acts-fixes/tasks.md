@@ -55,12 +55,12 @@
 
 ## 9. Verification
 
-- [ ] 9.1 Run `bun run typecheck` and report the last lines. Pass: exit 0.
-- [ ] 9.2 Run `bun run build` and report the last lines. Pass: exit 0.
-- [ ] 9.3 Run the full `bun test` with `DATABASE_URL` set through `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`, in the foreground. Pass: 0 fail, and no silent-green rejection.
-- [ ] 9.4 Run `bun run lint` and `bun run e2e`. Pass: both are green.
-- [ ] 9.5 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and the same with `whitespace.sh`. Pass: both exit 0.
-- [ ] 9.6 Run the browser check on the production build, then `/impeccable critique` and `/impeccable audit`, then `impeccable detect --json`. Pass: each scenario reads as observed, and a typed second name, a strategy switch and each picker state read correctly with real keystrokes.
+- [x] 9.1 Run `bun run typecheck` and report the last lines. Pass: exit 0.
+- [x] 9.2 Run `bun run build` and report the last lines. Pass: exit 0.
+- [x] 9.3 Run the full `bun test` with `DATABASE_URL` set through `rtk test sh scripts/dev-exec.sh sh scripts/test-gated.sh bun test`, in the foreground. Pass: 0 fail, and no silent-green rejection.
+- [x] 9.4 Run `bun run lint` and `bun run e2e`. Pass: both are green.
+- [x] 9.5 On the host, run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` and the same with `whitespace.sh`. Pass: both exit 0.
+- [x] 9.6 Run the browser check on the production build, then `/impeccable critique` and `/impeccable audit`, then `impeccable detect --json`. Pass: each scenario reads as observed, and a typed second name, a strategy switch and each picker state read correctly with real keystrokes.
 
 ## Workflow follow-up
 
