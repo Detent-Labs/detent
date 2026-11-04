@@ -17,6 +17,7 @@ import type {
   MyProcessAccess,
   AccessKind,
   ProcessAccessLists,
+  AssignableGroup,
 } from "./types.js";
 import { AppClientError, createInstance, getInstanceRecord, getJson, request, submitPath } from "../../../api/client.js";
 
@@ -118,6 +119,12 @@ export async function saveDraft(processId: string, input: SaveDraftInput, token:
 /** A draft's save points, newest first, with the bound the server states. */
 export function listSavePoints(processId: string, token: string): Promise<SavePointList> {
   return getJson(`/drafts/${encodeURIComponent(processId)}/save-points`, token);
+}
+
+/** The groups whose scope permits the process, by name. An author on the Developer list may read it. */
+export async function getAssignableGroups(processId: string, token: string): Promise<AssignableGroup[]> {
+  const res = await getJson<{ groups: AssignableGroup[] }>(`/drafts/${encodeURIComponent(processId)}/assignable-groups`, token);
+  return res.groups;
 }
 
 /** `undefined` on a 409: the draft moved past `revision`. The caller reloads, as it does for `saveDraft`. */

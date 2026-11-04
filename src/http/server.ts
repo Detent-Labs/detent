@@ -105,6 +105,7 @@ import {
 import {
   handleListDrafts,
   handleGetDraft,
+  handleListAssignableGroups,
   handleSaveDraft,
   handleDeleteDraft,
   handleListSavePoints,
@@ -761,6 +762,8 @@ export function createServer(
       handler: (p, req, _c, db) => handleSaveDraft(p[0]!, req, resolver, db) },
     { method: "DELETE", segments: seg("/drafts/:processId"),
       handler: (p, req, _c, db) => handleDeleteDraft(p[0]!, req, resolver, db) },
+    { method: "GET", segments: seg("/drafts/:processId/assignable-groups"),
+      handler: (p, req, _c, db) => handleListAssignableGroups(p[0]!, req, resolver, db) },
     { method: "GET", segments: seg("/drafts/:processId/save-points"),
       handler: (p, req, _c, db) => handleListSavePoints(p[0]!, req, resolver, db) },
     { method: "POST", segments: seg("/drafts/:processId/save-points"),

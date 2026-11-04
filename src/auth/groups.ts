@@ -218,3 +218,27 @@ export function validateGroupName(value: string): GroupNameValidation {
   if (trimmed.length > GROUP_NAME_MAX_LENGTH) return { ok: false, reason: "too-long" };
   return { ok: true, name: trimmed };
 }
+
+/** A group an author may name: its id and name, with no member list and no scope. */
+export interface AssignableGroup {
+  groupId: string;
+  name: string;
+}
+
+/**
+ * Every group whose scope permits `processId`, by name. A row with a malformed
+ * scope matches neither branch and stays out, so the list can be stricter than
+ * `validateGroupScope`.
+ *
+ * ponytail: no page cursor. A deployment's group count stays small. Upgrade
+ * path: keyset-page on `(name, group_id)` as `listGroups` does.
+ */
+export async function listGroupsPermitting(processId: string, db: SQL = sql): Promise<AssignableGroup[]> {
+  const rows = (await db`
+    SELECT group_id, name FROM groups
+    WHERE scope->>'type' = 'global'
+       OR (scope->>'type' = 'processes' AND scope->'processIds' @> to_jsonb(${processId}::text))
+    ORDER BY name, group_id
+  `) as { group_id: string; name: string }[];
+  return rows.map((r) => ({ groupId: r.group_id, name: r.name }));
+}

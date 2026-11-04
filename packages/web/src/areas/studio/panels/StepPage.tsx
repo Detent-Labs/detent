@@ -556,6 +556,8 @@ export interface WalkNeighbour {
 interface Props {
   fields: DraftField[];
   token: string;
+  /** The process the draft belongs to; the group picker reads the groups open to it. */
+  processId: string;
   /** The step the page holds, and its 1-based place in the rail's order. */
   step: DraftStep | undefined;
   stepNumber: number;
@@ -607,6 +609,7 @@ export function ChildLoadError({ message }: { message: string }) {
 export function StepPage({
   fields,
   token,
+  processId: _processId,
   step,
   stepNumber,
   previous,
