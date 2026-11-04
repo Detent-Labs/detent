@@ -84,9 +84,8 @@ export function DataSourceRow({ ds, listKeys, registryTypes, registrySchemas, to
         onChange={onChange}
         registryTypes={registryTypes}
         registrySchemas={registrySchemas}
-        customConfigEditor={{
-          type: INSTANCE_QUERY_TYPE,
-          render: (config, onConfigChange) => (
+        customConfigEditors={{
+          [INSTANCE_QUERY_TYPE]: (config, onConfigChange) => (
             // Keyed by the data source, so half-typed row text never carries over to another one.
             <InstanceQueryForm key={ds.id} token={token} config={config} onChange={onConfigChange} ownFields={ownFields} />
           ),

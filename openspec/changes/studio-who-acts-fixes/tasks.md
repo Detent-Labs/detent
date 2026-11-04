@@ -10,9 +10,9 @@
 
 ## 2. A type change clears the config
 
-- [ ] 2.1 Add the per-type memory of D2 to `PluginEnvelopeEditor` through the pure `switchedConfig` and `memoryAt`, with `edit` cleared on a type change and the memory cleared when `loadGeneration` moves. Pass: `bun:test` reads those two functions for the cleared key, the kept `description`, a switch back that restores and a restore that empties the memory. It also covers a free-text position with no memory write per keystroke, which `FieldCatalogPanel` relies on. `renderToStaticMarkup` covers an action and a data source position.
-- [ ] 2.2 Rename `customConfigEditor` to `customConfigEditors` per D4 and move `DataSourcesPanel` to it. Pass: `test` and `packages/web/test` suites for the `instance.query` form stay green with no assertion weakened.
-- [ ] 2.3 Add `noneOption` per D3. Pass: `renderToStaticMarkup` covers the first option, the hidden config and Description on an empty type, a stored empty type that keeps "Nobody in particular" pickable, and an undefined `registryTypes` with `noneOption` that draws no free-text input and reads a held type through `typeLabel`. `bun:test` reads `switchedConfig` for a switch to nobody and back that restores the config and the description.
+- [x] 2.1 Add the per-type memory of D2 to `PluginEnvelopeEditor` through the pure `switchedConfig` and `memoryAt`, with `edit` cleared on a type change and the memory cleared when `loadGeneration` moves. Pass: `bun:test` reads those two functions for the cleared key, the kept `description`, a switch back that restores and a restore that empties the memory. It also covers a free-text position with no memory write per keystroke, which `FieldCatalogPanel` relies on. `renderToStaticMarkup` covers an action and a data source position.
+- [x] 2.2 Rename `customConfigEditor` to `customConfigEditors` per D4 and move `DataSourcesPanel` to it. Pass: `test` and `packages/web/test` suites for the `instance.query` form stay green with no assertion weakened.
+- [x] 2.3 Add `noneOption` per D3. Pass: `renderToStaticMarkup` covers the first option, the hidden config and Description on an empty type, a stored empty type that keeps "Nobody in particular" pickable, and an undefined `registryTypes` with `noneOption` that draws no free-text input and reads a held type through `typeLabel`. `bun:test` reads `switchedConfig` for a switch to nobody and back that restores the config and the description.
 
 ## 3. The registry names closed strategies
 
