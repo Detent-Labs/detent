@@ -19,7 +19,7 @@ studio reads it from the registry's description.
 ### Requirement: A clear rail predicts only the checks it runs
 
 A clear rail SHALL predict a clean publish only for three checks. They are registry
-type resolution, a who-acts config's required keys, value kinds and closed keys, and a
+type resolution, a who-acts config's keys and value kinds, and a
 `process.start` action's chaining-target field mapping. It SHALL predict
 nothing about a subprocess step's `inputMapping` or its child's resolvability,
 which `cross-process-validation` owns.
