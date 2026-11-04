@@ -10,7 +10,7 @@ A section is to do where it is empty and the step needs it. Those are Ways
 out and Which process it calls. Who acts counts on a task step with a manual
 way out or none. How the case ends counts where the process declares
 outcomes. Who acts also counts wherever it stands and holds a strategy whose
-config does not hold.
+config does not hold, or a person-field strategy whose field reaches nobody.
 
 #### Scenario: A check decides which section opens first
 
@@ -39,6 +39,11 @@ config does not hold.
 - **WHEN** a task step with two automatic ways out holds `{ "candidates": [] }` and no open check
 - **THEN** Who acts stands open
 - **AND** Who acts carries the To do word
+
+#### Scenario: A person field that reaches nobody opens Who acts on an end step
+
+- **WHEN** an end step holds a person-field strategy on a field nothing writes, and no open check
+- **THEN** Who acts stands open
 
 ## ADDED Requirements
 
