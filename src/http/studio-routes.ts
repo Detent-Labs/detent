@@ -67,7 +67,7 @@ import {
 // The org-aware set (static + org.manager-of-starter), not the static-only leaf
 // factory of the same name in registry.js. This is the composition root.
 import { createDefaultAssignmentRegistry } from "../engine/assignment-strategies.js";
-import { describeConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
+import { describeConfigSchema, isClosedConfigSchema, type ConfigFieldDescriptor } from "../engine/config-descriptor.js";
 import type { ZodTypeAny } from "zod";
 import type { ActorResolver } from "../auth/resolve.js";
 import type { Actor } from "../cel/eval.js";
@@ -554,6 +554,9 @@ export async function handleGetRegistry(
         actionSchemas: describeRegistry(registry),
         dataSourceSchemas: describeRegistry(dataSourceRegistry),
         assignmentStrategySchemas: describeRegistry(assignmentRegistry),
+        closedAssignmentStrategyTypes: [...assignmentRegistry]
+          .filter(([, def]) => def.configSchema !== undefined && isClosedConfigSchema(def.configSchema))
+          .map(([type]) => type),
       },
     };
   });

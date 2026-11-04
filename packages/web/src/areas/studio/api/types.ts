@@ -159,6 +159,8 @@ export interface RegistryInfo {
   actionSchemas: Record<string, ConfigFieldDescriptor[]>;
   dataSourceSchemas: Record<string, ConfigFieldDescriptor[]>;
   assignmentStrategySchemas: Record<string, ConfigFieldDescriptor[]>;
+  /** Assignment strategy types whose config schema refuses an unknown key. */
+  closedAssignmentStrategyTypes: string[];
 }
 
 /** Mirrors src/runtime/api.ts::InstanceView (studio-player spec). */

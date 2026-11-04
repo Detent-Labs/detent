@@ -217,3 +217,18 @@ export function describeConfigSchema(schema: z.ZodTypeAny, typeName: string): Co
   }
   return descriptors;
 }
+
+/**
+ * True when `schema` refuses a key it does not declare. Reads the input-side
+ * JSON Schema: the default output mode reports `additionalProperties: false`
+ * for a plain `z.object` too, which strips an unknown key instead. A schema
+ * `z.toJSONSchema` cannot convert (`z.date()` and others) reads as not closed.
+ */
+export function isClosedConfigSchema(schema: z.ZodTypeAny): boolean {
+  try {
+    const node = z.toJSONSchema(schema, { io: "input" }) as unknown as { additionalProperties?: unknown };
+    return node.additionalProperties === false;
+  } catch {
+    return false;
+  }
+}

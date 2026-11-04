@@ -16,8 +16,8 @@
 
 ## 3. The registry names closed strategies
 
-- [ ] 3.1 Add `isClosedConfigSchema` to `src/engine/config-descriptor.ts` using `{ io: "input" }` per D8, and `closedAssignmentStrategyTypes` to `handleGetRegistry`. Pass: `test/config-descriptor.test.ts` covers plain, strict, empty strict, loose, and a strict schema holding `z.date()` that reads not closed. `test/http-studio.test.ts` reads the three strict types and no `static`, and it calls `handleGetRegistry` with an assignment registry holding that `z.date()` schema and reads 200.
-- [ ] 3.2 Mirror the field in `RegistryInfo` in `api/types.ts` as required. Widen `runValidation`'s parameter per D9. Pass: `bun run typecheck` exits 0.
+- [x] 3.1 Add `isClosedConfigSchema` to `src/engine/config-descriptor.ts` using `{ io: "input" }` per D8, and `closedAssignmentStrategyTypes` to `handleGetRegistry`. Pass: `test/config-descriptor.test.ts` covers plain, strict, empty strict, loose, and a strict schema holding `z.date()` that reads not closed. `test/http-studio.test.ts` reads the three strict types and no `static`, and it calls `handleGetRegistry` with an assignment registry holding that `z.date()` schema and reads 200.
+- [x] 3.2 Mirror the field in `RegistryInfo` in `api/types.ts` as required. Widen `runValidation`'s parameter per D9. Pass: `bun run typecheck` exits 0.
 
 ## 4. The groups route
 

@@ -9,6 +9,8 @@ import { sql, createInstance } from "../src/engine/store.js";
 import { DB, initDb, authedReq } from "./helpers/http-fixture.js";
 import { clearInstanceAudit } from "./audit-cleanup.js";
 import { createRegistry, createDataSourceRegistry } from "../src/engine/registry.js";
+import { handleGetRegistry } from "../src/http/studio-routes.js";
+import { z } from "zod";
 import { createDefinitionStore, publishBody } from "../src/engine/definitions.js";
 import { INSTANCE_QUERY_DATA_SOURCE_TYPE, createInstanceQueryDataSourceHandlerDef } from "../src/engine/instance-query-source.js";
 import { migrateInstances } from "../src/engine/migration.js";
@@ -1036,6 +1038,29 @@ test.skipIf(!DB)("GET /registry carries a config-schema description only for a s
   // org.manager-of-starter declares a strict empty config: a schema with no key,
   // which is what makes any authored key a publish error.
   expect(body.assignmentStrategySchemas["org.manager-of-starter"]).toEqual([]);
+});
+
+test.skipIf(!DB)("GET /registry names the strict assignment strategies as closed and not static", async () => {
+  const res = await fetch(authedReq("http://x/registry", "GET", developer));
+  const body = (await res.json()) as { closedAssignmentStrategyTypes: string[] };
+  expect([...body.closedAssignmentStrategyTypes].sort()).toEqual(["org.actor-from-field", "org.group-members", "org.manager-of-starter"]);
+  expect(body.closedAssignmentStrategyTypes).not.toContain("static");
+});
+
+test.skipIf(!DB)("GET /registry answers 200 when a strategy schema z.toJSONSchema cannot convert", async () => {
+  const assignmentRegistry = new Map([
+    ["test.date", { resolve: async () => [], configSchema: z.strictObject({ x: z.date() }) }],
+  ]) as unknown as Parameters<typeof handleGetRegistry>[5];
+  const result = await handleGetRegistry(
+    authedReq("http://x/registry", "GET", developer),
+    devHeaderResolver,
+    reg,
+    dataSourceReg,
+    sql,
+    assignmentRegistry,
+  );
+  expect(result.status).toBe(200);
+  expect((result.body as { closedAssignmentStrategyTypes: string[] }).closedAssignmentStrategyTypes).toEqual([]);
 });
 
 test.skipIf(!DB)("GET /registry without system:developer maps to 403", async () => {

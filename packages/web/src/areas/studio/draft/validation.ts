@@ -2,6 +2,7 @@ import type { ActionId, ProcessBody } from "workflow-engine/schema";
 import { validateStructure, validateReferences } from "workflow-engine/validate";
 import { collect } from "workflow-engine/engine/registry-check";
 import { PROCESS_START_ACTION_TYPE, type RegistryDescription } from "workflow-engine/engine/registry";
+import type { RegistryInfo } from "../api/types.js";
 import type { Draft } from "./types";
 import { resolveLoc, type EditorIssue, type IssueSource } from "./issues";
 import { t } from "../catalog.js";
@@ -86,7 +87,7 @@ const EMPTY_REGISTRY_DESCRIPTION: RegistryDescription = { actionTypes: [], assig
  */
 export function runValidation(
   draft: Draft,
-  registry: RegistryDescription | undefined,
+  registry: (RegistryDescription & Partial<Pick<RegistryInfo, "assignmentStrategySchemas" | "closedAssignmentStrategyTypes">>) | undefined,
   loadedChildren: Record<string, ProcessBody>,
   loadedChainingTargets: Record<ActionId, ProcessBody>,
 ): ValidationResult {

@@ -4,7 +4,7 @@
  */
 import { test, expect } from "bun:test";
 import { z } from "zod";
-import { describeConfigSchema } from "../src/engine/config-descriptor.js";
+import { describeConfigSchema, isClosedConfigSchema } from "../src/engine/config-descriptor.js";
 import { staticAssignmentConfigSchema } from "../src/engine/registry.js";
 import { staticDataSourceConfigSchema, dbListDataSourceConfigSchema } from "../src/engine/host.js";
 import { notificationEmailConfigSchema } from "../src/handlers/notification-email.js";
@@ -207,4 +207,15 @@ test("instanceTransitionConfigSchema produces a three-string descriptor, never t
     { key: "instanceIdField", kind: "string", required: true },
     { key: "pathId", kind: "string", required: true },
   ]);
+});
+
+test("isClosedConfigSchema reads a strict object as closed and a plain or loose one as open", () => {
+  expect(isClosedConfigSchema(z.object({ a: z.string() }))).toBe(false);
+  expect(isClosedConfigSchema(z.strictObject({ a: z.string() }))).toBe(true);
+  expect(isClosedConfigSchema(z.strictObject({}))).toBe(true);
+  expect(isClosedConfigSchema(z.looseObject({ a: z.string() }))).toBe(false);
+});
+
+test("isClosedConfigSchema reads a strict schema z.toJSONSchema cannot convert as not closed", () => {
+  expect(isClosedConfigSchema(z.strictObject({ x: z.date() }))).toBe(false);
 });
