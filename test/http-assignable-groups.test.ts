@@ -98,6 +98,12 @@ test.skipIf(!DB)("200 with groupId and name alone", async () => {
   expect(Object.keys(body.groups[0]!).sort()).toEqual(["groupId", "name"]);
 });
 
+test.skipIf(!DB)("200 for an author on the process's Developer list", async () => {
+  await seedDraft("proc_ag_5");
+  await sql`INSERT INTO process_access_roles (process_id, kind, principal) VALUES (${"proc_ag_5"}, ${"developer"}, ${author.id}) ON CONFLICT DO NOTHING`;
+  expect((await get(author, "proc_ag_5")).status).toBe(200);
+});
+
 test.skipIf(!DB)("401 with no credential", async () => {
   await seedDraft("proc_ag_2");
   expect((await fetch(new Request(url("proc_ag_2")))).status).toBe(401);

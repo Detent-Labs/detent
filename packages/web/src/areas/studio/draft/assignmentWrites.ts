@@ -3,7 +3,7 @@ import { flattenDraftFields, type DraftField } from "./fields";
 
 type Step = NonNullable<NonNullable<Draft["workflow"]>["steps"]>[number];
 /** The envelope a step's `assignment.strategy` holds. */
-export type DraftStrategy = NonNullable<NonNullable<Step["assignment"]>["strategy"]>;
+type DraftStrategy = NonNullable<NonNullable<Step["assignment"]>["strategy"]>;
 
 const GROUP_TYPE = "org.group-members";
 const PERSON_TYPE = "org.actor-from-field";
@@ -18,7 +18,7 @@ function groupIdOf(strategy: DraftStrategy | undefined): string | undefined {
 }
 
 /** A bare person field declares `format: "person"` with neither `options` nor `dataSource`. */
-export function isBarePersonField(f: DraftField): boolean {
+function isBarePersonField(f: DraftField): boolean {
   return f.format === "person" && f.options === undefined && f.dataSource === undefined;
 }
 
@@ -28,7 +28,7 @@ export function hasBarePersonField(d: Draft): boolean {
 }
 
 /** Removes `groupId` from `allowedGroups` when no other step names it and no bare person field exists. An emptied list deletes the key. */
-export function dropUnreadGroup(d: Draft, stepId: string, groupId: string): void {
+function dropUnreadGroup(d: Draft, stepId: string, groupId: string): void {
   if (!d.allowedGroups) return;
   const namedElsewhere = (d.workflow?.steps ?? []).some((s) => s.id !== stepId && groupIdOf(s.assignment?.strategy) === groupId);
   if (namedElsewhere || hasBarePersonField(d)) return;
@@ -49,11 +49,7 @@ function replaceStrategy(d: Draft, stepId: string, write: (s: Step) => DraftStra
   if (!step) return;
   const old = groupIdOf(step.assignment?.strategy);
   if (old !== undefined && old !== skipDropFor) {
-    // The step no longer names `old` once replaced, so the read must exclude it.
-    const keep = step.assignment;
-    delete step.assignment;
     dropUnreadGroup(d, stepId, old);
-    if (keep) step.assignment = keep;
   }
   const next = write(step);
   const added = groupIdOf(next);

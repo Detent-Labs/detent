@@ -17,7 +17,7 @@ export interface AssignableGroups {
 const LOADING: AssignableGroups = { status: "loading", groups: [], message: "" };
 
 /** A settled read and the process it belongs to. */
-export interface AssignableGroupsResult {
+interface AssignableGroupsResult {
   forProcessId: string;
   status: "ready" | "failed";
   groups: AssignableGroup[];

@@ -159,11 +159,11 @@ describe("groupPickerState", () => {
 
   it("raises the people note only for a chosen group and a bare person field", () => {
     const chosen = groupPickerState(ready([IT]), "group_it_ops", ["group_it_ops"], true);
-    expect(chosen.kind === "picker" && chosen.peopleNote).toBe(true);
+    expect(chosen).toMatchObject({ kind: "picker", peopleNote: true });
     const noField = groupPickerState(ready([IT]), "group_it_ops", ["group_it_ops"], false);
-    expect(noField.kind === "picker" && noField.peopleNote).toBe(false);
+    expect(noField).toMatchObject({ kind: "picker", peopleNote: false });
     const unchosen = groupPickerState(ready([IT]), undefined, undefined, true);
-    expect(unchosen.kind === "picker" && unchosen.peopleNote).toBe(false);
+    expect(unchosen).toMatchObject({ kind: "picker", peopleNote: false });
   });
 });
 

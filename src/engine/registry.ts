@@ -127,9 +127,9 @@ export function createRegistry(): Registry {
  * The three type-name arrays every dimension's type-resolution half checks
  * against — the same `[...registry.keys()]` shape `GET /registry` already
  * builds (`src/http/studio-routes.ts`). The studio's `useRegistry` response
- * satisfies this structurally: its `RegistryInfo` is a six-field superset
- * carrying these same three arrays plus three schema-description records, so
- * the studio passes its own fetched response wherever a `RegistryDescription`
+ * satisfies this structurally: its `RegistryInfo` is a seven-field superset
+ * carrying these same three arrays, three schema-description records and the
+ * closed strategy types, so the studio passes its own fetched response wherever a `RegistryDescription`
  * is expected, with no shared type tying the two declarations together.
  */
 export interface RegistryDescription {

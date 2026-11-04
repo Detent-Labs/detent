@@ -98,6 +98,6 @@ A kind switch to a call keeps the step's `assignment`, and that step stands no W
 
 #### Scenario: A call step keeps a broken config
 
-- **WHEN** a step holding a group strategy with no `groupId` switches to a call to another process
+- **WHEN** a step holding a group strategy with no `groupId` switches to a call to another process and compiles
 - **THEN** the rail's row names the JSON surface
 - **AND** its Fix opens the JSON surface

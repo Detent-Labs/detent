@@ -58,6 +58,22 @@ describe("PluginEnvelopeEditor positions", () => {
     expect(html).toContain("<input");
     expect(html).not.toContain("<select");
   });
+
+  it("reads a stored type named after an Object.prototype member as an unknown type", () => {
+    for (const type of ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"]) {
+      const html = markup({
+        label: "L",
+        value: { type, config: {} },
+        onChange: noop,
+        registryTypes: ["static"],
+        registrySchemas: { static: [] },
+        customConfigEditors: { static: () => <p>custom</p> },
+      });
+      expect(html).toContain(`${type} (unregistered)`);
+      expect(html).toContain("<textarea");
+      expect(html).not.toContain("custom");
+    }
+  });
 });
 
 describe("noneOption", () => {
@@ -75,6 +91,18 @@ describe("noneOption", () => {
     expect(html).toContain("Nobody in particular");
     expect(html).toContain("-- select type --");
     expect(html).not.toContain("<textarea");
+  });
+
+  it("selects the placeholder for a stored strategy with no type key, so Nobody can still fire a change", () => {
+    const html = markup({ label: "L", value: { config: {} } as never, onChange: noop, registryTypes: ["static"], noneOption: none });
+    expect(html).toContain('<option value="" selected="">-- select type --</option>');
+    expect(html).toContain("Nobody in particular");
+    expect(html).not.toContain("<textarea");
+  });
+
+  it("draws no placeholder when no strategy is held", () => {
+    const html = markup({ label: "L", value: undefined, onChange: noop, registryTypes: ["static"], noneOption: none });
+    expect(html).not.toContain("-- select type --");
   });
 
   it("draws a select, not free text, with no registry types, and labels a held type", () => {

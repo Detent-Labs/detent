@@ -260,8 +260,9 @@ export function PluginEnvelopeEditor({
   // (registerSubprocessHandlers), so GET /registry still lists them; the
   // picker just declines to offer them.
   const selectableTypes = registryTypes?.filter((rt) => !rt.startsWith("core."));
-  const descriptorList = registrySchemas?.[currentType];
-  const customEditor = customConfigEditors?.[currentType];
+  // A stored type can name an `Object.prototype` member, so both reads stay on own keys.
+  const descriptorList = registrySchemas && Object.hasOwn(registrySchemas, currentType) ? registrySchemas[currentType] : undefined;
+  const customEditor = customConfigEditors && Object.hasOwn(customConfigEditors, currentType) ? customConfigEditors[currentType] : undefined;
   const hasCustomEditor = customEditor !== undefined;
   const useCustomEditor = hasCustomEditor && !showRawJson;
   const useGeneratedForm = !useCustomEditor && descriptorList !== undefined && !showRawJson;
@@ -284,7 +285,7 @@ export function PluginEnvelopeEditor({
         {selectableTypes || noneOption ? (
           <select value={noneOption && value === undefined ? NONE_VALUE : currentType} onChange={(e) => changeType(e.target.value)}>
             {noneOption && <option value={NONE_VALUE}>{noneOption.label}</option>}
-            {(!noneOption || value?.type === "") && <option value="">{t("plugin.selectType")}</option>}
+            {(!noneOption || (value !== undefined && currentType === "")) && <option value="">{t("plugin.selectType")}</option>}
             {currentType && !(selectableTypes ?? []).includes(currentType) && (
               <option value={currentType}>
                 {selectableTypes ? `${currentType} ${t("plugin.unregisteredType")}` : typeLabel ? typeLabel(currentType) : currentType}

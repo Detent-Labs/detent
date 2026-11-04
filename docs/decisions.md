@@ -2438,7 +2438,7 @@ waits for an owner ruling or for the change it names.
 
 ## Open from studio-who-acts-fixes (needs its own OpenSpec change)
 
-The change repaired the Who acts section and left three points to a later change.
+The change repaired the Who acts section and left four points to a later change.
 
 - **WHOACTS-1: no studio control edits `allowedGroups`.** The group picker
   keeps the list for a group step. A process with no group step has no way to
@@ -2454,6 +2454,10 @@ The change repaired the Who acts section and left three points to a later change
   has no Who acts section, and every who-acts sentence aims at the JSON
   surface. Risk (Low): a stale assignment stays on the step. Removing it on
   the switch is the cleaner end.
+- **WHOACTS-4: the unwritten-field check says nothing applies a default.**
+  `checkUnwrittenTechnicalFields` and its comment in `draft/view-flags.ts` say
+  so, while `src/runtime/instances.ts:197` does apply one. Risk (Low): a
+  defaulted technical field may read as unwritten.
 
 ## Refused simplifications (kept so the next sweep does not re-propose them)
 

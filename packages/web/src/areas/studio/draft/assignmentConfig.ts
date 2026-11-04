@@ -26,7 +26,7 @@ export function fieldHasWriter(draft: Draft, fieldId: string, stepId: string): b
 }
 
 /** What the two config readers take of a strategy. A draft holds any JSON here. */
-export interface HeldStrategy {
+interface HeldStrategy {
   type?: unknown;
   config?: unknown;
 }
@@ -64,6 +64,13 @@ function hasKind(value: unknown, field: ConfigFieldDescriptor): boolean {
  * sentences stand in a check's Developer view. A strategy with no description
  * raises nothing. An empty list and an empty string raise nothing here: the
  * server accepts the first and the compile check reports the second.
+ *
+ * ponytail: this reads the registry's field descriptions and never runs the
+ * schema, so a schema that rewrites its input (`z.coerce`, `z.catch` or
+ * `z.preprocess`) can raise a gap the server admits. The ceiling is a plugin
+ * strategy with such a schema; no strategy the engine registers has one. The
+ * upgrade is a flag on `describeConfigSchema`'s descriptor that this function
+ * skips.
  */
 export function assignmentConfigGaps(
   strategy: HeldStrategy | undefined,

@@ -67,6 +67,15 @@ describe("mintCatalogField", () => {
     expect(mintCatalogField("dateTime", { de: "" }, "en").key).toBe("date_and_time");
   });
 
+  it("falls back to the kind's name for a name with no Latin letter, and reads two such names apart", () => {
+    const first = mintCatalogField("person", { en: "田中" }, "en");
+    expect(first.label).toEqual({ en: "田中" });
+    expect(first.key).toBe("person");
+
+    const second = mintCatalogField("person", { en: "???" }, "en", new Set([first.key!]));
+    expect(second.key).toBe("person_2");
+  });
+
   it("lets a typed name take the key over from the minted one", () => {
     const draft = {
       baseLocale: "en",

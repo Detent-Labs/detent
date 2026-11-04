@@ -83,7 +83,7 @@ On the two shapes `groupScope` admits, the statement and `validateGroupScope` ag
 
 `handleListAssignableGroups` reuses `draftGate`, the gate of `handleGetDraft`. The handler answers 404 on `getDraft`, as `handleGetDraft` does. `StepPage` gains a required `processId: string` prop from `EditScreen`'s `ProcessSurface`.
 
-`useAssignableGroups` lives in `GroupPicker` and keeps the pattern of `useChildInputFields`, with no idle state and a `message` from `describeCaughtError(err)`. A pure `assignableGroupsFor(result)` holds its reading, as `childInputsFor` does. `useFetchOnce` swallows a failure and would read as loading forever.
+`useAssignableGroups` lives in `GroupPicker` and keeps the pattern of `useChildInputFields`, with no idle state and a `message` from `describeCaughtError(err)`. A pure `assignableGroupsFor(result, processId)` holds its reading, as `childInputsFor` does. `useFetchOnce` swallows a failure and would read as loading forever.
 
 Widening `GET /admin/groups` was the alternative. It would hand every member list to every author. The route returns no page cursor. A `ponytail:` comment names that ceiling: a deployment's group count stays small, and a cursor is the upgrade.
 
@@ -99,7 +99,7 @@ The check runs inside the `if (registry)` branch, which itself runs only on a co
 
 The parameter widens to `RegistryDescription & Partial<Pick<RegistryInfo, 'assignmentStrategySchemas' | 'closedAssignmentStrategyTypes'>>`, and an absent field reads as no description. The `registryConfig` dimension stays at `not-run`, since actions and data sources stay held back. An empty list and an empty string raise no gap here. The server accepts the first. The compile check already reports the second.
 
-**D10. Header state.** `SummaryInput` gains optional `assignmentSchemas` and `closedAssignmentTypes`. `StepPage` reads them from the draft context's registry, which holds from the provider's mount. The page's own `useRegistry` remounts per step and starts empty.
+**D10. Header state.** `SummaryInput` gains optional `assignmentSchemas` and `closedAssignmentTypes`. `StepPage` reads them from the draft context's registry. The provider's first render has no registry, so the page's opening on the first step after a draft opens does not read the description. The page's own `useRegistry` remounts per step and starts empty.
 
 `sectionSummary` reads `held ? (holds ? 'done' : 'todo') : needed ? 'todo' : 'optional'`, so a held but incomplete strategy reads `todo` on every step kind that stands Who acts. `defaultOpenSection` reads the same state, so that strategy opens Who acts on an automatic step or an end step, and the delta modifies the base requirement to say so.
 

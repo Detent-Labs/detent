@@ -49,7 +49,7 @@ export function shownLines(edit: LinesEdit | null, stored: unknown): string {
 }
 
 /** What one registry type last held at a position: its config and, for the none option, its description. */
-export interface HeldPlugin {
+interface HeldPlugin {
   config: Record<string, unknown>;
   description?: string;
 }

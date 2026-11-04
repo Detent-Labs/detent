@@ -7562,23 +7562,28 @@ audit` on the route.
   break and the space, and the caption reads "People or roles, one per line".
 - **A switch and back**: pick another strategy, then the fixed list again.
   Pass: the list holds `alice` and `bob` as before.
-- **Nobody and back**: pick "Nobody in particular". Pass: its description shows
-  and no config box stands. Pick the fixed list. Pass: the old list returns.
+- **Nobody and back**: on a step that does not end the process, pick "Nobody in
+  particular". Pass: the warning "Only the starter or an admin can act on it"
+  shows and no config box stands. Pick the fixed list. Pass: the old list returns.
 - **Each custom editor**: select the fixed list, a group and a field in turn.
   Pass: each shows its own picker, label above control. None prints
   `candidates`, `groupId` or `fieldId`.
 - **Edit as JSON leaves `allowedGroups` alone**: pick a group, press "Edit as
-  JSON" and change `groupId` to another id. Pass: `allowedGroups` on the
-  JSON surface keeps its entries and gains only the new id.
-- **An empty fixed list**: pick "A fixed list of people" and leave it empty.
-  Pass: the header reads To do, and Checks lists no row for it.
-- **A stale key and its Fix**: on a step with a way out, press "Edit as JSON".
-  Write a key the type does not own into the config. Pass: Checks lists a
-  row. Press its Fix. Pass: focus lands on Who acts. The JSON surface stays
-  closed.
-- **A broken assignment on a call**: switch a step that holds that broken
-  assignment to a call to another process. Pass: its row names the JSON
-  surface. Its Fix opens that surface.
+  JSON" and change `groupId` to an id off the list. Pass: `allowedGroups` on the
+  JSON surface stays as it was, and Checks shows the group row.
+- **A fixed list never typed in**: use a draft that compiles. Take a step with a
+  way out that has not held the list. Pick "A fixed list of people" and type
+  nothing. Pass: the header shows a count, and Checks lists a row for it.
+- **An empty fixed list**: pick "A fixed list of people", type a value, then
+  delete it. Pass: the header reads To do, and Checks lists no row for it.
+- **A stale key and its Fix**: take a step with a way out. Pick "The starter's
+  manager" and press "Edit as JSON". Write a key the type does not own into the
+  config. Pass: Checks lists a row. Press its Fix. Pass: focus lands on Who
+  acts, and the JSON surface stays closed.
+- **A broken assignment on a call**: take a step that holds a group off the
+  list. Switch it to a call to another process. Pass: its row names the
+  JSON surface. Its Fix opens that surface. A broken config needs more first:
+  choose the process and make the way out automatic.
 - **Add and Cancel**: under "The person a field names", press "Add a person
   field". Type a name and press Add. Pass: the field joins the picker and
   focus returns to the control. Repeat with Cancel. Pass: the picker gains no
