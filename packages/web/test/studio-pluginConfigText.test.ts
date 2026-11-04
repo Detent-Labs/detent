@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { parsedConfigBase, shownConfig, type ConfigEdit } from "../src/areas/studio/panels/shared/pluginConfigText.js";
+import { parseLines, parsedConfigBase, shownConfig, shownLines, type ConfigEdit, type LinesEdit } from "../src/areas/studio/panels/shared/pluginConfigText.js";
 
 /** `studio-plugin-config-form`: the raw JSON text follows the stored config. */
 
@@ -53,5 +53,33 @@ describe("parsedConfigBase", () => {
   it("stringifies any other parsed value as is", () => {
     expect(parsedConfigBase({ listKey: "countries" })).toBe('{"listKey":"countries"}');
     expect(parsedConfigBase([])).toBe("[]");
+  });
+});
+
+describe("shownLines", () => {
+  const typedLines = (text: string): LinesEdit => ({ text, base: JSON.stringify(parseLines(text)) });
+
+  it("keeps a trailing newline after Enter", () => {
+    expect(shownLines(typedLines("requester\n"), ["requester"])).toBe("requester\n");
+  });
+
+  it("keeps a typed space while the list holds", () => {
+    expect(shownLines(typedLines("finance "), ["finance"])).toBe("finance ");
+    expect(shownLines(typedLines("finance approver"), ["finance approver"])).toBe("finance approver");
+  });
+
+  it("keeps a trailing blank line and stores no empty value", () => {
+    const text = "a\nb\n\n";
+    expect(parseLines(text)).toEqual(["a", "b"]);
+    expect(shownLines(typedLines(text), ["a", "b"])).toBe(text);
+  });
+
+  it("replaces the text when another write changes the list", () => {
+    expect(shownLines(typedLines("a\n"), ["x", "y"])).toBe("x\ny");
+  });
+
+  it("prints the stored list with no edit, and nothing for a non-list", () => {
+    expect(shownLines(null, ["a", "b"])).toBe("a\nb");
+    expect(shownLines(null, undefined)).toBe("");
   });
 });

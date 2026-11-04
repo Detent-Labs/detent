@@ -5,6 +5,7 @@ import type { Plugin } from "workflow-engine/schema";
 import type { DraftOf } from "../../draft/types";
 import type { ConfigFieldDescriptor } from "../../api/types.js";
 import { t, type CatalogKey } from "../../catalog.js";
+import { LinesInput } from "./LinesInput.js";
 import { parsedConfigBase, shownConfig, type ConfigEdit } from "./pluginConfigText.js";
 
 const styles = stylex.create({
@@ -152,6 +153,9 @@ function GeneratedField({
     return <EnumArrayField descriptor={descriptor} value={value} onChange={onChange} />;
   }
   const error = validateField(descriptor, value);
+  if (descriptor.kind === "string-array") {
+    return <LinesInput label={descriptor.key} value={value} onChange={onChange} error={error} />;
+  }
   return (
     <label {...stylex.props(styles.pluginField)}>
       {descriptor.key}
@@ -175,21 +179,6 @@ function GeneratedField({
             </option>
           ))}
         </select>
-      )}
-      {descriptor.kind === "string-array" && (
-        <textarea
-          rows={3}
-          aria-label={`${descriptor.key} (${t("plugin.arrayHint")})`}
-          value={Array.isArray(value) ? value.join("\n") : ""}
-          onChange={(e) =>
-            onChange(
-              e.target.value
-                .split("\n")
-                .map((s) => s.trim())
-                .filter((s) => s.length > 0),
-            )
-          }
-        />
       )}
       {error && <span className="error">{error}</span>}
     </label>

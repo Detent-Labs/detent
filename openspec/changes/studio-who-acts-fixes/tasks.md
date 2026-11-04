@@ -5,8 +5,8 @@
 
 ## 1. The string list keeps its text
 
-- [ ] 1.1 Add `shownLines` to `panels/shared/pluginConfigText.ts` and a `LinesInput` component in `panels/shared/` per D1. Make it the only string-list textarea, with the rule as visible text and `aria-describedby`, and a caption that states the rule replacing the hint. Pass: `packages/web/test` covers Enter, a typed space, a trailing blank line and a write from elsewhere, and a mutation on a copy that restores the old rewrite fails a named test.
-- [ ] 1.2 Add a test reading `aria-describedby` to the visible rule; no existing test reads the old label. Pass: the test names the description target, a render with a caption holding the rule prints "one per line" once, and `git grep -n 'plugin.arrayHint' -- packages/web/src` shows it only as visible text.
+- [x] 1.1 Add `shownLines` to `panels/shared/pluginConfigText.ts` and a `LinesInput` component in `panels/shared/` per D1. Make it the only string-list textarea, with the rule as visible text and `aria-describedby`, and a caption that states the rule replacing the hint. Pass: `packages/web/test` covers Enter, a typed space, a trailing blank line and a write from elsewhere, and a mutation on a copy that restores the old rewrite fails a named test.
+- [x] 1.2 Add a test reading `aria-describedby` to the visible rule; no existing test reads the old label. Pass: the test names the description target, a render with a caption holding the rule prints "one per line" once, and `git grep -n 'plugin.arrayHint' -- packages/web/src` shows it only as visible text.
 
 ## 2. A type change clears the config
 

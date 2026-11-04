@@ -23,3 +23,27 @@ export function shownConfig(edit: ConfigEdit | null, config: unknown): { text: s
 export function parsedConfigBase(parsed: unknown): string {
   return JSON.stringify(parsed ?? {});
 }
+
+/** The text of a string-list control (`studio-plugin-config-form`, "A string
+ * list keeps the author's text"). The author's text counts only while the
+ * stored list is the one it parsed to. */
+export interface LinesEdit {
+  text: string;
+  /** `JSON.stringify` of the stored list this text parsed to. */
+  base: string;
+}
+
+/** The list one line per value holds: each line trimmed, blank lines dropped. */
+export function parseLines(text: string): string[] {
+  return text
+    .split("\n")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/** The text the string-list textarea shows for the stored list. */
+export function shownLines(edit: LinesEdit | null, stored: unknown): string {
+  const list = Array.isArray(stored) ? stored : [];
+  if (edit !== null && edit.base === JSON.stringify(list)) return edit.text;
+  return list.join("\n");
+}
