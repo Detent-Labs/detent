@@ -7589,7 +7589,7 @@ audit` on the route.
   nothing of the first. Repeat on a data source.
 - **Add and Cancel**: under "The person a field names", press "Add a person
   field". Type a name and press Add. Pass: the field joins the picker and
-  focus returns to the control. Repeat with Cancel. Pass: the picker gains no
+  focus returns to "Add a person field". Repeat with Cancel. Pass: the picker gains no
   field, and focus returns to "Add a person field".
 - **A person field nothing writes**: after "Add a person field", look at the
   header. Pass: it reads To do with no Done mark.
