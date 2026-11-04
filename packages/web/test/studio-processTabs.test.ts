@@ -118,6 +118,14 @@ describe("checkTarget", () => {
       });
     });
 
+    it("lands a group outside the process's list on Who acts with the JSON surface closed", () => {
+      const message = "step 'a' references group 'group_x' via org.group-members, but it is not in allowedGroups";
+      const target = at("step", "step_a", "workflow.steps[0].assignment.strategy.config.groupId", message);
+
+      expect(target).toEqual({ tab: "steps", stepId: "step_a", section: "assignment", focusId: sectionHeaderId("assignment") });
+      expect(target.json).toBeUndefined();
+    });
+
     it("opens More for a check on the step's key", () => {
       expect(at("step", "step_a", "workflow.steps[0].key", BUILT_IN)).toMatchObject({ stepId: "step_a", section: "more", focusId: STEP_PAGE_KEY_ID });
       expect(at("step", "step_a", "workflow.steps[0].cancellable", UNKNOWN)).toMatchObject({ stepId: "step_a", section: "more", focusId: sectionHeaderId("more") });

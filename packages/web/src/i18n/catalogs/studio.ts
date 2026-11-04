@@ -1087,7 +1087,7 @@ export const en = {
   "checks.action.general": "An action on “{step}” is not complete. Under {section}, finish it.",
   "checks.assignment.unknownType": "“{step}” uses a way to pick people that this server does not offer. Under {section}, choose another.",
   "checks.assignment.config": "The settings for who acts on “{step}” do not pass. Under {section}, correct them.",
-  "checks.assignment.group": "“{step}” names a group this process may not use. Correct it in the JSON surface.",
+  "checks.assignment.group": "“{step}” names a group this process may not use. Under {section}, choose a group.",
   "checks.assignment.personField": "“{step}” takes its person from a field that holds no person. Under {section}, choose a person field.",
   "checks.assignment.general": "Who acts on “{step}” is not complete. Under {section}, finish it.",
   "checks.call.version": "“{step}” does not say which version of the process it calls. Under {section}, choose one.",

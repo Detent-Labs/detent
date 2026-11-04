@@ -16,9 +16,11 @@ export interface CheckGroup {
    * reading follows what ran" requirement. */
   heldBack: boolean;
   /** Set on the registry group alone, always `true`: the studio holds no
-   * live plugin registry, so the config-validation half stays held back for
-   * the whole session, independent of `heldBack` — the type-resolution half
-   * can read clear or issue-carrying at the same time. */
+   * live plugin registry, so the config-validation half, who-acts config apart, stays held back
+   * for the whole session, independent of `heldBack` — the type-resolution
+   * half can read clear or issue-carrying at the same time. A who-acts config
+   * is the one position the studio checks (`assignmentConfigGaps`); actions and
+   * data sources keep this flag true. */
   registryConfigHeldBack?: boolean;
   /** Set on the structural group alone, always `true`: `checkUnknownKeys`
    * needs the raw authored body, and the studio holds only the Zod-parsed,

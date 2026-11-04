@@ -9,6 +9,7 @@ import { t } from "../catalog.js";
 import { hasNoSteps, isProcessNameGap, isStartGap } from "./startGaps";
 import { checkViewFlags, checkUnwrittenTechnicalFields } from "./view-flags";
 import { checkSentence } from "./checkSentence";
+import { assignmentConfigGaps } from "./assignmentConfig";
 
 function pushIssues(
   issues: EditorIssue[],
@@ -83,7 +84,12 @@ const EMPTY_REGISTRY_DESCRIPTION: RegistryDescription = { actionTypes: [], assig
  * "not-run" and nothing from that half reaches `issues`, even though
  * `validateReferences` itself still ran (against an empty placeholder
  * description) to produce the CEL results. The studio never holds a live
- * plugin registry, so the config-validation half always reads "not-run".
+ * plugin registry, so the config-validation half, who-acts config apart, reads "not-run".
+ *
+ * The who-acts exception is `assignmentConfigGaps`, read from the registry's
+ * description. It needs a compiled body and a loaded registry, and its issues
+ * join the registry group. `dimensions.registryConfig` stays "not-run", since
+ * actions and data sources stay held back.
  */
 export function runValidation(
   draft: Draft,
@@ -175,6 +181,12 @@ export function runValidation(
       pushIssues(issues, draft, refs.actionConfigIssues, "registry");
       pushIssues(issues, draft, refs.assignmentConfigIssues, "registry");
       pushIssues(issues, draft, refs.dataSourceConfigIssues, "registry");
+      body.workflow.steps.forEach((step, index) => {
+        const gaps = assignmentConfigGaps(step.assignment?.strategy, registry.assignmentStrategySchemas, registry.closedAssignmentStrategyTypes);
+        // `tokenize` reads a step's index only in the bracket form.
+        const loc = `workflow.steps[${index}].assignment.strategy.config`;
+        pushIssues(issues, draft, gaps.map((message) => ({ loc, message })), "registry");
+      });
     }
     pushIssues(issues, draft, refs.celIssues, "cel");
 

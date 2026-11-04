@@ -336,7 +336,7 @@ const LITERAL_RULES: readonly LiteralRule[] = [
   { match: /^pattern does not compile as a JavaScript RegExp$/, aim: patternAim },
   { match: /^outputMapping key does not resolve to a field in this process: .*$/, aim: inSection("checks.call.outputGone", "subprocess") },
   { match: /^contract\.(inputFields|outputFields) entry does not resolve to a field: .*$/, aim: inJson("checks.contract.fieldGone") },
-  { match: /^step '.*' references group '.*' via org\.group-members, but it is not in allowedGroups$/, aim: inJson("checks.assignment.group") },
+  { match: /^step '.*' references group '.*' via org\.group-members, but it is not in allowedGroups$/, aim: inSection("checks.assignment.group", "assignment") },
   { match: /^step '.*' references field '.*' via org\.actor-from-field, but it does not declare format: "person"$/, aim: inSection("checks.assignment.personField", "assignment") },
   {
     match: /^columnMapping needs a dataSource: an inline options array declares no columns$/,

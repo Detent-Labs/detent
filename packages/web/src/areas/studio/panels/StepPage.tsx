@@ -666,7 +666,17 @@ export function StepPage({
     step
       ? sections.map((section) => [
           section,
-          sectionSummary(section, { step, draft, fields, steps, processes, contentLocale, baseLocale }),
+          sectionSummary(section, {
+            step,
+            draft,
+            fields,
+            steps,
+            processes,
+            contentLocale,
+            baseLocale,
+            assignmentSchemas: registry?.assignmentStrategySchemas,
+            closedAssignmentTypes: registry?.closedAssignmentStrategyTypes,
+          }),
         ])
       : [],
   );
