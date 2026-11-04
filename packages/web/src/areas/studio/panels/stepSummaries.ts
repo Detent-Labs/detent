@@ -10,6 +10,7 @@ import type { Draft } from "../draft/types.js";
 import type { DraftStep } from "../draft/createStep.js";
 import type { DraftField } from "../draft/fields.js";
 import type { ProcessSummary, RegistryInfo } from "../api/types.js";
+import { personStrategyReachesNobody } from "./whoActsLogic.js";
 import { assignmentConfigHolds } from "../draft/assignmentConfig.js";
 import { performedByFor, type PerformedBy } from "../draft/performedBy.js";
 import { assignmentWord, processLabel } from "../draft/guided-labels.js";
@@ -88,7 +89,12 @@ export function sectionSummary(section: SectionName, input: SummaryInput): Secti
       const waitsOnPerson = paths.length === 0 || paths.some((p) => p.trigger !== "automatic");
       const needed = performedBy === "participant" && waitsOnPerson;
       const holds = assignmentConfigHolds(step.assignment?.strategy, assignmentSchemas, closedAssignmentTypes);
-      return { text: word.text, mono: word.mono, state: held ? (holds ? "done" : "todo") : needed ? "todo" : "optional" };
+      const reachesNobody = personStrategyReachesNobody(draft, step.assignment?.strategy, step.id ?? "");
+      return {
+        text: word.text,
+        mono: word.mono,
+        state: held ? (holds && !reachesNobody ? "done" : "todo") : needed ? "todo" : "optional",
+      };
     }
     case "form": {
       const { fieldCount, requiredCount } = formCounts(step, fields);

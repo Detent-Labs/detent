@@ -61,6 +61,30 @@ const isSinglePerson = (f: DraftField) => f.format === "person" && f.type !== "l
 const isPeopleList = (f: DraftField) => f.format === "person" && f.type === "list";
 
 /**
+ * Whether a chosen person field reaches nobody: a list-typed field, or a
+ * single-person field no source writes. A held id that names no person field
+ * answers `false`, since the compile check or the unchosen reading covers it.
+ */
+export function fieldReachesNobody(draft: Draft, held: unknown, stepId: string): boolean {
+  const chosen = flattenDraftFields(draft.fields).find((f) => f.id !== undefined && f.id === held);
+  if (chosen === undefined) return false;
+  if (isPeopleList(chosen)) return true;
+  return isSinglePerson(chosen) && !fieldHasWriter(draft, chosen.id as string, stepId);
+}
+
+/** Whether a held who-acts strategy is the person-field one and its field reaches nobody. */
+export function personStrategyReachesNobody(
+  draft: Draft,
+  strategy: { type?: unknown; config?: unknown } | undefined,
+  stepId: string,
+): boolean {
+  if (strategy?.type !== "org.actor-from-field") return false;
+  const config = strategy.config;
+  const held = typeof config === "object" && config !== null ? (config as Record<string, unknown>).fieldId : undefined;
+  return fieldReachesNobody(draft, held, stepId);
+}
+
+/**
  * The single-person fields by label, nested ones included. A held list field
  * joins them, marked. Any other held id reads as the placeholder, so no id
  * stands on screen.
@@ -86,7 +110,7 @@ export function personPickerState(
   if (chosen === undefined) return { value: "", options, severalNote: false, unwrittenNote: false };
   const value = chosen.id as string;
   const severalNote = isPeopleList(chosen);
-  return { value, options, severalNote, unwrittenNote: !severalNote && !fieldHasWriter(draft, value, stepId) };
+  return { value, options, severalNote, unwrittenNote: !severalNote && fieldReachesNobody(draft, value, stepId) };
 }
 
 /** Whether the inline name can add a field. */

@@ -322,6 +322,19 @@ describe("The step page opens on the section that needs the author", () => {
       expect(header).not.toContain("To do");
     });
 
+    it("marks a person field nothing writes To do on the first render, with no Done mark", () => {
+      const step = { ...TASK_STEP, assignment: { strategy: { type: "org.actor-from-field", config: { fieldId: "field_p" } } } } as unknown as DraftStep;
+      const draft = {
+        baseLocale: "en",
+        fields: [{ id: "field_p", key: "owner", type: "string", format: "person" }],
+        workflow: { initialStep: "step_a", steps: [step] },
+      } as unknown as Draft;
+      const { header } = section(render({ step, draft, registry: REGISTRY }), "Who acts");
+
+      expect(header).toContain("To do");
+      expect(header).not.toContain("Done");
+    });
+
     it("opens Who acts for an emptied list on an automatic step", () => {
       const paths = [
         { id: "path_1", to: "step_b", trigger: "automatic", priority: 1, guard: { lang: "cel", src: "data.ok" } },

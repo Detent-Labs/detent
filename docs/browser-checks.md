@@ -7588,6 +7588,8 @@ audit` on the route.
   field". Type a name and press Add. Pass: the field joins the picker and
   focus returns to the control. Repeat with Cancel. Pass: the picker gains no
   field, and focus returns to "Add a person field".
+- **A person field nothing writes**: after "Add a person field", look at the
+  header. Pass: it reads To do with no Done mark.
 - **A fresh fixed list**: add a step and pick the fixed list. Pass: the
   `required` line reads on the empty list.
 - **Styling in the unstyled envelope**: view the section at 1280px and 1440px,

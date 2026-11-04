@@ -330,6 +330,37 @@ describe("sectionSummary: Who acts reads Done only when its config holds", () =>
   });
 });
 
+describe("sectionSummary: Who acts reads To do while the step reaches nobody", () => {
+  const FIELD = "org.actor-from-field";
+  const person = (entry: Record<string, unknown>) => ({ id: "field_p", key: "owner", type: "string", format: "person", ...entry });
+  const withFields = (step: DraftStep, fields: unknown[], over: Record<string, unknown> = {}): Partial<SummaryInput> => ({
+    draft: { baseLocale: "en", fields, workflow: { initialStep: step.id, steps: [step, REVIEW, REWORK] }, ...over } as unknown as Draft,
+  });
+  const pick = (fieldId: unknown) => task({ assignment: { strategy: { type: FIELD, config: { fieldId } } } });
+  const state = (step: DraftStep, over: Partial<SummaryInput>) => sectionSummary("assignment", input(step, over)).state;
+
+  it("reads to do on a person field nothing writes", () => {
+    const step = pick("field_p");
+    expect(state(step, withFields(step, [person({})]))).toBe("todo");
+  });
+
+  it("reads to do on a held list field", () => {
+    const step = pick("field_p");
+    expect(state(step, withFields(step, [person({ type: "list" })]))).toBe("todo");
+  });
+
+  it("reads done on a person field with a default", () => {
+    const step = pick("field_p");
+    expect(state(step, withFields(step, [person({ default: "alice" })]))).toBe("done");
+  });
+
+  it("reads done on a chosen field that is no person field", () => {
+    const step = pick("field_q");
+    expect(state(step, withFields(step, [{ id: "field_q", key: "q", type: "string" }]))).toBe("done");
+    expect(state(pick("gone"), withFields(pick("gone"), []))).toBe("done");
+  });
+});
+
 describe("defaultOpenSection", () => {
   const sections: SectionName[] = ["assignment", "form", "paths", "timers", "lifecycle", "more"];
   const states = (todo: SectionName[] = []) =>
