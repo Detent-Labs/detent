@@ -7584,6 +7584,9 @@ audit` on the route.
   list. Switch it to a call to another process. Pass: its row names the
   JSON surface. Its Fix opens that surface. A broken config needs more first:
   choose the process and make the way out automatic.
+- **A type change at another position**: on an action, pick another type. Pass:
+  its config reads `{}` under Edit as JSON. Open another action. Pass: it holds
+  nothing of the first. Repeat on a data source.
 - **Add and Cancel**: under "The person a field names", press "Add a person
   field". Type a name and press Add. Pass: the field joins the picker and
   focus returns to the control. Repeat with Cancel. Pass: the picker gains no
