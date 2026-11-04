@@ -952,6 +952,21 @@ export const en = {
   // An absent assignment names no strategy at all, so it never resolves
   // through the registry.
   "assignment.none": "Nobody in particular",
+  "whoActs.listCaption": "People or roles, one per line",
+  "whoActs.groupCaption": "Group",
+  "whoActs.groupChoose": "Choose a group",
+  "whoActs.groupsLoading": "Loading groups…",
+  "whoActs.groupsEmpty": "No group is open to this process yet. An operator adds one on the admin Groups screen.",
+  "whoActs.groupNotOffered": "{id} (not offered to this process)",
+  "whoActs.groupAlsoPeople": "This process's people pickers offer this group too.",
+  "whoActs.fieldCaption": "Field that names the person",
+  "whoActs.fieldChoose": "Choose a field",
+  "whoActs.fieldSeveral": "{label} (holds several people)",
+  "whoActs.fieldSeveralNote": "A field holding several people reaches nobody. Choose one that holds one person.",
+  "whoActs.fieldUnwritten": "Nothing in this process writes this field before this step, so it reaches nobody until an earlier form asks for it.",
+  "whoActs.addField": "Add a person field",
+  "whoActs.addFieldName": "Name of the new field",
+  "whoActs.addFieldConfirm": "Add",
 
   "headerBar.unnamedProcess": "(untitled process)",
   "headerBar.nameLabel": "Process name",
@@ -1378,6 +1393,7 @@ export const en = {
   "plugin.invalidEmail": "Enter a valid email address.",
   "plugin.allowedValues": "Choose from: {values}",
   "plugin.arrayHint": "one per line",
+  "plugin.notAList": "Enter one value per line.",
 
   "migrationPlan.back": "← Back to versions",
   "migrationPlan.surfaceForm": "Mapping",

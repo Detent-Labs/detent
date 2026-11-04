@@ -11,7 +11,15 @@ import { useDraft } from "../draft/store";
 import { t, type CatalogKey } from "../catalog.js";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import { performedByEdit, performedByFor, performedByReach, outcomePatch, pressDecision, type PerformedBy } from "../draft/performedBy";
-import { changeStrategy, clearAssignment, strategyWriteRoute } from "../draft/assignmentWrites";
+import {
+  addPersonField,
+  changeStrategy,
+  clearAssignment,
+  hasBarePersonField,
+  pickGroup,
+  pickPersonField,
+  strategyWriteRoute,
+} from "../draft/assignmentWrites";
 import { assignmentWord, isCuratedAssignmentStrategy, stepKindPhrase, assignmentStrategyLabel } from "../draft/guided-labels";
 import { ActionListEditor } from "./ActionListEditor";
 import { SubprocessSpecEditor } from "./SubprocessSpecEditor";
@@ -19,6 +27,8 @@ import { KindSwitchDialog } from "./KindSwitchDialog";
 import { RemoveStepDialog } from "./RemoveStepDialog";
 import { PluginEnvelopeEditor } from "./shared/PluginEnvelopeEditor";
 import { useRegistry } from "./shared/useRegistry.js";
+import { FixedListEditor, GroupPicker, PersonFieldPicker } from "./WhoActsPickers.js";
+import { mintPersonField, personPickerState } from "./whoActsLogic.js";
 import { useChildInputFields } from "./shared/useChildInputFields";
 import { childVersionFor } from "../draft/subprocessSpec";
 import { PathsPanel } from "./PathsPanel";
@@ -610,7 +620,7 @@ export function ChildLoadError({ message }: { message: string }) {
 export function StepPage({
   fields,
   token,
-  processId: _processId,
+  processId,
   step,
   stepNumber,
   previous,
@@ -807,6 +817,29 @@ export function StepPage({
               registryTypes={registry?.assignmentStrategyTypes}
               registrySchemas={registry?.assignmentStrategySchemas}
               typeLabel={strategyOptionLabel}
+              customConfigEditors={{
+                static: (config, onChange) => <FixedListEditor config={config} onChange={onChange} />,
+                "org.group-members": (config) => (
+                  <GroupPicker
+                    token={token}
+                    processId={processId}
+                    held={config.groupId}
+                    allowedGroups={draft.allowedGroups}
+                    barePerson={hasBarePersonField(draft)}
+                    onPick={(groupId) => mutate((d) => pickGroup(d, step.id!, groupId))}
+                  />
+                ),
+                "org.actor-from-field": (config) => (
+                  <PersonFieldPicker
+                    state={personPickerState(draft, config.fieldId, step.id!, contentLocale, baseLocale)}
+                    onPick={(fieldId) => mutate((d) => pickPersonField(d, step.id!, fieldId))}
+                    onAdd={(name) => {
+                      const field = mintPersonField(draft, name, contentLocale, baseLocale);
+                      mutate((d) => addPersonField(d, step.id!, field));
+                    }}
+                  />
+                ),
+              }}
             />
             {showAssignmentWarning && <p {...stylex.props(styles.warning)}>{t("stepSections.noAssignmentWarning")}</p>}
           </>

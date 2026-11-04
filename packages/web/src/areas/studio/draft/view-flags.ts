@@ -318,7 +318,7 @@ export function checkViewFlags(body: Draft): EditorIssue[] {
  * reminder timer: that timer's output is real (it fires and writes the
  * field every time), and the reminder-timer exclusion exists only to serve
  * the required+readonly "guaranteed before submission" rule. */
-function structuralWriterIds(body: Draft): Set<string> {
+export function structuralWriterIds(body: Draft): Set<string> {
   const steps = body.workflow?.steps ?? [];
   const written = new Set<string>();
 

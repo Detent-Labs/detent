@@ -91,6 +91,7 @@ export function validateField(descriptor: ConfigFieldDescriptor, value: unknown)
   const isEmpty = value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
   if (descriptor.required && isEmpty) return t("plugin.fieldRequired");
   if (isEmpty) return undefined;
+  if (descriptor.kind === "string-array" && !Array.isArray(value)) return t("plugin.notAList");
   if (descriptor.kind === "string" && typeof value === "string") {
     if (descriptor.minLength !== undefined && value.length < descriptor.minLength) return fill("plugin.minLength", { n: descriptor.minLength });
     if (descriptor.maxLength !== undefined && value.length > descriptor.maxLength) return fill("plugin.maxLength", { n: descriptor.maxLength });
@@ -348,14 +349,14 @@ export function PluginEnvelopeEditor({
       )}
 
       {!(noneOption && currentType === "") && (
-      <label>
-        {t("plugin.descriptionCaption")}
-        <input
-          type="text"
-          value={value?.description ?? ""}
-          onChange={(e) => onChange({ ...value, type: currentType, config: value?.config ?? {}, description: e.target.value })}
-        />
-      </label>
+        <label>
+          {t("plugin.descriptionCaption")}
+          <input
+            type="text"
+            value={value?.description ?? ""}
+            onChange={(e) => onChange({ ...value, type: currentType, config: value?.config ?? {}, description: e.target.value })}
+          />
+        </label>
       )}
     </fieldset>
   );

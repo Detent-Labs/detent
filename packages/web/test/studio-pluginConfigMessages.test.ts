@@ -55,6 +55,21 @@ describe("validateField messages", () => {
     expect(message(field({ kind: "string-array", enumValues: ["$&", "b"] }), ["c"])).toBe("Choose from: $&, b");
   });
 
+  it("states the wrong kind for a string list that holds no list", () => {
+    const list = field({ kind: "string-array" });
+    expect(message(list, "alice")).toBe("Enter one value per line.");
+    expect(message(list, 7)).toBe("Enter one value per line.");
+    expect(message(list, { a: 1 })).toBe("Enter one value per line.");
+    expect(message(list, false)).toBe("Enter one value per line.");
+  });
+
+  it("keeps required and empty ahead of the wrong kind", () => {
+    expect(message(field({ kind: "string-array", required: true }), "")).toBe("required");
+    expect(message(field({ kind: "string-array" }), "")).toBeUndefined();
+    expect(message(field({ kind: "string-array" }), null)).toBeUndefined();
+    expect(message(field({ kind: "string-array" }), [])).toBeUndefined();
+  });
+
   it("says nothing for a value that holds", () => {
     expect(message(field({ minLength: 3, maxLength: 5 }), "abcd")).toBeUndefined();
   });
