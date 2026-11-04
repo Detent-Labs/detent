@@ -105,6 +105,8 @@ The parameter widens to `RegistryDescription & Partial<Pick<RegistryInfo, 'assig
 
 With no descriptor `assignmentConfigHolds` passes, whatever the config holds. A plugin strategy therefore keeps reading Done on its type. With a descriptor, a config that is not a plain object fails and never throws, since raw JSON can store `null`. The helper adds the empty-value test to D9's gaps, so an emptied list reads "To do" with no issue. `SectionMark` already prefers the count, so the open check shows first.
 
+A person-field strategy whose note says the step reaches nobody also reads `todo`. One pure function answers that for the header and for the picker's notes, so the two cannot disagree. The state raises no issue, since a publish accepts it. The owner chose this on 2026-11-04 after the critique found Done above "reaches nobody".
+
 **D11. Copy.** Each string has one catalog key in `i18n/catalogs/studio.ts`, in English only, as the studio ships.
 
 | Key | Text |

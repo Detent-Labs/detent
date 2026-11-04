@@ -46,6 +46,8 @@
 - [x] 7.3 Move `checks.assignment.group` to `inSection` and its new sentence. Pass: `packages/web/test/studio-checkSentence.test.ts` pins the sentence and the Fix target, and a Fix test lands on Who acts with the JSON surface closed. On a call step that still holds a broken `assignment`, each who-acts check reads `checks.assignment.noSection` and its Fix opens the JSON surface.
 - [x] 7.4 Update the comment on `runValidation` and the `registryConfigHeldBack` comment in `checksRail.ts`, since the studio now checks one position. Pass: `git grep -n 'config-validation half' -- packages/web/src` prints `checksRail.ts` and `validation.ts`, each naming the who-acts exception, and `ActionListEditor.tsx:106`, whose action half stays true.
 
+- [ ] 7.5 Read To do while a person-field strategy's note says the step reaches nobody, per D10. One pure function answers it for `sectionSummary` and for the picker's notes. Pass: `packages/web/test/studio-stepSummaries.test.ts` covers an unwritten field, a held list field and a written field, and a first-render `StepPage` test reads To do with no Done mark. No issue joins the Checks tab.
+
 ## 8. Docs
 
 - [x] 8.1 Update `docs/authoring-guide.md`: the fixed-list passage and its "one candidates field", the group passage on `allowedGroups`, and the person-field passage. Pass: the guide names the pickers and the prose gate reports no rise.

@@ -286,7 +286,7 @@ The section SHALL print a note under the person-field picker while no source wri
 
 ### Requirement: Who acts reads Done only when its config holds
 
-The Who acts header SHALL carry the Done mark only when the strategy names a type and its config holds. A strategy with no description in `GET /registry` SHALL read Done on its type alone. A held config missing a value SHALL read "To do" on every step kind that stands Who acts. An open check SHALL show its count instead.
+The Who acts header SHALL carry the Done mark only when the strategy names a type and its config holds. A strategy with no description in `GET /registry` SHALL read Done on its type alone. A held config missing a value SHALL read "To do" on every step kind that stands Who acts. An open check SHALL show its count instead. A person-field strategy whose note says the step reaches nobody SHALL also read "To do".
 
 #### Scenario: An empty group reads as not done
 
@@ -322,6 +322,22 @@ The Who acts header SHALL carry the Done mark only when the strategy names a typ
 #### Scenario: A held config reads Done
 
 - **WHEN** a step's group strategy names a group on the process's list
+- **THEN** the header carries the Done mark
+
+#### Scenario: A field nothing writes reads To do
+
+- **WHEN** a step's person-field strategy holds a field no source writes
+- **THEN** the header reads "To do" and has no Done mark
+- **AND** the Checks tab shows no issue for it, since a publish accepts it
+
+#### Scenario: A held list field reads To do
+
+- **WHEN** a step's person-field strategy holds a field for several people
+- **THEN** the header reads "To do" and has no Done mark
+
+#### Scenario: A written field reads Done
+
+- **WHEN** another step's form asks for the chosen single-person field
 - **THEN** the header carries the Done mark
 
 #### Scenario: A strategy with no description reads on its type
