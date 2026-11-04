@@ -11,6 +11,7 @@ import { useDraft } from "../draft/store";
 import { t, type CatalogKey } from "../catalog.js";
 import { updateInDraftArray } from "../draft/draft-array-crud";
 import { performedByEdit, performedByFor, performedByReach, outcomePatch, pressDecision, type PerformedBy } from "../draft/performedBy";
+import { changeStrategy, clearAssignment, strategyWriteRoute } from "../draft/assignmentWrites";
 import { assignmentWord, isCuratedAssignmentStrategy, stepKindPhrase, assignmentStrategyLabel } from "../draft/guided-labels";
 import { ActionListEditor } from "./ActionListEditor";
 import { SubprocessSpecEditor } from "./SubprocessSpecEditor";
@@ -795,7 +796,14 @@ export function StepPage({
             <PluginEnvelopeEditor
               label={t("steps.assignmentLabel")}
               value={step.assignment?.strategy}
-              onChange={(strategy) => updateStep({ assignment: { strategy } })}
+              onChange={(strategy) => {
+                if (strategyWriteRoute(step.assignment?.strategy, strategy) === "direct") {
+                  updateStep({ assignment: { strategy } });
+                } else {
+                  mutate((d) => changeStrategy(d, step.id!, strategy));
+                }
+              }}
+              noneOption={{ label: t("assignment.none"), onChoose: () => mutate((d) => clearAssignment(d, step.id!)) }}
               registryTypes={registry?.assignmentStrategyTypes}
               registrySchemas={registry?.assignmentStrategySchemas}
               typeLabel={strategyOptionLabel}

@@ -27,8 +27,8 @@
 
 ## 5. The who-acts writes
 
-- [ ] 5.1 Add `draft/assignmentWrites.ts` per D5 and D6. Pass: `bun:test` covers each `allowedGroups` scenario of the delta: both lists written, one entry kept once, an unread entry leaving, a second step keeping it, a nested bare person field keeping it, an emptied list deleting the key, a switch away and back rewriting the entry, and a re-pick of a held id missing from the list leaving it on the list.
-- [ ] 5.2 Route `StepPage`'s Who acts writes through it, with the routing rule of D5 in a pure function. Pass: `bun:test` reads that function: a config-only write leaves `allowedGroups` unchanged, and "Nobody in particular" removes the `assignment` key. The browser check presses Edit as JSON.
+- [x] 5.1 Add `draft/assignmentWrites.ts` per D5 and D6. Pass: `bun:test` covers each `allowedGroups` scenario of the delta: both lists written, one entry kept once, an unread entry leaving, a second step keeping it, a nested bare person field keeping it, an emptied list deleting the key, a switch away and back rewriting the entry, and a re-pick of a held id missing from the list leaving it on the list.
+- [x] 5.2 Route `StepPage`'s Who acts writes through it, with the routing rule of D5 in a pure function. Pass: `bun:test` reads that function: a config-only write leaves `allowedGroups` unchanged, and "Nobody in particular" removes the `assignment` key. The browser check presses Edit as JSON.
 
 ## 6. The pickers
 
