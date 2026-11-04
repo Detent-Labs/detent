@@ -44,7 +44,7 @@ The owner confirmed this brief on 2026-11-04.
 
 ## Decisions
 
-**D1. Text state for a string list follows the raw JSON idiom.** A new `shownLines(edit, stored)` in `pluginConfigText.ts` mirrors `shownConfig`: the text counts while the stored list is the one it parsed to. A `LinesInput` component in `panels/shared/` holds the edit state and is the only string-list textarea. The draft updates on each key, so autosave and Checks stay live. A caller's caption that states the rule replaces the hint and serves as the description target, so the fixed list prints its rule once.
+**D1. Text state for a string list follows the raw JSON idiom.** A new `shownLines(edit, stored)` in `pluginConfigText.ts` mirrors `shownConfig`: the text counts while the stored list is the one it parsed to. A `LinesInput` component in `panels/shared/` holds the edit state and is the only string-list textarea. The draft updates on each key, so autosave and Checks stay live. A caller's caption that states the rule stands as the visible label above the control. It replaces the hint and serves as the description target, so the fixed list prints its rule once.
 
 Parsing on blur was the alternative. It leaves the draft stale while the author types, and a Fix or a section change could skip the commit.
 
@@ -95,11 +95,11 @@ Widening `GET /admin/groups` was the alternative. It would hand every member lis
 
 `runValidation` pushes each as a `registry` issue at `workflow.steps[<i>].assignment.strategy.config`, so the existing `propertyRule` picks `checks.assignment.config`. `tokenize` reads only the bracket form, and a dotted index falls to the process-level fallback.
 
-The check runs inside the `if (registry)` branch, which itself runs only on a compiled body. A draft with a structural issue elsewhere therefore shows no config row yet. That gate also keeps this check and the compile checks from flagging one step twice.
+The check runs inside the `if (registry)` branch, which itself runs only on a compiled body. A draft with a structural issue elsewhere therefore shows no config row yet. That gate also keeps this check and the compile checks from flagging one step twice. A kind switch to a call keeps the step's `assignment` and leaves no Who acts section, so every who-acts sentence aims at the JSON surface on such a step. Removing `assignment` on that switch is the cleaner end, and `docs/decisions.md` records it for the second change.
 
 The parameter widens to `RegistryDescription & Partial<Pick<RegistryInfo, 'assignmentStrategySchemas' | 'closedAssignmentStrategyTypes'>>`, and an absent field reads as no description. The `registryConfig` dimension stays at `not-run`, since actions and data sources stay held back. An empty list and an empty string raise no gap here. The server accepts the first. The compile check already reports the second.
 
-**D10. Header state.** `SummaryInput` gains optional `assignmentSchemas` and `closedAssignmentTypes`.
+**D10. Header state.** `SummaryInput` gains optional `assignmentSchemas` and `closedAssignmentTypes`. `StepPage` reads them from the draft context's registry, which holds from the provider's mount. The page's own `useRegistry` remounts per step and starts empty.
 
 `sectionSummary` reads `held ? (holds ? 'done' : 'todo') : needed ? 'todo' : 'optional'`, so a held but incomplete strategy reads `todo` on every step kind that stands Who acts. `defaultOpenSection` reads the same state, so that strategy opens Who acts on an automatic step or an end step, and the delta modifies the base requirement to say so.
 
@@ -127,7 +127,7 @@ With no descriptor `assignmentConfigHolds` passes, whatever the config holds. A 
 | `whoActs.addFieldConfirm` | Add |
 | `checks.assignment.group` | “{step}” names a group this process may not use. Under {section}, choose a group. |
 
-Two strings reuse an existing key: "Nobody in particular" reads `assignment.none`, and the inline control's Cancel reads `dialog.cancel`.
+`checks.assignment.noSection` reads “{step}” still holds a who-acts setting that does not pass. Correct it in the JSON surface. Two strings reuse an existing key: "Nobody in particular" reads `assignment.none`, and the inline control's Cancel reads `dialog.cancel`.
 
 **D12. The field-written note reuses the structural writers.** `view-flags.ts` exports `structuralWriterIds`. `draft/assignmentConfig.ts` adds `fieldHasWriter(draft, fieldId, stepId)`. It counts `structuralWriterIds` over the draft with the assigned step removed, any `default`, and an entry on another step with `visible !== false` and `readonly !== true`. `applyFieldDefaults` seeds a literal and an expression alike, so both count. An entry or an action on the assigned step does not count, since the strategy reads the field at step entry, before either lands. The note stands only while the picker shows a chosen single-person field. A later step on a loop still counts, so this warns about no writer at all and proves no order. `writtenFieldCounts` is the upgrade for a stricter reading.
 

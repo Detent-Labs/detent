@@ -19,7 +19,7 @@ studio reads it from the registry's description.
 ### Requirement: A clear rail predicts only the checks it runs
 
 A clear rail SHALL predict a clean publish only for three checks. They are registry
-type resolution, a who-acts config within the registry's description, and a
+type resolution, a who-acts config's required keys, value kinds and closed keys, and a
 `process.start` action's chaining-target field mapping. It SHALL predict
 nothing about a subprocess step's `inputMapping` or its child's resolvability,
 which `cross-process-validation` owns.
@@ -91,3 +91,13 @@ The check for a group missing from `allowedGroups` SHALL read "“{step}” name
 - **WHEN** a step names a group missing from `allowedGroups` and the author presses Fix
 - **THEN** the step page opens on Who acts
 - **AND** the JSON surface stays closed
+
+### Requirement: A who-acts check on a step with no Who acts section names the JSON surface
+
+A kind switch to a call keeps the step's `assignment`, and that step stands no Who acts section. A who-acts check on such a step SHALL read "“{step}” still holds a who-acts setting that does not pass. Correct it in the JSON surface." Its Fix SHALL open the JSON surface.
+
+#### Scenario: A call step keeps a broken config
+
+- **WHEN** a step holding a group strategy with no `groupId` switches to a call to another process
+- **THEN** the rail's row names the JSON surface
+- **AND** its Fix opens the JSON surface
