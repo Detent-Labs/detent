@@ -4,17 +4,14 @@ import { computeFit, MIN_SCALE, FIT_GUTTER, type Box, type Insets, type Fit } fr
 /**
  * Where the content box lands on screen, in the element's own pixel space.
  *
- * This mirrors what the browser does with Panzoom's transform, and it is the
- * reason the assertions below read as geometry rather than as a second copy
- * of the formula: `transform: scale(s) translate(x, y)` with
- * `transform-origin: 50% 50%` maps a user-space point `p` to
- * `C + s * (p + t - C)`, where `C` is the element centre.
+ * This mirrors what the browser does with the viewport's transform, and it is
+ * the reason the assertions below read as geometry rather than as a second
+ * copy of the formula: `transform: translate(x, y) scale(s)` with
+ * `transform-origin: 0 0` maps a user-space point `p` to `t + s * p`.
  */
-function project(fit: Fit, content: Box, element: { width: number; height: number }) {
-  const cx = element.width / 2;
-  const cy = element.height / 2;
-  const left = cx + fit.scale * (content.x + fit.x - cx);
-  const top = cy + fit.scale * (content.y + fit.y - cy);
+function project(fit: Fit, content: Box, _element: { width: number; height: number }) {
+  const left = fit.x + fit.scale * content.x;
+  const top = fit.y + fit.scale * content.y;
   return { left, top, right: left + content.width * fit.scale, bottom: top + content.height * fit.scale };
 }
 
@@ -45,10 +42,10 @@ describe("canvas fit: a canvas wider than the graph", () => {
   it("keeps the scale at 1 and centres the graph in the inset area", () => {
     // Worked by hand, so a reader can check it without running anything.
     // Usable area 1168x722. Scale min(1168/660, 722/180, 1) = 1.
-    // Target centre (16 + 584, 62 + 361) = (600, 423); element centre
-    // (600, 400); content centre (330, 90).
-    // x = (600 - 600)/1 + 600 - 330 = 270
-    // y = (423 - 400)/1 + 400 -  90 = 333
+    // Target centre (16 + 584, 62 + 361) = (600, 423); content centre
+    // (330, 90).
+    // x = 600 - 1 * 330 = 270
+    // y = 423 - 1 *  90 = 333
     const fit = computeFit(GRAPH, element, INSETS);
     expect(fit.scale).toBe(1);
     expect(fit.x).toBeCloseTo(270, 6);
@@ -114,8 +111,8 @@ describe("canvas fit: the toolbar overlay", () => {
   });
 
   it("does not spend the toolbar's clearance on the bottom edge as well", () => {
-    // A symmetric inset would; this asymmetry is why the pan carries the
-    // division by the scale.
+    // A symmetric inset would, which is why the fit cannot be the SDK
+    // viewport's own `fit`: its padding is one number for every edge.
     const element = { width: 500, height: 576 };
     const fit = computeFit(GRAPH, element, INSETS);
     const box = project(fit, GRAPH, element);

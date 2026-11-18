@@ -1,7 +1,8 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
-import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
+import { announce, type ConnectMessage } from "@ui-sdk/core";
+import { usePart, usePrimitive, type PartProps, type PrimitiveHandle } from "@ui-sdk/react/primitive";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useDraft } from "../draft/store";
 import { updateInDraftArray } from "../draft/draft-array-crud";
@@ -30,6 +31,8 @@ import { toggleSelection, normalizeRect, nodesInRect } from "./selection";
 import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups";
 import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER, type Fit } from "./fit";
 import { resolveDropGesture } from "./dropGesture";
+import { checkConnection } from "./connection";
+import { canvasPrimitive } from "./canvasPrimitive";
 import {
   nodeName,
   pathName,
@@ -82,6 +85,8 @@ const DISCLOSURE_HOST = DISCLOSURE_SIZE + 2 * DISCLOSURE_OUTLINE_CLEARANCE;
  * paints centered on that edge, so the gap reads 2px. */
 const FOCUS_RING_OFFSET = 3;
 const ARROW_KEYS: ArrowKey[] = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+/** How far Shift with an arrow pans, in screen pixels. */
+const KEY_PAN = 64;
 
 const styles = stylex.create({
   wrap: {
@@ -91,13 +96,15 @@ const styles = stylex.create({
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: colors.border,
-    overflow: "hidden",
+    // `clip`, not `hidden`: a focused node out of view would otherwise scroll
+    // the frame natively, behind the viewport's back. The viewport reveals it.
+    overflow: "clip",
+    touchAction: "none",
+    userSelect: "none",
     backgroundColor: colors.surfaceMuted,
     backgroundImage: `radial-gradient(${colors.border} 1px, transparent 1px)`,
-    // paintGrid() writes these two custom properties via style.setProperty()
-    // inside the same useLayoutEffect that mounts Panzoom, which always runs
-    // before the browser's first paint — so no fallback declaration for
-    // either property is reachable and none is declared here.
+    // The canvas primitive's root writes these three custom properties from
+    // the viewport, on bind, before the first paint.
     backgroundSize: "var(--canvas-grid-size) var(--canvas-grid-size)",
     backgroundPosition: "var(--canvas-grid-offset-x) var(--canvas-grid-offset-y)",
   },
@@ -297,6 +304,18 @@ const styles = stylex.create({
   edgeDragging: {
     stroke: colors.accent,
     strokeDasharray: "3 3",
+  },
+  // A connection's target: the step the line would reach on release or Enter.
+  connectTarget: {
+    fill: "none",
+    stroke: colors.accent,
+    strokeWidth: 2,
+    pointerEvents: "none",
+  },
+  // A step's target end for the SDK. It reads the box; nothing paints it.
+  inPort: {
+    fill: "none",
+    pointerEvents: "none",
   },
   // Was `.canvas-edge-group-selected .canvas-edge`. `isSelected` is already
   // in scope where the edge `<path>` renders, so this composes directly off
@@ -608,7 +627,7 @@ function EdgeLabel({
       y={box.y + box.height / 2 - SENTENCE_HOST_HEIGHT / 2}
       width={box.width}
       height={SENTENCE_HOST_HEIGHT}
-      className={`panzoom-exclude ${stylex.props(styles.edgeLabelHost).className}`}
+      {...stylex.props(styles.edgeLabelHost)}
       data-path-id={pathId}
       data-step-id={pathId !== undefined ? stepId : undefined}
     >
@@ -637,6 +656,70 @@ function EdgeLabel({
         </div>
       </div>
     </foreignObject>
+  );
+}
+
+/** The canvas frame: the primitive's root, which clips, paints the grid and
+ * takes the pan and wheel gestures. */
+function CanvasRoot({ handle, ...props }: { handle: PrimitiveHandle<typeof canvasPrimitive> } & PartProps<"div">) {
+  return usePart(handle, "root", {}, props, "div");
+}
+
+/** The `<svg>` the viewport's one transform moves. */
+function CanvasWorld(props: PartProps<"svg">) {
+  return usePart(canvasPrimitive, "world", {}, props, "svg");
+}
+
+/** A step's source end: the connect handle's hit circle. */
+function OutPort({ value, ...props }: { value: string } & PartProps<"circle">) {
+  return usePart(canvasPrimitive, "port", { value }, props, "circle");
+}
+
+/** A step's target end: an unpainted box over the node. */
+function InPort({ value, ...props }: { value: string } & PartProps<"rect">) {
+  return usePart(canvasPrimitive, "port", { value }, props, "rect");
+}
+
+/** The line a connection draws while it is under way, and the ring on the
+ * step it would reach. Present only while the SDK holds a draft. */
+function ConnectDraftLine({
+  anchor,
+  nodeAt,
+  stepOf,
+}: {
+  anchor: (stepId: string) => Point;
+  nodeAt: (stepId: string) => Point;
+  stepOf: (key: string) => string;
+}) {
+  return usePart(
+    canvasPrimitive,
+    "draft",
+    {},
+    {
+      "aria-hidden": "true",
+      children: ({ draft }) => {
+        if (!draft) return null;
+        const start = anchor(stepOf(draft.from));
+        const target = draft.to !== null ? nodeAt(stepOf(draft.to)) : undefined;
+        return (
+          <>
+            <line x1={start.x} y1={start.y} x2={draft.x} y2={draft.y} {...stylex.props(styles.edge, styles.edgeDragging)} />
+            {target && (
+              <rect
+                x={target.x - FOCUS_RING_OFFSET}
+                y={target.y - FOCUS_RING_OFFSET}
+                width={NODE_WIDTH + FOCUS_RING_OFFSET * 2}
+                height={NODE_HEIGHT + FOCUS_RING_OFFSET * 2}
+                rx={0}
+                {...stylex.props(styles.connectTarget)}
+                vectorEffect="non-scaling-stroke"
+              />
+            )}
+          </>
+        );
+      },
+    },
+    "g",
   );
 }
 
@@ -670,7 +753,6 @@ export function CanvasView({
   const baseLocale = draft.baseLocale ?? "en";
 
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const panzoomRef = useRef<PanzoomObject | null>(null);
   // The toolbar overlays the canvas, so `fitToView` measures it rather than
   // framing content underneath it.
   const toolbarRef = useRef<HTMLDivElement | null>(null);
@@ -680,23 +762,21 @@ export function CanvasView({
   // once the first step lands.
   const hasFitOnLoad = useRef(false);
 
-  // Shared by the initial `Panzoom()` construction below and by `fitToView`
-  // itself: both need the same scale/pan for the same content, measured the
-  // same way.
+  // Read by `fitToView`, on open and on demand.
   const measureFit = (svg: SVGSVGElement): Fit => {
     // `getBBox()` reports what the canvas actually draws, in user space and
-    // free of Panzoom's transform. That covers the start arrow and start
+    // free of the viewport's transform. That covers the start arrow and start
     // stamp beside the initial step, and the terminal stamp above a
     // terminal step — none of which the node rectangles contain.
     const content = svg.getBBox();
 
-    // `clientWidth`/`clientHeight`, never `getBoundingClientRect()`: Panzoom
-    // transforms this same element, so a client rect shrinks with the zoom
+    // `clientWidth`/`clientHeight`, never `getBoundingClientRect()`: the
+    // viewport transforms this same element, so a client rect shrinks with the zoom
     // and a second fit would frame a smaller canvas than the first.
     //
     // Two properties of `.canvas-svg` and `.canvas-wrap` make these two the
     // right reading, and a change to either would break this silently:
-    //   - `.canvas-wrap` is `overflow: hidden`. A transform can otherwise
+    //   - `.canvas-wrap` is `overflow: clip`. A transform can otherwise
     //     grow an ancestor's scrollable overflow, and a classic scrollbar
     //     appearing re-lays out a `width: 100%` child, which would feed the
     //     zoom back into the measurement after all.
@@ -722,92 +802,23 @@ export function CanvasView({
     return computeFit(content, element, { top: toolbarBottom + FIT_GUTTER, right: FIT_GUTTER, bottom: FIT_GUTTER, left: FIT_GUTTER });
   };
 
-  // Layout, not passive: the auto-fit effect below reads `panzoomRef` and
-  // must find it already set. React always runs every layout effect before
-  // any passive effect on mount, so that ordering holds only because this
-  // effect is a layout effect too — a passive one here would still run
-  // after the auto-fit effect's own useLayoutEffect and leave it reading a
-  // null ref on the one render that matters.
-  useLayoutEffect(() => {
-    if (!svgRef.current) return;
-    const el = svgRef.current;
-    const wrap = el.parentElement;
-    // Panzoom's own down-handler binds to `.canvas-wrap` (`canvas: true`),
-    // not to `el`: a non-identity transform moves `el`'s own hit-testable
-    // box away from the visible canvas, while `.canvas-wrap` never
-    // transforms and always covers it (design.md - Decisions). Native
-    // addEventListener there runs and calls stopPropagation() *before*
-    // React's synthetic event system — bound higher up the tree — ever sees
-    // the event, so a React-level e.stopPropagation() inside a node/handle
-    // handler is too late to stop it. `panzoom-exclude` (its own default
-    // exclude class) is the sanctioned way to opt an element out of
-    // Panzoom's own handling instead — every node and edge group carries
-    // it, and so does `.canvas-toolbar` now that `.canvas-wrap` is its
-    // ancestor too. A future control added over the canvas needs the same
-    // class, plus the wheel guard's own exclusion below.
-    //
-    // Panzoom's own constructor applies `startScale` synchronously but
-    // defers `pan(startX, startY)` to a `setTimeout` (its own source: it
-    // waits a tick so `zoom` has settled before it reads dimensions to
-    // constrain the initial pan). Left at the (0, 0) default, that deferred
-    // call would land after the auto-fit effect below has already panned
-    // the just-mounted graph into view, and silently reset it back to the
-    // top-left corner one tick later. Feeding the same fit in as the start
-    // position closes the race instead of trying to out-time it: the
-    // deferred call still fires, but lands on the values already showing.
-    const initialFit = measureFit(el);
-    const panzoom = Panzoom(el, {
-      minScale: MIN_SCALE,
-      maxScale: MAX_SCALE,
-      canvas: true,
-      startScale: initialFit.scale,
-      startX: initialFit.x,
-      startY: initialFit.y,
-    });
-    panzoomRef.current = panzoom;
-    // The manual `wheel` listener binds to the same `.canvas-wrap` element,
-    // for the same reason. `zoomWithWheel` carries no `panzoom-exclude`
-    // check of its own, so the toolbar needs an explicit guard here — the
-    // toolbar's own ref, not a general `.closest(".panzoom-exclude")` walk,
-    // since every node and edge already carries that class and already
-    // receives wheel-zoom today (stylex-phase-4-canvas design.md D2).
-    const onWheel = (e: WheelEvent) => {
-      if (toolbarRef.current?.contains(e.target as Node)) return;
-      panzoom.zoomWithWheel(e);
-    };
-    wrap?.addEventListener("wheel", onWheel);
-
-    // The painted grid lives on `.canvas-wrap`, which Panzoom never
-    // transforms, so it has to be told what the transform is. Without this a
-    // node rounded to the lattice meets the drawn dots at scale 1 and pan 0
-    // alone, and an author works at the fit scale, which is rarely 1.
-    //
-    // Two custom properties, read by the stylesheet: the gradient and its
-    // colour role stay in CSS, and this hands over two numbers. Reading the
-    // event's own `detail` rather than parsing the element's transform back
-    // keeps this off the layout path.
-    const paintGrid = (scale: number, x: number, y: number) => {
-      if (!wrap) return;
-      wrap.style.setProperty("--canvas-grid-size", `${GRID_STEP * scale}px`);
-      wrap.style.setProperty("--canvas-grid-offset-x", `${x * scale}px`);
-      wrap.style.setProperty("--canvas-grid-offset-y", `${y * scale}px`);
-    };
-    const onPanzoomChange = (e: Event) => {
-      const d = (e as CustomEvent<{ scale: number; x: number; y: number }>).detail;
-      paintGrid(d.scale, d.x, d.y);
-    };
-    el.addEventListener("panzoomchange", onPanzoomChange);
-    // Seeded from the fit above, so the grid is right before the first gesture
-    // rather than one event later.
-    paintGrid(initialFit.scale, initialFit.x, initialFit.y);
-
-    return () => {
-      wrap?.removeEventListener("wheel", onWheel);
-      el.removeEventListener("panzoomchange", onPanzoomChange);
-      panzoom.destroy();
-      panzoomRef.current = null;
-    };
-  }, []);
+  // The UI SDK owns pan, zoom and the connect gesture. Every option is a
+  // closure read at call time, so the ones naming functions declared further
+  // down stay arrows rather than references.
+  const canvas = usePrimitive(canvasPrimitive, {
+    minZoom: MIN_SCALE,
+    maxZoom: MAX_SCALE,
+    gridStep: GRID_STEP,
+    zoomMessage: (zoom) => t("canvas.zoomAnnounce").replace("{percent}", String(Math.round(zoom * 100))),
+    canConnect: (from, to) => canConnectPorts(from, to),
+    onConnect: (from, to, details) => connectPorts(from, to, details),
+    portLabel: (key) => nameText(stepOfPort(key)),
+    connectMessage: (message, label) => connectWords(message, label),
+    point: (x, y) => toSvgPoint({ clientX: x, clientY: y }),
+    // A node is a rectangle and the SDK snaps to a port's centre, so the
+    // radius is half a node's width at the current zoom.
+    radius: (zoom) => Math.max(28, (NODE_WIDTH / 2) * zoom),
+  });
 
   // Neither computation reads pointer/drag state, so without memoization
   // both re-run on every pointer-move event during a drag for nothing.
@@ -966,9 +977,12 @@ export function CanvasView({
     startPos: Record<string, Point>;
     current: Point;
   } | null>(null);
-  // `start` is the press point, so a release under the click threshold reads
-  // as a click and writes nothing.
-  const [connectDrag, setConnectDrag] = useState<{ sourceStepId: string; start: Point; current: Point } | null>(null);
+  // The connect drag the SDK draws. `start` is the press point, so a release
+  // under the click threshold reads as a click and writes nothing; `connected`
+  // records that the SDK's own release made the way out.
+  const connectGesture = useRef<{ sourceStepId: string; start: Point; connected: boolean } | null>(null);
+  // A plain press on empty canvas, in client pixels, until its release.
+  const backgroundPress = useRef<Point | null>(null);
   // A group box drag moves every member, the way a multi-step node drag does.
   const [groupDrag, setGroupDrag] = useState<{
     groupId: string;
@@ -989,7 +1003,7 @@ export function CanvasView({
   //
   // It carries both spaces on purpose. The band itself is an HTML overlay in
   // `.canvas-wrap`'s own coordinates, the way `.canvas-reject-message` already
-  // is: Panzoom scales the SVG element, so an SVG rect would clip at the
+  // is: the viewport scales the SVG element, so an SVG rect would clip at the
   // shrunken viewport whenever the band starts outside it — which is most of
   // the visible canvas at any zoom under 1. `startSvg` is the same press in
   // user space, which the release needs for the hit test against node
@@ -1043,12 +1057,10 @@ export function CanvasView({
   };
 
   const fitToView = () => {
-    const panzoom = panzoomRef.current;
     const svg = svgRef.current;
-    if (!panzoom || !svg || nodePositions.length === 0) return;
+    if (!svg || nodePositions.length === 0) return;
     const fit = measureFit(svg);
-    panzoom.zoom(fit.scale, { animate: false });
-    panzoom.pan(fit.x, fit.y, { animate: false });
+    canvas.api.viewport.setViewport({ x: fit.x, y: fit.y, zoom: fit.scale });
   };
 
   // Centers the graph on open, so an author never has to click "Fit to
@@ -1205,30 +1217,28 @@ export function CanvasView({
    * The marquee binds to `.canvas-wrap`, and in the CAPTURE phase. Both halves
    * are load-bearing, and each one cost a browser check.
    *
-   * The wrap, not the SVG: Panzoom scales the SVG element itself, so at any
+   * The wrap, not the SVG: the viewport scales the SVG element itself, so at any
    * zoom under 1 most of what an author reads as canvas — grid dots and all —
    * sits outside the SVG's own box. A handler on the SVG never sees that
    * press. `onPaletteDrop` resolves through `.canvas-wrap` for the same
    * reason.
    *
-   * The capture phase, not the bubble phase: Panzoom's own down-handler binds
-   * to `.canvas-wrap` and its default `handleStartEvent` calls
-   * `stopPropagation()`. React binds at the root, an ancestor of the wrap, so
-   * a bubble-phase handler here would never run at all. React dispatches its
-   * capture handlers while the event still travels down, before the wrap's own
-   * listener fires.
+   * The capture phase, so the shift press is claimed before the primitive's
+   * own pan handler, which skips a shift press, sees it.
    *
-   * A node, edge or toolbar press reaches this too, so it needs the same
-   * `.panzoom-exclude` guard the wheel listener uses.
+   * A node, edge or toolbar press reaches this too: anything but the bare
+   * frame or the bare `<svg>` is not empty canvas.
    */
   const onCanvasPointerDownCapture = (e: React.PointerEvent) => {
-    if (!e.shiftKey) return;
-    if ((e.target as Element).closest(".panzoom-exclude")) return;
+    if (!canvas.api.isBackground(e.target)) return;
+    if (!e.shiftKey) {
+      // A plain press on empty canvas pans, and a release that stayed under
+      // the click threshold deselects. The viewport captures the pointer on
+      // the frame, so the release can no longer be read off its target.
+      backgroundPress.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
     capturePointer(e);
-    // Panzoom has not run yet, but it will, and it will set `isPanning`. Its
-    // `constrainXY` reads `disablePan` off a fresh options spread on every
-    // call, so setting it here kills the pan that is about to start.
-    panzoomRef.current?.setOptions({ disablePan: true });
     const wrap = e.currentTarget.getBoundingClientRect();
     const client = { x: e.clientX, y: e.clientY };
     setMarquee({ origin: { x: wrap.left, y: wrap.top }, startClient: client, currentClient: client, startSvg: toSvgPoint(e) });
@@ -1237,13 +1247,13 @@ export function CanvasView({
   const onMarqueePointerMove = (e: React.PointerEvent) =>
     trackPointer(marquee, setMarquee, { currentClient: { x: e.clientX, y: e.clientY } });
 
-  // Restoring `disablePan` is not optional and not only a pointer-up concern:
-  // Panzoom binds `up` on `document`, so a release outside the SVG would leave
-  // the canvas unpannable for the life of the screen. Pointer capture (above)
-  // routes the release here, and lost capture is the backstop.
-  const releasePan = () => panzoomRef.current?.setOptions({ disablePan: false });
-
   const onMarqueePointerUp = (e: React.PointerEvent) => {
+    const press = backgroundPress.current;
+    backgroundPress.current = null;
+    if (press && !marquee) {
+      if (!exceedsClickThreshold({ x: e.clientX - press.x, y: e.clientY - press.y })) onSelectStep(undefined);
+      return;
+    }
     if (!marquee) return;
     const band = normalizeRect(marquee.startSvg, toSvgPoint(e));
     const picked = nodesInRect(band, visibleNodePositions);
@@ -1257,20 +1267,70 @@ export function CanvasView({
     }
     onSelectSteps(picked);
     setMarquee(null);
-    releasePan();
+  };
+
+  /** The step a port key names: `<stepId>:out` or `<stepId>:in`. */
+  const stepOfPort = (key: string) => key.slice(0, key.lastIndexOf(":"));
+
+  /** Why a new way out from this step is refused, or `undefined`. The rules
+   * `resolveDropGesture` applies, so the pointer and the keyboard agree. */
+  const connectRefusal = (sourceStepId: string): string | undefined => {
+    const source = steps.find((s) => s.id === sourceStepId);
+    if (!source) return "invalid connection";
+    if (source.terminal === true) return "a terminal step has no outgoing paths";
+    const check = checkConnection(source.paths ?? [], triggerForNewPath(source));
+    return check.ok ? undefined : (check.reason ?? "invalid connection");
+  };
+
+  const canConnectPorts = (from: string, to: string) =>
+    from.endsWith(":out") && to.endsWith(":in") && connectRefusal(stepOfPort(from)) === undefined;
+
+  /** Appends a way out from one drawn step to another. */
+  const addPath = (sourceStepId: string, targetStepId: string): boolean => {
+    const sourceIndex = steps.findIndex((s) => s.id === sourceStepId);
+    const sourceStep = steps[sourceIndex];
+    if (!sourceStep?.id) return false;
+    const existingPaths = sourceStep.paths ?? [];
+    const targetStep = steps.find((s) => s.id === targetStepId);
+    const path = newPath(
+      sourceStep,
+      targetStep,
+      targetStepId,
+      triggerForNewPath(sourceStep),
+      contentLocale,
+      baseLocale,
+      t("steps.unnamedStep"),
+    );
+    updateInDraftArray(mutate, (d) => d.workflow?.steps?.[sourceIndex], { paths: [...existingPaths, path] });
+    return true;
+  };
+
+  /** The SDK's `connect`: a drag release that snapped, or Enter. */
+  const connectPorts = (from: string, to: string, details: { reason: string; event?: Event }): boolean => {
+    const gesture = connectGesture.current;
+    if (details.reason === "drag" && gesture) {
+      const end = details.event as PointerEvent | undefined;
+      if (end && !exceedsClickThreshold(dragDelta(gesture.start, toSvgPoint(end)))) return false;
+      gesture.connected = true;
+    }
+    return addPath(stepOfPort(from), stepOfPort(to));
+  };
+
+  /** The announcements, from the catalog: the SDK's own say "port". */
+  const connectWords = (message: ConnectMessage, label: (key: string) => string): string => {
+    if (message.type === "start") return t("canvas.connectStart").replace("{source}", label(message.from));
+    if (message.type === "target") return t("canvas.connectTarget").replace("{target}", label(message.to));
+    if (message.type === "connect")
+      return t("canvas.connectDone").replace("{source}", label(message.from)).replace("{target}", label(message.to));
+    return t("canvas.connectCancel");
   };
 
   const onHandlePointerDown = (e: React.PointerEvent, stepId: string) => {
-    e.stopPropagation();
-    capturePointer(e);
     setRejectMessage(null);
     // The roving stop follows the press, as a press on the node moves it.
     moveFocus({ kind: "step", stepId });
-    const p = toSvgPoint(e);
-    setConnectDrag({ sourceStepId: stepId, start: p, current: p });
+    connectGesture.current = { sourceStepId: stepId, start: toSvgPoint(e), connected: false };
   };
-
-  const onHandlePointerMove = (e: React.PointerEvent) => trackPointer(connectDrag, setConnectDrag, { current: toSvgPoint(e) });
 
   const showRejection = (e: { clientX: number; clientY: number }, text: string) => {
     // Screen-relative, not the SVG's (panned/zoomed) user-space `point` — the
@@ -1280,48 +1340,39 @@ export function CanvasView({
     setTimeout(() => setRejectMessage(null), REJECT_MESSAGE_MS);
   };
 
+  /**
+   * The release the SDK did not turn into a way out. Its snap reads a circle
+   * around each port's centre, so a drop on a node's far end, on empty canvas,
+   * or from a step that refuses one lands here and takes the drop gesture's
+   * own rules.
+   */
   const onHandlePointerUp = (e: React.PointerEvent) => {
-    e.stopPropagation();
-    if (!connectDrag) return;
-    const point = toSvgPoint(e);
-    // Under the threshold this was a click, not a drag: it writes nothing,
-    // the rule the waypoint handle applies. Without it a click, and each
-    // click of a double-click, wrote a way out to the step itself or to a
-    // new step at the press point.
-    if (!exceedsClickThreshold(dragDelta(connectDrag.start, point))) {
-      setConnectDrag(null);
+    // No `stopPropagation`: the SDK ends its drag from a listener on the
+    // document, which a stopped event never reaches.
+    const gesture = connectGesture.current;
+    // Escape already let the draft go. React hears the release before the
+    // SDK's own listener on the document, so a live draft is still there.
+    if (!gesture || !canvas.api.connect.active()) {
+      connectGesture.current = null;
       return;
     }
-    const sourceIndex = steps.findIndex((s) => s.id === connectDrag.sourceStepId);
-    const sourceStep = steps[sourceIndex];
-
-    if (sourceStep?.id) {
+    const point = toSvgPoint(e);
+    const at = { clientX: e.clientX, clientY: e.clientY };
+    // After the document's listener has run, so `connected` is settled.
+    setTimeout(() => {
+      connectGesture.current = null;
+      if (gesture.connected || !exceedsClickThreshold(dragDelta(gesture.start, point))) return;
+      const sourceIndex = steps.findIndex((s) => s.id === gesture.sourceStepId);
+      const sourceStep = steps[sourceIndex];
+      if (!sourceStep?.id) return;
       const existingPaths = sourceStep.paths ?? [];
-      const candidateTrigger = triggerForNewPath(sourceStep);
-      // Visible nodes only: a hidden member is not a connect-drag target, or
-      // a release over a collapsed box would create a path to a step nobody
-      // can see.
-      const result = resolveDropGesture(point, visibleNodePositions, existingPaths, candidateTrigger, sourceStep.terminal === true);
-
+      const result = resolveDropGesture(point, visibleNodePositions, existingPaths, triggerForNewPath(sourceStep), sourceStep.terminal === true);
       if (result.kind === "rejected") {
-        showRejection(e, result.reason);
+        showRejection(at, result.reason);
       } else if (result.kind === "connect-to-step") {
-        const targetStep = steps.find((s) => s.id === result.targetStepId);
-        const path = newPath(
-          sourceStep,
-          targetStep,
-          result.targetStepId,
-          result.trigger,
-          contentLocale,
-          baseLocale,
-          t("steps.unnamedStep"),
-        );
-        updateInDraftArray(mutate, (d) => d.workflow?.steps?.[sourceIndex], { paths: [...existingPaths, path] });
+        addPath(sourceStep.id, result.targetStepId);
       } else {
-        // create-step-and-connect: the step first, then the path (design.md)
-        // — a candidate already accepted by resolveDropGesture above never
-        // leaves an orphan step behind, but ordering it this way keeps that
-        // true even if a future change moves the check.
+        // create-step-and-connect: the step first, then the path (design.md).
         const step = newStep("task", seedLocalizedText(contentLocale));
         const path = newPath(sourceStep, step, step.id, result.trigger, contentLocale, baseLocale, t("steps.unnamedStep"));
         mutate((d) => {
@@ -1336,15 +1387,7 @@ export function CanvasView({
         });
         if (step.id) onMoveStep(step.id, result.point);
       }
-    }
-    setConnectDrag(null);
-  };
-
-  const onBackgroundPointerUp = (e: React.PointerEvent) => {
-    // A marquee release is not a deselect. It runs on the wrap, after this
-    // one, and would otherwise empty the set it had just built.
-    if (marquee) return;
-    if (e.target === svgRef.current) onSelectStep(undefined);
+    }, 0);
   };
 
   /** The step text the node body and both accessible names read: the step
@@ -1363,6 +1406,23 @@ export function CanvasView({
     // is no text field, so an arrow key and Escape still reach this handler
     // from one.
     if ((e.target as Element).closest("input, textarea, [contenteditable]")) return;
+    // A keyboard connection takes the arrows, Enter, Space, Escape and Tab
+    // until it ends.
+    if (canvas.api.connect.active() && canvas.api.connect.keydown(e.nativeEvent)) return;
+    // `+`, `-` and `0` zoom about the centre and announce the new level.
+    if (canvas.api.viewport.keydown(e.nativeEvent)) return;
+    if ((e.key === "c" || e.key === "C") && !e.ctrlKey && !e.metaKey && !e.altKey && focus.kind === "step") {
+      e.preventDefault();
+      const refusal = connectRefusal(focus.stepId);
+      if (refusal !== undefined) {
+        announce(refusal, { priority: "assertive" });
+        const node = elementFor(focus)?.getBoundingClientRect();
+        if (node) showRejection({ clientX: node.right, clientY: node.top + node.height / 2 }, refusal);
+        return;
+      }
+      canvas.api.connect.start(`${focus.stepId}:out`);
+      return;
+    }
     if (e.key === "Escape") {
       // The stop moves with the focus. Without that move Tab walks straight
       // back in, since the roving `0` would still sit inside the `<svg>`.
@@ -1388,6 +1448,14 @@ export function CanvasView({
     if (!arrow) return;
     // Without this an arrow both moves canvas focus and scrolls the page.
     e.preventDefault();
+    // Shift with an arrow pans one lattice row at a time, so the keyboard can
+    // reach the margin around the graph as well as its steps.
+    if (e.shiftKey) {
+      const step = KEY_PAN * (arrow === "ArrowLeft" || arrow === "ArrowUp" ? 1 : -1);
+      if (arrow === "ArrowLeft" || arrow === "ArrowRight") canvas.api.viewport.panBy(step, 0);
+      else canvas.api.viewport.panBy(0, step);
+      return;
+    }
     moveFocus(nextFocus(focus, arrow, steps, groups, initialStepId));
   };
 
@@ -1467,12 +1535,14 @@ export function CanvasView({
         key={step.id}
         data-step-id={step.id}
         transform={`translate(${x}, ${y})`}
-        className={`canvas-node panzoom-exclude ${stylex.props(styles.node, stylex.defaultMarker()).className}`}
+        className={`canvas-node ${stylex.props(styles.node, stylex.defaultMarker()).className}`}
         role="button"
         tabIndex={focus.kind === "step" && focus.stepId === step.id ? 0 : -1}
         // `outgoing` counts the paths the traversal reaches, the set the edge
         // pass drew.
         aria-label={nodeName(step, nameText(step.id), outgoingCount.get(step.id) ?? 0, stamps)}
+        // C starts a way out from this step (`onCanvasKeyDown`).
+        aria-keyshortcuts="C"
         onPointerDown={(e) => onNodePointerDown(e, step.id as string)}
         onPointerUp={(e) => onNodePointerUp(e, step.id as string)}
         // The pointer's route to the Steps tab, the pair Enter calls. The
@@ -1497,7 +1567,7 @@ export function CanvasView({
             and the outer `<div>` resolves its own `height: 100%` against this
             rect. The 26 units on the right clear the connect handle's hit
             circle, which reaches 12 units inward from `NODE_WIDTH`. */}
-        <foreignObject x={10} y={0} width={NODE_WIDTH - 36} height={NODE_HEIGHT} className="panzoom-exclude">
+        <foreignObject x={10} y={0} width={NODE_WIDTH - 36} height={NODE_HEIGHT}>
           <NodeLabel label={nameText(step.id)} />
         </foreignObject>
         {stamps.start !== undefined && <NodeStamp text={stamps.start} corner="start" width={widthOfStamps} />}
@@ -1520,17 +1590,19 @@ export function CanvasView({
   };
 
   return (
-    <div
+    <CanvasRoot
+      handle={canvas}
       {...stylex.props(styles.wrap)}
       onPointerDownCapture={onCanvasPointerDownCapture}
       onPointerMove={onMarqueePointerMove}
       onPointerUp={onMarqueePointerUp}
       onLostPointerCapture={() => {
         if (marquee) setMarquee(null);
-        releasePan();
       }}
     >
-      <div className={`panzoom-exclude ${stylex.props(styles.toolbar).className}`} ref={toolbarRef}>
+      {/* `data-canvas-overlay`: a wheel over the toolbar neither pans nor
+          zooms. */}
+      <div {...stylex.props(styles.toolbar)} ref={toolbarRef} data-canvas-overlay="">
         <button type="button" className="btn btn-secondary" onClick={fitToView}>
           {t("canvas.fitToView")}
         </button>
@@ -1546,7 +1618,7 @@ export function CanvasView({
           {t("canvas.arrange")}
         </button>
       </div>
-      <svg
+      <CanvasWorld
         ref={svgRef}
         {...stylex.props(styles.svg)}
         // `application` is load-bearing, not cosmetic: a screen reader's
@@ -1559,13 +1631,13 @@ export function CanvasView({
         // the roving stop only once a focus names it.
         tabIndex={focus.kind === "root" ? 0 : -1}
         onKeyDown={onCanvasKeyDown}
-        onPointerMove={(e) => {
-          onNodePointerMove(e);
-          onHandlePointerMove(e);
+        // Whatever takes focus inside, by arrow key, by Tab or by a press,
+        // comes into view.
+        onFocus={(e) => {
+          if (e.target === e.currentTarget) return;
+          canvas.api.viewport.reveal(canvas.api.viewport.rectOf(e.target), { padding: FIT_GUTTER });
         }}
-        onPointerUp={(e) => {
-          onBackgroundPointerUp(e);
-        }}
+        onPointerMove={onNodePointerMove}
       >
         <defs>
           <marker id="canvas-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -1594,7 +1666,7 @@ export function CanvasView({
           return (
             <g
               key={group.id}
-              className={`panzoom-exclude ${stylex.props(styles.group).className}`}
+              {...stylex.props(styles.group)}
               onPointerDown={(e) => onGroupPointerDown(e, group)}
               onPointerMove={onGroupPointerMove}
               onPointerUp={(e) => onGroupPointerUp(e, group)}
@@ -1660,7 +1732,7 @@ export function CanvasView({
           return (
             <g
               key={path.id ?? `${step.id}-${pathIndex}`}
-              className={`panzoom-exclude ${stylex.props(styles.edgeGroup, stylex.defaultMarker()).className}`}
+              {...stylex.props(styles.edgeGroup, stylex.defaultMarker())}
               data-kind="edge"
               data-path-id={path.id}
               data-step-id={path.id !== undefined ? step.id : undefined}
@@ -1712,20 +1784,14 @@ export function CanvasView({
           );
         })}
 
-        {connectDrag &&
-          (() => {
-            const source = positionOf(connectDrag.sourceStepId);
-            const start = { x: source.x + NODE_WIDTH, y: source.y + NODE_HEIGHT / 2 };
-            return (
-              <line
-                x1={start.x}
-                y1={start.y}
-                x2={connectDrag.current.x}
-                y2={connectDrag.current.y}
-                {...stylex.props(styles.edge, styles.edgeDragging)}
-              />
-            );
-          })()}
+        <ConnectDraftLine
+          anchor={(stepId) => {
+            const p = positionOf(stepId);
+            return { x: p.x + NODE_WIDTH, y: p.y + NODE_HEIGHT / 2 };
+          }}
+          nodeAt={positionOf}
+          stepOf={stepOfPort}
+        />
 
         {/* Each drawn group's members sit inside one `<g>`, the element both
             disclosure controls name in `aria-controls`. The wrapper renders in
@@ -1782,12 +1848,7 @@ export function CanvasView({
               width={WAYPOINT_HANDLE}
               height={WAYPOINT_HANDLE}
               rx={0}
-              // `panzoom-exclude` is load-bearing, and the browser check
-              // earned it: Panzoom's down-handler calls `stopPropagation` at
-              // `.canvas-wrap`, and React listens at the root, an ancestor.
-              // Without the class the press never reaches this rect and pans
-              // the canvas instead. Every node and edge group carries it.
-              className={`panzoom-exclude ${stylex.props(styles.waypointHandle, h.index === undefined && styles.waypointHandleNew).className}`}
+              {...stylex.props(styles.waypointHandle, h.index === undefined && styles.waypointHandleNew)}
               onPointerDown={(e) => onWaypointPointerDown(e, h.pathId, { index: h.index, insertAt: h.insertAt })}
               onPointerMove={onWaypointPointerMove}
               onPointerUp={onWaypointPointerUp}
@@ -1806,12 +1867,23 @@ export function CanvasView({
         {connectHandles.map((h) => (
           // Out of the accessibility tree, as it was inside the node, whose
           // own name already names the step. The `<title>` still shows on
-          // hover. `panzoom-exclude`, or Panzoom takes the press and pans.
-          <g key={h.stepId} className="panzoom-exclude" data-connect-step-id={h.stepId} aria-hidden="true">
+          // hover. The keyboard reaches the same gesture through C on the node.
+          <g key={h.stepId} data-connect-step-id={h.stepId} aria-hidden="true">
+            {/* The node's target end for the SDK: it reads this box to snap a
+                drag and to walk the arrows. It takes no press. */}
+            <InPort
+              value={`${h.stepId}:in`}
+              x={h.x - NODE_WIDTH}
+              y={h.y - NODE_HEIGHT / 2}
+              width={NODE_WIDTH}
+              height={NODE_HEIGHT}
+              {...stylex.props(styles.inPort)}
+            />
             <circle cx={h.x} cy={h.y} r={HANDLE_RADIUS} {...stylex.props(styles.connectHandle, h.isTerminal && styles.connectHandleTerminal)} />
             {/* The handle's pointer target, over the dot. It carries the
                 press, the cursor and the tooltip naming the gesture. */}
-            <circle
+            <OutPort
+              value={`${h.stepId}:out`}
               cx={h.x}
               cy={h.y}
               r={HANDLE_HIT_RADIUS}
@@ -1831,7 +1903,7 @@ export function CanvasView({
               }}
             >
               <title>{t(h.isTerminal ? "canvas.connectHandleEnd" : "canvas.connectHandle")}</title>
-            </circle>
+            </OutPort>
           </g>
         ))}
 
@@ -1852,7 +1924,7 @@ export function CanvasView({
             // that band lies over a member node's corner at one end and over
             // empty canvas at the other. `groupDisclosureHost` makes
             // it inert, so only the button's own 20 units take a press.
-            className={`panzoom-exclude ${stylex.props(styles.groupDisclosureHost).className}`}
+            {...stylex.props(styles.groupDisclosureHost)}
           >
             <button
               type="button"
@@ -1863,9 +1935,8 @@ export function CanvasView({
               aria-controls={groupMembersDomId(group.id)}
               aria-label={t("canvas.groupDisclosure").replace("{group}", group.name)}
               // The press stops here rather than reaching the `<svg>`'s own
-              // handlers.
-              // `panzoom-exclude` above is what keeps Panzoom's native
-              // down-handler and the marquee's capture handler off it.
+              // handlers. The pan and the marquee take only a press on the
+              // bare frame or the bare `<svg>`.
               //
               // It also takes the roving stop. Enter binds for a step focus
               // and a path focus alone, so a stop left on a step would let one
@@ -1885,7 +1956,7 @@ export function CanvasView({
           </foreignObject>
         ))}
 
-      </svg>
+      </CanvasWorld>
       {marquee &&
         (() => {
           // Wrap-relative, so the band covers every part of the visible canvas
@@ -1903,6 +1974,6 @@ export function CanvasView({
           {rejectMessage.text}
         </div>
       )}
-    </div>
+    </CanvasRoot>
   );
 }

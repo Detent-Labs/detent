@@ -1,16 +1,12 @@
 /**
  * The "fit to view" arithmetic, as a pure function.
  *
- * Panzoom binds to the `<svg>` root itself and writes
- * `transform: scale(s) translate(x, y)`. The `translate` sits to the right of
- * the `scale`, so the browser scales it a second time. Panzoom also treats an
- * `<svg>` root as HTML rather than SVG (`isSVGElement` excludes it), which
- * leaves `transform-origin` at `50% 50%`. A user-space point `p` therefore
- * lands at `C + s * (p + t - C)` on screen, where `C` is the element centre
- * and `t` is the value handed to `panzoom.pan()`.
+ * The UI SDK viewport writes `transform: translate(x, y) scale(s)` with
+ * `transform-origin: 0 0` on the `<svg>`, so a user-space point `p` lands at
+ * `t + s * p` on screen, measured from the element's top left corner.
  *
  * Solving that for `t`, so that the content centre `m` lands on a chosen
- * screen point `T`, gives `t = (T - C) / s + C - m`.
+ * screen point `T`, gives `t = T - s * m`.
  *
  * Every length here is a CSS pixel. The canvas carries no `viewBox`, so one
  * SVG user unit is one CSS pixel and the content box compares directly with
@@ -46,7 +42,7 @@ export interface Fit {
   y: number;
 }
 
-/** The bounds the `Panzoom` call declares. Exported so the two agree. */
+/** The bounds the viewport declares. Exported so the two agree. */
 export const MIN_SCALE = 0.25;
 export const MAX_SCALE = 2;
 
@@ -79,9 +75,6 @@ export function computeFit(content: Box, element: Size, insets: Insets): Fit {
 
   const scale = Math.max(Math.min(usableWidth / content.width, usableHeight / content.height, 1), MIN_SCALE);
 
-  // The origin the browser scales about.
-  const centreX = element.width / 2;
-  const centreY = element.height / 2;
   // Where the content centre has to land.
   const targetX = insets.left + usableWidth / 2;
   const targetY = insets.top + usableHeight / 2;
@@ -89,9 +82,5 @@ export function computeFit(content: Box, element: Size, insets: Insets): Fit {
   const contentX = content.x + content.width / 2;
   const contentY = content.y + content.height / 2;
 
-  return {
-    scale,
-    x: (targetX - centreX) / scale + centreX - contentX,
-    y: (targetY - centreY) / scale + centreY - contentY,
-  };
+  return { scale, x: targetX - scale * contentX, y: targetY - scale * contentY };
 }

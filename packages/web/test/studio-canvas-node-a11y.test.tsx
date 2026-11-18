@@ -334,7 +334,8 @@ describe("the canvas node's accessibility markup", () => {
     expect(firstDisclosure).toBeGreaterThan(CANVAS.inner.lastIndexOf("data-connect-step-id="));
     for (const handle of HANDLES) {
       expect(attr(handle.open, "aria-hidden")).toBe("true");
-      expect((attr(handle.open, "class") ?? "").split(" ")).toContain("panzoom-exclude");
+      // The hit circle is the UI SDK's source port; the box beside it the target.
+      expect(handle.inner).toContain('data-slot="studio-canvas-port"');
     }
     // step_review stands at (240, 0): its handle sits at (420, 30).
     const review = HANDLES.find((h) => attr(h.open, "data-connect-step-id") === "step_review");

@@ -1205,6 +1205,13 @@ export const en = {
   "canvas.otherwise": "Otherwise",
   "canvas.connectHandle": "Drag to a step to add a way out, or to empty space to add a new step.",
   "canvas.connectHandleEnd": "An end has no way out.",
+  // What a screen reader hears from the canvas's zoom keys and from a way out
+  // added with C on a focused step.
+  "canvas.zoomAnnounce": "Map at {percent} percent",
+  "canvas.connectStart": "Adding a way out from {source}. Arrow keys choose where it leads, Enter adds it, Escape cancels.",
+  "canvas.connectTarget": "To {target}.",
+  "canvas.connectDone": "Added a way out from {source} to {target}.",
+  "canvas.connectCancel": "No way out added.",
 
   // The accessible names the canvas composes for its nodes, its paths and
   // its `<svg>` root, filled by `canvas/mapWords.ts`. A node's name reads the

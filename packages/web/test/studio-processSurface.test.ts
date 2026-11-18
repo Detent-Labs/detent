@@ -411,13 +411,14 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
 
   it("keeps focus on the node from a press on its connect handle, and moves the roving stop there", () => {
     const code = stripComments(read(CANVAS));
-    const down = code.slice(code.indexOf("const onHandlePointerDown"), code.indexOf("const onHandlePointerMove"));
+    const down = code.slice(code.indexOf("const onHandlePointerDown"), code.indexOf("const showRejection"));
     const handles = code.slice(code.indexOf("{connectHandles.map("), code.indexOf("{disclosures.map("));
 
     expect(down).toContain('moveFocus({ kind: "step", stepId })');
-    // Pointer capture and the drag stay as they were.
-    expect(down).toContain("capturePointer(e)");
-    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, start: p, current: p })");
+    // The UI SDK's port captures the pointer and draws the drag; the canvas
+    // records the press point for its click threshold.
+    expect(down).toContain("connectGesture.current = { sourceStepId: stepId, start: toSvgPoint(e), connected: false }");
+    expect(handles).toContain("<OutPort");
     // Without this the press's default focused the canvas svg, which drew
     // its outline around the whole graph.
     expect(handles).toContain("onMouseDown={(e) => e.preventDefault()}");
@@ -425,15 +426,17 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
 
   it("writes nothing from a click on the connect handle, only from a drag past the threshold", () => {
     const code = stripComments(read(CANVAS));
-    const down = code.slice(code.indexOf("const onHandlePointerDown"), code.indexOf("const onHandlePointerMove"));
-    const up = code.slice(code.indexOf("const onHandlePointerUp"), code.indexOf("setConnectDrag(null);\n  };"));
-    const guard = "if (!exceedsClickThreshold(dragDelta(connectDrag.start, point))) {";
+    const snapped = code.slice(code.indexOf("const connectPorts"), code.indexOf("const connectWords"));
+    const up = code.slice(code.indexOf("const onHandlePointerUp"), code.indexOf("}, 0);\n  };"));
+    const guard = "if (gesture.connected || !exceedsClickThreshold(dragDelta(gesture.start, point))) return;";
 
-    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, start: p, current: p })");
+    // A release the SDK snapped to a port still meets the threshold.
+    expect(snapped).toContain("if (end && !exceedsClickThreshold(dragDelta(gesture.start, toSvgPoint(end)))) return false;");
+    expect(snapped.indexOf("return false;")).toBeLessThan(snapped.indexOf("addPath("));
     expect(up).toContain(guard);
     // The guard returns before any write: a way out, a new step or a toast.
-    const afterGuard = up.indexOf("return;", up.indexOf(guard));
-    for (const write of ["resolveDropGesture(", "updateInDraftArray(", "mutate(", "showRejection("]) {
+    const afterGuard = up.indexOf(guard) + guard.length;
+    for (const write of ["resolveDropGesture(", "addPath(", "mutate(", "showRejection("]) {
       expect(up.indexOf(write)).toBeGreaterThan(afterGuard);
     }
   });
