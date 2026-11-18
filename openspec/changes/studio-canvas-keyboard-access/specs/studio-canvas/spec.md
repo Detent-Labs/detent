@@ -459,7 +459,8 @@ region SHALL announce it.
 A new step the way-out menu adds SHALL stand one column right of its source
 when that spot is free. Otherwise it SHALL stand at the first free lattice
 point to the right of that spot. No step SHALL overlap it, a step hidden in a
-collapsed group included.
+collapsed group included. The canvas SHALL then pan by the least distance
+that shows the new step and its way out whole.
 
 #### Scenario: A taken spot moves the new step right
 
@@ -468,6 +469,13 @@ collapsed group included.
   "Review"
 - **THEN** the new step stands at the first free lattice point right of that
   spot
+
+#### Scenario: A new step past the edge comes into view
+
+- **WHEN** the keyboard author presses Enter on "A new step" and the spot
+  lies past the frame's right edge
+- **THEN** the canvas pans until the new step and its way out stand whole in
+  the frame
 - **AND** the new step overlaps no step
 
 ### Requirement: A refused source opens no menu

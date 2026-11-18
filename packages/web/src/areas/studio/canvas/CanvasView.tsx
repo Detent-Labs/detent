@@ -1130,12 +1130,10 @@ export function CanvasView({
    * never transforms, so its rect and border give one pixel space for a node,
    * a path and a disclosure button alike. A pointer focus and a root focus
    * reveal nothing. */
-  const revealFocused = (e: React.FocusEvent<SVGSVGElement>) => {
+  const revealRect = (rect: { left: number; top: number; width: number; height: number }) => {
     const panzoom = panzoomRef.current;
-    const svg = svgRef.current;
-    const frame = svg?.parentElement;
-    if (!panzoom || !svg || !frame || e.target === svg || lastInputWasPointer()) return;
-    const rect = (e.target as Element).getBoundingClientRect();
+    const frame = svgRef.current?.parentElement;
+    if (!panzoom || !frame) return;
     const frameRect = frame.getBoundingClientRect();
     const toolbar = toolbarRef.current;
     const toolbarBottom = toolbar ? toolbar.offsetTop + toolbar.offsetHeight : 0;
@@ -1153,6 +1151,11 @@ export function CanvasView({
       current,
     );
     if (next.x !== current.x || next.y !== current.y) panzoom.pan(next.x, next.y, { animate: false });
+  };
+
+  const revealFocused = (e: React.FocusEvent<SVGSVGElement>) => {
+    if (e.target === svgRef.current || lastInputWasPointer()) return;
+    revealRect((e.target as Element).getBoundingClientRect());
   };
 
   // Centers the graph on open, so an author never has to click "Fit to
@@ -1503,7 +1506,22 @@ export function CanvasView({
     }
     if (!elementFor({ kind: "path", pathId: pendingPath.pathId, from: "source" })) return;
     setPendingPath(undefined);
+    const pathEl = elementFor({ kind: "path", pathId: pendingPath.pathId, from: "source" });
     moveFocus({ kind: "path", pathId: pendingPath.pathId, from: "source" });
+    // One pan brings the new way out and the step it ends on into view; it
+    // supersedes the focus reveal of the way out alone.
+    const pathRect = pathEl?.getBoundingClientRect();
+    const stepRect = nodeRectOf(pendingPath.targetId);
+    if (pathRect && stepRect) {
+      const left = Math.min(pathRect.left, stepRect.left);
+      const top = Math.min(pathRect.top, stepRect.top);
+      revealRect({
+        left,
+        top,
+        width: Math.max(pathRect.right, stepRect.right) - left,
+        height: Math.max(pathRect.bottom, stepRect.bottom) - top,
+      });
+    }
     announce(fill(t("canvas.wayOutAdded"), { source: nameText(pendingPath.sourceId), target: nameText(pendingPath.targetId) }));
   }, [pendingPath, drawnPaths]);
 

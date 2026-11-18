@@ -40,6 +40,10 @@ async function focusFirstNode(nodes: Locator): Promise<void> {
 test("the canvas frame keeps its scroll offsets at 0 when focus moves at 200 percent", async ({ page }) => {
   const nodes = await openMap(page);
   await focusFirstNode(nodes);
+  const status = page.getByRole("status").filter({ hasText: /^Map at \d+ percent$/ });
+  await page.keyboard.press("0");
+  await expect(status).toHaveText(/^Map at \d+ percent$/);
+  const fitSentence = (await status.textContent()) ?? "";
   for (let press = 0; press < 4; press += 1) await page.keyboard.press("+");
   await expect(page.getByRole("status").filter({ hasText: /^Map at \d+ percent$/ })).toContainText("200 percent");
   const focusedId = () => page.locator(".canvas-node:focus").getAttribute("data-step-id");
@@ -60,6 +64,10 @@ test("the canvas frame keeps its scroll offsets at 0 when focus moves at 200 per
       node.y >= box.y - 1 &&
       node.y + node.height <= box.y + box.height + 1,
   ).toBe(true);
+
+  // Fit to view after the sweep frames the graph as a fresh fit does.
+  await page.keyboard.press("0");
+  await expect(status).toHaveText(fitSentence);
 });
 
 test("Enter and a double-click land on a Name input", async ({ page }) => {
@@ -96,6 +104,11 @@ test("a lowercase c opens the way-out menu and Enter adds a way out that holds t
   await expect(menu).toBeHidden();
   await expect(page.locator("[data-kind=edge]")).toHaveCount(before + 1);
   await expect(page.locator("[data-kind=edge]:focus")).toHaveCount(1);
+  await expect(page.getByRole("status").filter({ hasText: /^Added a way out from .+ to .+\.$/ })).toHaveCount(1);
+
+  // C answers a step alone: on the focused way out it opens nothing.
+  await page.keyboard.press("c");
+  await expect(menu).toBeHidden();
 });
 
 test("the zoom key announces the level and Escape in the menu returns to the step", async ({ page }) => {
@@ -104,11 +117,19 @@ test("the zoom key announces the level and Escape in the menu returns to the ste
   await page.keyboard.press("+");
   await expect(page.getByRole("status").filter({ hasText: "Map at 125 percent" })).toHaveText("Map at 125 percent");
 
-  await page.keyboard.press("c");
+  await page.keyboard.press("Shift+C");
   await expect(page.getByRole("menu")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toBeHidden();
   await expect(nodes.first()).toBeFocused();
+
+  // A press outside the menu closes it and adds nothing.
+  const edges = await page.locator("[data-kind=edge]").count();
+  await page.keyboard.press("c");
+  await expect(page.getByRole("menu")).toBeVisible();
+  await page.mouse.click(2, 2);
+  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(page.locator("[data-kind=edge]")).toHaveCount(edges);
 });
 
 test("End then Enter on the new-step item adds a step and a way out and focuses the new way out", async ({ page }) => {
@@ -125,4 +146,21 @@ test("End then Enter on the new-step item adds a step and a way out and focuses 
   await expect(nodes).toHaveCount(steps + 1);
   await expect(page.locator("[data-kind=edge]")).toHaveCount(edges + 1);
   await expect(page.locator("[data-kind=edge]:focus")).toHaveCount(1);
+  // The new step comes into view with its way out.
+  const frameBox = await page.locator("[role=application]").locator("..").boundingBox();
+  const added = nodes.nth(steps);
+  await expect(added).toBeVisible();
+  await expect
+    .poll(async () => {
+      const box = await added.boundingBox();
+      return (
+        !!frameBox &&
+        !!box &&
+        box.x >= frameBox.x - 1 &&
+        box.x + box.width <= frameBox.x + frameBox.width + 1 &&
+        box.y >= frameBox.y - 1 &&
+        box.y + box.height <= frameBox.y + frameBox.height + 1
+      );
+    })
+    .toBe(true);
 });

@@ -815,6 +815,16 @@ recorded rather than fixed. The RAIL tags are local to this section.
   `packages/web/src/areas/studio/canvas/CanvasView.tsx:1064-1069` already reassigns,
   and announces the removal in a polite live region. The canvas now holds one
   such region, which a removal can reuse.
+- **The canvas node's focus ring draws dashed.** `nodeFocusRing` sets
+  `stroke-dasharray: 5 4` (`packages/web/src/areas/studio/canvas/CanvasView.tsx:248`),
+  while `design-language.md` asks for a solid 2px ring. Found in the
+  `studio-canvas-keyboard-access` browser walk. The style predates that change.
+  Risk: a dashed ring reads as not there yet.
+- **A drop's refusal box sits at the release point.** It covers the target
+  step's label while shown (`CanvasView.tsx`, the call in the drop handler).
+  The `C` key's refusal hangs from the source step. Found in the
+  `studio-canvas-keyboard-access` browser walk. The fix passes the source
+  step's top centre for both.
 - **The canvas bar's caret menu ignores the arrow keys.** The panel carries
   `role="menu"` (`packages/web/src/areas/studio/canvas/CanvasBar.tsx:376`), and
   ArrowDown leaves focus on its trigger. Risk: a screen reader announces a menu

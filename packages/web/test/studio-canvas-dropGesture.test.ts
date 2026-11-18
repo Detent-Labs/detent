@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { checkConnectSource, resolveDropGesture } from "../src/areas/studio/canvas/dropGesture.js";
+import { triggerForNewPath } from "../src/areas/studio/draft/createPath.js";
+import type { DraftStep } from "../src/areas/studio/draft/createStep.js";
 import type { NodePosition } from "../src/areas/studio/canvas/geometry.js";
 
 const nodes: NodePosition[] = [{ id: "step_b", x: 200, y: 100 }];
@@ -64,6 +66,13 @@ describe("checkConnectSource", () => {
 
   it("accepts a source the new way out keeps valid", () => {
     expect(checkConnectSource(false, [{ trigger: "manual" }], "manual")).toBeUndefined();
+  });
+
+  it("takes a subprocess source with an automatic way out", () => {
+    const call = { id: "step_call", type: "subprocess", paths: [] } as unknown as DraftStep;
+    const trigger = triggerForNewPath(call);
+    expect(trigger).toBe("automatic");
+    expect(checkConnectSource(false, [], trigger)).toBeUndefined();
   });
 
   it("is the check the drop runs first", () => {

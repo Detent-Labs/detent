@@ -117,6 +117,7 @@ returns early. It does not call `preventDefault`, so the browser zooms the page.
 allowed, since a US layout types `+` with it.
 
 Each key the canvas answers calls `preventDefault`. A modified key returns before that call.
+The return sits above the arrow branch on purpose. Ctrl, Alt or Meta with an arrow reaches the browser.
 
 The factor is `ZOOM_KEY_FACTOR = 1.25` each way, the factor the spike measured. `fit.ts` gains
 `zoomAbout(current: Fit, toScale: number, anchor: Point, view: Size): Fit`. It clamps `toScale` to
@@ -236,6 +237,7 @@ change leaves that menu as it is. Its later fix can reuse this menu's keyboard m
 the terminal refusal or `checkConnection`'s answer. `resolveDropGesture` calls it first, so it
 refuses the same inputs. The `C` key calls it too, with `triggerForNewPath(source)`. A refusal
 shows through `showRejection` at the node's top centre, and the live region reads the same text.
+With no room under the toolbar, the box hangs below the node. The frame's edges clamp it sideways.
 
 `showRejection` measures against `.canvas-wrap`'s rect and its `clientLeft` and `clientTop`, the
 frame measure D2 uses. Today it subtracts the `<svg>`'s rect, which Panzoom transforms
@@ -306,7 +308,7 @@ The target list follows the drop. A drop hit-tests the visible nodes, the source
 the menu lists the source and leaves out a step hidden in a collapsed group.
 
 After the add, a pending path focus in `CanvasView` waits for the new path's `<g>`. A layout
-effect then focuses it, with `preventScroll`, and D2 reveals it. The announcement fills
+effect then focuses it, with `preventScroll`, and D2 reveals it. One pan over the union of the new path and step then shows both. The announcement fills
 `canvas.wayOutAdded` from `stepTextMap`. A new step reads the text its node prints, such as
 "(unnamed step)". The selection stays as it was, as after a drop.
 

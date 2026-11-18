@@ -3297,7 +3297,7 @@ focus moves and the page holds still. An arrow that scrolls the page means a
 missing `preventDefault`.
 
 Focus a step and press Enter. Pass: the Steps tab opens on that step and the
-node draws as selected. The focus ring sits on the Name input.
+steps rail marks it. The focus ring sits on the Name input.
 
 Press Escape from that node. Pass: the outline lands on the `<svg>` itself.
 Press Tab. Pass: the stop leaves the canvas and reaches the control after it,
@@ -3400,6 +3400,9 @@ with it. Press Down at the last item. Pass: focus wraps to the first.
 
 Press Tab inside the menu. Pass: the menu closes and the focus returns to the
 step.
+
+Open the menu, then click the canvas background. Pass: the menu closes, no way
+out appears and the focus stays where the click put it.
 
 Shrink the window until the menu cannot fit under the step, then press `c`.
 Pass: the menu opens above the step and stays inside the window. Tab onto the
