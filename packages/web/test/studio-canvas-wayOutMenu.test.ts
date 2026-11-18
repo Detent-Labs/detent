@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { menuKeyTarget, typeAheadIndex, wayOutMenuItems, type WayOutMenuItem } from "../src/areas/studio/canvas/wayOutMenuLogic.js";
+import { menuKeyTarget, menuNewStepSpot, typeAheadIndex, wayOutMenuItems, type WayOutMenuItem } from "../src/areas/studio/canvas/wayOutMenuLogic.js";
 import { t } from "../src/areas/studio/catalog.js";
 
 const STEPS = [{ id: "step_review" }, { id: "step_booking" }, { id: "step_done" }];
@@ -105,5 +105,25 @@ describe("menuKeyTarget", () => {
     expect(menuKeyTarget("ArrowLeft", 0, items)).toBeUndefined();
     expect(menuKeyTarget("Enter", 0, items)).toBeUndefined();
     expect(menuKeyTarget("a", 0, items)).toBeUndefined();
+  });
+});
+
+describe("menuNewStepSpot", () => {
+  const source = { x: 0, y: 0 };
+
+  it("lands one column right of the source when the spot is free", () => {
+    expect(menuNewStepSpot(source, [{ id: "step_review", x: 0, y: 0 }])).toEqual({ x: 240, y: 0 });
+  });
+
+  it("walks right past a step that holds the spot", () => {
+    expect(menuNewStepSpot(source, [{ id: "step_a", x: 240, y: 0 }])).toEqual({ x: 440, y: 0 });
+  });
+
+  it("counts a hidden group member, which stays in the positions it is given", () => {
+    const positions = [
+      { id: "step_review", x: 0, y: 0 },
+      { id: "step_hidden", x: 260, y: 20 },
+    ];
+    expect(menuNewStepSpot(source, positions).x).toBeGreaterThan(240);
   });
 });

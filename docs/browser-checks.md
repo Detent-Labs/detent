@@ -3381,11 +3381,11 @@ These two stay manual. A pointer press and a focus move are both invisible to
 
 The smoke flows in `e2e/canvas-keyboard.e2e.ts` cover what follows. At 200
 percent, Down leaves the frame's scroll offsets at 0. Enter and a double-click
-land on a Name input. The `c` key and Enter add a way out. After `+` the live
+land on a Name input. The `c` key and Enter add a way out, and End then Enter adds a new step. After `+` the live
 region reads "Map at 125 percent", and Escape in the menu returns to the step.
 The entry for `studio-map-labels` walks each double-click.
 
-Scroll the process so a step sits past the frame's edge, then Tab onto the
+Pan the canvas with a drag on its background, or zoom in. A step then sits past the frame's edge. Tab onto the
 canvas. Pass: the canvas pans until the step shows whole, with its ring.
 Click a step that sits half outside the frame. Pass: the canvas does not pan.
 
@@ -3408,6 +3408,8 @@ canvas in that window. Pass: the focused step shows whole.
 Press `c` on an end. Pass: "An end has no way out." appears at the step's top
 centre. Repeat at a fit scale other than 1. Pass: the message still sits at
 that point.
+
+Take a call to another process with one numbered automatic way out. Press `c` on it, then drag from its handle to a step. Pass: both show the sentence about a way out that happens by itself. On a step at the top of the view, the box shows whole.
 
 ### The StyleX pilot: computed styles, not source (`stylex-phase-0-tooling`)
 

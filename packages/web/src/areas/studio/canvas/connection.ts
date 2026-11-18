@@ -44,7 +44,7 @@ export function checkConnection(existingPaths: ConnectionCandidate[], candidateT
  * An end reads the connect handle's own sentence. A missing order reads
  * `canvas.connectNeedsOrder`; every other reason the checks rail knows reads
  * the checks rail's sentence for `step`; anything else reads
- * `canvas.connectRefused`. `step` must be the object `body` holds.
+ * `canvas.connectRefused`. `step` is a step of `body`; the sentence reads it by id.
  */
 export function refusalSentence(refusal: ConnectRefusal, body: Draft, step: DraftStep): string {
   if (refusal.refusal === "end") return t("canvas.connectHandleEnd");

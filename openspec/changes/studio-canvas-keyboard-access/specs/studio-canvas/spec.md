@@ -56,7 +56,7 @@ panel route as its keyboard equivalent.
 <!-- antislop: allow passive-voice -->
 ### Requirement: Canvas interaction logic is tested as pure functions, independent of rendering
 
-Twenty computations SHALL live in pure modules with `bun:test` coverage. Five
+Twenty-one computations SHALL live in pure modules with `bun:test` coverage. Five
 came first: hit-testing, drag-delta computation, the auto-place traversal, the
 connection-validity predicate and the fit-to-view computation.
 
@@ -83,14 +83,14 @@ collection holds one.
 It returns the next focus, and it is total over a deep-partial draft. `packages/web/src/areas/app/screens/inboxLogic.ts` sets that
 convention.
 
-The keyboard adds the last eight. The reveal returns the pan that brings one
+The keyboard adds the last nine. The reveal returns the pan that brings one
 box into view. The inset reading returns the room the view leaves around it.
 The zoom step returns the transform that keeps one point in place.
 
 The menu's item list returns the items in order. The type-ahead and the menu's
 key step each return the next item. The source check returns a connect refusal
-or none, and the refusal sentence returns that refusal's words. None of the
-eight reads the DOM.
+or none, and the refusal sentence returns that refusal's words. The new-step
+spot returns where "A new step" lands. None of the nine reads the DOM.
 
 The tests need not cover the SVG rendering or the pointer-event wiring.
 

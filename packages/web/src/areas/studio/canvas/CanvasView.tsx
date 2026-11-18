@@ -9,12 +9,11 @@ import { newStep } from "../draft/createStep";
 import { newPath, triggerForNewPath } from "../draft/createPath";
 import { seedLocalizedText } from "../draft/localized-text";
 import { t } from "../catalog.js";
-import { drawnPositions, COLUMN_WIDTH, type LayoutStep } from "./layout";
+import { drawnPositions, type LayoutStep } from "./layout";
 import {
   dragDelta,
   exceedsClickThreshold,
   snapToGrid,
-  freeLatticePoint,
   svgPointFromClient,
   routeThroughWaypoints,
   legOfSegment,
@@ -33,7 +32,7 @@ import { computeFit, fitInsets, revealPan, zoomAbout, ZOOM_KEY_FACTOR, MIN_SCALE
 import { lastInputWasPointer } from "../focusScroll";
 import { checkConnectSource, resolveDropGesture } from "./dropGesture";
 import { refusalSentence } from "./connection";
-import { wayOutMenuItems, type WayOutMenuItem } from "./wayOutMenuLogic";
+import { menuNewStepSpot, wayOutMenuItems, type WayOutMenuItem } from "./wayOutMenuLogic";
 import { WayOutMenu, openWayOutMenu } from "./WayOutMenu";
 import {
   nodeName,
@@ -74,6 +73,10 @@ const REJECT_MESSAGE_MS = 4000;
 /** How far into a node the `C` key's refusal hangs from its top edge, in
  * pixels, so the message's bottom border covers that edge. */
 const REFUSAL_INSET = 2;
+/** The refusal box's widest width (`maxWidth` of its style, 16rem) and the
+ * height its longest sentence needs, in pixels, for keeping it in the frame. */
+const REFUSAL_BOX_WIDTH = 256;
+const REFUSAL_BOX_HEIGHT = 80;
 /** The disclosure button's side, in user units. It sits inside the group's own
  * 20-unit margin, so no member node reaches it. */
 const DISCLOSURE_SIZE = 20;
@@ -410,6 +413,10 @@ const styles = stylex.create({
     fontSize: "0.8rem",
     pointerEvents: "none",
     maxWidth: "16rem",
+  },
+  // Hangs below its point instead, where no room is left above the node.
+  rejectMessageBelow: {
+    transform: "translate(-50%, 0)",
   },
   // A way out's sentence host. It takes no press, so its empty corners never
   // swallow one meant for a node; the text block below takes them instead.
@@ -1020,7 +1027,8 @@ export function CanvasView({
   // positions. `origin` is `.canvas-wrap`'s top-left at press time; the wrap
   // never transforms, so one reading holds for the whole gesture.
   const [marquee, setMarquee] = useState<{ origin: Point; startClient: Point; currentClient: Point; startSvg: Point } | null>(null);
-  const [rejectMessage, setRejectMessage] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [rejectMessage, setRejectMessage] = useState<{ text: string; x: number; y: number; below: boolean } | null>(null);
+  const rejectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Where the keyboard sits. One element inside the `<svg>` carries the roving
   // `tabindex="0"`, and this names it. The traversal module decides every move;
   // this component only holds the result and points the browser at it.
@@ -1370,16 +1378,29 @@ export function CanvasView({
 
   /** Shows a refusal at a client point and speaks it. The message is an
    * absolutely positioned child of `.canvas-wrap`, so the point is measured
-   * against the frame, which never transforms, inside its border. */
-  const showRejection = (e: { clientX: number; clientY: number }, text: string) => {
+   * against the frame, which never transforms, inside its border. The box
+   * hangs above the point. It stays inside the frame sideways, and with no
+   * room above under the toolbar it hangs from `belowClientY` instead. */
+  const showRejection = (e: { clientX: number; clientY: number }, text: string, belowClientY?: number) => {
     const frame = svgRef.current?.parentElement;
     const rect = frame?.getBoundingClientRect();
-    setRejectMessage({
-      text,
-      x: frame && rect ? e.clientX - rect.left - frame.clientLeft : 0,
-      y: frame && rect ? e.clientY - rect.top - frame.clientTop : 0,
-    });
-    setTimeout(() => setRejectMessage(null), REJECT_MESSAGE_MS);
+    let x = 0;
+    let y = 0;
+    let below = false;
+    if (frame && rect) {
+      const toolbar = toolbarRef.current;
+      const top = toolbar ? toolbar.offsetTop + toolbar.offsetHeight : 0;
+      const half = Math.min(REFUSAL_BOX_WIDTH, frame.clientWidth) / 2;
+      x = Math.max(half, Math.min(e.clientX - rect.left - frame.clientLeft, frame.clientWidth - half));
+      y = e.clientY - rect.top - frame.clientTop;
+      if (belowClientY !== undefined && y - REFUSAL_BOX_HEIGHT < top) {
+        below = true;
+        y = belowClientY - rect.top - frame.clientTop;
+      }
+    }
+    setRejectMessage({ text, x, y, below });
+    clearTimeout(rejectTimer.current);
+    rejectTimer.current = setTimeout(() => setRejectMessage(null), REJECT_MESSAGE_MS);
     announce(text);
   };
 
@@ -1499,7 +1520,7 @@ export function CanvasView({
     if (refused) {
       // The box hangs from this point. A point on the edge itself can round to
       // a gap of a fraction of a pixel, so it sits just inside the node.
-      showRejection({ clientX: rect.left + rect.width / 2, clientY: rect.top + REFUSAL_INSET }, refusalSentence(refused, draft, source));
+      showRejection({ clientX: rect.left + rect.width / 2, clientY: rect.top + REFUSAL_INSET }, refusalSentence(refused, draft, source), rect.bottom);
       return;
     }
     const menu = menuRef.current;
@@ -1515,11 +1536,10 @@ export function CanvasView({
     let added: { pathId: string; targetId: string } | undefined;
     if (item.kind === "step") added = addWayOut(sourceIndex, { stepId: item.stepId });
     else {
-      // One column right of the source, where the auto-layout puts a step one
-      // level deeper; a taken spot walks right. Every step counts, hidden ones
-      // too, so the new step never lands on a collapsed group's member.
+      // Every step counts, hidden ones too, so the new step never lands on a
+      // collapsed group's member.
       const from = positionOf(source.id);
-      added = addWayOut(sourceIndex, { at: freeLatticePoint(snapToGrid({ x: from.x + COLUMN_WIDTH, y: from.y }), nodePositions) });
+      added = addWayOut(sourceIndex, { at: menuNewStepSpot(from, nodePositions) });
     }
     if (added) setPendingPath({ ...added, sourceId: source.id });
   };
@@ -2101,7 +2121,7 @@ export function CanvasView({
             );
           })()}
         {rejectMessage && (
-          <div {...stylex.props(styles.rejectMessage)} style={{ left: rejectMessage.x, top: rejectMessage.y }}>
+          <div {...stylex.props(styles.rejectMessage, rejectMessage.below && styles.rejectMessageBelow)} style={{ left: rejectMessage.x, top: rejectMessage.y }}>
             {rejectMessage.text}
           </div>
         )}

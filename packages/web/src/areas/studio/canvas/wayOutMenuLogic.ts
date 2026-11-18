@@ -1,4 +1,6 @@
 import { t } from "../catalog.js";
+import { freeLatticePoint, snapToGrid, type NodePosition, type Point } from "./geometry";
+import { COLUMN_WIDTH } from "./layout";
 
 /** One entry of the way-out menu: a step to lead to, the rule between the
  * steps and the new step, or the new step itself. */
@@ -59,4 +61,11 @@ export function menuKeyTarget(key: string, index: number, items: readonly WayOut
     default:
       return undefined;
   }
+}
+
+/** Where "A new step" lands: one column right of `source`, where the
+ * auto-layout puts a step one level deeper, on the lattice. A taken spot walks
+ * right. `positions` holds every step, hidden ones too. */
+export function menuNewStepSpot(source: Point, positions: NodePosition[]): Point {
+  return freeLatticePoint(snapToGrid({ x: source.x + COLUMN_WIDTH, y: source.y }), positions);
 }

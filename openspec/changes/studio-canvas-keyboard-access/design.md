@@ -337,8 +337,8 @@ decisions answer it. Each line marked *assumed* is a reading nobody confirmed.
 
 ### D9. The pure computations, counted
 
-The base requirement on pure canvas computations counts twelve. This change adds eight, so the
-count becomes twenty:
+The base requirement on pure canvas computations counts twelve. This change adds nine, so the
+count becomes twenty-one:
 
 1. `revealPan` in `canvas/fit.ts` (D2).
 2. `fitInsets` in `canvas/fit.ts` (D2).
@@ -348,8 +348,9 @@ count becomes twenty:
 6. `menuKeyTarget` in `canvas/wayOutMenuLogic.ts` (D6).
 7. `checkConnectSource` in `canvas/dropGesture.ts` (D7).
 8. `refusalSentence` in `canvas/connection.ts` (D7).
+9. `menuNewStepSpot` in `canvas/wayOutMenuLogic.ts` (D6).
 
-The `studio-canvas` delta modifies that requirement to name all eight. `literalSentenceFor` is
+The `studio-canvas` delta modifies that requirement to name all nine. `literalSentenceFor` is
 pure too. It lives in `draft/checkSentence.ts`, beside the checks rail's own sentence functions,
 so the canvas count leaves it out.
 

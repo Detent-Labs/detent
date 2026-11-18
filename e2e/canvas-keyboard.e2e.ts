@@ -1,9 +1,9 @@
 /**
  * The **canvas keyboard** flows (studio-canvas-keyboard-access): the frame that
  * never scrolls, the Enter and double-click landings, the way-out menu and the
- * zoom announcement. Each runs on the suite's draft that no flow publishes
- * differently. A draft saves itself, so every flow stubs the `PUT`: nothing
- * reaches the server and publish.e2e.ts finds the draft as it was.
+ * zoom announcement. Each runs on the suite's draft, and no flow changes what
+ * publish.e2e.ts finds. A draft saves itself, so every flow stubs the `PUT`:
+ * nothing reaches the server.
  */
 import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "./fixtures.js";
@@ -31,7 +31,7 @@ async function openMap(page: Page): Promise<Locator> {
   return nodes;
 }
 
-/** Focuses the first node with a click, then releases the pointer's focus to the keyboard by pressing a key. */
+/** Moves the focus onto the first node with `.focus()`, so the keyboard acts on it. */
 async function focusFirstNode(nodes: Locator): Promise<void> {
   await nodes.first().focus();
   await expect(nodes.first()).toBeFocused();
@@ -42,14 +42,24 @@ test("the canvas frame keeps its scroll offsets at 0 when focus moves at 200 per
   await focusFirstNode(nodes);
   for (let press = 0; press < 4; press += 1) await page.keyboard.press("+");
   await expect(page.getByRole("status").filter({ hasText: /^Map at \d+ percent$/ })).toContainText("200 percent");
+  const focusedId = () => page.locator(".canvas-node:focus").getAttribute("data-step-id");
+  const before = await focusedId();
   await page.keyboard.press("ArrowDown");
+  await expect.poll(focusedId).not.toBe(before);
   const frame = page.locator("[role=application]").locator("..");
   const offsets = await frame.evaluate((el) => ({ top: el.scrollTop, left: el.scrollLeft }));
   expect(offsets).toEqual({ top: 0, left: 0 });
   await expect(frame.locator(".canvas-node:focus")).toHaveCount(1);
   const box = await frame.boundingBox();
   const node = await page.locator(".canvas-node:focus").boundingBox();
-  expect(box && node && node.x >= box.x - 1 && node.x + node.width <= box.x + box.width + 1).toBe(true);
+  expect(
+    box &&
+      node &&
+      node.x >= box.x - 1 &&
+      node.x + node.width <= box.x + box.width + 1 &&
+      node.y >= box.y - 1 &&
+      node.y + node.height <= box.y + box.height + 1,
+  ).toBe(true);
 });
 
 test("Enter and a double-click land on a Name input", async ({ page }) => {
@@ -99,4 +109,20 @@ test("the zoom key announces the level and Escape in the menu returns to the ste
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toBeHidden();
   await expect(nodes.first()).toBeFocused();
+});
+
+test("End then Enter on the new-step item adds a step and a way out and focuses the new way out", async ({ page }) => {
+  const nodes = await openMap(page);
+  const steps = await nodes.count();
+  const edges = await page.locator("[data-kind=edge]").count();
+  await focusFirstNode(nodes);
+  await page.keyboard.press("c");
+  await expect(page.getByRole("menu")).toBeVisible();
+  await page.keyboard.press("End");
+  await expect(page.getByRole("menuitem", { name: "A new step" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(nodes).toHaveCount(steps + 1);
+  await expect(page.locator("[data-kind=edge]")).toHaveCount(edges + 1);
+  await expect(page.locator("[data-kind=edge]:focus")).toHaveCount(1);
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { checkConnection, refusalSentence } from "../src/areas/studio/canvas/connection.js";
+import { checkConnectSource } from "../src/areas/studio/canvas/dropGesture.js";
 import { checkSentence, literalSentenceFor } from "../src/areas/studio/draft/checkSentence.js";
 import type { DraftStep } from "../src/areas/studio/draft/createStep.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
@@ -75,6 +76,18 @@ describe("refusalSentence", () => {
       "“Check credit” already has a way out that happens by itself. Add the next one under Ways out, and give it a number.",
     );
     expect(t("canvas.connectNeedsOrder")).toContain("{section}");
+  });
+
+  it("reads the missing-order sentence for the refusal the engine's own check builds", () => {
+    const call = step("step_credit", "Check credit", {
+      type: "subprocess",
+      paths: [{ id: "path_a" as never, to: "step_credit" as never, trigger: "automatic", priority: 1, label: "On", key: "on" }],
+    });
+    const refused = checkConnectSource(false, [{ trigger: "automatic", priority: 1 }], "automatic");
+    expect(refused).toBeDefined();
+    expect(refusalSentence(refused!, draft([call]), call)).toBe(
+      "“Check credit” already has a way out that happens by itself. Add the next one under Ways out, and give it a number.",
+    );
   });
 
   for (const reason of [
