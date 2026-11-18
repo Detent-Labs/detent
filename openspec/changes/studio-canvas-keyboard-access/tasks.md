@@ -57,12 +57,12 @@
 
 ## 7. Verification
 
-- [ ] 7.1 Run `bun run typecheck` and report the last lines. Pass: exit 0.
-- [ ] 7.2 Run `bun run build` and report the last lines. Pass: exit 0.
-- [ ] 7.3 Run the full `bun test` with `DATABASE_URL` set, in the foreground, through the gated script. Pass: 0 fail.
-- [ ] 7.4 Run `bun run lint` and `bun run e2e`. Pass: both are green.
-- [ ] 7.5 On the host, run the prose and whitespace gates over `range.sh < /dev/null`. Pass: both exit 0.
-- [ ] 7.6 Walk 6.2 on the production build, then run `/impeccable critique` and `/impeccable audit` on the Map tab. Pass: each step reads as observed.
+- [x] 7.1 Run `bun run typecheck` and report the last lines. Pass: exit 0.
+- [x] 7.2 Run `bun run build` and report the last lines. Pass: exit 0.
+- [x] 7.3 Run the full `bun test` with `DATABASE_URL` set, in the foreground, through the gated script. Pass: 0 fail.
+- [x] 7.4 Run `bun run lint` and `bun run e2e`. Pass: both are green.
+- [x] 7.5 On the host, run the prose and whitespace gates over `range.sh < /dev/null`. Pass: both exit 0.
+- [x] 7.6 Walk 6.2 on the production build, then run `/impeccable critique` and `/impeccable audit` on the Map tab. Pass: each step reads as observed.
 
 ## Workflow follow-up
 
