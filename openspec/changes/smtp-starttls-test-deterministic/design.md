@@ -2,9 +2,10 @@
 
 ## Context
 
-`test/handlers-notification-email.test.ts:369-385` tests the STARTTLS decision. Its fake server
-(`fakeSmtp`, `:149-220`) splits every byte stream on CRLF and answers each "line". The handler
-sends `STARTTLS`, gets `220` and calls `upgradeTLS` (`src/handlers/notification-email.ts:297`). The
+`test/handlers-notification-email.test.ts:364-384` tests the STARTTLS decision. Its fake server
+(`fakeSmtp`, `:149-220`) splits every byte stream on CRLF and answers each "line". It has no
+`STARTTLS` branch, so it answers that command with its default `250 ok` (`:213`). The handler takes
+any 2xx (`requireOk`, `src/handlers/notification-email.ts:111`) and calls `upgradeTLS` (`:297`). The
 TLS client then sends a ClientHello, and the fake reads it as SMTP text.
 
 When the ClientHello's random bytes hold a CRLF, the fake answers `250 ok`. The TLS client aborts,
@@ -17,61 +18,77 @@ A probe ran 400 upgrades against a CRLF-splitting server in the dev container. I
 timeout.
 
 Only the timeout names the step today (`:371`). It reads the `phase` object that `runSession`
-updates (`:281-339`). The wire's `close` callback (`:135`) and its `error` callback (`:134`) ignore
-that object.
+updates (`:275-348`). The wire's `close` callback (`:135`) ignores that object. Its `error`
+callback (`:134`) passes Bun's own failure on unchanged.
 
 ## Goals / Non-Goals
 
 Goals:
 
 - The STARTTLS test passes or fails on the handler's behavior alone, never on random bytes.
-- Every transient wire failure names the session step.
+- A session that ends through its wire names the session step.
 
 Non-goals:
 
 - The fake server speaks no TLS. The test checks the handler's decision, and a real handshake adds
   nothing to that.
+- A `4xx` reply keeps its own message, which already names the refused command (`:113`). A refused
+  connection and the lease stop keep theirs too.
 - The split between permanent and transient failures stays as it is.
-- The timeout's own message stays as it is.
 
 ## Decisions
 
-### D1. The fake server goes silent after it answers STARTTLS
+### D1. The fake server answers STARTTLS and then owns the bytes that follow
 
-`fakeSmtp` gains a flag on each connection. The fake sets it right after it writes the `STARTTLS`
-reply. From then on, `data` drops every byte and answers nothing.
+`fakeSmtp` gains a `STARTTLS` branch. It writes `replyFor("STARTTLS", "220 ready to start TLS\r\n")`
+and marks the connection as upgraded. From then on, `data` never reads SMTP lines again. It counts
+the bytes it receives in `bytesAfterStartTls`, and a new option, `afterStartTls`, picks what it does.
 
-A real server hands the socket to its TLS layer at that point. The fake now stops reading there too. The STARTTLS test then stalls
-on every run. The one-second action timeout fires during "TLS handshake".
+- `"silent"`, the default, answers nothing. The STARTTLS test then stalls on every run, and the
+  one-second action timeout fires during "TLS handshake".
+- `"close"` ends the socket when the first bytes after `STARTTLS` arrive.
+- `"plaintext"` answers those first bytes with `250 not tls\r\n`, the old flake on every run.
 
-Every fake answers `STARTTLS` this way, so the flag does not need an option. No test reads SMTP lines after
-the upgrade.
+Both active modes wait for the ClientHello. The handler has started the upgrade by then, so the
+step reads "TLS handshake" before the failure.
 
-### D2. The wire carries the session step into its failures
+### D2. The wire owns the session step
 
-`SmtpWire` takes the `phase` object that `deliverBatch` already builds (`:365`). Its `close`
-callback rejects with "notification.email: the SMTP server closed the connection during <step>".
+`SmtpWire` gains a `phase` field, `{ current: "connect" }`. `runSession` writes `wire.phase.current`
+where it writes `phase.current` today, and the timeout in `deliverBatch` reads the same field.
+`runSession` then takes no `phase` argument.
 
-Its `error` callback wraps the socket's own failure. The message reads "notification.email: the SMTP
-connection failed during <step>: <cause>". Both stay plain `Error`s, so the outbox treats them as
-transient, as before.
+The `close` callback rejects with "notification.email: the SMTP server closed the connection during
+<step>". The `error` callback rejects with "notification.email: the SMTP connection failed during
+<step>: <cause>". It passes the socket's failure on as `cause`. Both stay plain `Error`s, so the
+outbox treats them as transient, as before.
 
-`runSession` keeps updating the same object. The wire reads the step at the moment of failure.
-`deliverBatch` now builds the `phase` object before the wire.
+The wire builds each message when the callback fires. The first failure wins (`fail`, `:186-187`),
+so the step it names is the step at that moment.
 
-### D3. A test for the fast path
+### D3. The TLS handshake step starts before the upgrade
 
-A new fake option, `closeAfterStartTls`, closes the socket after the `220` reply to `STARTTLS`. The
-new test runs the handler against it. The handler must fail as transient, with "TLS handshake" in
-the message. No `AUTH` may reach the fake. That covers the path the flaky test hit by chance, and it
-covers it on every run.
+`runSession` sets the step to "TLS handshake" right before it calls `upgradeTLS`. Today it sets it
+after (`:297-302`). A failure that fires while `upgradeTLS` runs, or that `upgradeTLS` throws, then
+names the handshake. A throw from `upgradeTLS` rejects `runSession` as before and stays transient.
+
+### D4. Tests
+
+- The existing STARTTLS test keeps its assertions and adds one: the fake's `bytesAfterStartTls` is
+  above 0. The handler did start a handshake, and the fake answered none of it.
+- A new test runs the fake in `"close"` mode. It expects a transient failure, "TLS handshake" in the
+  message and no `AUTH`.
+- A new test runs the fake in `"plaintext"` mode with the same three expectations.
+- A new test drives `SmtpWire` directly. It sets a step on a fresh wire and fires the `close`
+  callback. A second fresh wire fires the `error` callback. The test reads each rejection: the step,
+  the cause and a plain `Error`. The class gains an export for that test.
 
 ## Risks / Trade-offs
 
 - A test that asserts the full text of a close message would break. A search of `test/` finds none.
   The existing assertions use `toContain` on a fragment that stays.
-- The wrapped message now carries the socket's own text after a colon. Bun writes that text, and it
-  has no secret. The credential never reaches it.
+- The `error` message now carries the socket's own text after a colon. The credential cannot be in
+  it, since `AUTH` never runs before the upgrade completes.
 
 ## Migration Plan
 

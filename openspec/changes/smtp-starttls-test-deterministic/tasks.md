@@ -1,13 +1,14 @@
 # Tasks
 
-## 1. A deterministic STARTTLS test
+## 1. A deterministic fake after STARTTLS
 
-- [ ] 1.1 Make `fakeSmtp` drop every byte after it answers `STARTTLS`, per D1. Pass: the STARTTLS test passes 200 times in a row with `--rerun-each 200`, filtered to that test.
-- [ ] 1.2 Add the `closeAfterStartTls` option and the new fast-path test, per D3. Pass: before task 2.1 the new test fails on the missing "TLS handshake".
+- [ ] 1.1 Give `fakeSmtp` its `STARTTLS` branch, the `bytesAfterStartTls` count and the `afterStartTls` modes, per D1. Add the `bytesAfterStartTls` assertion to the STARTTLS test, per D4. Pass: the STARTTLS test passes and reads more than 0 bytes after `STARTTLS`.
+- [ ] 1.2 Add the `"close"` and `"plaintext"` tests, per D4. Pass: before task 2.1, both fail on the missing "TLS handshake".
 
-## 2. The session step in every wire failure
+## 2. The wire names the session step
 
-- [ ] 2.1 Pass the `phase` object into `SmtpWire`, and name the step in the wire's `close` and `error` failures, per D2. Pass: the new test from 1.2 passes, and every other test in the file stays green.
+- [ ] 2.1 Move the step into `SmtpWire`, name it in the `close` and `error` messages, and start the handshake step before `upgradeTLS`, per D2 and D3. Pass: the tests from 1.2 pass, and every other test in the file stays green.
+- [ ] 2.2 Add the direct `SmtpWire` test, per D4. Pass: it fails when either callback drops the step.
 
 ## 3. Verification
 
