@@ -77,7 +77,7 @@ export const notificationEmailConfigSchema = z
  */
 export type NotificationEmailResult = { messageId: string; recipients: string[] };
 
-type Reply = { code: number; text: string };
+type Reply = { code: number; text: string; lines: string[] };
 
 type SmtpEnv = { host: string; port: number; user?: string; password?: string; from: string };
 
@@ -272,7 +272,11 @@ function completeReplyEnd(buf: string): number {
 function parseReply(raw: string): Reply {
   const lines = raw.split("\r\n").filter((l) => l.length > 0);
   const last = lines[lines.length - 1] ?? "";
-  return { code: Number(last.slice(0, 3)), text: lines.map((l) => l.slice(4)).join(" ").trim() };
+  return {
+    code: Number(last.slice(0, 3)),
+    text: lines.map((l) => l.slice(4)).join(" ").trim(),
+    lines: lines.map((l) => l.slice(4).trim()),
+  };
 }
 
 /** RFC 2047 encoding, applied only when the subject leaves printable ASCII. */
@@ -331,6 +335,11 @@ function buildMessageId(idempotencyKey: string, from: string, batchNumber?: numb
   return `<${idempotencyKey}${suffix}@${domain}>`;
 }
 
+/** True when an EHLO extension line, any line after the first, opens with the STARTTLS keyword. */
+function offersStartTls(ehlo: Reply): boolean {
+  return ehlo.lines.slice(1).some((line) => line.split(/\s/)[0]?.toUpperCase() === "STARTTLS");
+}
+
 /** One SMTP session: the whole conversation for one batch, ending with the point of no return. */
 async function runSession(
   wire: SmtpWire,
@@ -350,7 +359,9 @@ async function runSession(
   wire.write(`EHLO ${clientName(env.from)}\r\n`);
   let ehlo = requireOk(await wire.next(), "EHLO");
 
-  if (/\bSTARTTLS\b/i.test(ehlo.text)) {
+  // The first line carries the server's own name, so only the extension lines
+  // (RFC 5321 §4.1.1.1) can offer STARTTLS.
+  if (offersStartTls(ehlo)) {
     phase.current = "STARTTLS";
     wire.write("STARTTLS\r\n");
     requireOk(await wire.next(), "STARTTLS");

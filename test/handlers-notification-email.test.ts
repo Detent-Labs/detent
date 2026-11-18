@@ -488,6 +488,24 @@ test("a completed handshake releases the wire, and the bytes held before it are 
   expect((await wire.next()).text).toBe("fresh");
 });
 
+test("a server name holding starttls is no STARTTLS offer", async () => {
+  await withFake(
+    { replies: { EHLO: "250-starttls-relay.example.test greets you\r\n250 SIZE 10240000\r\n" } },
+    async (server) => {
+      await mailDef.handler(ctxFor(validConfig));
+      expect(server.commands).not.toContain("STARTTLS");
+      expect(server.messages).toHaveLength(1);
+    },
+  );
+});
+
+test("a STARTTLS extension line is taken in any letter case", async () => {
+  await withFake({ replies: { EHLO: "250-relay.example.test\r\n250-starttls\r\n250 SIZE 1\r\n" }, afterStartTls: "close" }, async (server) => {
+    await rejects(mailDef.handler(ctxFor(validConfig)));
+    expect(server.commands).toContain("STARTTLS");
+  });
+});
+
 test("credentials without STARTTLS are refused permanently", async () => {
   await withFake(
     { offerStartTls: false },
