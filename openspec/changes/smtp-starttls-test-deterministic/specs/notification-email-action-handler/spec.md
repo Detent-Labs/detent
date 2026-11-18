@@ -35,3 +35,15 @@ either case.
   handshake completes
 - **THEN** the handler reads none of it as an SMTP reply
 - **AND** the delivery fails as transient during the TLS handshake, and no `AUTH` reaches the server
+
+### Requirement: The handler reads STARTTLS from the EHLO extension lines alone
+
+The handler SHALL take a server's `STARTTLS` offer from the `EHLO` reply's extension lines alone.
+Those are the lines after the first. A line offers it when its first word equals `STARTTLS`,
+ignoring case. The first line names the server, and a name that holds the word SHALL offer nothing.
+
+#### Scenario: A server named after STARTTLS offers nothing
+
+- **WHEN** the `EHLO` reply's first line holds "starttls" in the server's name, and no extension
+  line offers `STARTTLS`
+- **THEN** the handler sends no `STARTTLS` and goes on without the upgrade

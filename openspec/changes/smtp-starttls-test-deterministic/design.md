@@ -104,6 +104,18 @@ The handler closes it in three places:
 Each of these failures stays a plain `Error`, so it stays transient. The `"plaintext"` fake mode
 then fails during "TLS handshake", and no `AUTH` reaches the fake.
 
+### D6. STARTTLS comes from the extension lines alone
+
+Apply found a second gap. The handler tests the whole `EHLO` reply with `/\bSTARTTLS\b/i`
+(`src/handlers/notification-email.ts:353` at `0521ea96`). The reply's first line carries the server's own name. A
+server whose name holds "starttls" therefore reads as one that offers `STARTTLS`. This worktree's
+pod carries such a name. Mailpit repeats it, and the real-message test failed there with
+`502 STARTTLS rejected`.
+
+The handler now reads the extension lines alone, every line after the first. It takes each line's
+first word and compares it to `STARTTLS`, ignoring case. RFC 5321 §4.1.1.1 places the keywords
+there.
+
 ## Risks / Trade-offs
 
 - A test that asserts the full text of a close message would break. A search of `test/` finds none.
