@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { computeFit, MIN_SCALE, FIT_GUTTER, type Box, type Insets, type Fit } from "../src/areas/studio/canvas/fit.js";
+import { readFileSync } from "node:fs";
+import { computeFit, fitInsets, revealPan, MIN_SCALE, FIT_GUTTER, type Box, type Insets, type Fit } from "../src/areas/studio/canvas/fit.js";
 
 /**
  * Where the content box lands on screen, in the element's own pixel space.
@@ -177,5 +178,89 @@ describe("canvas fit: an empty canvas", () => {
 
   it("returns a neutral fit for a zero-sized element", () => {
     expect(computeFit(GRAPH, { width: 0, height: 0 }, INSETS)).toEqual({ scale: 1, x: 0, y: 0 });
+  });
+});
+
+describe("canvas fit: the insets", () => {
+  it("clears the toolbar's bottom edge plus the gutter on top, the gutter elsewhere", () => {
+    expect(fitInsets(46)).toEqual({ top: 46 + FIT_GUTTER, right: FIT_GUTTER, bottom: FIT_GUTTER, left: FIT_GUTTER });
+  });
+});
+
+describe("canvas fit: revealPan", () => {
+  const view = { width: 800, height: 600 };
+  const insets = fitInsets(46);
+  // Room between the insets: x 16..784, y 62..584.
+
+  for (const scale of [1, 0.5, 2]) {
+    const current: Fit = { scale, x: 30, y: -20 };
+    const tag = `at scale ${scale}`;
+
+    it(`leaves a box in view where it is, ${tag}`, () => {
+      const box: Box = { x: 100, y: 100, width: 100, height: 60 };
+      expect(revealPan(box, view, insets, current)).toEqual(current);
+    });
+
+    it(`shifts a box past the right edge left until it meets the inset, ${tag}`, () => {
+      const box: Box = { x: 750, y: 100, width: 100, height: 60 };
+      const next = revealPan(box, view, insets, current);
+      expect(next.scale).toBe(scale);
+      expect(next.y).toBe(current.y);
+      expect(next.x).toBeCloseTo(current.x - (850 - (800 - FIT_GUTTER)) / scale, 9);
+    });
+
+    it(`shifts a box past the left edge right until it meets the inset, ${tag}`, () => {
+      const box: Box = { x: -40, y: 100, width: 100, height: 60 };
+      const next = revealPan(box, view, insets, current);
+      expect(next.x).toBeCloseTo(current.x + (FIT_GUTTER + 40) / scale, 9);
+      expect(next.y).toBe(current.y);
+    });
+
+    it(`shifts a box past the bottom edge up until it meets the inset, ${tag}`, () => {
+      const box: Box = { x: 100, y: 560, width: 100, height: 60 };
+      const next = revealPan(box, view, insets, current);
+      expect(next.y).toBeCloseTo(current.y - (620 - (600 - FIT_GUTTER)) / scale, 9);
+      expect(next.x).toBe(current.x);
+    });
+
+    it(`shifts a box under the toolbar inset down, ${tag}`, () => {
+      const box: Box = { x: 100, y: 20, width: 100, height: 60 };
+      const next = revealPan(box, view, insets, current);
+      expect(next.y).toBeCloseTo(current.y + (insets.top - 20) / scale, 9);
+      expect(next.x).toBe(current.x);
+    });
+
+    it(`aligns a box wider than the room to the left inset, ${tag}`, () => {
+      const box: Box = { x: 300, y: 100, width: 900, height: 60 };
+      const next = revealPan(box, view, insets, current);
+      expect(next.x).toBeCloseTo(current.x + (insets.left - 300) / scale, 9);
+    });
+
+    it(`aligns a box taller than the room to the top inset, ${tag}`, () => {
+      const box: Box = { x: 100, y: 300, width: 100, height: 700 };
+      const next = revealPan(box, view, insets, current);
+      expect(next.y).toBeCloseTo(current.y + (insets.top - 300) / scale, 9);
+    });
+
+    it(`puts the revealed box inside the room, ${tag}`, () => {
+      const box: Box = { x: 790, y: 590, width: 100, height: 60 };
+      const next = revealPan(box, view, insets, current);
+      const dx = (next.x - current.x) * scale;
+      const dy = (next.y - current.y) * scale;
+      expect(box.x + dx + box.width).toBeCloseTo(view.width - insets.right, 9);
+      expect(box.y + dy + box.height).toBeCloseTo(view.height - insets.bottom, 9);
+    });
+  }
+});
+
+describe("canvas frame: clips instead of scrolling", () => {
+  const source = readFileSync(new URL("../src/areas/studio/canvas/CanvasView.tsx", import.meta.url), "utf8");
+
+  it("sets overflow: \"clip\" on the wrap style", () => {
+    expect(/wrap: \{[^}]*?overflow: "clip"/s.test(source)).toBe(true);
+  });
+
+  it("passes overflow: \"clip\" to Panzoom", () => {
+    expect(/Panzoom\(el, \{[^}]*?overflow: "clip"/s.test(source)).toBe(true);
   });
 });

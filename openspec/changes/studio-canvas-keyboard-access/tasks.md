@@ -2,14 +2,14 @@
 
 ## 1. The frame clips without scrolling
 
-- [ ] 1.1 Install the impeccable skill and its detector hook in this worktree, as `CLAUDE.md` asks. Pass: `impeccable hook < /dev/null` exits 0 here.
-- [ ] 1.2 Set `overflow: "clip"` on the compiled `wrap` style and in the `Panzoom(el, {...})` options, per D1. Rewrite the `measureFit` comment that names `overflow: hidden`. Pass: a source-text test in `packages/web/test/studio-canvas-fit.test.ts` reads `overflow: "clip"` in both places.
-- [ ] 1.3 Pass `{ preventScroll: true }` to every `focus()` call under `canvas/`, per D1. That covers `CanvasView.tsx` and the new `WayOutMenu.tsx`. Pass: `git grep -n '\.focus()' -- packages/web/src/areas/studio/canvas/` prints nothing.
+- [x] 1.1 Install the impeccable skill and its detector hook in this worktree, as `CLAUDE.md` asks. Pass: `impeccable hook < /dev/null` exits 0 here.
+- [x] 1.2 Set `overflow: "clip"` on the compiled `wrap` style and in the `Panzoom(el, {...})` options, per D1. Rewrite the `measureFit` comment that names `overflow: hidden`. Pass: a source-text test in `packages/web/test/studio-canvas-fit.test.ts` reads `overflow: "clip"` in both places.
+- [x] 1.3 Pass `{ preventScroll: true }` to every `focus()` call under `canvas/`, per D1. That covers `CanvasView.tsx` and the new `WayOutMenu.tsx`. Pass: `git grep -n '\.focus()' -- packages/web/src/areas/studio/canvas/` prints nothing.
 
 ## 2. Reveal on focus
 
-- [ ] 2.1 Add `revealPan` and the pure `fitInsets(toolbarBottom)` to `canvas/fit.ts`, per D2. Make `measureFit` read its insets through `fitInsets`. Pass: `packages/web/test/studio-canvas-fit.test.ts` covers a box past each edge and a box under the toolbar inset. It also covers a box in view and a box larger than the room. Each case also runs at a scale other than 1. A case pins the insets `fitInsets` returns.
-- [ ] 2.2 Export `lastInputWasPointer()` from `focusScroll.ts`, per D2. Reveal from the `<svg>`'s `onFocus` only when it returns false, and skip a root focus. Add no `scrollIntoView` call. Pass: `packages/web/test/studio-focusScroll.test.ts` shows the reader true after `noteInputModality("pointer")` and false after `noteInputModality("keyboard")`. The first smoke flow in 6.1 finds the focused step's box inside the frame after Down. The 6.2 walk covers a Tab entry and a click.
+- [x] 2.1 Add `revealPan` and the pure `fitInsets(toolbarBottom)` to `canvas/fit.ts`, per D2. Make `measureFit` read its insets through `fitInsets`. Pass: `packages/web/test/studio-canvas-fit.test.ts` covers a box past each edge and a box under the toolbar inset. It also covers a box in view and a box larger than the room. Each case also runs at a scale other than 1. A case pins the insets `fitInsets` returns.
+- [x] 2.2 Export `lastInputWasPointer()` from `focusScroll.ts`, per D2. Reveal from the `<svg>`'s `onFocus` only when it returns false, and skip a root focus. Add no `scrollIntoView` call. Pass: `packages/web/test/studio-focusScroll.test.ts` shows the reader true after `noteInputModality("pointer")` and false after `noteInputModality("keyboard")`. The first smoke flow in 6.1 finds the focused step's box inside the frame after Down. The 6.2 walk covers a Tab entry and a click.
 
 ## 3. Zoom keys and the live region
 

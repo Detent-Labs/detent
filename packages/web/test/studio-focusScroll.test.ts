@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { focusVisible, noteInputModality, scrollKeyboardFocusIntoView } from "../src/areas/studio/focusScroll.js";
+import { focusVisible, lastInputWasPointer, noteInputModality, scrollKeyboardFocusIntoView } from "../src/areas/studio/focusScroll.js";
 
 /**
  * `scrollKeyboardFocusIntoView` runs on a surface root's `onFocusCapture`
@@ -91,5 +91,14 @@ describe("focusVisible", () => {
 
   it("reads false where the selector throws", () => {
     expect(focusVisible(target({ visible: "throws" }).element)).toBe(false);
+  });
+});
+
+describe("lastInputWasPointer", () => {
+  it("reads true after a pointer input and false after a key", () => {
+    noteInputModality("pointer");
+    expect(lastInputWasPointer()).toBe(true);
+    noteInputModality("keyboard");
+    expect(lastInputWasPointer()).toBe(false);
   });
 });

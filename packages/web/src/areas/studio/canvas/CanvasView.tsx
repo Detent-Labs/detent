@@ -28,7 +28,8 @@ import {
 } from "./geometry";
 import { toggleSelection, normalizeRect, nodesInRect } from "./selection";
 import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups";
-import { computeFit, MIN_SCALE, MAX_SCALE, FIT_GUTTER, type Fit } from "./fit";
+import { computeFit, fitInsets, revealPan, MIN_SCALE, MAX_SCALE, type Fit } from "./fit";
+import { lastInputWasPointer } from "../focusScroll";
 import { resolveDropGesture } from "./dropGesture";
 import {
   nodeName,
@@ -91,7 +92,7 @@ const styles = stylex.create({
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: colors.border,
-    overflow: "hidden",
+    overflow: "clip",
     backgroundColor: colors.surfaceMuted,
     backgroundImage: `radial-gradient(${colors.border} 1px, transparent 1px)`,
     // paintGrid() writes these two custom properties via style.setProperty()
@@ -696,10 +697,11 @@ export function CanvasView({
     //
     // Two properties of `.canvas-svg` and `.canvas-wrap` make these two the
     // right reading, and a change to either would break this silently:
-    //   - `.canvas-wrap` is `overflow: hidden`. A transform can otherwise
+    //   - `.canvas-wrap` is `overflow: clip`. A transform can otherwise
     //     grow an ancestor's scrollable overflow, and a classic scrollbar
     //     appearing re-lays out a `width: 100%` child, which would feed the
-    //     zoom back into the measurement after all.
+    //     zoom back into the measurement after all. A clip box is no scroll
+    //     container, so a focus can never scroll it either.
     //   - `.canvas-svg` carries no padding. `clientWidth` is the padding box,
     //     while an SVG with no `viewBox` anchors user space to the content
     //     box; padding would offset the origin and overstate the viewport.
@@ -719,7 +721,7 @@ export function CanvasView({
     const toolbar = toolbarRef.current;
     const toolbarBottom = toolbar ? toolbar.offsetTop + toolbar.offsetHeight : 0;
 
-    return computeFit(content, element, { top: toolbarBottom + FIT_GUTTER, right: FIT_GUTTER, bottom: FIT_GUTTER, left: FIT_GUTTER });
+    return computeFit(content, element, fitInsets(toolbarBottom));
   };
 
   // Layout, not passive: the auto-fit effect below reads `panzoomRef` and
@@ -760,6 +762,8 @@ export function CanvasView({
       minScale: MIN_SCALE,
       maxScale: MAX_SCALE,
       canvas: true,
+      // Panzoom writes the parent's overflow inline, so the class alone loses.
+      overflow: "clip",
       startScale: initialFit.scale,
       startX: initialFit.x,
       startY: initialFit.y,
@@ -1020,7 +1024,7 @@ export function CanvasView({
     setFocus(next);
     // The element already stands in the DOM at `tabindex="-1"`, which
     // `focus()` accepts; the next render hands it the stop.
-    elementFor(next)?.focus();
+    elementFor(next)?.focus({ preventScroll: true });
   };
 
   // A focus the canvas stops drawing — its group collapsed, its step deleted
@@ -1049,6 +1053,35 @@ export function CanvasView({
     const fit = measureFit(svg);
     panzoom.zoom(fit.scale, { animate: false });
     panzoom.pan(fit.x, fit.y, { animate: false });
+  };
+
+  /** Pans the focused element into the frame by the least distance. The frame
+   * never transforms, so its rect and border give one pixel space for a node,
+   * a path and a disclosure button alike. A pointer focus and a root focus
+   * reveal nothing. */
+  const revealFocused = (e: React.FocusEvent<SVGSVGElement>) => {
+    const panzoom = panzoomRef.current;
+    const svg = svgRef.current;
+    const frame = svg?.parentElement;
+    if (!panzoom || !svg || !frame || e.target === svg || lastInputWasPointer()) return;
+    const rect = (e.target as Element).getBoundingClientRect();
+    const frameRect = frame.getBoundingClientRect();
+    const toolbar = toolbarRef.current;
+    const toolbarBottom = toolbar ? toolbar.offsetTop + toolbar.offsetHeight : 0;
+    const pan = panzoom.getPan();
+    const current: Fit = { scale: panzoom.getScale(), x: pan.x, y: pan.y };
+    const next = revealPan(
+      {
+        x: rect.left - frameRect.left - frame.clientLeft,
+        y: rect.top - frameRect.top - frame.clientTop,
+        width: rect.width,
+        height: rect.height,
+      },
+      { width: frame.clientWidth, height: frame.clientHeight },
+      fitInsets(toolbarBottom),
+      current,
+    );
+    if (next.x !== current.x || next.y !== current.y) panzoom.pan(next.x, next.y, { animate: false });
   };
 
   // Centers the graph on open, so an author never has to click "Fit to
@@ -1367,7 +1400,7 @@ export function CanvasView({
       // The stop moves with the focus. Without that move Tab walks straight
       // back in, since the roving `0` would still sit inside the `<svg>`.
       setFocus({ kind: "root" });
-      svgRef.current?.focus();
+      svgRef.current?.focus({ preventScroll: true });
       return;
     }
     if (e.key === "Enter") {
@@ -1559,6 +1592,7 @@ export function CanvasView({
         // the roving stop only once a focus names it.
         tabIndex={focus.kind === "root" ? 0 : -1}
         onKeyDown={onCanvasKeyDown}
+        onFocus={revealFocused}
         onPointerMove={(e) => {
           onNodePointerMove(e);
           onHandlePointerMove(e);
