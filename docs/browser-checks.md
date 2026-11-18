@@ -3296,8 +3296,8 @@ Scroll the page so the canvas sits below the fold, then press each arrow. Pass:
 focus moves and the page holds still. An arrow that scrolls the page means a
 missing `preventDefault`.
 
-Focus a step and press Enter. Pass: the Steps tab opens on that step, the
-node draws as selected, and the focus ring sits on the Name input.
+Focus a step and press Enter. Pass: the Steps tab opens on that step and the
+node draws as selected. The focus ring sits on the Name input.
 
 Press Escape from that node. Pass: the outline lands on the `<svg>` itself.
 Press Tab. Pass: the stop leaves the canvas and reaches the control after it,
