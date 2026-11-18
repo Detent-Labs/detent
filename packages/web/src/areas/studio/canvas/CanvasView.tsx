@@ -9,11 +9,12 @@ import { newStep } from "../draft/createStep";
 import { newPath, triggerForNewPath } from "../draft/createPath";
 import { seedLocalizedText } from "../draft/localized-text";
 import { t } from "../catalog.js";
-import { drawnPositions, type LayoutStep } from "./layout";
+import { drawnPositions, COLUMN_WIDTH, type LayoutStep } from "./layout";
 import {
   dragDelta,
   exceedsClickThreshold,
   snapToGrid,
+  freeLatticePoint,
   svgPointFromClient,
   routeThroughWaypoints,
   legOfSegment,
@@ -30,7 +31,10 @@ import { toggleSelection, normalizeRect, nodesInRect } from "./selection";
 import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups";
 import { computeFit, fitInsets, revealPan, zoomAbout, ZOOM_KEY_FACTOR, MIN_SCALE, MAX_SCALE, type Fit } from "./fit";
 import { lastInputWasPointer } from "../focusScroll";
-import { resolveDropGesture } from "./dropGesture";
+import { checkConnectSource, resolveDropGesture } from "./dropGesture";
+import { refusalSentence } from "./connection";
+import { wayOutMenuItems, type WayOutMenuItem } from "./wayOutMenuLogic";
+import { WayOutMenu, openWayOutMenu } from "./WayOutMenu";
 import {
   nodeName,
   pathName,
@@ -53,7 +57,7 @@ import {
   startArrowObstacle,
   type Obstacle, type SentenceBox, type SentenceInput } from "./sentencePlacement";
 import { nextFocus, entryFocus, type ArrowKey, type Focus } from "./traversal";
-import { stepTextMap } from "../panels/shared/optionText";
+import { fill, stepTextMap } from "../panels/shared/optionText";
 import { buildOperands } from "../panels/shared/conditionLogic";
 
 const HANDLE_RADIUS = 7;
@@ -67,6 +71,9 @@ const SENTENCE_HOST_HEIGHT = 96;
  * one control shape, and the connect handle owns it (design.md). */
 const WAYPOINT_HANDLE = 10;
 const REJECT_MESSAGE_MS = 4000;
+/** How far into a node the `C` key's refusal hangs from its top edge, in
+ * pixels, so the message's bottom border covers that edge. */
+const REFUSAL_INSET = 2;
 /** The disclosure button's side, in user units. It sits inside the group's own
  * 20-unit margin, so no member node reaches it. */
 const DISCLOSURE_SIZE = 20;
@@ -1361,12 +1368,55 @@ export function CanvasView({
 
   const onHandlePointerMove = (e: React.PointerEvent) => trackPointer(connectDrag, setConnectDrag, { current: toSvgPoint(e) });
 
+  /** Shows a refusal at a client point and speaks it. The message is an
+   * absolutely positioned child of `.canvas-wrap`, so the point is measured
+   * against the frame, which never transforms, inside its border. */
   const showRejection = (e: { clientX: number; clientY: number }, text: string) => {
-    // Screen-relative, not the SVG's (panned/zoomed) user-space `point` — the
-    // message is an absolutely-positioned HTML sibling of the SVG.
-    const rect = svgRef.current?.getBoundingClientRect();
-    setRejectMessage({ text, x: rect ? e.clientX - rect.left : 0, y: rect ? e.clientY - rect.top : 0 });
+    const frame = svgRef.current?.parentElement;
+    const rect = frame?.getBoundingClientRect();
+    setRejectMessage({
+      text,
+      x: frame && rect ? e.clientX - rect.left - frame.clientLeft : 0,
+      y: frame && rect ? e.clientY - rect.top - frame.clientTop : 0,
+    });
     setTimeout(() => setRejectMessage(null), REJECT_MESSAGE_MS);
+    announce(text);
+  };
+
+  /**
+   * Adds a way out from the step at `sourceIndex`, with the trigger a new path
+   * out of it takes. A step id target adds the path alone. A point target
+   * mints a task step there first, then the path to it. The connect drop and
+   * the way-out menu both call this, so the two add the same way out.
+   */
+  const addWayOut = (sourceIndex: number, target: { stepId: string } | { at: Point }): { pathId: string; targetId: string } | undefined => {
+    const sourceStep = steps[sourceIndex];
+    if (!sourceStep?.id) return undefined;
+    const existingPaths = sourceStep.paths ?? [];
+    const trigger = triggerForNewPath(sourceStep);
+    if ("stepId" in target) {
+      const targetStep = steps.find((s) => s.id === target.stepId);
+      const path = newPath(sourceStep, targetStep, target.stepId, trigger, contentLocale, baseLocale, t("steps.unnamedStep"));
+      updateInDraftArray(mutate, (d) => d.workflow?.steps?.[sourceIndex], { paths: [...existingPaths, path] });
+      return path.id ? { pathId: path.id, targetId: target.stepId } : undefined;
+    }
+    // The step first, then the path (design.md): a refused candidate never
+    // reaches here, and this order keeps an orphan step impossible even if the
+    // check moves.
+    const step = newStep("task", seedLocalizedText(contentLocale));
+    const path = newPath(sourceStep, step, step.id, trigger, contentLocale, baseLocale, t("steps.unnamedStep"));
+    mutate((d) => {
+      d.workflow ??= {};
+      d.workflow.steps ??= [];
+      d.workflow.steps.push(step);
+      const source = d.workflow.steps[sourceIndex];
+      if (source) {
+        source.paths ??= [];
+        source.paths.push(path);
+      }
+    });
+    if (step.id) onMoveStep(step.id, target.at);
+    return path.id && step.id ? { pathId: path.id, targetId: step.id } : undefined;
   };
 
   const onHandlePointerUp = (e: React.PointerEvent) => {
@@ -1385,46 +1435,20 @@ export function CanvasView({
     const sourceStep = steps[sourceIndex];
 
     if (sourceStep?.id) {
-      const existingPaths = sourceStep.paths ?? [];
-      const candidateTrigger = triggerForNewPath(sourceStep);
       // Visible nodes only: a hidden member is not a connect-drag target, or
       // a release over a collapsed box would create a path to a step nobody
       // can see.
-      const result = resolveDropGesture(point, visibleNodePositions, existingPaths, candidateTrigger, sourceStep.terminal === true);
+      const result = resolveDropGesture(
+        point,
+        visibleNodePositions,
+        sourceStep.paths ?? [],
+        triggerForNewPath(sourceStep),
+        sourceStep.terminal === true,
+      );
 
-      if (result.kind === "rejected") {
-        showRejection(e, result.reason);
-      } else if (result.kind === "connect-to-step") {
-        const targetStep = steps.find((s) => s.id === result.targetStepId);
-        const path = newPath(
-          sourceStep,
-          targetStep,
-          result.targetStepId,
-          result.trigger,
-          contentLocale,
-          baseLocale,
-          t("steps.unnamedStep"),
-        );
-        updateInDraftArray(mutate, (d) => d.workflow?.steps?.[sourceIndex], { paths: [...existingPaths, path] });
-      } else {
-        // create-step-and-connect: the step first, then the path (design.md)
-        // — a candidate already accepted by resolveDropGesture above never
-        // leaves an orphan step behind, but ordering it this way keeps that
-        // true even if a future change moves the check.
-        const step = newStep("task", seedLocalizedText(contentLocale));
-        const path = newPath(sourceStep, step, step.id, result.trigger, contentLocale, baseLocale, t("steps.unnamedStep"));
-        mutate((d) => {
-          d.workflow ??= {};
-          d.workflow.steps ??= [];
-          d.workflow.steps.push(step);
-          const source = d.workflow.steps[sourceIndex];
-          if (source) {
-            source.paths ??= [];
-            source.paths.push(path);
-          }
-        });
-        if (step.id) onMoveStep(step.id, result.point);
-      }
+      if (result.kind === "rejected") showRejection(e, refusalSentence(result, draft, sourceStep));
+      else if (result.kind === "connect-to-step") addWayOut(sourceIndex, { stepId: result.targetStepId });
+      else addWayOut(sourceIndex, { at: result.point });
     }
     setConnectDrag(null);
   };
@@ -1441,6 +1465,68 @@ export function CanvasView({
    * repeats (design.md D11). */
   const stepTexts = useMemo(() => stepTextMap(steps, contentLocale, baseLocale), [steps, contentLocale, baseLocale]);
   const nameText = (id: string | undefined) => (id !== undefined ? stepTexts.get(id) : undefined) ?? t("steps.unnamedStep");
+
+  // The way-out menu. Its items follow what a connect drop can reach; the
+  // source is the step `C` opened it on.
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuSourceId, setMenuSourceId] = useState<string | undefined>(undefined);
+  const menuItems = useMemo(() => wayOutMenuItems(steps, hidden, stepTexts), [steps, hidden, stepTexts]);
+  // A way out the menu added, waiting for its `<g>` to draw.
+  const [pendingPath, setPendingPath] = useState<{ pathId: string; sourceId: string; targetId: string } | undefined>(undefined);
+
+  useLayoutEffect(() => {
+    if (!pendingPath) return;
+    if (!steps.some((s) => s.paths?.some((p) => p.id === pendingPath.pathId))) {
+      setPendingPath(undefined);
+      return;
+    }
+    if (!elementFor({ kind: "path", pathId: pendingPath.pathId, from: "source" })) return;
+    setPendingPath(undefined);
+    moveFocus({ kind: "path", pathId: pendingPath.pathId, from: "source" });
+    announce(fill(t("canvas.wayOutAdded"), { source: nameText(pendingPath.sourceId), target: nameText(pendingPath.targetId) }));
+  }, [pendingPath, drawnPaths]);
+
+  /** The node's own box on screen, without its focus ring or its stamps. */
+  const nodeRectOf = (stepId: string): DOMRect | undefined =>
+    elementFor({ kind: "step", stepId })?.querySelector("rect")?.getBoundingClientRect();
+
+  /** `C` on a step: the menu, or the refusal a connect drop from it shows. */
+  const openWayOutMenuOn = (stepId: string) => {
+    const source = steps.find((s) => s.id === stepId);
+    const rect = nodeRectOf(stepId);
+    if (!source || !rect) return;
+    const refused = checkConnectSource(source.terminal === true, source.paths ?? [], triggerForNewPath(source));
+    if (refused) {
+      // The box hangs from this point. A point on the edge itself can round to
+      // a gap of a fraction of a pixel, so it sits just inside the node.
+      showRejection({ clientX: rect.left + rect.width / 2, clientY: rect.top + REFUSAL_INSET }, refusalSentence(refused, draft, source));
+      return;
+    }
+    const menu = menuRef.current;
+    if (!menu) return;
+    setMenuSourceId(stepId);
+    openWayOutMenu(menu, rect);
+  };
+
+  const onWayOutPicked = (item: WayOutMenuItem) => {
+    const sourceIndex = steps.findIndex((s) => s.id === menuSourceId);
+    const source = steps[sourceIndex];
+    if (!source?.id || item.kind === "separator") return;
+    let added: { pathId: string; targetId: string } | undefined;
+    if (item.kind === "step") added = addWayOut(sourceIndex, { stepId: item.stepId });
+    else {
+      // One column right of the source, where the auto-layout puts a step one
+      // level deeper; a taken spot walks right. Every step counts, hidden ones
+      // too, so the new step never lands on a collapsed group's member.
+      const from = positionOf(source.id);
+      added = addWayOut(sourceIndex, { at: freeLatticePoint(snapToGrid({ x: from.x + COLUMN_WIDTH, y: from.y }), nodePositions) });
+    }
+    if (added) setPendingPath({ ...added, sourceId: source.id });
+  };
+
+  const onWayOutMenuReturn = () => {
+    if (menuSourceId !== undefined) moveFocus({ kind: "step", stepId: menuSourceId });
+  };
 
   /**
    * The canvas's own keyboard. It binds on the `<svg>` rather than on
@@ -1475,6 +1561,13 @@ export function CanvasView({
     }
     // A modified key belongs to the browser: Ctrl with `+` zooms the page.
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key.toLowerCase() === "c") {
+      if (focus.kind !== "step") return;
+      // Keeps a browser's find-as-you-type from taking the letter.
+      e.preventDefault();
+      openWayOutMenuOn(focus.stepId);
+      return;
+    }
     if (e.key === "+" || e.key === "=" || e.key === "-") {
       e.preventDefault();
       zoomByKey(e.key === "-" ? 1 / ZOOM_KEY_FACTOR : ZOOM_KEY_FACTOR);
@@ -1572,6 +1665,7 @@ export function CanvasView({
         transform={`translate(${x}, ${y})`}
         className={`canvas-node panzoom-exclude ${stylex.props(styles.node, stylex.defaultMarker()).className}`}
         role="button"
+        aria-keyshortcuts="C"
         tabIndex={focus.kind === "step" && focus.stepId === step.id ? 0 : -1}
         // `outgoing` counts the paths the traversal reaches, the set the edge
         // pass drew.
@@ -1623,393 +1717,398 @@ export function CanvasView({
   };
 
   return (
-    <div
-      {...stylex.props(styles.wrap)}
-      onPointerDownCapture={onCanvasPointerDownCapture}
-      onPointerMove={onMarqueePointerMove}
-      onPointerUp={onMarqueePointerUp}
-      onLostPointerCapture={() => {
-        if (marquee) setMarquee(null);
-        releasePan();
-      }}
-    >
-      <div className={`panzoom-exclude ${stylex.props(styles.toolbar).className}`} ref={toolbarRef}>
-        <button type="button" className="btn btn-secondary" onClick={fitToView}>
-          {t("canvas.fitToView")}
-        </button>
-        <button
-          type="button"
-          className={`btn btn-secondary ${stylex.props(edgeStyle === "smoothstep" && styles.toolbarToggleActive).className}`}
-          aria-pressed={edgeStyle === "smoothstep"}
-          onClick={() => onEdgeStyleChange(edgeStyle === "smoothstep" ? "step" : "smoothstep")}
-        >
-          {t("canvas.edgeStyleToggle")}
-        </button>
-        <button type="button" className="btn btn-secondary" onClick={onArrange}>
-          {t("canvas.arrange")}
-        </button>
-      </div>
-      <svg
-        ref={svgRef}
-        {...stylex.props(styles.svg)}
-        // `application` is load-bearing, not cosmetic: a screen reader's
-        // browse mode otherwise consumes an arrow key before this handler
-        // sees it. The price is that every element inside must be a named
-        // control, which each node, path and disclosure now is.
-        role="application"
-        aria-label={t("canvas.svgLabel")}
-        // `-1` still answers the `focus()` call Escape makes; the root takes
-        // the roving stop only once a focus names it.
-        tabIndex={focus.kind === "root" ? 0 : -1}
-        onKeyDown={onCanvasKeyDown}
-        onFocus={revealFocused}
-        onPointerMove={(e) => {
-          onNodePointerMove(e);
-          onHandlePointerMove(e);
-        }}
-        onPointerUp={(e) => {
-          onBackgroundPointerUp(e);
+    <>
+      <div
+        {...stylex.props(styles.wrap)}
+        onPointerDownCapture={onCanvasPointerDownCapture}
+        onPointerMove={onMarqueePointerMove}
+        onPointerUp={onMarqueePointerUp}
+        onLostPointerCapture={() => {
+          if (marquee) setMarquee(null);
+          releasePan();
         }}
       >
-        <defs>
-          <marker id="canvas-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 z" {...stylex.props(styles.arrowhead)} />
-          </marker>
-        </defs>
+        <div className={`panzoom-exclude ${stylex.props(styles.toolbar).className}`} ref={toolbarRef}>
+          <button type="button" className="btn btn-secondary" onClick={fitToView}>
+            {t("canvas.fitToView")}
+          </button>
+          <button
+            type="button"
+            className={`btn btn-secondary ${stylex.props(edgeStyle === "smoothstep" && styles.toolbarToggleActive).className}`}
+            aria-pressed={edgeStyle === "smoothstep"}
+            onClick={() => onEdgeStyleChange(edgeStyle === "smoothstep" ? "step" : "smoothstep")}
+          >
+            {t("canvas.edgeStyleToggle")}
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={onArrange}>
+            {t("canvas.arrange")}
+          </button>
+        </div>
+        <svg
+          ref={svgRef}
+          {...stylex.props(styles.svg)}
+          // `application` is load-bearing, not cosmetic: a screen reader's
+          // browse mode otherwise consumes an arrow key before this handler
+          // sees it. The price is that every element inside must be a named
+          // control, which each node, path and disclosure now is.
+          role="application"
+          aria-label={t("canvas.svgLabel")}
+          // `-1` still answers the `focus()` call Escape makes; the root takes
+          // the roving stop only once a focus names it.
+          tabIndex={focus.kind === "root" ? 0 : -1}
+          onKeyDown={onCanvasKeyDown}
+          onFocus={revealFocused}
+          onPointerMove={(e) => {
+            onNodePointerMove(e);
+            onHandlePointerMove(e);
+          }}
+          onPointerUp={(e) => {
+            onBackgroundPointerUp(e);
+          }}
+        >
+          <defs>
+            <marker id="canvas-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" {...stylex.props(styles.arrowhead)} />
+            </marker>
+          </defs>
 
-        {/* Groups draw first, so every node and every route sits over them.
-            A box is a container, not a control: the design language gives it
-            a hairline and no fill, and the grid dots stay visible through it. */}
-        {groupBoxes.map(({ group, box }) => {
-          if (!box) return null;
-          const dragging = groupDrag?.groupId === group.id;
-          const delta = dragging ? dragDelta(groupDrag.startPointer, groupDrag.current) : { x: 0, y: 0 };
-          const moved = dragging ? snapToGrid({ x: box.x + delta.x, y: box.y + delta.y }) : box;
-          const members = group.stepIds.length;
-          // The drag preview offset rides along, so the button follows a group
-          // the author is dragging. The point is the host's corner, not the
-          // button's: the button sits inset by the clearance below, which puts
-          // it back at `box.width - DISCLOSURE_SIZE`.
-          disclosures.push({
-            group,
-            x: moved.x + box.width - DISCLOSURE_SIZE - DISCLOSURE_OUTLINE_CLEARANCE,
-            y: moved.y + box.height - DISCLOSURE_SIZE - DISCLOSURE_OUTLINE_CLEARANCE,
-          });
-          return (
-            <g
-              key={group.id}
-              className={`panzoom-exclude ${stylex.props(styles.group).className}`}
-              onPointerDown={(e) => onGroupPointerDown(e, group)}
-              onPointerMove={onGroupPointerMove}
-              onPointerUp={(e) => onGroupPointerUp(e, group)}
-            >
-              <rect
-                x={moved.x}
-                y={moved.y}
-                width={box.width}
-                height={box.height}
-                rx={0}
-                {...stylex.props(styles.groupBox, group.collapsed && styles.groupBoxCollapsed)}
-              />
-              <text
-                x={moved.x + 8}
-                y={group.collapsed ? moved.y + 24 : moved.y - 6}
-                {...stylex.props(styles.groupName, group.collapsed && styles.groupNameCollapsed)}
-              >
-                {group.name}
-              </text>
-              {group.collapsed && (
-                <text x={moved.x + 8} y={moved.y + 44} {...stylex.props(styles.groupCount)}>
-                  {members} {t("canvas.groupStepCount")}
-                </text>
-              )}
-            </g>
-          );
-        })}
-
-        {drawnPaths.map(({ step, path, pathIndex, routed, mid, sentence, sentenceKey, pathWaypoints }) => {
-          const route = routed.points;
-          const d = routePath(route, edgeStyle);
-          const midX = mid.point.x;
-          const midY = mid.point.y;
-          const isSelected = path.id !== undefined && path.id === selectedPathId;
-          const box = sentenceBoxes.get(sentenceKey);
-          if (sentence !== undefined && box !== undefined) {
-            edgeLabels.push({ key: sentenceKey, box, text: sentence, stepId: step.id as string, pathId: path.id });
-          }
-          // Only the selected path shows handles. Every path showing them
-          // would put a control every twenty pixels on a busy graph.
-          if (isSelected && path.id !== undefined) {
-            const pathId = path.id;
-            for (const [index, w] of pathWaypoints.entries()) {
-              waypointHandles.push({ key: `${pathId}-w${index}`, x: w.x, y: w.y, stepId: step.id as string, pathId, index });
-            }
-            // The midpoint's own segment names a leg, never a list index:
-            // one leg draws as two to six segments.
-            waypointHandles.push({
-              key: `${pathId}-mid`,
-              x: midX,
-              y: midY,
-              stepId: step.id as string,
-              pathId,
-              insertAt: legOfSegment(routed.legStarts, mid.segment),
+          {/* Groups draw first, so every node and every route sits over them.
+              A box is a container, not a control: the design language gives it
+              a hairline and no fill, and the grid dots stay visible through it. */}
+          {groupBoxes.map(({ group, box }) => {
+            if (!box) return null;
+            const dragging = groupDrag?.groupId === group.id;
+            const delta = dragging ? dragDelta(groupDrag.startPointer, groupDrag.current) : { x: 0, y: 0 };
+            const moved = dragging ? snapToGrid({ x: box.x + delta.x, y: box.y + delta.y }) : box;
+            const members = group.stepIds.length;
+            // The drag preview offset rides along, so the button follows a group
+            // the author is dragging. The point is the host's corner, not the
+            // button's: the button sits inset by the clearance below, which puts
+            // it back at `box.width - DISCLOSURE_SIZE`.
+            disclosures.push({
+              group,
+              x: moved.x + box.width - DISCLOSURE_SIZE - DISCLOSURE_OUTLINE_CLEARANCE,
+              y: moved.y + box.height - DISCLOSURE_SIZE - DISCLOSURE_OUTLINE_CLEARANCE,
             });
-          }
-          const isInsertTarget = path.id !== undefined && path.id === insertTargetPathId;
-          // A path with no id draws, but nothing can reference it, so the
-          // traversal never reaches it and it never joins a fan count.
-          if (path.id !== undefined) {
-            outgoingCount.set(step.id as string, (outgoingCount.get(step.id as string) ?? 0) + 1);
-          }
-          return (
-            <g
-              key={path.id ?? `${step.id}-${pathIndex}`}
-              className={`panzoom-exclude ${stylex.props(styles.edgeGroup, stylex.defaultMarker()).className}`}
-              data-kind="edge"
-              data-path-id={path.id}
-              data-step-id={path.id !== undefined ? step.id : undefined}
-              role="button"
-              tabIndex={focus.kind === "path" && focus.pathId === path.id ? 0 : -1}
-              aria-label={pathName(path, nameText(step.id), nameText(path.to), sentence)}
-              // The press takes the roving stop, entered through the source,
-              // which is the end Up and Down walk from. A path with no id
-              // takes none: nothing can name it.
-              onPointerDown={() => {
-                if (path.id !== undefined) moveFocus({ kind: "path", pathId: path.id, from: "source" });
-              }}
-              onPointerUp={(e) => {
-                e.stopPropagation();
-                onSelectStep(step.id, path.id);
-              }}
-              // Opens the source step's Ways out on this way out, the pair
-              // Enter on a focused path calls. A waypoint handle draws
-              // outside this group, so its own double-click never lands here.
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                onSelectStep(step.id, path.id);
-                onOpenStepPage?.(step.id as string, path.id);
-              }}
-            >
-              {/* The halo, not a ring: a stroke holds no offset, so a line's
-                  indicator is a band around the shape. It shares the edge's
-                  own `d` and draws before it, and the 1.5px edge paints over
-                  its middle — a manual path keeps its dash, and about 2px of
-                  accent reads on each side. */}
-              <path d={d} {...stylex.props(styles.edgeFocusHalo)} vectorEffect="non-scaling-stroke" />
-              <path
-                d={d}
-                {...stylex.props(
-                  styles.edge,
-                  path.trigger === "manual" ? styles.edgeManual : styles.edgeAutomatic,
-                  isSelected && styles.edgeSelected,
-                  isInsertTarget && styles.edgeInsertTarget,
-                )}
-                markerEnd="url(#canvas-arrow)"
-              />
-              {/* The same `d`, so the pointer target follows the route
-                  rather than a straight line the canvas no longer draws.
-                  `edgeHitarea` needs `fill: none` for that: a
-                  `<line>` cannot fill, a `<path>` can, and a five-segment
-                  route encloses area SVG would otherwise paint black. */}
-              <path d={d} {...stylex.props(styles.edgeHitarea)} />
-            </g>
-          );
-        })}
-
-        {connectDrag &&
-          (() => {
-            const source = positionOf(connectDrag.sourceStepId);
-            const start = { x: source.x + NODE_WIDTH, y: source.y + NODE_HEIGHT / 2 };
             return (
-              <line
-                x1={start.x}
-                y1={start.y}
-                x2={connectDrag.current.x}
-                y2={connectDrag.current.y}
-                {...stylex.props(styles.edge, styles.edgeDragging)}
+              <g
+                key={group.id}
+                className={`panzoom-exclude ${stylex.props(styles.group).className}`}
+                onPointerDown={(e) => onGroupPointerDown(e, group)}
+                onPointerMove={onGroupPointerMove}
+                onPointerUp={(e) => onGroupPointerUp(e, group)}
+              >
+                <rect
+                  x={moved.x}
+                  y={moved.y}
+                  width={box.width}
+                  height={box.height}
+                  rx={0}
+                  {...stylex.props(styles.groupBox, group.collapsed && styles.groupBoxCollapsed)}
+                />
+                <text
+                  x={moved.x + 8}
+                  y={group.collapsed ? moved.y + 24 : moved.y - 6}
+                  {...stylex.props(styles.groupName, group.collapsed && styles.groupNameCollapsed)}
+                >
+                  {group.name}
+                </text>
+                {group.collapsed && (
+                  <text x={moved.x + 8} y={moved.y + 44} {...stylex.props(styles.groupCount)}>
+                    {members} {t("canvas.groupStepCount")}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {drawnPaths.map(({ step, path, pathIndex, routed, mid, sentence, sentenceKey, pathWaypoints }) => {
+            const route = routed.points;
+            const d = routePath(route, edgeStyle);
+            const midX = mid.point.x;
+            const midY = mid.point.y;
+            const isSelected = path.id !== undefined && path.id === selectedPathId;
+            const box = sentenceBoxes.get(sentenceKey);
+            if (sentence !== undefined && box !== undefined) {
+              edgeLabels.push({ key: sentenceKey, box, text: sentence, stepId: step.id as string, pathId: path.id });
+            }
+            // Only the selected path shows handles. Every path showing them
+            // would put a control every twenty pixels on a busy graph.
+            if (isSelected && path.id !== undefined) {
+              const pathId = path.id;
+              for (const [index, w] of pathWaypoints.entries()) {
+                waypointHandles.push({ key: `${pathId}-w${index}`, x: w.x, y: w.y, stepId: step.id as string, pathId, index });
+              }
+              // The midpoint's own segment names a leg, never a list index:
+              // one leg draws as two to six segments.
+              waypointHandles.push({
+                key: `${pathId}-mid`,
+                x: midX,
+                y: midY,
+                stepId: step.id as string,
+                pathId,
+                insertAt: legOfSegment(routed.legStarts, mid.segment),
+              });
+            }
+            const isInsertTarget = path.id !== undefined && path.id === insertTargetPathId;
+            // A path with no id draws, but nothing can reference it, so the
+            // traversal never reaches it and it never joins a fan count.
+            if (path.id !== undefined) {
+              outgoingCount.set(step.id as string, (outgoingCount.get(step.id as string) ?? 0) + 1);
+            }
+            return (
+              <g
+                key={path.id ?? `${step.id}-${pathIndex}`}
+                className={`panzoom-exclude ${stylex.props(styles.edgeGroup, stylex.defaultMarker()).className}`}
+                data-kind="edge"
+                data-path-id={path.id}
+                data-step-id={path.id !== undefined ? step.id : undefined}
+                role="button"
+                tabIndex={focus.kind === "path" && focus.pathId === path.id ? 0 : -1}
+                aria-label={pathName(path, nameText(step.id), nameText(path.to), sentence)}
+                // The press takes the roving stop, entered through the source,
+                // which is the end Up and Down walk from. A path with no id
+                // takes none: nothing can name it.
+                onPointerDown={() => {
+                  if (path.id !== undefined) moveFocus({ kind: "path", pathId: path.id, from: "source" });
+                }}
+                onPointerUp={(e) => {
+                  e.stopPropagation();
+                  onSelectStep(step.id, path.id);
+                }}
+                // Opens the source step's Ways out on this way out, the pair
+                // Enter on a focused path calls. A waypoint handle draws
+                // outside this group, so its own double-click never lands here.
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  onSelectStep(step.id, path.id);
+                  onOpenStepPage?.(step.id as string, path.id);
+                }}
+              >
+                {/* The halo, not a ring: a stroke holds no offset, so a line's
+                    indicator is a band around the shape. It shares the edge's
+                    own `d` and draws before it, and the 1.5px edge paints over
+                    its middle — a manual path keeps its dash, and about 2px of
+                    accent reads on each side. */}
+                <path d={d} {...stylex.props(styles.edgeFocusHalo)} vectorEffect="non-scaling-stroke" />
+                <path
+                  d={d}
+                  {...stylex.props(
+                    styles.edge,
+                    path.trigger === "manual" ? styles.edgeManual : styles.edgeAutomatic,
+                    isSelected && styles.edgeSelected,
+                    isInsertTarget && styles.edgeInsertTarget,
+                  )}
+                  markerEnd="url(#canvas-arrow)"
+                />
+                {/* The same `d`, so the pointer target follows the route
+                    rather than a straight line the canvas no longer draws.
+                    `edgeHitarea` needs `fill: none` for that: a
+                    `<line>` cannot fill, a `<path>` can, and a five-segment
+                    route encloses area SVG would otherwise paint black. */}
+                <path d={d} {...stylex.props(styles.edgeHitarea)} />
+              </g>
+            );
+          })}
+
+          {connectDrag &&
+            (() => {
+              const source = positionOf(connectDrag.sourceStepId);
+              const start = { x: source.x + NODE_WIDTH, y: source.y + NODE_HEIGHT / 2 };
+              return (
+                <line
+                  x1={start.x}
+                  y1={start.y}
+                  x2={connectDrag.current.x}
+                  y2={connectDrag.current.y}
+                  {...stylex.props(styles.edge, styles.edgeDragging)}
+                />
+              );
+            })()}
+
+          {/* Each drawn group's members sit inside one `<g>`, the element both
+              disclosure controls name in `aria-controls`. The wrapper renders in
+              both states; a collapsed group's holds nothing, so the attribute
+              never points at an element that is not there. */}
+          {(() => {
+            const emitted = new Set<string>();
+            return steps.map((step) => {
+              if (!step.id) return null;
+              const boxed = groupBoxes.find(({ group }) => group.stepIds.includes(step.id as string));
+              if (!boxed) return renderNode(step);
+              if (emitted.has(boxed.group.id)) return null;
+              emitted.add(boxed.group.id);
+              return (
+                <g key={boxed.group.id} id={groupMembersDomId(boxed.group.id)}>
+                  {steps.filter((s) => s.id !== undefined && boxed.group.stepIds.includes(s.id)).map(renderNode)}
+                </g>
+              );
+            });
+          })()}
+
+          {edgeLabels.map((label) => (
+            <EdgeLabel
+              key={label.key}
+              box={label.box}
+              text={label.text}
+              stepId={label.stepId}
+              pathId={label.pathId}
+              // The press takes the roving stop exactly as the line's does.
+              onPress={() => {
+                if (label.pathId !== undefined) moveFocus({ kind: "path", pathId: label.pathId, from: "source" });
+              }}
+              onSelect={() => onSelectStep(label.stepId, label.pathId)}
+              onOpen={() => {
+                onSelectStep(label.stepId, label.pathId);
+                onOpenStepPage?.(label.stepId, label.pathId);
+              }}
+            />
+          ))}
+
+          {waypointHandles.map((h) => {
+            // The drag previews where the handle will land, snapped, so the
+            // square under the pointer is the square the author gets.
+            const dragging =
+              waypointDrag?.pathId === h.pathId &&
+              waypointDrag.index === h.index &&
+              waypointDrag.insertAt === h.insertAt;
+            const at = dragging ? snapToGrid(waypointDrag.current) : { x: h.x, y: h.y };
+            return (
+              <rect
+                key={h.key}
+                x={at.x - WAYPOINT_HANDLE / 2}
+                y={at.y - WAYPOINT_HANDLE / 2}
+                width={WAYPOINT_HANDLE}
+                height={WAYPOINT_HANDLE}
+                rx={0}
+                // `panzoom-exclude` is load-bearing, and the browser check
+                // earned it: Panzoom's down-handler calls `stopPropagation` at
+                // `.canvas-wrap`, and React listens at the root, an ancestor.
+                // Without the class the press never reaches this rect and pans
+                // the canvas instead. Every node and edge group carries it.
+                className={`panzoom-exclude ${stylex.props(styles.waypointHandle, h.index === undefined && styles.waypointHandleNew).className}`}
+                onPointerDown={(e) => onWaypointPointerDown(e, h.pathId, { index: h.index, insertAt: h.insertAt })}
+                onPointerMove={onWaypointPointerMove}
+                onPointerUp={onWaypointPointerUp}
+                // An existing waypoint's double-click deletes it. The midpoint
+                // handle stands over its sentence, so it takes the second click
+                // of a double-click on it, and opens the way out as the line
+                // does. Its first click stayed under the drag threshold, so it
+                // wrote no waypoint.
+                onDoubleClick={(e) =>
+                  h.index === undefined ? onMidpointDoubleClick(e, h.stepId, h.pathId) : onWaypointDoubleClick(e, h.pathId, h.index)
+                }
+              />
+            );
+          })}
+
+          {connectHandles.map((h) => (
+            // Out of the accessibility tree, as it was inside the node, whose
+            // own name already names the step. The `<title>` still shows on
+            // hover. `panzoom-exclude`, or Panzoom takes the press and pans.
+            <g key={h.stepId} className="panzoom-exclude" data-connect-step-id={h.stepId} aria-hidden="true">
+              <circle cx={h.x} cy={h.y} r={HANDLE_RADIUS} {...stylex.props(styles.connectHandle, h.isTerminal && styles.connectHandleTerminal)} />
+              {/* The handle's pointer target, over the dot. It carries the
+                  press, the cursor and the tooltip naming the gesture. */}
+              <circle
+                cx={h.x}
+                cy={h.y}
+                r={HANDLE_HIT_RADIUS}
+                {...stylex.props(styles.connectHandleHit, h.isTerminal && styles.connectHandleHitTerminal)}
+                onPointerDown={(e) => onHandlePointerDown(e, h.stepId)}
+                // The mouse press's default would move focus off the node the
+                // press just focused, to the canvas `<svg>`, which draws its
+                // outline around the whole graph.
+                onMouseDown={(e) => e.preventDefault()}
+                onPointerUp={onHandlePointerUp}
+                // The handle belongs to its node: a double-click opens the step,
+                // as it did while the handle drew inside the node's group.
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  onSelectStep(h.stepId);
+                  onOpenStepPage?.(h.stepId);
+                }}
+              >
+                <title>{t(h.isTerminal ? "canvas.connectHandleEnd" : "canvas.connectHandle")}</title>
+              </circle>
+            </g>
+          ))}
+
+          {/* Last of all, so no route, node, sentence, waypoint handle or
+              connect handle can
+              take a press meant for a disclosure. A sentence's text block is up
+              to 200 wide, carries its own pointer handler, and lands wherever its
+              route has room. Each button is a sibling of its box
+              `<g>`, so the group's drag handlers never see the press either. */}
+          {disclosures.map(({ group, x, y }) => (
+            <foreignObject
+              key={group.id}
+              x={x}
+              y={y}
+              width={DISCLOSURE_HOST}
+              height={DISCLOSURE_HOST}
+              // The host stands 4 units clear of the button on every side, and
+              // that band lies over a member node's corner at one end and over
+              // empty canvas at the other. `groupDisclosureHost` makes
+              // it inert, so only the button's own 20 units take a press.
+              className={`panzoom-exclude ${stylex.props(styles.groupDisclosureHost).className}`}
+            >
+              <button
+                type="button"
+                {...stylex.props(styles.groupDisclosure)}
+                data-group-id={group.id}
+                tabIndex={focus.kind === "group" && focus.groupId === group.id ? 0 : -1}
+                aria-expanded={group.collapsed !== true}
+                aria-controls={groupMembersDomId(group.id)}
+                aria-label={t("canvas.groupDisclosure").replace("{group}", group.name)}
+                // The press stops here rather than reaching the `<svg>`'s own
+                // handlers.
+                // `panzoom-exclude` above is what keeps Panzoom's native
+                // down-handler and the marquee's capture handler off it.
+                //
+                // It also takes the roving stop. Enter binds for a step focus
+                // and a path focus alone, so a stop left on a step would let one
+                // Enter both toggle this group and open that step's inspector.
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  moveFocus({ kind: "group", groupId: group.id });
+                }}
+                onClick={() => toggleGroup(group.id)}
+              >
+                {group.collapsed ? (
+                  <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" />
+                ) : (
+                  <ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" />
+                )}
+              </button>
+            </foreignObject>
+          ))}
+
+        </svg>
+        <p {...stylex.props(styles.visuallyHidden)} role="status" aria-live="polite">
+          {announcement}
+        </p>
+        {marquee &&
+          (() => {
+            // Wrap-relative, so the band covers every part of the visible canvas
+            // rather than clipping at the transformed SVG's own viewport.
+            const r = normalizeRect(marquee.startClient, marquee.currentClient);
+            return (
+              <div
+                {...stylex.props(styles.marquee)}
+                style={{ left: r.x - marquee.origin.x, top: r.y - marquee.origin.y, width: r.width, height: r.height }}
               />
             );
           })()}
-
-        {/* Each drawn group's members sit inside one `<g>`, the element both
-            disclosure controls name in `aria-controls`. The wrapper renders in
-            both states; a collapsed group's holds nothing, so the attribute
-            never points at an element that is not there. */}
-        {(() => {
-          const emitted = new Set<string>();
-          return steps.map((step) => {
-            if (!step.id) return null;
-            const boxed = groupBoxes.find(({ group }) => group.stepIds.includes(step.id as string));
-            if (!boxed) return renderNode(step);
-            if (emitted.has(boxed.group.id)) return null;
-            emitted.add(boxed.group.id);
-            return (
-              <g key={boxed.group.id} id={groupMembersDomId(boxed.group.id)}>
-                {steps.filter((s) => s.id !== undefined && boxed.group.stepIds.includes(s.id)).map(renderNode)}
-              </g>
-            );
-          });
-        })()}
-
-        {edgeLabels.map((label) => (
-          <EdgeLabel
-            key={label.key}
-            box={label.box}
-            text={label.text}
-            stepId={label.stepId}
-            pathId={label.pathId}
-            // The press takes the roving stop exactly as the line's does.
-            onPress={() => {
-              if (label.pathId !== undefined) moveFocus({ kind: "path", pathId: label.pathId, from: "source" });
-            }}
-            onSelect={() => onSelectStep(label.stepId, label.pathId)}
-            onOpen={() => {
-              onSelectStep(label.stepId, label.pathId);
-              onOpenStepPage?.(label.stepId, label.pathId);
-            }}
-          />
-        ))}
-
-        {waypointHandles.map((h) => {
-          // The drag previews where the handle will land, snapped, so the
-          // square under the pointer is the square the author gets.
-          const dragging =
-            waypointDrag?.pathId === h.pathId &&
-            waypointDrag.index === h.index &&
-            waypointDrag.insertAt === h.insertAt;
-          const at = dragging ? snapToGrid(waypointDrag.current) : { x: h.x, y: h.y };
-          return (
-            <rect
-              key={h.key}
-              x={at.x - WAYPOINT_HANDLE / 2}
-              y={at.y - WAYPOINT_HANDLE / 2}
-              width={WAYPOINT_HANDLE}
-              height={WAYPOINT_HANDLE}
-              rx={0}
-              // `panzoom-exclude` is load-bearing, and the browser check
-              // earned it: Panzoom's down-handler calls `stopPropagation` at
-              // `.canvas-wrap`, and React listens at the root, an ancestor.
-              // Without the class the press never reaches this rect and pans
-              // the canvas instead. Every node and edge group carries it.
-              className={`panzoom-exclude ${stylex.props(styles.waypointHandle, h.index === undefined && styles.waypointHandleNew).className}`}
-              onPointerDown={(e) => onWaypointPointerDown(e, h.pathId, { index: h.index, insertAt: h.insertAt })}
-              onPointerMove={onWaypointPointerMove}
-              onPointerUp={onWaypointPointerUp}
-              // An existing waypoint's double-click deletes it. The midpoint
-              // handle stands over its sentence, so it takes the second click
-              // of a double-click on it, and opens the way out as the line
-              // does. Its first click stayed under the drag threshold, so it
-              // wrote no waypoint.
-              onDoubleClick={(e) =>
-                h.index === undefined ? onMidpointDoubleClick(e, h.stepId, h.pathId) : onWaypointDoubleClick(e, h.pathId, h.index)
-              }
-            />
-          );
-        })}
-
-        {connectHandles.map((h) => (
-          // Out of the accessibility tree, as it was inside the node, whose
-          // own name already names the step. The `<title>` still shows on
-          // hover. `panzoom-exclude`, or Panzoom takes the press and pans.
-          <g key={h.stepId} className="panzoom-exclude" data-connect-step-id={h.stepId} aria-hidden="true">
-            <circle cx={h.x} cy={h.y} r={HANDLE_RADIUS} {...stylex.props(styles.connectHandle, h.isTerminal && styles.connectHandleTerminal)} />
-            {/* The handle's pointer target, over the dot. It carries the
-                press, the cursor and the tooltip naming the gesture. */}
-            <circle
-              cx={h.x}
-              cy={h.y}
-              r={HANDLE_HIT_RADIUS}
-              {...stylex.props(styles.connectHandleHit, h.isTerminal && styles.connectHandleHitTerminal)}
-              onPointerDown={(e) => onHandlePointerDown(e, h.stepId)}
-              // The mouse press's default would move focus off the node the
-              // press just focused, to the canvas `<svg>`, which draws its
-              // outline around the whole graph.
-              onMouseDown={(e) => e.preventDefault()}
-              onPointerUp={onHandlePointerUp}
-              // The handle belongs to its node: a double-click opens the step,
-              // as it did while the handle drew inside the node's group.
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                onSelectStep(h.stepId);
-                onOpenStepPage?.(h.stepId);
-              }}
-            >
-              <title>{t(h.isTerminal ? "canvas.connectHandleEnd" : "canvas.connectHandle")}</title>
-            </circle>
-          </g>
-        ))}
-
-        {/* Last of all, so no route, node, sentence, waypoint handle or
-            connect handle can
-            take a press meant for a disclosure. A sentence's text block is up
-            to 200 wide, carries its own pointer handler, and lands wherever its
-            route has room. Each button is a sibling of its box
-            `<g>`, so the group's drag handlers never see the press either. */}
-        {disclosures.map(({ group, x, y }) => (
-          <foreignObject
-            key={group.id}
-            x={x}
-            y={y}
-            width={DISCLOSURE_HOST}
-            height={DISCLOSURE_HOST}
-            // The host stands 4 units clear of the button on every side, and
-            // that band lies over a member node's corner at one end and over
-            // empty canvas at the other. `groupDisclosureHost` makes
-            // it inert, so only the button's own 20 units take a press.
-            className={`panzoom-exclude ${stylex.props(styles.groupDisclosureHost).className}`}
-          >
-            <button
-              type="button"
-              {...stylex.props(styles.groupDisclosure)}
-              data-group-id={group.id}
-              tabIndex={focus.kind === "group" && focus.groupId === group.id ? 0 : -1}
-              aria-expanded={group.collapsed !== true}
-              aria-controls={groupMembersDomId(group.id)}
-              aria-label={t("canvas.groupDisclosure").replace("{group}", group.name)}
-              // The press stops here rather than reaching the `<svg>`'s own
-              // handlers.
-              // `panzoom-exclude` above is what keeps Panzoom's native
-              // down-handler and the marquee's capture handler off it.
-              //
-              // It also takes the roving stop. Enter binds for a step focus
-              // and a path focus alone, so a stop left on a step would let one
-              // Enter both toggle this group and open that step's inspector.
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                moveFocus({ kind: "group", groupId: group.id });
-              }}
-              onClick={() => toggleGroup(group.id)}
-            >
-              {group.collapsed ? (
-                <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" />
-              ) : (
-                <ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" />
-              )}
-            </button>
-          </foreignObject>
-        ))}
-
-      </svg>
-      <p {...stylex.props(styles.visuallyHidden)} role="status" aria-live="polite">
-        {announcement}
-      </p>
-      {marquee &&
-        (() => {
-          // Wrap-relative, so the band covers every part of the visible canvas
-          // rather than clipping at the transformed SVG's own viewport.
-          const r = normalizeRect(marquee.startClient, marquee.currentClient);
-          return (
-            <div
-              {...stylex.props(styles.marquee)}
-              style={{ left: r.x - marquee.origin.x, top: r.y - marquee.origin.y, width: r.width, height: r.height }}
-            />
-          );
-        })()}
-      {rejectMessage && (
-        <div {...stylex.props(styles.rejectMessage)} style={{ left: rejectMessage.x, top: rejectMessage.y }}>
-          {rejectMessage.text}
-        </div>
-      )}
-    </div>
+        {rejectMessage && (
+          <div {...stylex.props(styles.rejectMessage)} style={{ left: rejectMessage.x, top: rejectMessage.y }}>
+            {rejectMessage.text}
+          </div>
+        )}
+      </div>
+      {/* Outside the frame: Panzoom's press handler and the wheel zoom bind
+          there, and the canvas's own keys bind on the <svg>. */}
+      <WayOutMenu menuRef={menuRef} items={menuItems} onPick={onWayOutPicked} onReturnFocus={onWayOutMenuReturn} />
+    </>
   );
 }

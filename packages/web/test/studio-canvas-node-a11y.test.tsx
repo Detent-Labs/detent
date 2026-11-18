@@ -427,4 +427,43 @@ describe("the canvas node's accessibility markup", () => {
     expect(regions[0][1]).toBe("");
     expect(HTML.indexOf(regions[0][0])).toBeGreaterThan(HTML.indexOf("</svg>"));
   });
+
+  // A screen reader learns the way-out menu's key; no visible hint draws.
+  it("tells a screen reader each step answers C", () => {
+    for (const node of NODES) expect(attr(node.open, "aria-keyshortcuts")).toBe("C");
+    expect(CANVAS.inner).not.toContain(">C<");
+  });
+});
+
+describe("the way-out menu's markup", () => {
+  const POPOVER = elementsOf(HTML, (openTag) => openTag.startsWith("<div ") && attr(openTag, "popover") === "auto")[0];
+  const MENU = elementsOf(POPOVER.inner, (openTag) => attr(openTag, "role") === "menu")[0];
+  const HEADING = elementsOf(POPOVER.inner, (openTag) => openTag.startsWith("<p "))[0];
+
+  // Panzoom's press handler and the wheel zoom bind on the frame, the root
+  // element, so a menu inside it would pan on a press.
+  it("stands outside the canvas frame", () => {
+    const frame = elementsOf(HTML, (openTag) => openTag.startsWith("<div "))[0];
+    expect(frame.inner).not.toContain('popover="auto"');
+    expect(HTML.indexOf('popover="auto"')).toBeGreaterThan(HTML.indexOf("</svg>"));
+  });
+
+  it("heads the menu outside role=menu, and labels the menu by that heading", () => {
+    expect(HEADING.inner).toBe(t("canvas.wayOutMenuHeading"));
+    expect(MENU.inner).not.toContain(t("canvas.wayOutMenuHeading"));
+    expect(attr(MENU.open, "aria-labelledby")).toBe(attr(HEADING.open, "id"));
+  });
+
+  it("lists the visible steps in draft order as menu items, then a separator and a new step", () => {
+    const items = elementsOf(MENU.inner, (openTag) => openTag.startsWith("<button "));
+    for (const item of items) {
+      expect(attr(item.open, "role")).toBe("menuitem");
+      expect(attr(item.open, "tabindex")).toBe("-1");
+    }
+    // approve and archive hide inside the collapsed group.
+    expect(items.map((item) => item.inner)).toEqual(["Capture the request", "Review the request", "Reject", t("canvas.wayOutMenuNewStep")]);
+    const separator = MENU.inner.indexOf('role="separator"');
+    expect(separator).toBeGreaterThan(MENU.inner.indexOf("Reject"));
+    expect(separator).toBeLessThan(MENU.inner.indexOf(t("canvas.wayOutMenuNewStep")));
+  });
 });

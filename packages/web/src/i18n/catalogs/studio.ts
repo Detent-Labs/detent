@@ -1209,6 +1209,8 @@ export const en = {
   "canvas.otherwise": "Otherwise",
   "canvas.connectHandle": "Drag to a step to add a way out, or to empty space to add a new step.",
   "canvas.connectHandleEnd": "An end has no way out.",
+  "canvas.connectRefused": "This step cannot take another way out here.",
+  "canvas.connectNeedsOrder": "“{step}” already has a way out that happens by itself. Add the next one under {section}, and give it a number.",
 
   // The accessible names the canvas composes for its nodes, its paths and
   // its `<svg>` root, filled by `canvas/mapWords.ts`. A node's name reads the
