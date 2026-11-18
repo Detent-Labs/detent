@@ -3396,16 +3396,18 @@ and the canvas stays as it was.
 
 Press `c` on a focused step. Pass: the menu opens under the step with the first
 item focused. Press a letter. Pass: focus jumps to the next item that starts
-with it. Press Down at the last item. Pass: focus wraps to the first. Press Tab.
-Pass: the menu closes, and the focus does not return to the page's top.
+with it. Press Down at the last item. Pass: focus wraps to the first.
+
+Press Tab inside the menu. Pass: the menu closes and the focus returns to the
+step.
 
 Shrink the window until the menu cannot fit under the step, then press `c`.
 Pass: the menu opens above the step and stays inside the window. Tab onto the
 canvas in that window. Pass: the focused step shows whole.
 
-Press `c` on an end, and on a step whose fit scale is not 1. Pass: the end
-answers "An end has no way out." beside the step. At the other scale the refusal
-sits at the step's top centre, not away from it.
+Press `c` on an end. Pass: "An end has no way out." appears at the step's top
+centre. Repeat at a fit scale other than 1. Pass: the message still sits at
+that point.
 
 ### The StyleX pilot: computed styles, not source (`stylex-phase-0-tooling`)
 
