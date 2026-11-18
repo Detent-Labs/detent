@@ -21,6 +21,7 @@
  * following the DATABASE_URL / AUTH_JWT_SECRET convention.
  */
 
+import type { Socket, TLSOptions } from "bun";
 import { z } from "zod";
 import { emailAddressSchema, emailsForUserIds } from "../auth/users.js";
 import { durationMs } from "../engine/duration.js";
@@ -125,9 +126,13 @@ export class SmtpWire {
   private ready: Reply[] = [];
   private waiter: { resolve: (r: Reply) => void; reject: (e: Error) => void } | null = null;
   private failure: Error | null = null;
-  // True from the STARTTLS upgrade until the TLS handshake completes. The wire
-  // reads nothing in that window.
+  // True from the STARTTLS upgrade until the TLS handshake completes.
   private handshaking = false;
+  // True once the upgrade began. From then on only the attached TLS socket
+  // feeds the reply reader. The raw TCP socket keeps calling `handlers` with the
+  // bytes on the wire: plain text, the server's handshake records, later
+  // ciphertext. The TLS layer reads those itself, so none of them is a reply.
+  private upgraded = false;
   private handshakeWaiter: { resolve: () => void; reject: (e: Error) => void } | null = null;
   // Structural rather than `Socket<T>`: Bun.connect hands back a
   // `Socket<undefined>` and upgradeTLS a `Socket<unknown>`, and the wire needs
@@ -136,20 +141,12 @@ export class SmtpWire {
 
   /** Handlers for both the plain and the upgraded socket — the wire is the same either way. */
   readonly handlers = {
-    data: (_s: unknown, chunk: Uint8Array) => {
-      // Bun delivers plain bytes from the server to the upgraded socket before
-      // the handshake completes. Any such byte is injected, never a reply.
-      if (this.handshaking) {
-        this.fail(
-          new Error(
-            `notification.email: the server sent data before the TLS handshake completed during ${this.phase.current}`,
-          ),
-        );
-        return;
-      }
+    data: (s: unknown, chunk: Uint8Array) => {
+      if (this.upgraded && s !== this.socket) return;
       this.onData(chunk);
     },
-    handshake: (_s: unknown, success: boolean, authorizationError: Error | null) => {
+    handshake: (s: unknown, success: boolean, authorizationError: Error | null) => {
+      if (this.upgraded && s !== this.socket) return;
       if (success && !authorizationError) {
         this.handshaking = false;
         const waiter = this.handshakeWaiter;
@@ -176,12 +173,13 @@ export class SmtpWire {
 
   /**
    * Called when STARTTLS gets its 2xx, right before upgradeTLS. Drops every
-   * byte the plain socket still holds (RFC 3207 §4.2) and stops reading until
-   * the handshake callback fires.
+   * reply the plain socket still holds (RFC 3207 §4.2). The caller attaches the
+   * TLS socket in the same tick, and only that socket is read from then on.
    */
   beginTls(): void {
     this.buffer = "";
     this.ready = [];
+    this.upgraded = true;
     this.handshaking = true;
   }
 
@@ -340,6 +338,21 @@ function offersStartTls(ehlo: Reply): boolean {
   return ehlo.lines.slice(1).some((line) => line.split(/\s/)[0]?.toUpperCase() === "STARTTLS");
 }
 
+/**
+ * Upgrades the connection to TLS and resolves once the handshake completes.
+ * Named separately from "STARTTLS": a failure from here on is the TLS
+ * handshake, not the command. The step starts before the upgrade, so a failure
+ * that fires while upgradeTLS runs names it too. `extraTls` exists for the
+ * tests, which trust a test CA. `runSession` passes none.
+ */
+export async function startTls(wire: SmtpWire, socket: Socket<undefined>, host: string, extraTls: TLSOptions = {}): Promise<void> {
+  wire.phase.current = "TLS handshake";
+  wire.beginTls();
+  const [, tlsSocket] = socket.upgradeTLS({ tls: { ...extraTls, serverName: host }, socket: wire.handlers });
+  wire.attach(tlsSocket);
+  await wire.tlsReady();
+}
+
 /** One SMTP session: the whole conversation for one batch, ending with the point of no return. */
 async function runSession(
   wire: SmtpWire,
@@ -365,14 +378,7 @@ async function runSession(
     phase.current = "STARTTLS";
     wire.write("STARTTLS\r\n");
     requireOk(await wire.next(), "STARTTLS");
-    // Named separately from "STARTTLS": a failure from here on is the TLS
-    // handshake, not the command. The step starts before the upgrade, so a
-    // failure that fires while upgradeTLS runs names it too.
-    phase.current = "TLS handshake";
-    wire.beginTls();
-    const [, tlsSocket] = socket.upgradeTLS({ tls: { serverName: env.host }, socket: wire.handlers });
-    wire.attach(tlsSocket);
-    await wire.tlsReady();
+    await startTls(wire, socket, env.host);
     wire.write(`EHLO ${clientName(env.from)}\r\n`);
     ehlo = requireOk(await wire.next(), "EHLO after STARTTLS");
   } else if (env.user) {

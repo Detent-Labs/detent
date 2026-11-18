@@ -10,11 +10,15 @@
  * same way the DB-backed suites skip.
  */
 import { test, expect, spyOn } from "bun:test";
-import type { SQL } from "bun";
+import { readFileSync } from "node:fs";
+import { createServer as netCreateServer } from "node:net";
+import { TLSSocket } from "node:tls";
+import type { SQL, TLSOptions } from "bun";
 import {
   notificationEmailHandlerDef,
   notificationEmailConfigSchema,
   SmtpWire,
+  startTls,
   NOTIFICATION_EMAIL_ACTION_TYPE,
   SMTP_DEFAULT_TIMEOUT_MS,
   SMTP_MAX_RECIPIENTS_PER_SESSION,
@@ -447,23 +451,31 @@ test("the wire's close and error callbacks name the session step and keep a plai
   expect((failErr as Error).cause).toBe(cause);
 });
 
-test("a byte before the TLS handshake completes ends the wire and is never read as a reply", async () => {
+test("bytes from the plain socket the upgrade replaced never read as a reply", async () => {
+  const plain = {};
+  const tlsSide = { write: () => undefined, end: () => undefined };
   const wire = new SmtpWire();
   wire.phase.current = "TLS handshake";
   wire.beginTls();
-  wire.handlers.data(undefined, Buffer.from("250 not tls\r\n"));
-  const err = await rejects(wire.tlsReady());
-  expect(err).not.toBeInstanceOf(PermanentError);
-  expect((err as Error).message).toContain("sent data before the TLS handshake completed during TLS handshake");
-  await rejects(wire.next());
+  wire.attach(tlsSide);
+  wire.handlers.data(plain, Buffer.from("250 not tls\r\n"));
+  wire.handlers.handshake(plain, false, new Error("ignored"));
+  wire.handlers.handshake(tlsSide, true, null);
+  await wire.tlsReady();
+  // Ciphertext the replaced socket still delivers after the handshake.
+  wire.handlers.data(plain, Buffer.from("502 ticket\r\n"));
+  wire.handlers.data(tlsSide, Buffer.from("250 inside tls\r\n"));
+  expect((await wire.next()).text).toBe("inside tls");
 });
 
 test("a failed or unauthorized TLS handshake ends the wire", async () => {
+  const tlsSide = { write: () => undefined, end: () => undefined };
   const refused = new SmtpWire();
   refused.phase.current = "TLS handshake";
   refused.beginTls();
+  refused.attach(tlsSide);
   const pending = rejects(refused.tlsReady());
-  refused.handlers.handshake(undefined, false, null);
+  refused.handlers.handshake(tlsSide, false, null);
   const refusedErr = await pending;
   expect(refusedErr).not.toBeInstanceOf(PermanentError);
   expect((refusedErr as Error).message).toContain("the TLS handshake failed during TLS handshake");
@@ -471,21 +483,106 @@ test("a failed or unauthorized TLS handshake ends the wire", async () => {
   const untrusted = new SmtpWire();
   untrusted.phase.current = "TLS handshake";
   untrusted.beginTls();
+  untrusted.attach(tlsSide);
   const pendingUntrusted = rejects(untrusted.tlsReady());
-  untrusted.handlers.handshake(undefined, true, new Error("self signed certificate"));
+  untrusted.handlers.handshake(tlsSide, true, new Error("self signed certificate"));
   const untrustedErr = await pendingUntrusted;
   expect((untrustedErr as Error).message).toContain("the TLS handshake failed during TLS handshake: self signed certificate");
 });
 
-test("a completed handshake releases the wire, and the bytes held before it are dropped", async () => {
+test("a completed handshake releases the wire, and the replies held before it are dropped", async () => {
+  const plain = { write: () => undefined, end: () => undefined };
+  const tlsSide = { write: () => undefined, end: () => undefined };
   const wire = new SmtpWire();
-  wire.handlers.data(undefined, Buffer.from("250 stale\r\n"));
+  wire.attach(plain);
+  wire.handlers.data(plain, Buffer.from("250 stale\r\n"));
   wire.beginTls();
+  wire.attach(tlsSide);
   const ready = wire.tlsReady();
-  wire.handlers.handshake(undefined, true, null);
+  wire.handlers.handshake(tlsSide, true, null);
   await ready;
-  wire.handlers.data(undefined, Buffer.from("250 fresh\r\n"));
+  wire.handlers.data(tlsSide, Buffer.from("250 fresh\r\n"));
   expect((await wire.next()).text).toBe("fresh");
+});
+
+// --- a real TLS handshake ----------------------------------------------------
+
+const TLS_FIXTURE = new URL("./fixtures/smtp-tls/", import.meta.url);
+const TLS_CERT = readFileSync(new URL("cert.pem", TLS_FIXTURE), "utf-8");
+const TLS_KEY = readFileSync(new URL("key.pem", TLS_FIXTURE), "utf-8");
+
+/** An SMTP server that offers STARTTLS and then upgrades its own side with a real TLS stack. */
+async function tlsSmtp(): Promise<{ port: number; plain: string[]; secure: string[]; stop: () => void }> {
+  const plain: string[] = [];
+  const secure: string[] = [];
+  const server = netCreateServer((socket) => {
+    socket.on("error", () => undefined);
+    socket.write("220 tls-fake ESMTP\r\n");
+    socket.on("data", (chunk) => {
+      const line = chunk.toString("latin1").trim();
+      plain.push(line);
+      if (/^EHLO/i.test(line)) socket.write("250-tls-fake greets you\r\n250 STARTTLS\r\n");
+      else if (/^STARTTLS/i.test(line)) {
+        socket.removeAllListeners("data");
+        socket.write("220 ready to start TLS\r\n");
+        const secured = new TLSSocket(socket, { isServer: true, key: TLS_KEY, cert: TLS_CERT });
+        secured.on("error", () => undefined);
+        secured.on("data", (inner) => {
+          const command = inner.toString("latin1").trim();
+          secure.push(command);
+          if (/^EHLO/i.test(command)) secured.write("250-inside-tls\r\n250 AUTH PLAIN\r\n");
+        });
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return { port: (server.address() as { port: number }).port, plain, secure, stop: () => server.close() };
+}
+
+/** Drives the wire through greeting, EHLO and STARTTLS against `tlsSmtp`, then upgrades with `extraTls`. */
+async function upgradeAgainstTlsSmtp(extraTls: TLSOptions): Promise<{ wire: SmtpWire; server: Awaited<ReturnType<typeof tlsSmtp>>; upgrade: Promise<void> }> {
+  const server = await tlsSmtp();
+  const wire = new SmtpWire();
+  const socket = await Bun.connect({ hostname: "127.0.0.1", port: server.port, socket: wire.handlers });
+  wire.attach(socket);
+  await wire.next();
+  wire.write("EHLO test\r\n");
+  await wire.next();
+  wire.write("STARTTLS\r\n");
+  await wire.next();
+  return { wire, server, upgrade: startTls(wire, socket, "127.0.0.1", extraTls) };
+}
+
+test("a trusted handshake completes and the second EHLO is answered inside TLS", async () => {
+  const { wire, server, upgrade } = await upgradeAgainstTlsSmtp({ ca: TLS_CERT });
+  try {
+    await upgrade;
+    wire.write("EHLO test\r\n");
+    const reply = await wire.next();
+    expect(reply.code).toBe(250);
+    // Exact lines: a stray raw byte in the reader would prefix the first one.
+    expect(reply.lines).toEqual(["inside-tls", "AUTH PLAIN"]);
+    expect(server.secure).toEqual(["EHLO test"]);
+    // The plain side saw the first EHLO and STARTTLS, and nothing after the upgrade.
+    expect(server.plain).toEqual(["EHLO test", "STARTTLS"]);
+  } finally {
+    wire.close();
+    server.stop();
+  }
+});
+
+test("an untrusted certificate fails the handshake and sends nothing", async () => {
+  const { wire, server, upgrade } = await upgradeAgainstTlsSmtp({});
+  try {
+    const err = await rejects(upgrade);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(PermanentError);
+    expect((err as Error).message).toContain("the TLS handshake failed during TLS handshake");
+    expect(server.secure).toEqual([]);
+  } finally {
+    wire.close();
+    server.stop();
+  }
 });
 
 test("a server name holding starttls is no STARTTLS offer", async () => {
