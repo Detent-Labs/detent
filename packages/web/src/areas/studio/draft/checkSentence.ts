@@ -608,6 +608,22 @@ export function checkAnswer(body: Draft, check: CheckSite): CheckAnswer {
   return fallback(site);
 }
 
+/**
+ * The checks rail's tier-1 sentence for `message` on `step`, as if the check
+ * stood on that step: the site comes from the step's id, an empty location and
+ * the message. A given `key` replaces the rule's own template and keeps its
+ * section. `undefined` when no literal rule matches.
+ */
+export function literalSentenceFor(body: Draft, step: DraftStep, message: string, key?: CatalogKey): string | undefined {
+  const rule = literalRuleFor(message);
+  if (!rule) return undefined;
+  const site = readSite(body, { loc: "", message, entityType: "step", entityId: step.id ?? "" });
+  const match = rule.match.exec(message)!;
+  const aim = typeof rule.aim === "function" ? rule.aim(site, match) : rule.aim;
+  if (!aim) return undefined;
+  return settle(site, key === undefined ? aim : { ...aim, key }, 1).sentence;
+}
+
 /** One sentence for a person. Names read the base locale. */
 export function checkSentence(body: Draft, check: CheckSite): string {
   return checkAnswer(body, check).sentence;

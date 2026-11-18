@@ -432,8 +432,9 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     expect(down).toContain("setConnectDrag({ sourceStepId: stepId, start: p, current: p })");
     expect(up).toContain(guard);
     // The guard returns before any write: a way out, a new step or a toast.
+    // Both adds go through `addWayOut`, the one writer the menu shares.
     const afterGuard = up.indexOf("return;", up.indexOf(guard));
-    for (const write of ["resolveDropGesture(", "updateInDraftArray(", "mutate(", "showRejection("]) {
+    for (const write of ["resolveDropGesture(", "addWayOut(", "showRejection("]) {
       expect(up.indexOf(write)).toBeGreaterThan(afterGuard);
     }
   });

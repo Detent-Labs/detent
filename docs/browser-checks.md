@@ -3296,8 +3296,8 @@ Scroll the page so the canvas sits below the fold, then press each arrow. Pass:
 focus moves and the page holds still. An arrow that scrolls the page means a
 missing `preventDefault`.
 
-Focus a step and press Enter. Pass: the configuration pane switches to
-that step, and the node draws as selected.
+Focus a step and press Enter. Pass: the Steps tab opens on that step and the
+steps rail marks it. The focus ring sits on the Name input.
 
 Press Escape from that node. Pass: the outline lands on the `<svg>` itself.
 Press Tab. Pass: the stop leaves the canvas and reaches the control after it,
@@ -3379,8 +3379,40 @@ Enter toggle the group and open the step.
 These two stay manual. A pointer press and a focus move are both invisible to
 `renderToStaticMarkup`, and the web package carries no DOM harness.
 
-Double-click a node. Pass: the Steps tab opens on that step, and no text field
-opens on the canvas. The entry for `studio-map-labels` walks each double-click.
+The smoke flows in `e2e/canvas-keyboard.e2e.ts` cover what follows. At 200
+percent, Down leaves the frame's scroll offsets at 0. Enter and a double-click
+land on a Name input. The `c` key and Enter add a way out, and End then Enter adds a new step. After `+` the live
+region reads "Map at 125 percent", and Escape in the menu returns to the step.
+The entry for `studio-map-labels` walks each double-click.
+
+Pan the canvas with a drag on its background, or zoom in. A step then sits past the frame's edge. Tab onto the
+canvas. Pass: the canvas pans until the step shows whole, with its ring.
+Click a step that sits half outside the frame. Pass: the canvas does not pan.
+
+Press `+` until the level stops, then `-` until it stops, then `0`. Pass: each
+press announces the level it holds, `0` returns to the fit, and a press at a
+bound still speaks. Hold Ctrl and press `+`. Pass: the browser zooms the page
+and the canvas stays as it was.
+
+Press `c` on a focused step. Pass: the menu opens under the step with the first
+item focused. Press a letter. Pass: focus jumps to the next item that starts
+with it. Press Down at the last item. Pass: focus wraps to the first.
+
+Press Tab inside the menu. Pass: the menu closes and the focus returns to the
+step.
+
+Open the menu, then click the canvas background. Pass: the menu closes, no way
+out appears and the focus stays where the click put it.
+
+Shrink the window until the menu cannot fit under the step, then press `c`.
+Pass: the menu opens above the step and stays inside the window. Tab onto the
+canvas in that window. Pass: the focused step shows whole.
+
+Press `c` on an end. Pass: "An end has no way out." appears at the step's top
+centre. Repeat at a fit scale other than 1. Pass: the message still sits at
+that point.
+
+Take a call to another process with one numbered automatic way out. Press `c` on it, then drag from its handle to a step. Pass: both show the sentence about a way out that happens by itself. On a step at the top of the view, the box shows whole.
 
 ### The StyleX pilot: computed styles, not source (`stylex-phase-0-tooling`)
 
