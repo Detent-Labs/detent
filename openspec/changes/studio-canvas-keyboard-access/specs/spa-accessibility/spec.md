@@ -49,8 +49,8 @@ A keystroke on a graphical surface can change something the focused element's
 name does not report. Examples are a zoom level, a new connector and a refused
 operation. The surface SHALL announce that result through one polite live
 region of its own. The region SHALL stay mounted while the surface shows, so
-its first announcement reaches a screen reader. Every announcement SHALL use
-the words the surface itself prints.
+its first announcement reaches a screen reader. Every announcement SHALL read
+from the area's catalog, in the author's words.
 
 #### Scenario: A zoom key announces the new level
 

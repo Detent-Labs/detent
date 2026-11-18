@@ -90,12 +90,18 @@ stays as it was. The function returns the new `{ scale, x, y }`, and the canvas 
 The canvas measures the target with `getBoundingClientRect()`. It subtracts the frame's rect and
 its `clientLeft` and `clientTop`, since the frame never transforms. One measure then serves a node
 `<g>`, a path `<g>` and the HTML disclosure button alike. The insets come from the same reading
-`measureFit` takes. A small `fitInsets()` helper serves both, so they cannot drift.
+`measureFit` takes. A small pure `fitInsets(toolbarBottom)` serves both, so they cannot drift.
+Its caller measures the toolbar's bottom edge and passes the number in.
 
-The reveal runs from the `<svg>`'s `onFocus`, which React fires for every focus inside it. A ref
-records a pointer press: the frame's `onPointerDownCapture` sets it, and the next
-`pointerup` clears it. A focus during a press reveals nothing. A root focus reveals nothing, since
-the root is the whole view.
+The reveal runs from the `<svg>`'s `onFocus`, which React fires for every focus inside it. It
+runs only when the last input reads as a key. `focusScroll.ts` already tracks the input modality
+with document capture listeners. No `stopPropagation` below them can hide a press, and many canvas
+`pointerup` handlers stop propagation. That file gains an exported reader,
+`lastInputWasPointer()`. The canvas keeps no press flag of its own.
+
+A focus after a pointer press reveals nothing. A keydown resets the modality, so an arrow after a
+click still reveals. A root focus reveals nothing, since the root is the whole view. A way out a
+click adds from the menu reveals nothing either, as after any other press.
 
 Alternative: reveal inside `moveFocus` alone. Rejected: it misses a Tab entry onto the initial
 step and the focus the menu hands back.
@@ -109,6 +115,8 @@ The handler `onCanvasKeyDown` reads `e.key` before the arrow branch. The keys `+
 in. The `-` key zooms out, and the `0` key calls `fitToView`. A press with Ctrl, Meta or Alt
 returns early. It does not call `preventDefault`, so the browser zooms the page. Shift stays
 allowed, since a US layout types `+` with it.
+
+Each key the canvas answers calls `preventDefault`. A modified key returns before that call.
 
 The factor is `ZOOM_KEY_FACTOR = 1.25` each way, the factor the spike measured. `fit.ts` gains
 `zoomAbout(current: Fit, toScale: number, anchor: Point, view: Size): Fit`. It clamps `toScale` to
@@ -140,8 +148,8 @@ The new catalog keys, all English, since the studio catalog carries one locale:
 | `canvas.wayOutMenuHeading` | `Way out to …` |
 | `canvas.wayOutMenuNewStep` | `A new step` |
 | `canvas.wayOutAdded` | `Added a way out from {source} to {target}.` |
-
 | `canvas.connectRefused` | `This step cannot take another way out here.` |
+| `canvas.connectNeedsOrder` | `“{step}” already has a way out that happens by itself. Add the next one under {section}, and give it a number.` |
 
 A refusal reads a catalog sentence too (owner ruling 2026-11-18). D7 says which one.
 
@@ -158,6 +166,9 @@ can announce a removal through this region. This change leaves removal as it is.
 - A path: `setSectionRequest({ stepId, section: "paths" })` and
   `setPendingFocus({ tab: "steps", elementId: wayOutNameId(pathId) })`. The request opens Ways
   out (`StepPage.tsx:705`). `pendingFocusLands` holds the focus until that section shows.
+
+The handler keeps the `waysOutRequest` bump (`EditScreen.tsx:1374`). The `sectionRequest` adds the
+commit that `pendingFocusLands` waits for.
 
 `draft/process-tabs.ts` gains `wayOutNameId(pathId)`, beside `sectionHeaderId`. The Name input in
 each Ways out row carries it (`panels/PathsPanel.tsx:270`).
@@ -177,6 +188,8 @@ A new module `canvas/wayOutMenu.ts` holds the pure parts:
   includes the source step.
 - `typeAheadIndex(items, from, letter)` returns the next item after `from` whose text starts with
   the letter, compared case-insensitively. It wraps, and it skips the separator.
+- `menuKeyTarget(key, index, items)` returns the next index for Down, Up, Home and End. Down and
+  Up wrap at either end. It skips the separator, and it returns `undefined` for any other key.
 
 A component `canvas/WayOutMenu.tsx` renders it as a sibling of `.canvas-wrap`, and `CanvasView`
 returns a fragment. Panzoom's press handler and the wheel listener both bind on the frame
@@ -188,15 +201,27 @@ The markup is a `popover="auto"` container holding a heading `<p>` and a `<div r
 with `tabindex="-1"`, and the separator is a `<div role="separator">`. The heading sits outside
 `role="menu"`, since a menu owns items and separators alone.
 
-The canvas key handler opens it with `showPopover()` on `C`. Its `beforetoggle` places it with
-`position: fixed`, under the node's client rect and left-aligned, 4px below it. This is the
-canvas bar's own placement (`CanvasBar.tsx:260`). A menu that would pass the viewport's bottom
-opens above the node instead. On the open edge the first item takes focus.
+The canvas key handler opens it with `showPopover()` when `e.key.toLowerCase() === "c"`. Shift
+stays allowed, as the zoom keys allow it, and Ctrl, Meta or Alt return early. The handler calls
+`preventDefault`, so a browser's find-as-you-type never takes the letter.
 
-The menu's own `onKeyDown` answers Down, Up, Home, End, Enter, Tab and a printable letter. Escape
-falls to the popover's native light dismiss. The `toggle` handler for the closed edge returns
-focus to the step, with `preventScroll`. It acts only while focus sits inside the menu or on
-the page body. A press elsewhere keeps the focus it took.
+The menu takes `position: fixed`, left-aligned with the node's client rect, as the canvas bar's
+menu does (`CanvasBar.tsx:260`). The placement runs right after `showPopover()` returns. At
+`beforetoggle` the popover still has no layout and reads a height of 0.
+
+The handler first sets `top` 4px under the node. It then reads the menu's
+`getBoundingClientRect().bottom`. The handler moves `top` to 4px above the node when that bottom
+passes `innerHeight`.
+The call is synchronous, so nothing paints between the two writes. On the open edge the first item
+takes focus.
+
+An item adds through its `onClick`, so Enter, Space and a click take one route. The menu's own
+`onKeyDown` answers Down, Up, Home and End through `menuKeyTarget`. It also answers Tab and a
+printable letter. It leaves Enter and Space to the button.
+
+Escape falls to the popover's native light dismiss. The `toggle` handler for the closed edge
+returns focus to the step, with `preventScroll`. It acts only while focus sits inside the menu or
+on the page body. A press elsewhere keeps the focus it took.
 
 Each step node gains `aria-keyshortcuts="C"`. No visible hint draws.
 
@@ -206,35 +231,71 @@ change leaves that menu as it is. Its later fix can reuse this menu's keyboard m
 ### D7. The menu adds through the drop's own code
 
 `dropGesture.ts` gains `checkConnectSource(sourceTerminal, existingPaths, trigger)`. It returns
-the terminal refusal or `checkConnection`'s answer. `resolveDropGesture` calls it first, so its
-results stay identical. The `C` key calls it too, with `triggerForNewPath(source)`. A refusal
+the terminal refusal or `checkConnection`'s answer. `resolveDropGesture` calls it first, so it
+refuses the same inputs. The `C` key calls it too, with `triggerForNewPath(source)`. A refusal
 shows through `showRejection` at the node's top centre, and the live region reads the same text.
 
+`showRejection` measures against `.canvas-wrap`'s rect and its `clientLeft` and `clientTop`, the
+frame measure D2 uses. Today it subtracts the `<svg>`'s rect, which Panzoom transforms
+(`CanvasView.tsx:1278`). Under any pan or zoom that puts the message away from its point. The
+frame never transforms, so one measure serves both callers. The drop and the key both pass
+client coordinates.
+
 The owner ruled on 2026-11-18 that the refusal reads author's words, for the drop and the key
-alike. A new pure `refusalSentence(refusal, step)` in `canvas/connection.ts` picks the sentence:
+alike. A new pure `refusalSentence(refusal, body, step)` in `canvas/connection.ts` picks the
+sentence:
 
 - A terminal source reads `canvas.connectHandleEnd`, "An end has no way out."
   (`studio.ts:1207`). The connect handle on an end already prints it.
-- A trigger reason resolves through `literalRuleFor(reason)` (`draft/checkSentence.ts:382`).
-  That is the table the checks rail uses, with rows such as `checks.paths.noOrder`
-  (`checkSentence.ts:295-299`). It fills `{step}` with the step's printed text and
-  `{section}` with the Ways out section's name, as the checks rail does.
-- A reason the table does not match reads `canvas.connectRefused`.
+- The reason "automatic paths need a priority when a step has two or more" reads
+  `canvas.connectNeedsOrder` (owner ruling 2026-11-18).
+- Every other trigger reason reads the checks rail's own sentence for that rule.
+- A reason the checks rail's table does not match reads `canvas.connectRefused`.
 
-`checkConnectSource` therefore returns a refusal kind and the engine's reason, never display text.
-`resolveDropGesture`'s `rejected` result carries the same pair, and `CanvasView` turns it into the
-sentence. The engine's `checkPathTriggerConsistency` stays as it is, since `src/schema` is out of
-scope. The hard-coded English sentence at `dropGesture.ts:31` goes.
+The missing-order reason needs its own sentence. The new way out has no `priority`
+(`connection.ts:29`). A source with one or more automatic paths therefore always returns that
+reason. Every subprocess step with one way out is such a source (`createPath.ts:79-82`).
+
+The checks rail's sentence, `checks.paths.noOrder`, says the existing ways out need an order. A valid
+step with one numbered automatic way out has no such defect. The checks rail shows no check for
+it. The canvas sentence names what the author can do instead.
+
+The drop already refuses a second automatic way out today. This change keeps that refusal. Only
+its sentence changes.
+
+The file `draft/checkSentence.ts` exports one new helper:
+`literalSentenceFor(body, step, message, key?)`. It builds the site with `readSite`, from the
+step's id, an empty `loc` and the message. It then runs `literalRuleFor(message)` and then
+`settle`. The first tier of `checkAnswer` runs the same two. A given `key` replaces the rule's own
+template. It returns `undefined` when no literal rule matches.
+
+The helper `settle` fills `{step}` through `stepSlot`. That slot reads the base locale and prints
+"Step {number}" for an unnamed step. It fills `{section}` through `sectionLabel`. The canvas
+sentence therefore matches the checks rail's, slot for slot.
+
+`refusalSentence` calls `literalSentenceFor`, with `"canvas.connectNeedsOrder"` for the
+missing-order reason, and falls back to `canvas.connectRefused`.
+
+The function `checkConnectSource` returns a refusal kind and the engine's reason. It returns no
+display text. The `rejected` result of `resolveDropGesture` carries the same pair:
+`{ kind: "rejected", refusal, reason }`. `CanvasView` turns that pair into the sentence. The engine's `checkPathTriggerConsistency`
+stays as it is, since `src/schema` is out of scope. The hard-coded English sentence at
+`dropGesture.ts:31` goes.
 
 `CanvasView` moves the two branches of the drop's release into one `addWayOut(sourceIndex,
 target)`. The target is a step id, or a new step at a point. The drop and the menu both call it.
 Each branch keeps the calls it makes today: `newPath`, `updateInDraftArray`, `newStep("task",
 seedLocalizedText(contentLocale))`, `mutate` and `onMoveStep`.
 
-The drop places a new step at the release point. The menu has no such point. It places the new
-step at `freeLatticePoint(snapToGrid({ x: source.x + COLUMN_WIDTH, y: source.y }), drawn)`
-(`geometry.ts:71`, `layout.ts:13`). `COLUMN_WIDTH` is the auto-layout's column pitch. The new
-step stands where the auto-layout puts a step one level deeper.
+The drop places a new step at the release point. The menu has no such point. It calls
+`freeLatticePoint` (`geometry.ts:71`) with a wanted spot and the set `nodePositions`. The wanted
+spot is `snapToGrid({ x: source.x + COLUMN_WIDTH, y: source.y })` (`layout.ts:13`). `COLUMN_WIDTH` is the auto-layout's column
+pitch. The new step stands where the auto-layout puts a step one level deeper. Where another
+step holds that spot, `freeLatticePoint` walks right to the first free lattice point.
+
+The set is `nodePositions` (`CanvasView.tsx:821`), every step with hidden ones included. The
+canvas bar's press reads the same set through `drawnPositions` (`EditScreen.tsx:980-983`). A set
+of the visible steps alone could put the new step on a collapsed group's member.
 
 Alternative: the canvas bar's press rule, the visible canvas centre (`EditScreen.tsx:969`).
 Rejected: the new step lands far from its source, and its way out crosses the graph.
@@ -272,13 +333,36 @@ decisions answer it. Each line marked *assumed* is a reading nobody confirmed.
   hears `aria-keyshortcuts`. `docs/authoring-guide.md` names the keys.
 - **Untouched.** The canvas bar, the toolbar, the stamps and the sentences.
 
+### D9. The pure computations, counted
+
+The base requirement on pure canvas computations counts twelve. This change adds eight, so the
+count becomes twenty:
+
+1. `revealPan` in `canvas/fit.ts` (D2).
+2. `fitInsets` in `canvas/fit.ts` (D2).
+3. `zoomAbout` in `canvas/fit.ts` (D3).
+4. `wayOutMenuItems` in `canvas/wayOutMenu.ts` (D6).
+5. `typeAheadIndex` in `canvas/wayOutMenu.ts` (D6).
+6. `menuKeyTarget` in `canvas/wayOutMenu.ts` (D6).
+7. `checkConnectSource` in `canvas/dropGesture.ts` (D7).
+8. `refusalSentence` in `canvas/connection.ts` (D7).
+
+The `studio-canvas` delta modifies that requirement to name all eight. `literalSentenceFor` is
+pure too. It lives in `draft/checkSentence.ts`, beside the checks rail's own sentence functions,
+so the canvas count leaves it out.
+
 ## Risks / Trade-offs
 
 - [On a Tab into the canvas, the browser moves focus with no `preventScroll`. The tab body
-  scrolls (`EditScreen.tsx:235`). The browser can scroll it toward a clipped node.] → The canvas
-  reveals that node first. It then calls `scrollIntoView` with `nearest` on both axes, for a
-  focus the canvas did not make alone. A ref set around the canvas's own `focus()` calls marks
-  those. A browser check walks it in a short window.
+  scrolls (`EditScreen.tsx:235`). The browser can scroll it toward a clipped node.] → Focus
+  events fire before the browser scrolls the target into view. React's `onFocus`
+  runs inside that event. The reveal therefore pans first, and the browser's own scroll lands on
+  the revealed spot.
+
+  The canvas makes no `scrollIntoView` call of its own. In `focusScroll.ts`,
+  `scrollKeyboardFocusIntoView` skips a target inside an `<svg>` on purpose. The canvas pans its
+  own nodes, and this change keeps that rule. A browser check walks a Tab entry in a short window.
+  If the tab body still moves there, a later change adds the scroll.
 - [Panzoom rewrites the frame's inline overflow in its public `resetStyle` and in `setOptions`.] →
   The canvas never calls `resetStyle`, and no `setOptions` call passes `overflow`. A source-text
   test pins the option in the constructor call.
@@ -293,6 +377,9 @@ decisions answer it. Each line marked *assumed* is a reading nobody confirmed.
   Popover API, which needs later versions than these.
 - [The handler for `C` could swallow a typed letter.] → The canvas's key handler already returns
   early for a text field (`CanvasView.tsx:1365`). The menu stands outside the `<svg>`.
+- [A `rejected` result changes shape.] → Two `toEqual` cases in
+  `studio-canvas-dropGesture.test.ts` (lines 28-33 and 46-48) pin the old `{ kind, reason }`
+  shape. Task 5.1 moves both to the new shape.
 
 ## Migration Plan
 

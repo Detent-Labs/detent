@@ -52,6 +52,137 @@ panel route as its keyboard equivalent.
   keyboard
 - **AND** that way out takes the same trigger, name and key
 
+<!-- Why: a MODIFIED block keeps the base heading and every base scenario word for word. -->
+<!-- antislop: allow passive-voice -->
+### Requirement: Canvas interaction logic is tested as pure functions, independent of rendering
+
+Twenty computations SHALL live in pure modules with `bun:test` coverage. Five
+came first: hit-testing, drag-delta computation, the auto-place traversal, the
+connection-validity predicate and the fit-to-view computation.
+
+Two arrived with the selection set. One toggles a step in that set. The other
+is the marquee's overlap test against node rectangles. The eighth is the edge
+route between two anchors.
+
+The ninth is the anchor rule. It takes a node position and the point that node
+faces. It returns that node's anchor and the side it leaves on.
+
+The tenth is the route through a waypoint list. It takes two node positions
+and the list. It returns one polyline and the index at which each leg of that
+polyline begins.
+
+The eleventh is the group rule set. It gives a group's box, the hidden step
+ids, and the box a path anchors on.
+
+The twelfth is the keyboard traversal step. It takes the current focus, a key,
+the draft's steps, its groups and its initial step. It reads that last one for
+a root focus alone, which resolves to the entry point. The traversal reaches a
+path through its owning step. A path lives at `workflow.steps[i].paths`, and no separate
+collection holds one.
+
+It returns the next focus, and it is total over a deep-partial draft. `packages/web/src/areas/app/screens/inboxLogic.ts` sets that
+convention.
+
+The keyboard adds the last eight. The reveal returns the pan that brings one
+box into view. The inset reading returns the room the view leaves around it.
+The zoom step returns the transform that keeps one point in place.
+
+The menu's item list returns the items in order. The type-ahead and the menu's
+key step each return the next item. The source check returns a connect refusal
+or none, and the refusal sentence returns that refusal's words. None of the
+eight reads the DOM.
+
+The tests need not cover the SVG rendering or the pointer-event wiring.
+
+#### Scenario: Connection validity holds without rendering
+
+<!-- antislop: allow negation-habit -->
+- **WHEN** a test gives the connection-validity predicate a step's existing
+  paths and a candidate path
+- **THEN** it returns accept or reject-with-reason, and the test needs no DOM
+  or canvas rendering
+
+#### Scenario: The fit computation holds without rendering
+
+<!-- antislop: allow negation-habit -->
+- **WHEN** a test gives the fit-to-view computation a content bounding box and
+  a viewport size
+- **THEN** it returns a zoom level and a pan offset, and the test needs no DOM
+  or canvas rendering
+
+#### Scenario: The selection toggle and the overlap test hold without rendering
+
+<!-- antislop: allow negation-habit -->
+- **WHEN** a test gives the toggle a list of ids and one more id
+- **AND** gives the overlap test a rectangle and a list of node positions
+- **THEN** each returns its own list of ids, and the test needs no DOM or
+  canvas rendering
+
+#### Scenario: The edge route holds without rendering
+
+<!-- antislop: allow negation-habit -->
+- **WHEN** a test gives the routing computation a source anchor, a target
+  anchor and a style
+- **THEN** it returns the route's corner points, and the test needs no DOM or
+  canvas rendering
+
+#### Scenario: The anchor rule holds without rendering
+
+<!-- antislop: allow negation-habit -->
+- **WHEN** a test gives the anchor rule a node position and a facing point
+- **THEN** it returns that node's anchor and the side it leaves on
+- **AND** the test needs no DOM or canvas rendering
+
+#### Scenario: The group rules hold without rendering
+
+<!-- antislop: allow negation-habit -->
+- **WHEN** a test gives the group rules a list of groups and a list of node
+  positions
+- **THEN** it returns each group's box, the hidden step ids, and the box a
+  given step anchors on
+- **AND** the test needs no DOM or canvas rendering
+
+#### Scenario: The waypoint route holds without rendering
+
+<!-- antislop: allow negation-habit -->
+- **WHEN** a test gives the waypoint route two node positions and a list of
+  points
+- **THEN** it returns one polyline through every point in that list
+- **AND** it returns the index at which each leg of that polyline begins
+- **AND** the test needs no DOM or canvas rendering
+
+#### Scenario: The traversal step holds without rendering
+
+<!-- antislop: allow negation-habit -->
+- **WHEN** a test gives the traversal step a focus, a key, a draft's steps, its
+  groups and its initial step
+- **THEN** it returns the next focus, naming the step, the path, the group or
+  the `<svg>` root that takes it
+- **AND** the test needs no DOM or canvas rendering
+
+#### Scenario: The reveal holds without rendering
+
+- **WHEN** a test gives the reveal a box, the view's size, its insets and the
+  current transform
+- **THEN** it returns the new pan at the same zoom level
+- **AND** the test does not need a DOM or canvas rendering
+
+#### Scenario: The zoom step holds without rendering
+
+- **WHEN** a test gives the zoom step a transform, a target level, an anchor
+  point and the view's size
+- **THEN** it returns a clamped level and a pan that keeps the anchor in place
+- **AND** the test does not need a DOM or canvas rendering
+
+#### Scenario: The menu's item list holds without rendering
+
+- **WHEN** a test gives the item list the draft's steps, the hidden step ids
+  and the step texts
+- **THEN** it returns the step items in the draft's order, then the separator
+  and "A new step"
+- **AND** the test does not need a DOM or canvas rendering
+
+
 ## ADDED Requirements
 
 ### Requirement: The canvas frame clips the graph without scrolling
@@ -91,7 +222,7 @@ nothing.
 - **WHEN** focus sits on a step, and the next step in the draft's order stands
   past the canvas's right edge
 - **AND** the keyboard author presses Down
-- **THEN** the graph pans left until that step's right edge stands 16px inside
+- **THEN** the graph pans left until that step's focus ring stands 16px inside
   the canvas edge
 - **AND** the zoom level stays as it was
 
@@ -124,7 +255,8 @@ nothing.
 
 ### Requirement: Zoom keys scale the canvas
 
-With focus inside the canvas, `+` and `=` SHALL zoom in by a factor of 1.25.
+With focus on the canvas's `<svg>` or an element inside it, `+` and `=` SHALL
+zoom in by a factor of 1.25.
 The `-` key SHALL zoom out by the same factor. The zoom level SHALL stay
 between the canvas's least and greatest level. The `0` key SHALL run "Fit to
 view". A key pressed with Ctrl, Meta or Alt SHALL reach the browser untouched.
@@ -217,8 +349,8 @@ each by the text its node prints. The source step SHALL stand in the list. A
 step hidden inside a collapsed group SHALL NOT.
 
 A separator SHALL follow the steps, then the item "A new step". The first item
-SHALL take focus. With Ctrl, Meta or Alt, the `C` key SHALL reach the browser
-untouched.
+SHALL take focus. Shift SHALL change nothing. With Ctrl, Meta or Alt, the key
+SHALL reach the browser untouched.
 
 #### Scenario: The menu lists the steps, then a new step
 
@@ -228,6 +360,12 @@ untouched.
 - **AND** it lists "Review", "Booking Error" and "Done", a separator, then "A
   new step"
 - **AND** "Review" holds focus
+
+#### Scenario: A lowercase c opens the menu
+
+- **WHEN** focus sits on "Review"
+- **AND** the keyboard author presses `c` with no modifier
+- **THEN** the menu headed "Way out to …" opens beside "Review"
 
 #### Scenario: A collapsed group hides its members from the menu
 
@@ -281,10 +419,9 @@ and add nothing.
 
 Enter on a step's item SHALL add the way out a connect drop on that step adds.
 Enter on "A new step" SHALL add the step and the way out a drop on empty canvas
-adds. Each way out SHALL take the trigger, the id, the name and the key the
-drop gives it. The new step SHALL stand one column right of its source, on the
-lattice and clear of every drawn step. Focus SHALL then move to the new way
-out, and the live region SHALL announce it.
+adds. Each way out SHALL come from the drop's own `newPath` call, with its
+trigger, name and key. Focus SHALL then move to the new way out, and the live
+region SHALL announce it.
 
 #### Scenario: Enter adds a way out to an existing step
 
@@ -317,6 +454,22 @@ out, and the live region SHALL announce it.
 - **THEN** a way out from "Review" back to "Review" exists, as a drop on
   "Review" adds
 
+### Requirement: The menu places a new step beside its source
+
+A new step the way-out menu adds SHALL stand one column right of its source
+when that spot is free. Otherwise it SHALL stand at the first free lattice
+point to the right of that spot. No step SHALL overlap it, a step hidden in a
+collapsed group included.
+
+#### Scenario: A taken spot moves the new step right
+
+- **WHEN** the step "Booking Error" stands one column right of "Review"
+- **AND** the keyboard author presses Enter on "A new step" in the menu on
+  "Review"
+- **THEN** the new step stands at the first free lattice point right of that
+  spot
+- **AND** the new step overlaps no step
+
 ### Requirement: A refused source opens no menu
 
 The `C` key SHALL open no menu on a step the connect drop refuses as a source.
@@ -339,52 +492,33 @@ check SHALL decide the refusal for the drop and the key.
 A connect refusal, from the drop or the key, SHALL read a studio catalog
 sentence in the author's words. It SHALL NOT print the engine's rule text. An
 end SHALL read "An end has no way out.", the connect handle's own sentence. A
-trigger refusal SHALL read the sentence the checks rail prints for the same
-rule. A rule the checks rail cannot name SHALL read one general catalog
-sentence.
+missing order SHALL read the canvas's own sentence, since the checks rail's
+sentence does not fit a valid step. Every other trigger refusal SHALL read the
+checks rail's sentence for the same rule. Any other rule SHALL read one general
+catalog sentence.
 
 #### Scenario: An inconsistent source refuses the key
 
-- **WHEN** focus sits on a step that already carries an automatic way out with
-  no priority
+- **WHEN** focus sits on "Check credit", a call to another process with one way
+  out
+- **AND** that way out happens by itself and carries the number 1
 - **AND** the keyboard author presses `C`
-- **THEN** no menu opens, and the checks rail's sentence for a missing order
-  appears beside the step
+- **THEN** no menu opens
+- **AND** "“Check credit” already has a way out that happens by itself. Add the
+  next one under Ways out, and give it a number." appears beside the step
 - **AND** the engine's text "automatic paths need a priority" appears nowhere
 
 #### Scenario: A drop's refusal reads the same sentence
 
-- **WHEN** the author drags a connect handle from that same step and drops it
+- **WHEN** the author drags a connect handle from "Check credit" and drops it
   on another step
 - **THEN** the canvas shows the sentence the `C` key shows
 - **AND** the draft does not gain a way out
 
-### Requirement: The keyboard's canvas computations hold as pure functions
+#### Scenario: A mixed source reads the checks rail's sentence
 
-Three more computations SHALL live in pure modules with `bun:test` coverage,
-beside the twelve this capability already names. The reveal returns the pan
-that brings one box into view. The zoom step returns the transform that keeps
-one point in place. The menu's item list returns the items in order. None
-SHALL read the DOM.
-
-#### Scenario: The reveal holds without rendering
-
-- **WHEN** a test gives the reveal a box, the view's size, its insets and the
-  current transform
-- **THEN** it returns the new pan at the same zoom level
-- **AND** the test does not need a DOM or canvas rendering
-
-#### Scenario: The zoom step holds without rendering
-
-- **WHEN** a test gives the zoom step a transform, a target level, an anchor
-  point and the view's size
-- **THEN** it returns a clamped level and a pan that keeps the anchor in place
-- **AND** the test does not need a DOM or canvas rendering
-
-#### Scenario: The menu's item list holds without rendering
-
-- **WHEN** a test gives the item list the draft's steps, the hidden step ids
-  and the step texts
-- **THEN** it returns the step items in the draft's order, then the separator
-  and "A new step"
-- **AND** the test does not need a DOM or canvas rendering
+- **WHEN** focus sits on a call to another process whose one way out a person
+  chooses
+- **AND** the keyboard author presses `C`
+- **THEN** no menu opens, and the checks rail's sentence for mixed ways out
+  appears beside the step

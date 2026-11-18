@@ -24,8 +24,9 @@ change does that.
 - **The way-out menu.** On a focused step, `C` opens a menu headed "Way out to …". It lists the draft's
   steps, then "A new step". Enter adds the way out a connect drop would add. A source the drop refuses
   opens no menu, and the canvas shows and announces the refusal.
-- A refusal, from the drop or the key, reads a catalog sentence in the author's words. It reuses
-  the checks rail's sentence for each trigger rule and the handle's "An end has no way out."
+- A refusal, from the drop or the key, reads a catalog sentence in the author's words. An end
+  reads the handle's "An end has no way out." A missing order reads a canvas sentence of its own.
+  Every other trigger rule reads the checks rail's sentence for it.
 - **Announcements.** The canvas gains one polite, visually hidden live region. Every string comes from
   the studio catalog, in the author's words.
 
@@ -52,7 +53,11 @@ None.
   module, `wayOutMenu.ts`, builds the menu's items, and `WayOutMenu.tsx` draws the menu.
 - `packages/web/src/areas/studio/screens/EditScreen.tsx`, `draft/process-tabs.ts` and
   `panels/PathsPanel.tsx`: the focus landing after Enter.
-- `packages/web/src/i18n/catalogs/studio.ts`: the menu's words and the announcements.
+- `packages/web/src/i18n/catalogs/studio.ts`: the menu's words, the refusals and the announcements.
+- `canvas/connection.ts` (`refusalSentence`), `draft/checkSentence.ts` (the shared sentence helper)
+  and `focusScroll.ts` (the modality reader), all under `packages/web/src/areas/studio/`.
+- `.claude/rules/ui-glossary.md`: a row for the way-out menu.
 - Tests under `packages/web/test/` and a new smoke flow, `e2e/canvas-keyboard.e2e.ts`.
-- `docs/browser-checks.md`, `docs/authoring-guide.md` and the CANVAS-1 entry of `docs/decisions.md`.
+- `docs/browser-checks.md` and `docs/authoring-guide.md`. In `docs/decisions.md`, the CANVAS-1 entry
+  and the entry on a canvas removal.
 - No engine change, no definition contract change, no new dependency.
