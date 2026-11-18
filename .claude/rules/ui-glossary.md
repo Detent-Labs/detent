@@ -97,6 +97,7 @@ Every other term below belongs to one tab.
 | Map tab | the tab holding the canvas bar and the canvas. Say *Map tab* for the tab and *canvas* for the graph surface on it | `screens/EditScreen.tsx` |
 | canvas | the graph surface an author draws a process on | `canvas/CanvasView.tsx` |
 | canvas bar | the row between the tab row and canvas: add controls, a reachability report, and selection controls | `canvas/CanvasBar.tsx` |
+| way-out menu | the popover `C` opens on a focused step. It lists the steps, then "A new step". An item adds a way out | `canvas/WayOutMenu.tsx` |
 | steps rail | the Steps tab's left column: one numbered row per step, in the draft's own order | `panels/StepsRail.tsx` |
 | grip | the steps rail's own drag control, trailing each row | `panels/StepsRail.tsx` (`GripVertical`) |
 | step page | the Steps tab's wide right column, open on the one selected step | `panels/StepPage.tsx` |

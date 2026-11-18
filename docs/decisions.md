@@ -813,7 +813,8 @@ recorded rather than fixed. The RAIL tags are local to this section.
   their place after every removal (WCAG 2.4.3, and 4.1.3 for the silence). The
   fix moves focus to the canvas's own tab stop, which
   `packages/web/src/areas/studio/canvas/CanvasView.tsx:768-776` already reassigns,
-  and announces the removal in a polite live region.
+  and announces the removal in a polite live region. The canvas now holds one
+  such region, which a removal can reuse.
 - **The canvas bar's caret menu ignores the arrow keys.** The panel carries
   `role="menu"` (`packages/web/src/areas/studio/canvas/CanvasBar.tsx:376`), and
   ArrowDown leaves focus on its trigger. Risk: a screen reader announces a menu
@@ -824,7 +825,7 @@ recorded rather than fixed. The RAIL tags are local to this section.
 - **CANVAS-1: at 400px the canvas clips the Arrange ring by 2px.** The
   canvas's own toolbar sits 8px inside the canvas, in one row that never
   wraps (`canvas/CanvasView.tsx:80`). The canvas clips at its padding edge,
-  with `overflow: hidden` (`:70`). Measured 2026-09-24 at 400x800: Fit to
+  with `overflow: clip` (`:70`). Measured 2026-09-24 at 400x800: Fit to
   view, Rounded corners and Arrange fill the row, and Arrange's ring runs
   2px past the right edge. The canvas scrolls nothing, so the scroll-box
   rule of `studio-focus-ring-clipping` does not reach it. Risk (Low): the

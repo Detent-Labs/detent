@@ -44,15 +44,15 @@
 
 ## 6. Docs and browser checks
 
-- [ ] 6.1 Add `e2e/canvas-keyboard.e2e.ts` with four flows, per `development-toolchain`'s split rule. Pass: `bun run e2e` runs all four green.
+- [x] 6.1 Add `e2e/canvas-keyboard.e2e.ts` with four flows, per `development-toolchain`'s split rule. Pass: `bun run e2e` runs all four green.
   - The first keeps the frame's scroll offsets at 0 at 200 percent zoom. It finds the focused step inside the frame after Down.
   - The second lands Enter on a step, Enter on a way out and a double-click on a step. Each lands on its Name input.
   - The third presses a lowercase `c`, then Enter, and finds the new way out focused.
   - The fourth reads "Map at 125 percent" in `role=status` after `+` at 100 percent. It finds the step focused after Escape in the menu.
-- [ ] 6.2 Extend the entry "Keyboard access to the canvas" in `docs/browser-checks.md` with what the smoke flows cannot see. Cover reveal on a Tab entry and a click. Cover the zoom keys past `+`, the menu, a short-window Tab entry and a refusal at a fit scale other than 1. Rewrite the Pass of "Focus a step and press Enter" to the Name input landing. Remove each step the smoke flows now cover. Pass: the prose gate reports no rise on the file.
-- [ ] 6.3 Add the zoom keys and the way-out menu to the Map passage of `docs/authoring-guide.md`, beside the drag sentence. Pass: `git grep -n 'Way out to' -- docs/authoring-guide.md` prints a line.
-- [ ] 6.4 Update the CANVAS-1 entry in `docs/decisions.md`, which names the frame's `overflow: hidden`. Add to the entry on a canvas removal that the canvas now holds a live region a removal can reuse. Pass: the CANVAS-1 entry names `overflow: clip`, and the prose gate reports no rise on the file.
-- [ ] 6.5 Add a row for the way-out menu to the Map tab table in `.claude/rules/ui-glossary.md`. The row names the popover `C` opens on a focused step. That popover lists the steps, then "A new step". It lives in `canvas/WayOutMenu.tsx`. Pass: `git grep -n 'way-out menu |' -- .claude/rules/ui-glossary.md` prints the row.
+- [x] 6.2 Extend the entry "Keyboard access to the canvas" in `docs/browser-checks.md` with what the smoke flows cannot see. Cover reveal on a Tab entry and a click. Cover the zoom keys past `+`, the menu, a short-window Tab entry and a refusal at a fit scale other than 1. Rewrite the Pass of "Focus a step and press Enter" to the Name input landing. Remove each step the smoke flows now cover. Pass: the prose gate reports no rise on the file.
+- [x] 6.3 Add the zoom keys and the way-out menu to the Map passage of `docs/authoring-guide.md`, beside the drag sentence. Pass: `git grep -n 'Way out to' -- docs/authoring-guide.md` prints a line.
+- [x] 6.4 Update the CANVAS-1 entry in `docs/decisions.md`, which names the frame's `overflow: hidden`. Add to the entry on a canvas removal that the canvas now holds a live region a removal can reuse. Pass: the CANVAS-1 entry names `overflow: clip`, and the prose gate reports no rise on the file.
+- [x] 6.5 Add a row for the way-out menu to the Map tab table in `.claude/rules/ui-glossary.md`. The row names the popover `C` opens on a focused step. That popover lists the steps, then "A new step". It lives in `canvas/WayOutMenu.tsx`. Pass: `git grep -n 'way-out menu |' -- .claude/rules/ui-glossary.md` prints the row.
 
 ## 7. Verification
 
