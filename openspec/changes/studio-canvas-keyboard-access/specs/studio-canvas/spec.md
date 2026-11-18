@@ -1,0 +1,373 @@
+## MODIFIED Requirements
+
+### Requirement: The canvas introduces no authoring operation unavailable through the panels
+
+<!-- Why: the copied paragraphs repeat the base spec's wording; remove and delete name two controls. -->
+<!-- antislop: allow sentence-length passive-voice synonym-rotation -->
+
+Every mutation the canvas can trigger SHALL have an existing panel-based
+equivalent. Those mutations are positioning a step, connecting a path,
+inserting a step into a path, and deleting a selection. The canvas SHALL NOT
+be the only way to perform any authoring operation. Deletion keeps its panel
+route. The step page's own remove control removes each step the canvas bar's
+delete control removes.
+
+The insert gesture holds to this rule by composition. It performs no mutation
+the panels lack. The rail's own existing step-creation drag creates the step.
+Then `PathsPanel` retargets the source step's existing path to the new step.
+It also adds a new path on it, naming the old target. Both are
+already-existing panel actions.
+
+The canvas spends one gesture where the panels spend four operations, and
+reaches the same draft.
+
+Selection, traversal and connecting two steps answer the keyboard on the
+canvas itself. The way-out menu is the connect drag's keyboard route there. The
+panel route stays a keyboard equivalent beside it. Every other drag keeps the
+panel route as its keyboard equivalent.
+
+#### Scenario: A step and its paths remain deletable without the canvas
+
+<!-- Why: the scenario repeats the base spec's own wording, character for character. -->
+<!-- antislop: allow passive-voice synonym-rotation -->
+- **WHEN** a step or path is deleted through its panel
+- **THEN** the deletion succeeds identically to before this change, with no
+  canvas-only deletion affordance introduced
+
+#### Scenario: The panels reach an inserted step's end state
+
+<!-- Why: this scenario repeats the base spec's own wording; the rail carries that name on the screen. -->
+<!-- antislop: allow synonym-rotation -->
+- **WHEN** the developer drags a Step from the edit rail onto empty canvas
+- **AND** retargets the source step's path to it in `PathsPanel`
+- **AND** adds a path on the new step naming the old target
+- **THEN** the draft matches what one drop on that path produces
+- **AND** it differs in the new step's position and the cleared waypoints
+
+#### Scenario: A way out added from the keyboard has a panel route too
+
+- **WHEN** a keyboard author adds a way out from "Review" to "Booking Error"
+  through the way-out menu
+- **THEN** the step page's Ways out section can add the same way out from the
+  keyboard
+- **AND** that way out takes the same trigger, name and key
+
+## ADDED Requirements
+
+### Requirement: The canvas frame clips the graph without scrolling
+
+The canvas frame SHALL clip the graph without being a scroll container. Its
+scroll offsets SHALL stay at zero, whatever takes focus inside it. Each focus
+move the canvas makes itself SHALL ask the browser not to scroll. Pan and zoom
+SHALL stay the one way the view moves.
+
+#### Scenario: A focus move off the visible canvas leaves the frame unscrolled
+
+- **WHEN** the canvas stands at 200 percent zoom
+- **AND** a keyboard author moves focus to a step outside the visible canvas
+- **THEN** the frame's horizontal and vertical scroll offsets both read 0
+- **AND** the step draws where the pan transform puts it
+
+#### Scenario: Fit to view frames the graph after a focus move
+
+- **WHEN** a keyboard author moved focus across the whole graph at 200 percent
+  zoom
+- **AND** the author then activates "Fit to view"
+- **THEN** the framing matches the one "Fit to view" gives on a fresh open
+
+### Requirement: A keyboard focus move reveals the focused element
+
+A keyboard focus move SHALL bring the step, way out or group disclosure it
+lands on fully into view. The canvas SHALL pan by the least amount
+that does so. It SHALL keep its zoom level. The visible area leaves out the
+toolbar and the gutter of "Fit to view".
+
+An element larger than that area SHALL align to the area's top-left corner. An
+element already in view SHALL move nothing. A pointer press SHALL reveal
+nothing.
+
+#### Scenario: A step past the right edge comes into view
+
+- **WHEN** focus sits on a step, and the next step in the draft's order stands
+  past the canvas's right edge
+- **AND** the keyboard author presses Down
+- **THEN** the graph pans left until that step's right edge stands 16px inside
+  the canvas edge
+- **AND** the zoom level stays as it was
+
+#### Scenario: A step under the toolbar comes clear of it
+
+- **WHEN** a keyboard author moves focus to a step that sits under the toolbar
+- **THEN** the graph pans down until the step stands 16px below the toolbar
+
+#### Scenario: Tab into the canvas reveals the entry step
+
+- **WHEN** the draft's initial step stands outside the visible canvas
+- **AND** a keyboard author tabs into the canvas
+- **THEN** focus lands on the initial step, and the graph pans it into view
+
+#### Scenario: An element in view moves nothing
+
+- **WHEN** a keyboard author moves focus to a way out already fully in view
+- **THEN** the graph keeps its pan and its zoom
+
+#### Scenario: An element larger than the view aligns to its top-left
+
+- **WHEN** a keyboard author moves focus to a way out whose route is wider than
+  the visible area
+- **THEN** the route's leftmost point stands 16px inside the canvas's left edge
+
+#### Scenario: A pointer press reveals nothing
+
+- **WHEN** an author clicks a step that stands half outside the visible canvas
+- **THEN** the graph keeps its pan, and the click selects the step
+
+### Requirement: Zoom keys scale the canvas
+
+With focus inside the canvas, `+` and `=` SHALL zoom in by a factor of 1.25.
+The `-` key SHALL zoom out by the same factor. The zoom level SHALL stay
+between the canvas's least and greatest level. The `0` key SHALL run "Fit to
+view". A key pressed with Ctrl, Meta or Alt SHALL reach the browser untouched.
+
+A zoom key SHALL keep the focused element's centre in place on screen. On a
+root focus, the view's centre SHALL stay in place instead.
+
+#### Scenario: Plus zooms in about the focused step
+
+- **WHEN** the canvas stands at 100 percent zoom and a step holds focus
+- **AND** the keyboard author presses `+`
+- **THEN** the canvas stands at 125 percent
+- **AND** the focused step's centre stays at the same point on screen
+
+#### Scenario: Minus zooms out about the view's centre from the root
+
+- **WHEN** the canvas `<svg>` itself holds focus at 100 percent zoom
+- **AND** the keyboard author presses `-`
+- **THEN** the canvas stands at 80 percent
+- **AND** the graph point under the view's centre stays there
+
+#### Scenario: The greatest level holds
+
+- **WHEN** the canvas stands at its greatest zoom level
+- **AND** the keyboard author presses `=`
+- **THEN** the zoom level stays where it is
+
+#### Scenario: Zero frames the graph
+
+- **WHEN** a keyboard author presses `0` inside the canvas
+- **THEN** the canvas shows the framing "Fit to view" gives
+
+#### Scenario: A modifier leaves the key to the browser
+
+- **WHEN** a keyboard author presses Ctrl and `+` inside the canvas
+- **THEN** the canvas keeps its own zoom level
+- **AND** the browser zooms the page
+
+### Requirement: The canvas announces through one polite live region
+
+The canvas SHALL hold one live region. It is polite and visually hidden, and
+it lays out inside the canvas frame. It SHALL stay mounted while the canvas
+shows. Each zoom key SHALL announce the new level, as in "Map at 125 percent".
+An added way out and a refused source SHALL announce too.
+
+A zoom level and an added way out SHALL read from the studio catalog, in the
+author's words. Neither SHALL say "edge", "node" or "port". A refusal SHALL
+read the text the connect drop's refusal shows.
+
+#### Scenario: A zoom key announces the level
+
+- **WHEN** a keyboard author presses `+` at 100 percent zoom
+- **THEN** the live region reads "Map at 125 percent"
+
+#### Scenario: The region stands before its first announcement
+
+- **WHEN** the Map tab first shows a draft
+- **THEN** the canvas frame already holds the empty live region
+
+### Requirement: Opening from the canvas lands focus on the step page
+
+Enter on a focused step SHALL move focus to the step page's Name input, once
+the Steps tab shows. Enter on a focused way out SHALL open Ways out on its
+source step. Focus SHALL then move to that way out's own Name input, in its
+row. A double-click SHALL land focus the same way. Focus SHALL NOT fall to the
+page body.
+
+#### Scenario: Enter on a step lands on its Name input
+
+- **WHEN** focus sits on the step "Review" and the author presses Enter
+- **THEN** the Steps tab shows "Review", and its Name input holds focus
+
+#### Scenario: Enter on a way out lands on its row
+
+- **WHEN** focus sits on the way out "Approve" from "Review"
+- **AND** the author presses Enter
+- **THEN** the Steps tab shows "Review" with Ways out open
+- **AND** the Name input in the row of "Approve" holds focus
+
+#### Scenario: A double-click lands the same way
+
+- **WHEN** the author double-clicks the step "Review"
+- **THEN** its Name input on the step page holds focus
+
+### Requirement: C opens the way-out menu on a focused step
+
+On a focused step, the `C` key SHALL open a menu anchored at that step,
+headed "Way out to …". It SHALL list the draft's steps in the draft's order,
+each by the text its node prints. The source step SHALL stand in the list. A
+step hidden inside a collapsed group SHALL NOT.
+
+A separator SHALL follow the steps, then the item "A new step". The first item
+SHALL take focus. With Ctrl, Meta or Alt, the `C` key SHALL reach the browser
+untouched.
+
+#### Scenario: The menu lists the steps, then a new step
+
+- **WHEN** a draft holds "Review", "Booking Error" and "Done", in that order
+- **AND** the keyboard author presses `C` on "Review"
+- **THEN** a menu headed "Way out to …" opens beside "Review"
+- **AND** it lists "Review", "Booking Error" and "Done", a separator, then "A
+  new step"
+- **AND** "Review" holds focus
+
+#### Scenario: A collapsed group hides its members from the menu
+
+- **WHEN** "Done" sits inside a collapsed group
+- **AND** the keyboard author presses `C` on "Review"
+- **THEN** the menu does not list "Done"
+
+#### Scenario: C answers a step alone
+
+- **WHEN** focus sits on a way out, a group's disclosure or the `<svg>` root
+- **AND** the keyboard author presses `C`
+- **THEN** no menu opens
+
+#### Scenario: A screen reader learns the key
+
+- **WHEN** the canvas draws a step
+- **THEN** the step carries `aria-keyshortcuts="C"`, and no visible key hint
+  draws
+
+### Requirement: The way-out menu answers the keyboard
+
+Down and Up SHALL move focus through the menu's items, wrapping at either end.
+Home and End SHALL reach the first and the last item. A typed letter SHALL
+move focus to the next item whose text starts with it. Enter SHALL add the way
+out the focused item names.
+
+Escape SHALL close the menu and add nothing. Tab SHALL do the same. Either one
+SHALL return focus to the source step. A press outside the menu SHALL close it
+and add nothing.
+
+#### Scenario: A typed letter jumps by name
+
+- **WHEN** the menu lists "Review", "Booking Error" and "Done"
+- **AND** the keyboard author types `b`
+- **THEN** "Booking Error" holds focus
+
+#### Scenario: Escape returns to the step
+
+- **WHEN** the menu is open on "Review"
+- **AND** the keyboard author presses Escape
+- **THEN** the menu closes, and "Review" holds focus
+- **AND** the draft has no new way out
+
+#### Scenario: Down wraps at the end
+
+- **WHEN** "A new step" holds focus
+- **AND** the keyboard author presses Down
+- **THEN** the first item holds focus
+
+### Requirement: The way-out menu adds what a connect drop adds
+
+Enter on a step's item SHALL add the way out a connect drop on that step adds.
+Enter on "A new step" SHALL add the step and the way out a drop on empty canvas
+adds. Each way out SHALL take the trigger, the id, the name and the key the
+drop gives it. The new step SHALL stand one column right of its source, on the
+lattice and clear of every drawn step. Focus SHALL then move to the new way
+out, and the live region SHALL announce it.
+
+#### Scenario: Enter adds a way out to an existing step
+
+- **WHEN** the menu is open on "Review", which has no way out yet
+- **AND** the keyboard author presses Enter on "Booking Error"
+- **THEN** a manual way out from "Review" to "Booking Error" exists, named
+  "Review → Booking Error"
+- **AND** that way out holds focus
+- **AND** the live region reads "Added a way out from Review to Booking Error."
+
+#### Scenario: Enter on a new step adds a step and a way out
+
+- **WHEN** the menu is open on "Review", and the place one column right of it
+  is free
+- **AND** the keyboard author presses Enter on "A new step"
+- **THEN** a new task step exists one column right of "Review"
+- **AND** a way out from "Review" to the new step exists
+- **AND** the live region names the text the new step's node prints
+
+#### Scenario: A subprocess source takes an automatic way out
+
+- **WHEN** the menu is open on a subprocess step with no way out
+- **AND** the keyboard author presses Enter on any item
+- **THEN** the new way out is automatic, as a connect drop's would be
+
+#### Scenario: The source itself is a target
+
+- **WHEN** the menu is open on "Review"
+- **AND** the keyboard author presses Enter on "Review"
+- **THEN** a way out from "Review" back to "Review" exists, as a drop on
+  "Review" adds
+
+### Requirement: A refused source opens no menu
+
+The `C` key SHALL open no menu on a step the connect drop refuses as a source.
+A terminal step is one. A step whose existing paths reject the new way out's
+trigger is another. The canvas SHALL show the refusal the drop shows, beside
+the step. The live region SHALL announce the same text.
+
+Focus SHALL stay on the step, and the draft SHALL stay unchanged. One shared
+check SHALL decide the refusal for the drop and the key.
+
+#### Scenario: An end refuses the key
+
+- **WHEN** focus sits on an end
+- **AND** the keyboard author presses `C`
+- **THEN** no menu opens, the drop's refusal text shows beside the end, and the
+  live region reads it
+
+#### Scenario: An inconsistent source refuses the key
+
+- **WHEN** focus sits on a step that already carries an automatic way out with
+  no priority
+- **AND** the keyboard author presses `C`
+- **THEN** no menu opens, and the refusal a connect drop from that step shows
+  appears beside it
+
+### Requirement: The keyboard's canvas computations hold as pure functions
+
+Three more computations SHALL live in pure modules with `bun:test` coverage,
+beside the twelve this capability already names. The reveal returns the pan
+that brings one box into view. The zoom step returns the transform that keeps
+one point in place. The menu's item list returns the items in order. None
+SHALL read the DOM.
+
+#### Scenario: The reveal holds without rendering
+
+- **WHEN** a test gives the reveal a box, the view's size, its insets and the
+  current transform
+- **THEN** it returns the new pan at the same zoom level
+- **AND** the test does not need a DOM or canvas rendering
+
+#### Scenario: The zoom step holds without rendering
+
+- **WHEN** a test gives the zoom step a transform, a target level, an anchor
+  point and the view's size
+- **THEN** it returns a clamped level and a pan that keeps the anchor in place
+- **AND** the test does not need a DOM or canvas rendering
+
+#### Scenario: The menu's item list holds without rendering
+
+- **WHEN** a test gives the item list the draft's steps, the hidden step ids
+  and the step texts
+- **THEN** it returns the step items in the draft's order, then the separator
+  and "A new step"
+- **AND** the test does not need a DOM or canvas rendering
