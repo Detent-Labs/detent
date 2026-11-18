@@ -62,6 +62,8 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 | `@types/bun` | 1.4.4 | MIT |
 | `@types/react` | 19.3.0 | MIT |
 | `@types/react-dom` | 19.3.0 | MIT |
+| `@ui-sdk/core` | 0.1.0-beta.10 | Apache-2.0 |
+| `@ui-sdk/react` | 0.1.0-beta.10 | Apache-2.0 |
 | `@vitejs/plugin-react` | 6.1.2 | MIT |
 | `jose` | 6.2.4 | MIT |
 | `lucide-react` | 1.61.0 | ISC |
