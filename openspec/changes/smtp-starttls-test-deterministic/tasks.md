@@ -18,6 +18,6 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Run `bun run typecheck`, `bun run build` and `bun run lint`. Pass: each exits 0.
-- [ ] 4.2 Run the full `bun test` with `DATABASE_URL` set, in the foreground, through the gated script. Pass: 0 fail.
-- [ ] 4.3 On the host, run the prose and whitespace gates over `range.sh < /dev/null`. Pass: both exit 0.
+- [x] 4.1 Run `bun run typecheck`, `bun run build` and `bun run lint`. Pass: each exits 0.
+- [x] 4.2 Run the full `bun test` with `DATABASE_URL` set, in the foreground, through the gated script. Pass: 0 fail.
+- [x] 4.3 On the host, run the prose and whitespace gates over `range.sh < /dev/null`. Pass: both exit 0.

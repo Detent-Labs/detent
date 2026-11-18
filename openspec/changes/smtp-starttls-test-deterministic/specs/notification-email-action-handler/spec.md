@@ -46,6 +46,11 @@ certificate counts as a failed handshake.
 - **WHEN** the server presents a certificate the handler does not trust
 - **THEN** the delivery fails as transient during the TLS handshake, and no `AUTH` reaches the server
 
+#### Scenario: A certificate for another host ends the session
+
+- **WHEN** the server presents a trusted certificate that does not name `SMTP_HOST`
+- **THEN** the delivery fails as transient during the TLS handshake, and no `AUTH` reaches the server
+
 ### Requirement: The handler reads STARTTLS from the EHLO extension lines alone
 
 The handler SHALL take a server's `STARTTLS` offer from the `EHLO` reply's extension lines alone.
