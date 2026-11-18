@@ -181,7 +181,9 @@ reads as a control. It would also add a second landing rule for one page.
 
 ### D6. The way-out menu
 
-A new module `canvas/wayOutMenu.ts` holds the pure parts:
+A new module `canvas/wayOutMenuLogic.ts` holds the pure parts. Its name differs from the
+component's by more than case, because Bun resolved `./WayOutMenu.js` to a sibling
+`wayOutMenu.ts`. The parts are these:
 
 - `wayOutMenuItems(steps, hidden, texts)` returns the step items in draft order, then a
   separator, then the new-step item. It skips a step with no id and a step in `hidden`. It
@@ -341,9 +343,9 @@ count becomes twenty:
 1. `revealPan` in `canvas/fit.ts` (D2).
 2. `fitInsets` in `canvas/fit.ts` (D2).
 3. `zoomAbout` in `canvas/fit.ts` (D3).
-4. `wayOutMenuItems` in `canvas/wayOutMenu.ts` (D6).
-5. `typeAheadIndex` in `canvas/wayOutMenu.ts` (D6).
-6. `menuKeyTarget` in `canvas/wayOutMenu.ts` (D6).
+4. `wayOutMenuItems` in `canvas/wayOutMenuLogic.ts` (D6).
+5. `typeAheadIndex` in `canvas/wayOutMenuLogic.ts` (D6).
+6. `menuKeyTarget` in `canvas/wayOutMenuLogic.ts` (D6).
 7. `checkConnectSource` in `canvas/dropGesture.ts` (D7).
 8. `refusalSentence` in `canvas/connection.ts` (D7).
 

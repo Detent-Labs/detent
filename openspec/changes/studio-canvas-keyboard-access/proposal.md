@@ -50,7 +50,7 @@ None.
 ## Impact
 
 - `packages/web/src/areas/studio/canvas/`: `CanvasView.tsx`, `fit.ts` and `dropGesture.ts`. A new pure
-  module, `wayOutMenu.ts`, builds the menu's items, and `WayOutMenu.tsx` draws the menu.
+  module, `wayOutMenuLogic.ts`, builds the menu's items, and `WayOutMenu.tsx` draws the menu.
 - `packages/web/src/areas/studio/screens/EditScreen.tsx`, `draft/process-tabs.ts` and
   `panels/PathsPanel.tsx`: the focus landing after Enter.
 - `packages/web/src/i18n/catalogs/studio.ts`: the menu's words, the refusals and the announcements.
