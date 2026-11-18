@@ -417,4 +417,14 @@ describe("the canvas node's accessibility markup", () => {
       expect(elementsOf(CANVAS.inner, (openTag) => openTag.startsWith("<g") && attr(openTag, "id") === controls).length).toBe(1);
     }
   });
+
+  // The defect class: a live region added at the moment its text arrives,
+  // which no engine announces reliably.
+  it("renders an empty polite status region in the first markup", () => {
+    const regions = [...HTML.matchAll(/<p\b[^>]*role="status"[^>]*>([^<]*)<\/p>/g)];
+    expect(regions.length).toBe(1);
+    expect(regions[0][0]).toContain('aria-live="polite"');
+    expect(regions[0][1]).toBe("");
+    expect(HTML.indexOf(regions[0][0])).toBeGreaterThan(HTML.indexOf("</svg>"));
+  });
 });

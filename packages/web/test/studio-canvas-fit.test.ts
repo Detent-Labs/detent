@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
-import { computeFit, fitInsets, revealPan, MIN_SCALE, FIT_GUTTER, type Box, type Insets, type Fit } from "../src/areas/studio/canvas/fit.js";
+import { computeFit, fitInsets, revealPan, zoomAbout, ZOOM_KEY_FACTOR, MAX_SCALE, MIN_SCALE, FIT_GUTTER, type Box, type Insets, type Fit } from "../src/areas/studio/canvas/fit.js";
 
 /**
  * Where the content box lands on screen, in the element's own pixel space.
@@ -251,6 +251,60 @@ describe("canvas fit: revealPan", () => {
       expect(box.y + dy + box.height).toBeCloseTo(view.height - insets.bottom, 9);
     });
   }
+});
+
+describe("canvas fit: zoomAbout", () => {
+  const view = { width: 800, height: 600 };
+  const centre = { x: 400, y: 300 };
+
+  /** Where a user-space point lands on screen: `C + s * (p + t - C)`. */
+  const screenOf = (fit: Fit, p: { x: number; y: number }) => ({
+    x: centre.x + fit.scale * (p.x + fit.x - centre.x),
+    y: centre.y + fit.scale * (p.y + fit.y - centre.y),
+  });
+
+  it("steps by 1.25 each way", () => {
+    expect(ZOOM_KEY_FACTOR).toBe(1.25);
+  });
+
+  for (const [from, to] of [
+    [1, 1.25],
+    [1, 0.8],
+    [0.5, 0.625],
+    [1.5, 1.2],
+  ] as const) {
+    it(`keeps the anchor's screen point fixed going ${from} to ${to}`, () => {
+      const current: Fit = { scale: from, x: 30, y: -20 };
+      // The anchor's screen point, and the user-space point under it.
+      const anchor = { x: 150, y: 480 };
+      const under = { x: centre.x + (anchor.x - centre.x) / from - current.x, y: centre.y + (anchor.y - centre.y) / from - current.y };
+      const next = zoomAbout(current, to, anchor, view);
+      expect(next.scale).toBeCloseTo(to, 10);
+      const after = screenOf(next, under);
+      expect(after.x).toBeCloseTo(anchor.x, 6);
+      expect(after.y).toBeCloseTo(anchor.y, 6);
+    });
+  }
+
+  it("leaves the pan as it was for a centre anchor", () => {
+    const current: Fit = { scale: 1, x: 30, y: -20 };
+    expect(zoomAbout(current, 1.25, centre, view)).toEqual({ scale: 1.25, x: 30, y: -20 });
+  });
+
+  it("clamps at MAX_SCALE", () => {
+    const next = zoomAbout({ scale: 1.9, x: 0, y: 0 }, 1.9 * ZOOM_KEY_FACTOR, { x: 100, y: 100 }, view);
+    expect(next.scale).toBe(MAX_SCALE);
+  });
+
+  it("clamps at MIN_SCALE", () => {
+    const next = zoomAbout({ scale: 0.3, x: 0, y: 0 }, 0.3 / ZOOM_KEY_FACTOR, { x: 100, y: 100 }, view);
+    expect(next.scale).toBe(MIN_SCALE);
+  });
+
+  it("changes nothing at a bound it already holds", () => {
+    const current: Fit = { scale: MAX_SCALE, x: 12, y: 7 };
+    expect(zoomAbout(current, MAX_SCALE * ZOOM_KEY_FACTOR, { x: 100, y: 100 }, view)).toEqual(current);
+  });
 });
 
 describe("canvas frame: clips instead of scrolling", () => {

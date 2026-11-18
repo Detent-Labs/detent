@@ -125,3 +125,22 @@ export function revealPan(target: Box, view: Size, insets: Insets, current: Fit)
   const dy = revealShift(target.y, target.height, insets.top, view.height - insets.bottom);
   return { scale: current.scale, x: current.x + dx / current.scale, y: current.y + dy / current.scale };
 }
+
+/** The factor one zoom key applies, each way. */
+export const ZOOM_KEY_FACTOR = 1.25;
+
+/**
+ * The fit at `toScale` (clamped to the bounds) that keeps `anchor`, a screen
+ * point in the frame's pixel space, where it is. From the projection above,
+ * the pan moves by `(anchor - C) * (1/s' - 1/s)`, with `C` the view centre. An
+ * anchor at the centre leaves the pan as it was.
+ */
+export function zoomAbout(current: Fit, toScale: number, anchor: { x: number; y: number }, view: Size): Fit {
+  const scale = Math.min(Math.max(toScale, MIN_SCALE), MAX_SCALE);
+  const k = 1 / scale - 1 / current.scale;
+  return {
+    scale,
+    x: current.x + (anchor.x - view.width / 2) * k,
+    y: current.y + (anchor.y - view.height / 2) * k,
+  };
+}

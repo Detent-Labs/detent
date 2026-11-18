@@ -13,10 +13,10 @@
 
 ## 3. Zoom keys and the live region
 
-- [ ] 3.1 Add `zoomAbout` and `ZOOM_KEY_FACTOR` to `canvas/fit.ts`, per D3. Pass: `packages/web/test/studio-canvas-fit.test.ts` shows the anchor's screen point unchanged after a zoom. It also covers a clamp at each bound and a centre anchor that leaves the pan as it was.
-- [ ] 3.2 Answer `+`, `=`, `-` and `0` in `onCanvasKeyDown`, per D3. Return early on Ctrl, Meta or Alt, and call `preventDefault` on each key the canvas answers. Pass: the fourth smoke flow in 6.1 reads the zoom level after `+`. The 6.2 walk reads it after `-`, `0` and Ctrl with `+`.
-- [ ] 3.3 Add the live region and its `announce` helper inside `.canvas-wrap`, per D4. Add the four `canvas.*` keys for the zoom, the menu and the add to `i18n/catalogs/studio.ts`. Pass: a test in `packages/web/test/studio-canvas-node-a11y.test.tsx` finds an empty polite `role="status"` in the first markup.
-- [ ] 3.4 Announce the zoom level after each zoom key, through `canvas.zoomAnnounce`. Pass: the fourth smoke flow in 6.1 reads "Map at 125 percent" in `role=status` after `+` at 100 percent.
+- [x] 3.1 Add `zoomAbout` and `ZOOM_KEY_FACTOR` to `canvas/fit.ts`, per D3. Pass: `packages/web/test/studio-canvas-fit.test.ts` shows the anchor's screen point unchanged after a zoom. It also covers a clamp at each bound and a centre anchor that leaves the pan as it was.
+- [x] 3.2 Answer `+`, `=`, `-` and `0` in `onCanvasKeyDown`, per D3. Return early on Ctrl, Meta or Alt, and call `preventDefault` on each key the canvas answers. Pass: the fourth smoke flow in 6.1 reads the zoom level after `+`. The 6.2 walk reads it after `-`, `0` and Ctrl with `+`.
+- [x] 3.3 Add the live region and its `announce` helper inside `.canvas-wrap`, per D4. Add the four `canvas.*` keys for the zoom, the menu and the add to `i18n/catalogs/studio.ts`. Pass: a test in `packages/web/test/studio-canvas-node-a11y.test.tsx` finds an empty polite `role="status"` in the first markup.
+- [x] 3.4 Announce the zoom level after each zoom key, through `canvas.zoomAnnounce`. Pass: the fourth smoke flow in 6.1 reads "Map at 125 percent" in `role=status` after `+` at 100 percent.
 
 ## 4. Enter lands on the step page
 

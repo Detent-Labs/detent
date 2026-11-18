@@ -1162,6 +1162,10 @@ export const en = {
   "issues.crossProcessNotChecked": "Cross-process references: not checked",
 
   "canvas.fitToView": "Fit to view",
+  "canvas.zoomAnnounce": "Map at {percent} percent",
+  "canvas.wayOutMenuHeading": "Way out to …",
+  "canvas.wayOutMenuNewStep": "A new step",
+  "canvas.wayOutAdded": "Added a way out from {source} to {target}.",
   "canvas.arrange": "Arrange",
   "canvas.edgeStyleToggle": "Rounded corners",
   "canvas.selectionHeading": "Steps selected",

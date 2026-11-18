@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as stylex from "@stylexjs/stylex";
 import { colors, fonts, space } from "form-ui/tokens.stylex";
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
@@ -28,7 +28,7 @@ import {
 } from "./geometry";
 import { toggleSelection, normalizeRect, nodesInRect } from "./selection";
 import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups";
-import { computeFit, fitInsets, revealPan, MIN_SCALE, MAX_SCALE, type Fit } from "./fit";
+import { computeFit, fitInsets, revealPan, zoomAbout, ZOOM_KEY_FACTOR, MIN_SCALE, MAX_SCALE, type Fit } from "./fit";
 import { lastInputWasPointer } from "../focusScroll";
 import { resolveDropGesture } from "./dropGesture";
 import {
@@ -85,6 +85,19 @@ const FOCUS_RING_OFFSET = 3;
 const ARROW_KEYS: ArrowKey[] = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
 
 const styles = stylex.create({
+  // The live region's hiding: laid out but invisible, since `display: none`
+  // is announced by no engine.
+  visuallyHidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
+  },
   wrap: {
     position: "relative",
     flex: "1 1 auto",
@@ -1046,6 +1059,49 @@ export function CanvasView({
     return svgPointFromClient(svg, e.clientX, e.clientY);
   };
 
+  // The polite live region's text. Empty on the first commit, so the first
+  // message reaches a screen reader.
+  const [announcement, setAnnouncement] = useState("");
+  const announcedRef = useRef("");
+  const announceFrame = useRef(0);
+  /** Speaks `text`. A repeat clears the region first and writes one frame
+   * later, so the reader speaks it again. */
+  const announce = (text: string) => {
+    cancelAnimationFrame(announceFrame.current);
+    if (announcedRef.current === text) setAnnouncement("");
+    announcedRef.current = text;
+    announceFrame.current = requestAnimationFrame(() => setAnnouncement(text));
+  };
+  useEffect(() => () => cancelAnimationFrame(announceFrame.current), []);
+
+  const announceZoom = (scale: number) => announce(t("canvas.zoomAnnounce").replace("{percent}", String(Math.round(scale * 100))));
+
+  /** Zooms by one key step about the focused element's centre; a root focus
+   * anchors at the view centre. */
+  const zoomByKey = (factor: number) => {
+    const panzoom = panzoomRef.current;
+    const svg = svgRef.current;
+    const frame = svg?.parentElement;
+    if (!panzoom || !svg || !frame) return;
+    const view = { width: frame.clientWidth, height: frame.clientHeight };
+    let anchor = { x: view.width / 2, y: view.height / 2 };
+    const active = document.activeElement;
+    if (active && active !== svg && svg.contains(active)) {
+      const rect = active.getBoundingClientRect();
+      const frameRect = frame.getBoundingClientRect();
+      anchor = {
+        x: rect.left + rect.width / 2 - frameRect.left - frame.clientLeft,
+        y: rect.top + rect.height / 2 - frameRect.top - frame.clientTop,
+      };
+    }
+    const pan = panzoom.getPan();
+    const current: Fit = { scale: panzoom.getScale(), x: pan.x, y: pan.y };
+    const next = zoomAbout(current, current.scale * factor, anchor, view);
+    panzoom.zoom(next.scale, { animate: false });
+    panzoom.pan(next.x, next.y, { animate: false });
+    announceZoom(next.scale);
+  };
+
   const fitToView = () => {
     const panzoom = panzoomRef.current;
     const svg = svgRef.current;
@@ -1415,6 +1471,20 @@ export function CanvasView({
           onOpenStepPage?.(owner.id, focus.pathId);
         }
       }
+      return;
+    }
+    // A modified key belongs to the browser: Ctrl with `+` zooms the page.
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === "+" || e.key === "=" || e.key === "-") {
+      e.preventDefault();
+      zoomByKey(e.key === "-" ? 1 / ZOOM_KEY_FACTOR : ZOOM_KEY_FACTOR);
+      return;
+    }
+    if (e.key === "0") {
+      e.preventDefault();
+      fitToView();
+      const scale = panzoomRef.current?.getScale();
+      if (scale !== undefined) announceZoom(scale);
       return;
     }
     const arrow = ARROW_KEYS.find((k) => k === e.key);
@@ -1920,6 +1990,9 @@ export function CanvasView({
         ))}
 
       </svg>
+      <p {...stylex.props(styles.visuallyHidden)} role="status" aria-live="polite">
+        {announcement}
+      </p>
       {marquee &&
         (() => {
           // Wrap-relative, so the band covers every part of the visible canvas
