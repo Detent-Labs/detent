@@ -20,8 +20,8 @@
 
 ## 4. Enter lands on the step page
 
-- [ ] 4.1 Add `wayOutNameId(pathId)` to `draft/process-tabs.ts`, per D5. Put it on the Name input of each Ways out row in `panels/PathsPanel.tsx`. Pass: `packages/web/test/studio-processTabs.test.ts` pins the id. A `PathsPanel` markup test finds it on the row's Name input.
-- [ ] 4.2 Make `EditScreen`'s `onOpenStepPage` set `pendingFocus`, plus `sectionRequest` for a path, per D5. Keep the `waysOutRequest` bump. Pass: the second smoke flow in 6.1 finds the Name input focused after Enter on a step. It finds the same after a double-click. Enter on a way out focuses that row's Name input.
+- [x] 4.1 Add `wayOutNameId(pathId)` to `draft/process-tabs.ts`, per D5. Put it on the Name input of each Ways out row in `panels/PathsPanel.tsx`. Pass: `packages/web/test/studio-processTabs.test.ts` pins the id. A `PathsPanel` markup test finds it on the row's Name input.
+- [x] 4.2 Make `EditScreen`'s `onOpenStepPage` set `pendingFocus`, plus `sectionRequest` for a path, per D5. Keep the `waysOutRequest` bump. Pass: the second smoke flow in 6.1 finds the Name input focused after Enter on a step. It finds the same after a double-click. Enter on a way out focuses that row's Name input.
 
 ## 5. The way-out menu
 

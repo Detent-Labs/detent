@@ -30,7 +30,7 @@ import { useFetchOnce } from "../panels/shared/useFetchOnce.js";
 import { stepTextMap } from "../panels/shared/optionText.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
 import { DEFAULT_TAB, FIELDS_VIEWS, SETTINGS_VIEWS, type ProcessTab, type Route, type TabView } from "../routing.js";
-import { checkTarget, fixPendingFocus, formEditorReturnTab, pendingFocusLands, placeAction, processTabCounts, STEP_PAGE_NAME_ID, surfaceTab, type CheckTarget, type FixRequest, type PendingFocus } from "../draft/process-tabs.js";
+import { checkTarget, fixPendingFocus, formEditorReturnTab, pendingFocusLands, placeAction, processTabCounts, STEP_PAGE_NAME_ID, surfaceTab, wayOutNameId, type CheckTarget, type FixRequest, type PendingFocus } from "../draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { structuralBannerStands } from "../draft/startGaps.js";
 import { issueText } from "../draft/issues.js";
@@ -1370,8 +1370,14 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                   selectedStepIds={selectedStepIds}
                   onSelectStep={onSelectStep}
                   onSelectSteps={onSelectSteps}
-                  onOpenStepPage={(_stepId, pathId) => {
-                    if (pathId !== undefined) setWaysOutRequest((n) => n + 1);
+                  onOpenStepPage={(stepId, pathId) => {
+                    if (pathId !== undefined) {
+                      setWaysOutRequest((n) => n + 1);
+                      setSectionRequest({ stepId, section: "paths" });
+                      setPendingFocus({ tab: "steps", elementId: wayOutNameId(pathId) });
+                    } else {
+                      setPendingFocus({ tab: "steps", elementId: STEP_PAGE_NAME_ID });
+                    }
                     goToTab("steps");
                   }}
                   selectedPathId={selectedPathId}

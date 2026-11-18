@@ -366,3 +366,9 @@ describe("a way out whose target exists", () => {
     expect(render({})).not.toContain("(step removed)");
   });
 });
+
+describe("a way out's Name input", () => {
+  it("carries the id Enter on the canvas lands focus on", () => {
+    expect(render({ trigger: "manual" })).toMatch(/<input[^>]*id="way-out-name-path_1"[^>]*value="Approve"/);
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { checkTarget, fixPendingFocus, formEditorReturnTab, pendingFocusLands, placeAction, processTabCounts, sectionHeaderId, STEP_PAGE_KEY_ID, STEP_PAGE_NAME_ID, surfaceTab } from "../src/areas/studio/draft/process-tabs.js";
+import { checkTarget, fixPendingFocus, formEditorReturnTab, pendingFocusLands, placeAction, processTabCounts, sectionHeaderId, STEP_PAGE_KEY_ID, STEP_PAGE_NAME_ID, surfaceTab, wayOutNameId } from "../src/areas/studio/draft/process-tabs.js";
 import * as processTabs from "../src/areas/studio/draft/process-tabs.js";
 import { checkAnswer } from "../src/areas/studio/draft/checkSentence.js";
 import { checksDotState, groupChecksBySource } from "../src/areas/studio/draft/checksRail.js";
@@ -398,5 +398,11 @@ describe("a Fix's focus hand-off", () => {
     const pending = fixPendingFocus({ tab: "steps", stepId: "s", section: "more", focusId: STEP_PAGE_KEY_ID });
     expect(pendingFocusLands(pending, "steps", { stepId: "s", section: "more" })).toBe(false);
     expect(pendingFocusLands(pending, "steps", undefined)).toBe(true);
+  });
+});
+
+describe("wayOutNameId", () => {
+  it("pins the Ways out row's Name input id", () => {
+    expect(wayOutNameId("path_a")).toBe("way-out-name-path_a");
   });
 });
