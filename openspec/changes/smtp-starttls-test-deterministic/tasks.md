@@ -12,7 +12,7 @@
 
 ## 3. No reading before the handshake completes
 
-- [x] 3.1 Discard the plain socket's buffered bytes on `STARTTLS`, per D5. Await the `handshake` callback before the second `EHLO`, and fail on data before it. Pass: the `"plaintext"` test passes, with no `AUTH` at the fake.
+- [x] 3.1 Discard the plain socket's buffered bytes on `STARTTLS`, per D5. Await the `handshake` callback before the second `EHLO`, and read only the attached TLS socket. Pass: the `"plaintext"` test passes, with no `AUTH` at the fake.
 - [x] 3.2 Add a direct `SmtpWire` case for a byte before the handshake and one for a failed handshake, per D5. Pass: each case fails once you disable its check.
 - [x] 3.3 Read `STARTTLS` from the `EHLO` reply's extension lines alone, per D6. Pass: a fake whose greeting line holds "starttls" draws no `STARTTLS`, and the real-message test passes in this pod.
 

@@ -45,14 +45,19 @@ None.
 
 ### Modified Capabilities
 
-- `notification-email-action-handler`: a new requirement says a session that ends through its wire
-  names the session step.
+- `notification-email-action-handler`: three new requirements. A session that ends through its wire
+  names the session step. The handler reads nothing after `STARTTLS` until the TLS handshake
+  completes. The handler reads `STARTTLS` from the `EHLO` extension lines alone.
 
 ## Impact
 
 - `src/handlers/notification-email.ts`: the wire owns the session step and names it in its failures.
   The TLS handshake step starts before `upgradeTLS`.
+- `src/handlers/notification-email.ts` also exports `startTls`, the upgrade sequence, and takes the
+  `STARTTLS` offer from the extension lines.
 - `test/handlers-notification-email.test.ts`: the fake gains a `STARTTLS` branch and two modes for
-  the bytes that follow it. Three new tests cover the close path, the plain-text path and the wire's
-  two callbacks.
+  the bytes that follow it. Eleven new tests cover the close and plain-text paths, the wire's
+  callbacks, three real TLS handshakes and the extension-line parse.
+- `test/fixtures/smtp-tls/`: a self-signed certificate and key for 127.0.0.1, for the real
+  handshake tests.
 - The definition contract, the outbox and the failure classification stay as they are.

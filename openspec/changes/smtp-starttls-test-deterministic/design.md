@@ -30,8 +30,8 @@ Goals:
 
 Non-goals:
 
-- The fake server speaks no TLS. The test checks the handler's decision, and a real handshake adds
-  nothing to that.
+- `fakeSmtp` speaks no TLS. The STARTTLS test checks the handler's decision, and a real handshake
+  adds nothing to that. D5 covers the real handshake with a separate TLS server.
 - A `4xx` reply keeps its own message, which already names the refused command (`:113`). A refused
   connection and the lease stop keep theirs too.
 - The split between permanent and transient failures stays as it is.

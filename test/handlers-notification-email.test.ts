@@ -1,6 +1,7 @@
 /**
  * notification.email action handler: unit tests against a locally started
- * Bun.listen fake SMTP server. The handler's one database read is address
+ * Bun.listen fake SMTP server. The real-TLS-handshake tests use a node:net +
+ * node:tls server instead. The handler's one database read is address
  * resolution, and `accountsDb` below stands in for the pool —
  * `local-user-accounts`' own suite covers the real query. Mirrors
  * handlers-http.test.ts's style — flat test(), no describe blocks. Two tests
@@ -507,6 +508,12 @@ test("a completed handshake releases the wire, and the replies held before it ar
 
 // --- a real TLS handshake ----------------------------------------------------
 
+// The key is public and for these tests alone. The certificate is self-signed
+// for 127.0.0.1 with CA:TRUE, so it serves as its own CA, and it is valid to 2126.
+// Regenerate both from the repository root with:
+//   openssl req -x509 -newkey rsa:2048 -nodes -days 36500 -subj "/CN=127.0.0.1" \
+//     -addext "subjectAltName=IP:127.0.0.1" -addext "basicConstraints=critical,CA:TRUE" \
+//     -keyout test/fixtures/smtp-tls/key.pem -out test/fixtures/smtp-tls/cert.pem
 const TLS_FIXTURE = new URL("./fixtures/smtp-tls/", import.meta.url);
 const TLS_CERT = readFileSync(new URL("cert.pem", TLS_FIXTURE), "utf-8");
 const TLS_KEY = readFileSync(new URL("key.pem", TLS_FIXTURE), "utf-8");
@@ -540,7 +547,7 @@ async function tlsSmtp(): Promise<{ port: number; plain: string[]; secure: strin
 }
 
 /** Drives the wire through greeting, EHLO and STARTTLS against `tlsSmtp`, then upgrades with `extraTls`. */
-async function upgradeAgainstTlsSmtp(extraTls: TLSOptions): Promise<{ wire: SmtpWire; server: Awaited<ReturnType<typeof tlsSmtp>>; upgrade: Promise<void> }> {
+async function upgradeAgainstTlsSmtp(extraTls: TLSOptions, serverName = "127.0.0.1"): Promise<{ wire: SmtpWire; server: Awaited<ReturnType<typeof tlsSmtp>>; upgrade: Promise<void> }> {
   const server = await tlsSmtp();
   const wire = new SmtpWire();
   const socket = await Bun.connect({ hostname: "127.0.0.1", port: server.port, socket: wire.handlers });
@@ -550,7 +557,7 @@ async function upgradeAgainstTlsSmtp(extraTls: TLSOptions): Promise<{ wire: Smtp
   await wire.next();
   wire.write("STARTTLS\r\n");
   await wire.next();
-  return { wire, server, upgrade: startTls(wire, socket, "127.0.0.1", extraTls) };
+  return { wire, server, upgrade: startTls(wire, socket, serverName, extraTls) };
 }
 
 test("a trusted handshake completes and the second EHLO is answered inside TLS", async () => {
@@ -565,6 +572,21 @@ test("a trusted handshake completes and the second EHLO is answered inside TLS",
     expect(server.secure).toEqual(["EHLO test"]);
     // The plain side saw the first EHLO and STARTTLS, and nothing after the upgrade.
     expect(server.plain).toEqual(["EHLO test", "STARTTLS"]);
+  } finally {
+    wire.close();
+    server.stop();
+  }
+});
+
+test("a certificate that does not name the host fails the handshake and sends nothing", async () => {
+  // The certificate names 127.0.0.1. The handler connects by that address but verifies it as "localhost".
+  const { wire, server, upgrade } = await upgradeAgainstTlsSmtp({ ca: TLS_CERT }, "localhost");
+  try {
+    const err = await rejects(upgrade);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(PermanentError);
+    expect((err as Error).message).toContain("the TLS handshake failed during TLS handshake");
+    expect(server.secure).toEqual([]);
   } finally {
     wire.close();
     server.stop();

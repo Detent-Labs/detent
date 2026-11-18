@@ -139,7 +139,7 @@ export class SmtpWire {
   // neither generic — only these two methods.
   private socket: { write(data: string): unknown; end(): unknown } | null = null;
 
-  /** Handlers for both the plain and the upgraded socket — the wire is the same either way. */
+  /** Handlers for both sockets. After the upgrade, `data` and `handshake` read only the attached TLS socket. */
   readonly handlers = {
     data: (s: unknown, chunk: Uint8Array) => {
       if (this.upgraded && s !== this.socket) return;
