@@ -39,8 +39,9 @@ Non-goals:
 ### D1. The fake server goes silent after it answers STARTTLS
 
 `fakeSmtp` gains a flag on each connection. The fake sets it right after it writes the `STARTTLS`
-reply. From then on, `data` drops every byte and answers nothing. A real server hands the socket to
-its TLS layer at that point. The fake now stops reading there too. The STARTTLS test then stalls
+reply. From then on, `data` drops every byte and answers nothing.
+
+A real server hands the socket to its TLS layer at that point. The fake now stops reading there too. The STARTTLS test then stalls
 on every run. The one-second action timeout fires during "TLS handshake".
 
 Every fake answers `STARTTLS` this way, so the flag does not need an option. No test reads SMTP lines after
