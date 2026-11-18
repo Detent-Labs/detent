@@ -118,11 +118,17 @@ function requireOk(reply: Reply, what: string): Reply {
  * The socket is mutable because STARTTLS replaces it: upgradeTLS returns a new
  * TLS socket, and everything after the handshake writes to that one.
  */
-class SmtpWire {
+export class SmtpWire {
+  /** The session step in progress. A failure that ends the wire names it. */
+  readonly phase = { current: "connect" };
   private buffer = "";
   private ready: Reply[] = [];
   private waiter: { resolve: (r: Reply) => void; reject: (e: Error) => void } | null = null;
   private failure: Error | null = null;
+  // True from the STARTTLS upgrade until the TLS handshake completes. The wire
+  // reads nothing in that window.
+  private handshaking = false;
+  private handshakeWaiter: { resolve: () => void; reject: (e: Error) => void } | null = null;
   // Structural rather than `Socket<T>`: Bun.connect hands back a
   // `Socket<undefined>` and upgradeTLS a `Socket<unknown>`, and the wire needs
   // neither generic — only these two methods.
@@ -130,13 +136,62 @@ class SmtpWire {
 
   /** Handlers for both the plain and the upgraded socket — the wire is the same either way. */
   readonly handlers = {
-    data: (_s: unknown, chunk: Uint8Array) => this.onData(chunk),
-    error: (_s: unknown, err: Error) => this.fail(err),
-    close: () => this.fail(new Error("notification.email: the SMTP server closed the connection")),
+    data: (_s: unknown, chunk: Uint8Array) => {
+      // Bun delivers plain bytes from the server to the upgraded socket before
+      // the handshake completes. Any such byte is injected, never a reply.
+      if (this.handshaking) {
+        this.fail(
+          new Error(
+            `notification.email: the server sent data before the TLS handshake completed during ${this.phase.current}`,
+          ),
+        );
+        return;
+      }
+      this.onData(chunk);
+    },
+    handshake: (_s: unknown, success: boolean, authorizationError: Error | null) => {
+      if (success && !authorizationError) {
+        this.handshaking = false;
+        const waiter = this.handshakeWaiter;
+        this.handshakeWaiter = null;
+        waiter?.resolve();
+        return;
+      }
+      const cause = authorizationError ?? new Error("handshake refused");
+      this.fail(
+        new Error(`notification.email: the TLS handshake failed during ${this.phase.current}: ${cause.message}`, { cause }),
+      );
+    },
+    error: (_s: unknown, err: Error) =>
+      this.fail(
+        new Error(`notification.email: the SMTP connection failed during ${this.phase.current}: ${err.message}`, { cause: err }),
+      ),
+    close: () =>
+      this.fail(new Error(`notification.email: the SMTP server closed the connection during ${this.phase.current}`)),
   };
 
   attach(socket: { write(data: string): unknown; end(): unknown }): void {
     this.socket = socket;
+  }
+
+  /**
+   * Called when STARTTLS gets its 2xx, right before upgradeTLS. Drops every
+   * byte the plain socket still holds (RFC 3207 §4.2) and stops reading until
+   * the handshake callback fires.
+   */
+  beginTls(): void {
+    this.buffer = "";
+    this.ready = [];
+    this.handshaking = true;
+  }
+
+  /** Resolve when the TLS handshake completes, or reject with whatever ended the session first. */
+  tlsReady(): Promise<void> {
+    if (this.failure) return Promise.reject(this.failure);
+    if (!this.handshaking) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+      this.handshakeWaiter = { resolve, reject };
+    });
   }
 
   write(line: string): void {
@@ -185,6 +240,11 @@ class SmtpWire {
 
   private fail(err: Error): void {
     this.failure ??= err;
+    const handshakeWaiter = this.handshakeWaiter;
+    if (handshakeWaiter) {
+      this.handshakeWaiter = null;
+      handshakeWaiter.reject(this.failure);
+    }
     const waiter = this.waiter;
     if (waiter) {
       this.waiter = null;
@@ -278,8 +338,8 @@ async function runSession(
   recipients: string[],
   env: SmtpEnv,
   messageId: string,
-  phase: { current: string },
 ): Promise<void> {
+  const { phase } = wire;
   phase.current = "connect";
   const socket = await Bun.connect({ hostname: env.host, port: env.port, socket: wire.handlers });
   wire.attach(socket);
@@ -294,12 +354,14 @@ async function runSession(
     phase.current = "STARTTLS";
     wire.write("STARTTLS\r\n");
     requireOk(await wire.next(), "STARTTLS");
+    // Named separately from "STARTTLS": a failure from here on is the TLS
+    // handshake, not the command. The step starts before the upgrade, so a
+    // failure that fires while upgradeTLS runs names it too.
+    phase.current = "TLS handshake";
+    wire.beginTls();
     const [, tlsSocket] = socket.upgradeTLS({ tls: { serverName: env.host }, socket: wire.handlers });
     wire.attach(tlsSocket);
-    // Named separately from "STARTTLS": a stall here is the TLS handshake, not
-    // the command. Without the distinction an operator reads only "the session
-    // timed out" and has no reason to suspect the certificate or the upgrade.
-    phase.current = "TLS handshake";
+    await wire.tlsReady();
     wire.write(`EHLO ${clientName(env.from)}\r\n`);
     ehlo = requireOk(await wire.next(), "EHLO after STARTTLS");
   } else if (env.user) {
@@ -360,20 +422,17 @@ async function deliverBatch(
   timeoutMs: number,
 ): Promise<void> {
   const wire = new SmtpWire();
-  // The session step that was waiting when the bound fired. A bare "the session
-  // timed out" leaves an operator without the one fact that localizes the fault.
-  const phase = { current: "connect" };
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
     timeoutHandle = setTimeout(() => {
       // Release the socket rather than waiting for the outbox's claim lease.
       wire.close();
-      reject(new Error(`notification.email: the SMTP session exceeded ${timeoutMs}ms during ${phase.current}`));
+      reject(new Error(`notification.email: the SMTP session exceeded ${timeoutMs}ms during ${wire.phase.current}`));
     }, timeoutMs);
   });
 
   try {
-    await Promise.race([runSession(wire, config, batch, env, messageId, phase), deadline]);
+    await Promise.race([runSession(wire, config, batch, env, messageId), deadline]);
   } finally {
     clearTimeout(timeoutHandle);
     wire.close();

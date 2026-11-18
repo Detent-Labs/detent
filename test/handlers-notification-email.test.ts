@@ -14,6 +14,7 @@ import type { SQL } from "bun";
 import {
   notificationEmailHandlerDef,
   notificationEmailConfigSchema,
+  SmtpWire,
   NOTIFICATION_EMAIL_ACTION_TYPE,
   SMTP_DEFAULT_TIMEOUT_MS,
   SMTP_MAX_RECIPIENTS_PER_SESSION,
@@ -130,6 +131,11 @@ type FakeOptions = {
   sessionRcptReplies?: Record<number, string[]>;
   /** Hold the greeting back by this many milliseconds in every session. */
   greetingDelayMs?: number;
+  /**
+   * What the server does with the bytes that follow its `220` to STARTTLS. It speaks no TLS.
+   * `"silent"` (default) answers nothing, `"close"` ends the socket, `"plaintext"` answers `250 not tls`.
+   */
+  afterStartTls?: "silent" | "close" | "plaintext";
 };
 
 /** What one SMTP connection saw: its commands, its RCPT TO addresses and its accepted messages. */
@@ -140,17 +146,20 @@ type FakeServer = {
   commands: string[];
   messages: string[];
   sessions: FakeSession[];
+  /** Bytes received after the `220` to STARTTLS, across all connections. */
+  bytesAfterStartTls: () => number;
   stop: () => void;
 };
 
 /** The state of one connection. It rides on the socket, so a late command lands on its own session. */
-type Connection = { index: number; session: FakeSession; buffer: string; inData: boolean };
+type Connection = { index: number; session: FakeSession; buffer: string; inData: boolean; upgraded: boolean };
 
 /** A scriptable SMTP server on a random loopback port. Each connection keeps its own state. */
 function fakeSmtp(opts: FakeOptions = {}): FakeServer {
   const commands: string[] = [];
   const messages: string[] = [];
   const sessions: FakeSession[] = [];
+  let bytesAfterStartTls = 0;
   const replyFor = (verb: string, fallback = "250 ok\r\n") => opts.replies?.[verb] ?? fallback;
 
   const server = Bun.listen<Connection>({
@@ -159,7 +168,7 @@ function fakeSmtp(opts: FakeOptions = {}): FakeServer {
     socket: {
       open(socket) {
         const session: FakeSession = { commands: [], rcpts: [], messages: [] };
-        socket.data = { index: sessions.length, session, buffer: "", inData: false };
+        socket.data = { index: sessions.length, session, buffer: "", inData: false, upgraded: false };
         sessions.push(session);
         if (opts.silent) return;
         const greet = () => socket.write(replyFor("GREETING", "220 fake ESMTP\r\n"));
@@ -170,6 +179,14 @@ function fakeSmtp(opts: FakeOptions = {}): FakeServer {
         if (opts.silent) return;
         const conn = socket.data;
         const { session } = conn;
+        if (conn.upgraded) {
+          // The bytes are a TLS ClientHello, never SMTP lines: count them, never parse them.
+          const first = bytesAfterStartTls === 0;
+          bytesAfterStartTls += chunk.byteLength;
+          if (first && opts.afterStartTls === "close") socket.end();
+          else if (first && opts.afterStartTls === "plaintext") socket.write("250 not tls\r\n");
+          return;
+        }
         conn.buffer += Buffer.from(chunk).toString("latin1");
         for (;;) {
           if (conn.inData) {
@@ -207,6 +224,12 @@ function fakeSmtp(opts: FakeOptions = {}): FakeServer {
             const reply = replyFor("DATA", "354 send it\r\n");
             socket.write(reply);
             if (reply.startsWith("3")) conn.inData = true;
+          } else if (verb === "STARTTLS") {
+            socket.write(replyFor("STARTTLS", "220 ready to start TLS\r\n"));
+            conn.upgraded = true;
+            // Later bytes in this chunk belong to the handshake, not to SMTP.
+            conn.buffer = "";
+            return;
           } else if (verb === "QUIT") {
             socket.write(replyFor("QUIT", "221 bye\r\n"));
             socket.end();
@@ -218,7 +241,7 @@ function fakeSmtp(opts: FakeOptions = {}): FakeServer {
     },
   });
 
-  return { port: server.port, commands, messages, sessions, stop: () => server.stop(true) };
+  return { port: server.port, commands, messages, sessions, bytesAfterStartTls: () => bytesAfterStartTls, stop: () => server.stop(true) };
 }
 
 /** Point the handler at a fresh fake server for the duration of `fn`. */
@@ -378,9 +401,91 @@ test("an advertised STARTTLS is taken, and no credential precedes it", async () 
       // The phase names the upgrade, so an operator is not left reading a bare
       // "the session timed out" when a certificate is what actually failed.
       expect((err as Error).message).toContain("TLS handshake");
+      // The handler did start a handshake, and the fake answered none of it.
+      expect(server.bytesAfterStartTls()).toBeGreaterThan(0);
     },
     { SMTP_USER: "someone", SMTP_PASSWORD: "sup3rsecret" },
   );
+});
+
+for (const mode of ["close", "plaintext"] as const) {
+  test(`a server that answers the TLS handshake with ${mode} fails during the TLS handshake`, async () => {
+    await withFake(
+      { offerStartTls: true, afterStartTls: mode },
+      async (server) => {
+        const err = await rejects(mailDef.handler(ctxFor(validConfig)));
+        expect(err).toBeInstanceOf(Error);
+        expect(err).not.toBeInstanceOf(PermanentError);
+        expect((err as Error).message).toContain("TLS handshake");
+        expect(server.commands.some((c) => c.startsWith("AUTH"))).toBe(false);
+      },
+      { SMTP_USER: "someone", SMTP_PASSWORD: "sup3rsecret" },
+    );
+  });
+}
+
+// --- the wire names the session step -----------------------------------------
+
+test("the wire's close and error callbacks name the session step and keep a plain Error", async () => {
+  const closed = new SmtpWire();
+  closed.phase.current = "RCPT TO a@example.test";
+  closed.handlers.close();
+  const closeErr = await rejects(closed.next());
+  expect(closeErr).toBeInstanceOf(Error);
+  expect(closeErr).not.toBeInstanceOf(PermanentError);
+  expect((closeErr as Error).message).toContain("closed the connection during RCPT TO a@example.test");
+
+  const failed = new SmtpWire();
+  failed.phase.current = "message body";
+  const cause = new Error("socket reset");
+  failed.handlers.error(undefined, cause);
+  const failErr = await rejects(failed.next());
+  expect(failErr).toBeInstanceOf(Error);
+  expect(failErr).not.toBeInstanceOf(PermanentError);
+  expect((failErr as Error).message).toContain("connection failed during message body");
+  expect((failErr as Error).message).toContain("socket reset");
+  expect((failErr as Error).cause).toBe(cause);
+});
+
+test("a byte before the TLS handshake completes ends the wire and is never read as a reply", async () => {
+  const wire = new SmtpWire();
+  wire.phase.current = "TLS handshake";
+  wire.beginTls();
+  wire.handlers.data(undefined, Buffer.from("250 not tls\r\n"));
+  const err = await rejects(wire.tlsReady());
+  expect(err).not.toBeInstanceOf(PermanentError);
+  expect((err as Error).message).toContain("sent data before the TLS handshake completed during TLS handshake");
+  await rejects(wire.next());
+});
+
+test("a failed or unauthorized TLS handshake ends the wire", async () => {
+  const refused = new SmtpWire();
+  refused.phase.current = "TLS handshake";
+  refused.beginTls();
+  const pending = rejects(refused.tlsReady());
+  refused.handlers.handshake(undefined, false, null);
+  const refusedErr = await pending;
+  expect(refusedErr).not.toBeInstanceOf(PermanentError);
+  expect((refusedErr as Error).message).toContain("the TLS handshake failed during TLS handshake");
+
+  const untrusted = new SmtpWire();
+  untrusted.phase.current = "TLS handshake";
+  untrusted.beginTls();
+  const pendingUntrusted = rejects(untrusted.tlsReady());
+  untrusted.handlers.handshake(undefined, true, new Error("self signed certificate"));
+  const untrustedErr = await pendingUntrusted;
+  expect((untrustedErr as Error).message).toContain("the TLS handshake failed during TLS handshake: self signed certificate");
+});
+
+test("a completed handshake releases the wire, and the bytes held before it are dropped", async () => {
+  const wire = new SmtpWire();
+  wire.handlers.data(undefined, Buffer.from("250 stale\r\n"));
+  wire.beginTls();
+  const ready = wire.tlsReady();
+  wire.handlers.handshake(undefined, true, null);
+  await ready;
+  wire.handlers.data(undefined, Buffer.from("250 fresh\r\n"));
+  expect((await wire.next()).text).toBe("fresh");
 });
 
 test("credentials without STARTTLS are refused permanently", async () => {
