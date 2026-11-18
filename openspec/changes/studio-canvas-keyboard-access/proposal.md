@@ -24,6 +24,8 @@ change does that.
 - **The way-out menu.** On a focused step, `C` opens a menu headed "Way out to …". It lists the draft's
   steps, then "A new step". Enter adds the way out a connect drop would add. A source the drop refuses
   opens no menu, and the canvas shows and announces the refusal.
+- A refusal, from the drop or the key, reads a catalog sentence in the author's words. It reuses
+  the checks rail's sentence for each trigger rule and the handle's "An end has no way out."
 - **Announcements.** The canvas gains one polite, visually hidden live region. Every string comes from
   the studio catalog, in the author's words.
 

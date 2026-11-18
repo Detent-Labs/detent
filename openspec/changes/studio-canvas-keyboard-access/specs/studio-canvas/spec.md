@@ -172,7 +172,7 @@ An added way out and a refused source SHALL announce too.
 
 A zoom level and an added way out SHALL read from the studio catalog, in the
 author's words. Neither SHALL say "edge", "node" or "port". A refusal SHALL
-read the text the connect drop's refusal shows.
+read the sentence the drop shows.
 
 #### Scenario: A zoom key announces the level
 
@@ -331,16 +331,33 @@ check SHALL decide the refusal for the drop and the key.
 
 - **WHEN** focus sits on an end
 - **AND** the keyboard author presses `C`
-- **THEN** no menu opens, the drop's refusal text shows beside the end, and the
-  live region reads it
+- **THEN** no menu opens, "An end has no way out." shows beside the end, and
+  the live region reads it
+
+### Requirement: A refusal reads the author's words
+
+A connect refusal, from the drop or the key, SHALL read a studio catalog
+sentence in the author's words. It SHALL NOT print the engine's rule text. An
+end SHALL read "An end has no way out.", the connect handle's own sentence. A
+trigger refusal SHALL read the sentence the checks rail prints for the same
+rule. A rule the checks rail cannot name SHALL read one general catalog
+sentence.
 
 #### Scenario: An inconsistent source refuses the key
 
 - **WHEN** focus sits on a step that already carries an automatic way out with
   no priority
 - **AND** the keyboard author presses `C`
-- **THEN** no menu opens, and the refusal a connect drop from that step shows
-  appears beside it
+- **THEN** no menu opens, and the checks rail's sentence for a missing order
+  appears beside the step
+- **AND** the engine's text "automatic paths need a priority" appears nowhere
+
+#### Scenario: A drop's refusal reads the same sentence
+
+- **WHEN** the author drags a connect handle from that same step and drops it
+  on another step
+- **THEN** the canvas shows the sentence the `C` key shows
+- **AND** the draft does not gain a way out
 
 ### Requirement: The keyboard's canvas computations hold as pure functions
 

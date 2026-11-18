@@ -26,6 +26,7 @@
 ## 5. The way-out menu
 
 - [ ] 5.1 Add `checkConnectSource` to `canvas/dropGesture.ts`, and call it first in `resolveDropGesture`, per D7. Pass: `packages/web/test/studio-canvas-dropGesture.test.ts` covers a terminal source, an inconsistent source and an accepted one. Every existing case there stays green.
+- [ ] 5.1a Add `refusalSentence` to `canvas/connection.ts` and the `canvas.connectRefused` key, per D7. Show its sentence for every drop and key refusal. Pass: a test covers the end, each of the five trigger reasons and an unknown reason. No engine rule text reaches the canvas.
 - [ ] 5.2 Add `canvas/wayOutMenu.ts` with `wayOutMenuItems` and `typeAheadIndex`, per D6. Pass: a new `packages/web/test/studio-canvas-wayOutMenu.test.ts` covers draft order, the source in the list and a hidden step left out. It covers a step with no id, the separator and the new-step item. The type-ahead cases cover wrap, case and a skipped separator.
 - [ ] 5.3 Move the drop's two add branches into one `addWayOut` in `CanvasView.tsx`, per D7. Pass: `git grep -n 'newPath(' -- packages/web/src/areas/studio/canvas/CanvasView.tsx` prints the calls inside `addWayOut` alone. The drop browser check in 6.2 still adds both kinds of way out.
 - [ ] 5.4 Build `canvas/WayOutMenu.tsx`: the popover, the heading, the items, the separator and the keyboard model, per D6. Its styles follow the shape brief in D8. Pass: a markup test reads the heading outside `role="menu"`, the items as `menuitem` and the separator.

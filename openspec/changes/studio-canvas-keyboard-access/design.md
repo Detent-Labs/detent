@@ -141,7 +141,9 @@ The new catalog keys, all English, since the studio catalog carries one locale:
 | `canvas.wayOutMenuNewStep` | `A new step` |
 | `canvas.wayOutAdded` | `Added a way out from {source} to {target}.` |
 
-A refusal announces the drop's own text, so it does not add a key (see Open Questions).
+| `canvas.connectRefused` | `This step cannot take another way out here.` |
+
+A refusal reads a catalog sentence too (owner ruling 2026-11-18). D7 says which one.
 
 `docs/decisions.md` holds an open entry on a canvas removal that announces nothing. A later change
 can announce a removal through this region. This change leaves removal as it is.
@@ -207,6 +209,22 @@ change leaves that menu as it is. Its later fix can reuse this menu's keyboard m
 the terminal refusal or `checkConnection`'s answer. `resolveDropGesture` calls it first, so its
 results stay identical. The `C` key calls it too, with `triggerForNewPath(source)`. A refusal
 shows through `showRejection` at the node's top centre, and the live region reads the same text.
+
+The owner ruled on 2026-11-18 that the refusal reads author's words, for the drop and the key
+alike. A new pure `refusalSentence(refusal, step)` in `canvas/connection.ts` picks the sentence:
+
+- A terminal source reads `canvas.connectHandleEnd`, "An end has no way out."
+  (`studio.ts:1207`). The connect handle on an end already prints it.
+- A trigger reason resolves through `literalRuleFor(reason)` (`draft/checkSentence.ts:382`).
+  That is the table the checks rail uses, with rows such as `checks.paths.noOrder`
+  (`checkSentence.ts:295-299`). It fills `{step}` with the step's printed text and
+  `{section}` with the Ways out section's name, as the checks rail does.
+- A reason the table does not match reads `canvas.connectRefused`.
+
+`checkConnectSource` therefore returns a refusal kind and the engine's reason, never display text.
+`resolveDropGesture`'s `rejected` result carries the same pair, and `CanvasView` turns it into the
+sentence. The engine's `checkPathTriggerConsistency` stays as it is, since `src/schema` is out of
+scope. The hard-coded English sentence at `dropGesture.ts:31` goes.
 
 `CanvasView` moves the two branches of the drop's release into one `addWayOut(sourceIndex,
 target)`. The target is a step id, or a new step at a point. The drop and the menu both call it.
@@ -283,9 +301,5 @@ revert of the commit rolls it back.
 
 ## Open Questions
 
-- The terminal refusal is a hard-coded English sentence, "a terminal step has no outgoing paths"
-  (`dropGesture.ts:31`). The trigger refusal is the engine's rule text. Neither comes from the
-  catalog, and both use contract words. This change keeps parity and announces them as the drop
-  shows them. A later change can move both to catalog words, such as the handle's "An end has no
-  way out." That later change touches no requirement here, since this spec says "the refusal the
-  drop shows".
+- None open. The owner settled the refusal wording (D7) and the double-click landing (D5) on
+  2026-11-18.
