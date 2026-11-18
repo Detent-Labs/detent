@@ -23,18 +23,28 @@ through the greeting, `EHLO`, `STARTTLS`, the TLS handshake, `AUTH`, `MAIL FROM`
 
 ### Requirement: The handler reads nothing after STARTTLS until the TLS handshake completes
 
-After the server accepts `STARTTLS`, the handler SHALL discard every byte the plain socket still
-holds. It SHALL write and read nothing on the session until the TLS handshake completes. A byte that
-arrives before the handshake completes SHALL end the session as a transient failure during the TLS
-handshake. A failed handshake SHALL end it the same way. No credential SHALL reach the server in
-either case.
+After the server accepts `STARTTLS`, the handler SHALL discard every reply it still holds from the
+plain connection. No byte SHALL reach its SMTP reply reader until the TLS handshake completes, and
+it SHALL write nothing before then. Only bytes the TLS session decrypts SHALL count as replies. A
+failed handshake SHALL end the session as a transient failure during the TLS handshake. A rejected
+certificate counts as a failed handshake.
 
 #### Scenario: Plain text injected before the handshake ends the session
 
-- **WHEN** the server answers `STARTTLS` with `220`, and then sends plain text before any TLS
-  handshake completes
+- **WHEN** the server answers `STARTTLS` with `220`, and then sends plain text instead of a TLS
+  handshake
 - **THEN** the handler reads none of it as an SMTP reply
 - **AND** the delivery fails as transient during the TLS handshake, and no `AUTH` reaches the server
+
+#### Scenario: A trusted handshake carries the session on
+
+- **WHEN** the server completes a TLS handshake with a certificate the handler trusts
+- **THEN** the handler sends its second `EHLO` inside the TLS session and reads the reply from it
+
+#### Scenario: An untrusted certificate ends the session
+
+- **WHEN** the server presents a certificate the handler does not trust
+- **THEN** the delivery fails as transient during the TLS handshake, and no `AUTH` reaches the server
 
 ### Requirement: The handler reads STARTTLS from the EHLO extension lines alone
 

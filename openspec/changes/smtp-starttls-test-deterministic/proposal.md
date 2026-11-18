@@ -30,9 +30,9 @@ at the upgrade, although the test's own comment promises one.
   transient failure.
 - The handler marks the TLS handshake before it starts the upgrade, so a failure during the upgrade
   names it.
-- The handler reads nothing after `STARTTLS` until the TLS handshake completes. Apply found that Bun
-  hands plain bytes to the upgraded socket before the handshake ends. The handler read them as the
-  second `EHLO` reply and went on to `AUTH`. Plain bytes before the handshake now end the session.
+- The handler reads nothing after `STARTTLS` until the TLS handshake completes. Apply found that the
+  raw socket keeps feeding the wire's `data` callback after the upgrade. The handler read plain bytes
+  there as the second `EHLO` reply and went on to `AUTH`. The wire now reads only the TLS socket.
 - Two new tests drive the fast paths on every run. The first fake closes the connection when the
   ClientHello arrives. The second fake answers the ClientHello with plain text. That second test
   turns the old flake into a fixed case.

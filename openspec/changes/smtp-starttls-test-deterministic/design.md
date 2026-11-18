@@ -85,24 +85,32 @@ names the handshake. A throw from `upgradeTLS` rejects `runSession` as before an
 
 ### D5. The handler reads nothing after STARTTLS until the handshake completes
 
-Apply found a real gap here (owner ruling 2026-11-18). After `upgradeTLS`, Bun hands plain bytes
-from the server to the upgraded socket's `data` callback before the TLS handshake completes. The
-handler then reads `250 not tls` as the reply to its second `EHLO` and goes on to `AUTH`. That is the
-STARTTLS response injection class: a party in the middle answers before encryption starts.
+Apply found a real gap here (owner ruling 2026-11-18). The handler hands one `handlers` object to
+`Bun.connect` and to `upgradeTLS`. After the upgrade, the raw TCP socket keeps calling that `data`
+callback with the bytes on the wire. A live probe on Bun 1.4.4 showed the raw socket delivering
+`250 not tls`, the ServerHello, and after a handshake the session ticket.
+
+Before this change the wire read all of it as SMTP replies. So `250 not tls` became the reply to the second `EHLO`, and the
+handler went on to `AUTH`. That is the STARTTLS response injection class.
 
 The handler closes it in three places:
 
-- When `STARTTLS` gets its `2xx`, the wire drops every byte it still holds from the plain socket.
+- When `STARTTLS` gets its `2xx`, the wire drops every reply it still holds from the plain socket.
   RFC 3207 asks the client to discard what it learned before the upgrade.
-- The upgraded socket's `handshake` callback resolves a promise. `runSession` awaits it before it
-  writes the second `EHLO`. A failed handshake ends the session, and so does a rejected certificate.
-  The message reads "notification.email: the TLS handshake failed during TLS handshake: <cause>".
-- Any byte that reaches the upgraded socket's `data` callback before the handshake completes ends
-  the session. The message reads "notification.email: the server sent data before the TLS handshake
-  completed during TLS handshake".
+- The wire's `data` callback reads only the socket it has attached. After the upgrade that is the
+  TLS socket, so raw bytes, plain or encrypted, never reach the reply reader. The TLS layer reads
+  them itself.
+- The TLS socket's `handshake` callback resolves a promise. `runSession` awaits it before it writes
+  the second `EHLO`. A failed handshake ends the session, and so does a rejected certificate. The
+  message reads "notification.email: the TLS handshake failed during TLS handshake: <cause>".
 
-Each of these failures stays a plain `Error`, so it stays transient. The `"plaintext"` fake mode
-then fails during "TLS handshake", and no `AUTH` reaches the fake.
+Each of these failures stays a plain `Error`, so it stays transient. In the `"plaintext"` fake mode,
+the TLS layer reads `250 not tls` as a broken record and fails the handshake. The session then fails
+during "TLS handshake", and no `AUTH` reaches the fake.
+
+A test drives a real handshake. The upgrade sequence moves into a function that takes extra TLS
+options, which `runSession` never passes. The test passes a test CA, so a committed test
+certificate for `127.0.0.1` completes the handshake. Without the CA, the same certificate fails it.
 
 ### D6. STARTTLS comes from the extension lines alone
 
