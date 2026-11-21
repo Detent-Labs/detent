@@ -44,6 +44,24 @@ export function hitTestGrownNode(point: Point, nodes: NodePosition[]): string | 
 }
 
 /**
+ * The step and docking point a position drops on: the step `hitTestGrownNode`
+ * reads and its nearest point. On the pressed step's own box the pressed point
+ * is skipped, since two identical anchors have no route. `undefined` over empty
+ * canvas. The snap ring and the connect release both read it.
+ */
+export function dropTargetOf(
+  position: Point,
+  nodes: NodePosition[],
+  sourceStepId: string,
+  pressed: DockingEnd,
+): { stepId: string; point: DockingPoint } | undefined {
+  const stepId = hitTestGrownNode(position, nodes);
+  const node = stepId !== undefined ? nodes.find((n) => n.id === stepId) : undefined;
+  if (stepId === undefined || !node) return undefined;
+  return { stepId, point: nearestDockingPoint(node, position, { exclude: stepId === sourceStepId ? pressed : undefined }) };
+}
+
+/**
  * The docking point a press at `press` lands on: among the points whose press
  * target holds it, the nearest. `undefined` where no target holds it.
  */
@@ -135,8 +153,7 @@ export function resolveConnectDrop(input: {
   const result = resolveDropGesture(point, nodes, input.existingPaths, input.trigger, input.sourceTerminal);
   if (result.kind === "rejected") return result;
   if (result.kind === "create-step-and-connect") return { ...result, source: pressed };
-  const node = nodes.find((n) => n.id === result.targetStepId);
-  if (!node) return { kind: "create-step-and-connect", point, trigger: result.trigger, source: pressed };
-  const { side, at } = nearestDockingPoint(node, point, { exclude: result.targetStepId === sourceStepId ? pressed : undefined });
-  return { ...result, source: pressed, target: { side, at } };
+  const drop = dropTargetOf(point, nodes, sourceStepId, pressed);
+  if (!drop) return { kind: "create-step-and-connect", point, trigger: result.trigger, source: pressed };
+  return { ...result, source: pressed, target: { side: drop.point.side, at: drop.point.at } };
 }

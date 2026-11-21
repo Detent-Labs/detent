@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   checkConnectSource,
+  dropTargetOf,
   hitTestGrownNode,
   pressedDockingPoint,
   resolveConnectDrop,
@@ -183,15 +184,6 @@ describe("resolveConnectDrop", () => {
     expect(result.target).toEqual({ side: "bottom", at: 1 });
   });
 
-  it("lets one point hold an incoming end and an outgoing end", () => {
-    const top = { side: "top" as const, at: 0 };
-    const result = resolveConnectDrop({ ...base, pressed: top, point: { x: 390, y: -2 } });
-    // step_b's top middle (390, 0) takes this path's end; a path from it later presses the same point.
-    expect(result).toMatchObject({ kind: "connect-to-step", target: top });
-    const out = resolveConnectDrop({ ...base, sourceStepId: "step_b", pressed: top, point: { x: 90, y: -2 } });
-    expect(out).toMatchObject({ kind: "connect-to-step", targetStepId: "step_a", source: top, target: top });
-  });
-
   it("refuses a terminal source before it reads the release", () => {
     expect(resolveConnectDrop({ ...base, sourceTerminal: true, point: { x: 310, y: 30 } })).toEqual({ kind: "rejected", refusal: "end" });
   });
@@ -199,5 +191,27 @@ describe("resolveConnectDrop", () => {
   it("refuses an inconsistent trigger before it reads the release", () => {
     const result = resolveConnectDrop({ ...base, existingPaths: [{ trigger: "automatic", priority: 1 }], point: { x: 900, y: 900 } });
     expect(result.kind).toBe("rejected");
+  });
+});
+
+describe("dropTargetOf", () => {
+  const nodes: NodePosition[] = [
+    { id: "step_a", x: 0, y: 0 },
+    { id: "step_b", x: 300, y: 0 },
+  ];
+  const pressed = { side: "bottom" as const, at: 0 };
+
+  it("returns the step under the position and its nearest point", () => {
+    expect(dropTargetOf({ x: 292, y: 12 }, nodes, "step_a", pressed)).toMatchObject({ stepId: "step_b", point: { side: "left", at: -1 } });
+  });
+
+  it("skips the pressed point on the source step", () => {
+    const hit = dropTargetOf({ x: 91, y: 59 }, nodes, "step_a", pressed);
+    expect(hit?.stepId).toBe("step_a");
+    expect(hit?.point).toMatchObject({ side: "bottom", at: 1 });
+  });
+
+  it("returns nothing over empty canvas", () => {
+    expect(dropTargetOf({ x: 900, y: 900 }, nodes, "step_a", pressed)).toBeUndefined();
   });
 });

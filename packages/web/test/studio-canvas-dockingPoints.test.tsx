@@ -4,11 +4,12 @@ import { CanvasView } from "../src/areas/studio/canvas/CanvasView.js";
 import type { StepGroup } from "../src/areas/studio/canvas/groups.js";
 import { t } from "../src/areas/studio/catalog.js";
 import { DraftProvider } from "../src/areas/studio/draft/store.js";
+import type { PathDockingEnds } from "../src/areas/studio/canvas/layout.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
 /**
  * What a step's docking points draw, read off static markup. A hover, a press
- * and a drag need a browser (`e2e/canvas-docking-points.e2e.ts`).
+ * and a drag need a browser (the e2e flow for docking points).
  */
 
 const DRAFT: Draft = {
@@ -42,9 +43,13 @@ const LAYOUT: Record<string, unknown> = {
   step_done: { x: 480, y: 0 },
 };
 
-function render(selected: string[], groups: StepGroup[] = []): string {
+function render(
+  selected: string[],
+  groups: StepGroup[] = [],
+  opts: { draft?: Draft; dockingPoints?: Record<string, PathDockingEnds>; selectedPathId?: string } = {},
+): string {
   const html = renderToStaticMarkup(
-    <DraftProvider initial={DRAFT} token="token">
+    <DraftProvider initial={opts.draft ?? DRAFT} token="token">
       <CanvasView
         layout={LAYOUT}
         onMoveStep={() => {}}
@@ -56,7 +61,8 @@ function render(selected: string[], groups: StepGroup[] = []): string {
         edgeStyle="step"
         onEdgeStyleChange={() => {}}
         waypoints={{}}
-        dockingPoints={{}}
+        dockingPoints={opts.dockingPoints ?? {}}
+        selectedPathId={opts.selectedPathId}
         onDockingPointsChange={() => {}}
         onWaypointsChange={() => {}}
         groups={groups}
@@ -210,5 +216,24 @@ describe("the draw order", () => {
     const html = render(["step_review"], groups);
     expect(html.indexOf("data-docking-step-id")).toBeGreaterThan(html.lastIndexOf("data-step-id="));
     expect(html.indexOf("groupDisclosure")).toBeGreaterThan(html.lastIndexOf("data-docking-point="));
+  });
+});
+
+describe("one point holding an incoming end and an outgoing end", () => {
+  // path_a arrives at step_approve's top middle (330, 0); path_b leaves from it.
+  const top = { side: "top" as const, at: 0 };
+  const html = render(["step_approve"], [], { dockingPoints: { path_a: { target: top }, path_b: { source: top } } });
+  const pathD = (id: string) => new RegExp(`data-path-id="${id}"[\\s\\S]*?<path d="([^"]*)"`).exec(html)?.[1] ?? "";
+
+  it("routes both paths to that point's coordinates", () => {
+    expect(pathD("path_a")).toMatch(/330,0$/);
+    expect(pathD("path_b")).toMatch(/^M330,0/);
+  });
+
+  it("draws the point in the held form, alike for both ends", () => {
+    const set = setOf(html, "step_approve");
+    expect(pointOf(set, "top:0")).toContain('data-docking-held="true"');
+    expect(dotClassOf(set, "top:0")).not.toBe(dotClassOf(set, "top:1"));
+    expect(count(set, 'data-docking-held="true"')).toBe(1);
   });
 });

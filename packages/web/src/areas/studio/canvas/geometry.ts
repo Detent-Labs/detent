@@ -629,6 +629,21 @@ export function inPressTarget(target: DockingPoint, press: Point): boolean {
 }
 
 /**
+ * One docking point's press target as rect attributes, the rectangle
+ * `inPressTarget` tests: 12 units outward from the border, 6 inward, and half a
+ * grid step either way along the side.
+ */
+export function pressTargetRect(p: DockingPoint): { x: number; y: number; width: number; height: number } {
+  const half = GRID_STEP / 2;
+  const { x, y } = p.point;
+  const depth = PRESS_REACH_OUT + PRESS_REACH_IN;
+  if (p.side === "top") return { x: x - half, y: y - PRESS_REACH_OUT, width: GRID_STEP, height: depth };
+  if (p.side === "bottom") return { x: x - half, y: y - PRESS_REACH_IN, width: GRID_STEP, height: depth };
+  if (p.side === "left") return { x: x - PRESS_REACH_OUT, y: y - half, width: depth, height: GRID_STEP };
+  return { x: x - PRESS_REACH_IN, y: y - half, width: depth, height: GRID_STEP };
+}
+
+/**
  * One end of a path as the router reads it: the anchor, the side it sits on,
  * and the box that side belongs to.
  */

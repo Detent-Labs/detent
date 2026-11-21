@@ -21,6 +21,7 @@ import {
   dockingAnchor,
   dockingEndOfAnchor,
   inPressTarget,
+  pressTargetRect,
   routeBetweenEnds,
   type DockingSide,
   type RouteEnd,
@@ -927,5 +928,32 @@ describe("canvas geometry: a waypointed route keeps its stored points", () => {
     const route = routeThroughWaypoints({ x: 0, y: 0 }, { x: 300, y: 0 }, [], {}, { source: { side: "right", at: 1 } });
     expect(route.points[0]).toEqual({ x: 180, y: 50 });
     expect(route.points[route.points.length - 1]).toEqual({ x: 300, y: 30 });
+  });
+});
+
+describe("pressTargetRect", () => {
+  const node = { x: 200, y: 200 };
+  const points = dockingPointsOf(node);
+
+  it("holds every corner of the rect inside the hit test, and a point one unit beyond it outside", () => {
+    for (const p of points) {
+      const r = pressTargetRect(p);
+      for (const x of [r.x, r.x + r.width]) {
+        for (const y of [r.y, r.y + r.height]) {
+          expect(inPressTarget(p, { x, y })).toBe(true);
+        }
+      }
+      expect(inPressTarget(p, { x: r.x - 1, y: r.y })).toBe(false);
+      expect(inPressTarget(p, { x: r.x + r.width + 1, y: r.y + r.height })).toBe(false);
+      expect(inPressTarget(p, { x: r.x, y: r.y - 1 })).toBe(false);
+      expect(inPressTarget(p, { x: r.x + r.width, y: r.y + r.height + 1 })).toBe(false);
+    }
+  });
+
+  it("reaches 12 units outward and 6 inward", () => {
+    const top0 = points.find((p) => p.side === "top" && p.at === 0)!;
+    expect(pressTargetRect(top0)).toEqual({ x: top0.point.x - 10, y: top0.point.y - 12, width: 20, height: 18 });
+    const right0 = points.find((p) => p.side === "right" && p.at === 0)!;
+    expect(pressTargetRect(right0)).toEqual({ x: right0.point.x - 6, y: right0.point.y - 10, width: 18, height: 20 });
   });
 });

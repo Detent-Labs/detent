@@ -22,14 +22,11 @@ import {
   dockingAnchor,
   dockingEndOfAnchor,
   dockingPointsOf,
-  nearestDockingPoint,
-  PRESS_REACH_IN,
-  PRESS_REACH_OUT,
+  pressTargetRect,
   GRID_STEP,
   NODE_WIDTH,
   NODE_HEIGHT,
   type DockingEnd,
-  type DockingPoint,
   type Point,
   type NodePosition,
   type EdgeStyle,
@@ -38,7 +35,7 @@ import { toggleSelection, normalizeRect, nodesInRect } from "./selection";
 import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups";
 import { computeFit, fitInsets, revealPan, zoomAbout, ZOOM_KEY_FACTOR, MIN_SCALE, MAX_SCALE, type Fit } from "./fit";
 import { lastInputWasPointer } from "../focusScroll";
-import { checkConnectSource, hitTestGrownNode, pressedDockingPoint, resolveConnectDrop } from "./dropGesture";
+import { checkConnectSource, dropTargetOf, pressedDockingPoint, resolveConnectDrop } from "./dropGesture";
 import { refusalSentence } from "./connection";
 import { menuNewStepSpot, wayOutMenuItems, type WayOutMenuItem } from "./wayOutMenuLogic";
 import { WayOutMenu, openWayOutMenu } from "./WayOutMenu";
@@ -74,8 +71,8 @@ const SNAP_RING_RADIUS = 10;
 /** A way out's sentence host: six 16-unit lines (design.md D5). It centres on
  * the placed box, so a short estimate never clips a line. */
 const SENTENCE_HOST_HEIGHT = 96;
-/** The waypoint handle's side. A square, not a circle: the canvas already has
- * one control shape, and the connect handle owns it (design.md). */
+/** The waypoint handle's side. A square, not a circle: the end handle owns the
+ * circle shape, and a waypoint stays distinct from it (design.md). */
 const WAYPOINT_HANDLE = 10;
 const REJECT_MESSAGE_MS = 4000;
 /** How far into a node the `C` key's refusal hangs from its top edge, in
@@ -488,19 +485,6 @@ function pointerMovesToStep(e: React.PointerEvent, stepId: string): boolean {
   const to = e.relatedTarget;
   if (!(to instanceof Element)) return false;
   return to.closest(`.canvas-node[data-step-id="${stepId}"], [data-docking-step-id="${stepId}"]`) !== null;
-}
-
-/** A docking point's press target as rect attributes: 12 units outward from the
- * border, 6 inward, and half a grid step either way along the side. */
-function pressTargetOf(p: DockingPoint): { x: number; y: number; width: number; height: number } {
-  const out = PRESS_REACH_OUT;
-  const inward = PRESS_REACH_IN;
-  const half = GRID_STEP / 2;
-  const { x, y } = p.point;
-  if (p.side === "top") return { x: x - half, y: y - out, width: GRID_STEP, height: out + inward };
-  if (p.side === "bottom") return { x: x - half, y: y - inward, width: GRID_STEP, height: out + inward };
-  if (p.side === "left") return { x: x - out, y: y - half, width: out + inward, height: GRID_STEP };
-  return { x: x - inward, y: y - half, width: out + inward, height: GRID_STEP };
 }
 
 /** The `<g>` holding a drawn group's member nodes. Both disclosure controls —
@@ -1038,8 +1022,9 @@ export function CanvasView({
 
   // Where each sentence stands (design.md D5): clear of every drawn node, its
   // label and its stamps, the start arrow, every arrowhead, every group's
-  // name or collapsed box, and the sentences placed before it. A hidden Map tab places nothing and draws no
-  // sentence; the render that shows the tab places them all before it paints.
+  // name or collapsed box, and the sentences placed before it. A hidden Map tab
+  // places nothing and draws no sentence; the render that shows the tab places
+  // them all before it paints.
   const sentenceBoxes = useMemo(() => {
     if (!visible) return new Map<string, SentenceBox>();
     const obstacles: Obstacle[] = [];
@@ -1085,7 +1070,13 @@ export function CanvasView({
   } | null>(null);
   // `start` is the press point, so a release under the click threshold reads
   // as a click and writes nothing.
-  const [connectDrag, setConnectDrag] = useState<{ sourceStepId: string; pressed: DockingEnd; start: Point; current: Point } | null>(null);
+  const [connectDrag, setConnectDrag] = useState<{
+    sourceStepId: string;
+    pressed: DockingEnd;
+    refused: boolean;
+    start: Point;
+    current: Point;
+  } | null>(null);
   // The step the pointer rests on, whose docking points draw. Its own state,
   // outside every memo above: a pointer crossing ten steps redraws ten sets of
   // points and no route.
@@ -1487,7 +1478,11 @@ export function CanvasView({
     // The roving stop follows the press, as a press on the node moves it.
     moveFocus({ kind: "step", stepId });
     const p = toSvgPoint(e);
-    setConnectDrag({ sourceStepId: stepId, pressed, start: p, current: p });
+    // The source check runs once, here: it reads nothing the drag changes.
+    const source = steps.find((s) => s.id === stepId);
+    const refused =
+      !source || checkConnectSource(source.terminal === true, source.paths ?? [], triggerForNewPath(source)) !== undefined;
+    setConnectDrag({ sourceStepId: stepId, pressed, refused, start: p, current: p });
   };
 
   const onHandlePointerMove = (e: React.PointerEvent) => trackPointer(connectDrag, setConnectDrag, { current: toSvgPoint(e) });
@@ -1786,12 +1781,9 @@ export function CanvasView({
   // pointer. A drag ignores the resting pointer, whose events a captured
   // pointer no longer reports. The snap names the point the drag will land on.
   const snap = (() => {
-    if (!connectDrag) return undefined;
-    const stepId = hitTestGrownNode(connectDrag.current, visibleNodePositions);
-    const node = stepId !== undefined ? positionsById[stepId] : undefined;
-    if (stepId === undefined || !node) return undefined;
-    const exclude = stepId === connectDrag.sourceStepId ? connectDrag.pressed : undefined;
-    return { stepId, point: nearestDockingPoint(node, connectDrag.current, { exclude }) };
+    // A refused source draws no ring: the release shows the refusal.
+    if (!connectDrag || connectDrag.refused) return undefined;
+    return dropTargetOf(connectDrag.current, visibleNodePositions, connectDrag.sourceStepId, connectDrag.pressed);
   })();
   const dockedStepIds = new Set<string>(selectedStepIds);
   if (connectDrag) {
@@ -2200,7 +2192,7 @@ export function CanvasView({
                 const key = `${p.side}:${p.at}`;
                 const held = heldPoints.get(set.stepId)?.has(key) === true;
                 const snapped = snap?.stepId === set.stepId && snap.point.side === p.side && snap.point.at === p.at;
-                const target = pressTargetOf(p);
+                const target = pressTargetRect(p);
                 return (
                   // `panzoom-exclude`, or Panzoom takes the press and pans: a
                   // target reaches outside its node.
@@ -2256,10 +2248,10 @@ export function CanvasView({
           ))}
 
           {/* Last of all, so no route, node, sentence, waypoint handle or
-              docking point can take a press meant for a disclosure. A sentence's text block is up
-              to 200 wide, carries its own pointer handler, and lands wherever its
-              route has room. Each button is a sibling of its box
-              `<g>`, so the group's drag handlers never see the press either. */}
+              docking point can take a press meant for a disclosure. A sentence's
+              text block is up to 200 wide, carries its own pointer handler, and
+              lands wherever its route has room. Each button is a sibling of its
+              box `<g>`, so the group's drag handlers never see the press either. */}
           {disclosures.map(({ group, x, y }) => (
             <foreignObject
               key={group.id}
