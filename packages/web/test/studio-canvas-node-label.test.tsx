@@ -63,6 +63,7 @@ function renderCanvas(baseLocale: string): string {
         onEdgeStyleChange={() => {}}
         waypoints={{}}
         dockingPoints={{}}
+        onDockingPointsChange={() => {}}
         onWaypointsChange={() => {}}
         groups={[]}
         onGroupsChange={() => {}}

@@ -59,6 +59,7 @@ function dOf(opts: {
         onEdgeStyleChange={() => {}}
         waypoints={opts.waypoints ?? {}}
         dockingPoints={opts.dockingPoints ?? {}}
+        onDockingPointsChange={() => {}}
         onWaypointsChange={() => {}}
         groups={opts.groups ?? []}
         onGroupsChange={() => {}}
@@ -156,6 +157,7 @@ describe("a path from a step to itself", () => {
             onEdgeStyleChange={() => {}}
             waypoints={{}}
             dockingPoints={readDockingPoints(layout)}
+            onDockingPointsChange={() => {}}
             onWaypointsChange={() => {}}
             groups={[]}
             onGroupsChange={() => {}}

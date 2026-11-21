@@ -48,19 +48,19 @@ static markup, or by the e2e flow of group 7.
 
 ## 5. Docking points as connect handles
 
-- [ ] 5.1 Track the pointed-at step in its own state. Assert in `studio-processSurface.test.ts` that the route memo's dependency list does not name it.
-- [ ] 5.2 Draw the points of a selected step, with the free, held and end-step forms from `design.md`. Verify in static markup, and verify that a resting canvas and a collapsed box draw none.
-- [ ] 5.3 Give every point's group the `panzoom-exclude` class. Verify in the same static markup.
-- [ ] 5.4 Start a connect drag from the pressed point, in place of the right-middle connect handle. Resolve a press through 1.2 and 1.5.
-- [ ] 5.5 Keep the end step's refusal, tooltip and cursor on every point. Verify with the existing terminal-handle tests, moved to a docking point.
-- [ ] 5.6 Treat a press under the click threshold as a press on the node. It selects, Shift toggles, and a double-click opens the step.
-- [ ] 5.7 In `canvas/dropGesture.ts`, count a release on a press target as a release over that step. Verify in `studio-canvas-dropGesture.test.ts`, with a case where two grown boxes overlap.
-- [ ] 5.8 During a connect drag, draw the points of the step under the pointer and ring the nearest. End the straight preview on that point.
-- [ ] 5.9 Add a pure `resolveConnectDrop` that returns the points a release stores. Verify the three scenarios of "A connect drag stores the points it joins", and the self-path scenario.
-- [ ] 5.10 Verify with 5.9 that one point holds an incoming end and an outgoing end.
-- [ ] 5.11 Draw the points above the stamps and the way-out sentences, and before the group disclosure hosts. Correct the order assertion in `studio-processSurface.test.ts`.
-- [ ] 5.12 Remove `handleObstacle` and its call. Correct `studio-sentencePlacement.test.ts` and the `handleObstacle(at)` assertion in `studio-processSurface.test.ts`.
-- [ ] 5.13 Correct every test that reads the right-middle handle. Start with `studio-canvas-node-a11y.test.tsx` and `studio-canvas-node-label.test.tsx`, and list each file in the commit message.
+- [x] 5.1 Track the pointed-at step in its own state. Assert in `studio-processSurface.test.ts` that the route memo's dependency list does not name it.
+- [x] 5.2 Draw the points of a selected step, with the free, held and end-step forms from `design.md`. Verify in static markup, and verify that a resting canvas and a collapsed box draw none.
+- [x] 5.3 Give every point's group the `panzoom-exclude` class. Verify in the same static markup.
+- [x] 5.4 Start a connect drag from the pressed point, in place of the right-middle connect handle. Resolve a press through 1.2 and 1.5.
+- [x] 5.5 Keep the end step's refusal, tooltip and cursor on every point. Verify with the existing terminal-handle tests, moved to a docking point.
+- [x] 5.6 Treat a press under the click threshold as a press on the node. It selects, Shift toggles, and a double-click opens the step.
+- [x] 5.7 In `canvas/dropGesture.ts`, count a release on a press target as a release over that step. Verify in `studio-canvas-dropGesture.test.ts`, with a case where two grown boxes overlap.
+- [x] 5.8 During a connect drag, draw the points of the step under the pointer and ring the nearest. End the straight preview on that point.
+- [x] 5.9 Add a pure `resolveConnectDrop` that returns the points a release stores. Verify the three scenarios of "A connect drag stores the points it joins", and the self-path scenario.
+- [x] 5.10 Verify with 5.9 that one point holds an incoming end and an outgoing end.
+- [x] 5.11 Draw the points above the stamps and the way-out sentences, and before the group disclosure hosts. Correct the order assertion in `studio-processSurface.test.ts`.
+- [x] 5.12 Remove `handleObstacle` and its call. Correct `studio-sentencePlacement.test.ts` and the `handleObstacle(at)` assertion in `studio-processSurface.test.ts`.
+- [x] 5.13 Correct every test that reads the right-middle handle. Start with `studio-canvas-node-a11y.test.tsx` and `studio-canvas-node-label.test.tsx`, and list each file in the commit message.
 
 ## 6. End handles
 

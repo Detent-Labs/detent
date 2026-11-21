@@ -50,7 +50,7 @@ import {
 } from "../canvas/geometry.js";
 import { type StepGroup } from "../canvas/groups.js";
 import { arrangeSteps, hasHandPlacedStep } from "../canvas/arrange.js";
-import { drawnPositions, isPoint, layoutAfterArrange, layoutAfterInsert, layoutAfterMove, readDockingPoints, type LayoutStep, type PathDockingEnds } from "../canvas/layout.js";
+import { drawnPositions, isPoint, layoutAfterArrange, layoutAfterInsert, layoutAfterMove, readDockingPoints, withDockingPoints, type LayoutStep, type PathDockingEnds } from "../canvas/layout.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { insertOnPath } from "../draft/insertOnPath.js";
@@ -634,6 +634,12 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
       else next[pathId] = points;
       return { ...s, layout: { ...s.layout, waypoints: next } };
     });
+  };
+
+  // One path's stored docking ends, from a connect drag. Layout, as waypoints
+  // are: the Draft model never sees it.
+  const onDockingPointsChange = (pathId: string, ends: PathDockingEnds) => {
+    setSaveState((s) => ({ ...s, layout: withDockingPoints(s.layout, pathId, ends) }));
   };
 
   // Position is not body — it lives in `saveState.layout` (round-tripped
@@ -1391,6 +1397,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                   waypoints={waypoints}
                   dockingPoints={dockingPoints}
                   onWaypointsChange={onWaypointsChange}
+                  onDockingPointsChange={onDockingPointsChange}
                   groups={groups}
                   onGroupsChange={onGroupsChange}
                   insertTargetPathId={insertTargetPathId}
