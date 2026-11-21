@@ -1156,11 +1156,14 @@ rule scales with the node and stays inside it.
 
 ### Canvas floating anchors (`canvas-floating-anchors`)
 
-Open Studio and a draft with three or more steps, where no step has moved since
-the draft opened. A path with no stored docking point takes the automatic side.
-The first move of one of its steps fixes that side. Press Arrange and confirm
-to return a draft to this state. Most of this entry is a visual judgment
-against the drawn routes.
+Open Studio and a draft with three or more steps. Its paths must store no
+docking point, as in a new or just-arranged draft. A path with no stored docking
+point takes the automatic side. The first move of one of its steps fixes that
+side. Press Arrange and confirm to return a draft to this state. Most of this
+entry is a visual judgment against the drawn routes.
+
+Place the steps for each case first. Then add the path through the way-out
+menu (`C`), which stores no point. Moving a step afterwards stores the points.
 
 Find a path whose target lies directly below its source, further down than
 across. Pass: the path leaves the source's bottom edge at its middle. It
@@ -1171,15 +1174,15 @@ the top edge and enters the bottom edge. Watch for the defect: a route drawn
 on the far side of the canvas. That means the upward transform did not map
 back.
 
-Drag a target slowly around its source, through all four quadrants. Pass: the
-path keeps the sides it had before the first move. Its anchors do not jump as
-you cross the diagonal. No route ever leaves at an angle.
+Drag a target around its source, and release it in each of the four quadrants.
+Pass: after each release the path keeps the sides it had before the first
+move. No route ever leaves at an angle.
 
 Find a path whose target lies left of its source, on the same row and clear of
 it. Pass: the path is one short straight line from the source's left edge to
-the target's right edge. It does not loop around the outside of either node.
+the target's right edge. It does not loop around the outside of either step.
 
-Now drag that target until the two nodes overlap horizontally. Pass: the path
+Now drag that target until the two steps overlap horizontally. Pass: the path
 still draws, and every segment stays square.
 
 Read the arrowhead in each of the cases above. Pass: it points into the side
@@ -1190,8 +1193,8 @@ sits on the route and stays legible. It does not overlap a node.
 
 Click a vertical route away from its ends. Pass: that path selects.
 
-Point at a step. Pass: its docking points draw, and no single handle sits at
-the node's right middle. Press one. Pass: the preview is a straight line from
+Point at a step. Pass: its docking points draw, and no larger handle draws at
+the step's right middle. Press one. Pass: the preview is a straight line from
 that point to the pointer.
 
 ### Canvas edge waypoints (`canvas-edge-waypoints`)
@@ -1239,28 +1242,31 @@ visual judgment against the drawn points. A docking point has no panel route
 and no key, so only the pointer reaches it.
 
 The flow `e2e/canvas-docking-points.e2e.ts` already asserts several things. A
-resting canvas draws no point, and a pointed-at step draws twenty. A connect
-drag stores both ends, and a reload keeps them. A step move keeps both sides
-of a path. An end handle drag changes the layout alone.
+resting canvas draws no point, and a pointed-at step draws twenty. Opening an
+older draft sends no write and shows no "Unsaved changes". A connect drag
+rings the nearest point and stores both ends. A reload keeps them, and the
+points go when the pointer leaves. A step move keeps both sides of a path.
 
-A self path keeps its other end. An end step's refused drag rings no point, and
-an end handle drag does not pan. Everything else below stays manual.
+An end handle drag changes the layout alone. A release over empty canvas
+changes nothing. A self path keeps its other end. An end step's refused drag rings no point, and
+an end handle drag does not pan. A step keeps its points while the pointer
+rests on its end handle. Everything else below stays manual.
 
-Rest the pointer on empty canvas. Pass: no step draws a docking point.
+Rest the pointer on empty canvas, with no step selected. Pass: no step draws a docking point.
 
 Point at one step. Pass: it draws twenty points. Each upright side holds
 three, and each level side holds seven. Move the pointer off the step. Pass:
 the points go in the same frame, with no fade.
 
-Look at a step that a path leaves and a step that a path enters. Pass: a held
-point draws filled in slate, and a free point draws as an outline on paper.
-Point at an end step. Pass: its points draw dashed and unfilled.
+Point at a step that is not an end, and that a path leaves. Pass: a held point
+draws filled in slate, and a free point draws as an outline on paper. Point at
+an end step. Pass: its points draw dashed and unfilled.
 
-Press 6 units inside a step's border, on a free point's side, and drag. Pass:
+Press a few units inside a step's border, next to a point, and drag. Pass:
 a connect drag starts from the nearest point. Press well inside the step and
 drag. Pass: the step moves instead. Judge whether the inward reach feels
 right. Too little makes the points hard to grab, and too much leaves little of
-the node to move.
+the step to move.
 
 Drag from a point toward another step. Pass: that step draws its points, and
 a ring of the accent colour marks the nearest one. Release over it. Pass: the
@@ -1286,23 +1292,28 @@ Add a path from a step to itself, through the way-out menu. Select it and drag
 one end handle to another point. Pass: that end moves, and the other end stays
 where it was.
 
-Press Arrange. Pass: a dialog asks first and names the stored points. Confirm.
+Press Arrange. Pass: a dialog asks first. Its second note reads "Each path goes back to the
+middle of a side." Confirm.
 Pass: every path end returns to the middle of a side.
 
-Open a draft that you saved before this change. Pass: the page never reads
-"Unsaved changes" on opening, and no path moves.
+Open a draft that you saved before this change. Pass: no path moves. The
+flow asserts the missing write and the missing "Unsaved changes".
 
-Open a draft with an empty layout. Drag a connect from one step to another.
+Open a draft with an empty layout. Drag from a docking point of one step to another step.
 Pass: the new path draws between the two points you chose. Auto-placed steps
 may move when the graph changes. Pass: a stored point stays on its step, and
 the route redraws.
 
-Check two known limits. On a short path, an end handle's press target
-can cover the midpoint square or a waypoint square. Pass: you can still reach
-the square by pressing its outer edge or by lengthening the path. Within 12
-units of a path's end, the path line takes no double-click, because a point's
-press target covers it. Pass: a double-click farther along the line opens the
-step.
+Check two known limits. On a short path, an end handle's press target can
+cover the midpoint square or a waypoint square. Pass: pressing the square's
+outer edge reaches it, or lengthening the path does. Take the shortest route,
+with two steps 20 units apart. Pass: the two targets cover the whole midpoint
+square, so only lengthening the path works.
+
+Within 12 units of a path's end, the path line takes no double-click while its
+source step draws its points. Selecting the path selects that step. Pass: a
+double-click farther along the line opens the source step with Ways out open
+and that way out selected. A point's double-click opens the step alone.
 
 ### Canvas step groups (`canvas-step-groups`)
 
@@ -2323,8 +2334,8 @@ The marquee needed one thing more. It needed
 after it. `click --modifiers` only applies to a full click action. It never
 applies to a raw mousedown/mouseup pair.
 
-The connect-drag's target handle is small. At this draft's fit-to-view
-scale it draws as roughly a 5 to 10 pixel circle. `playwright-cli
+A docking point is small. At this draft's fit-to-view scale it draws as a
+circle a few pixels wide. `playwright-cli
 mousewheel 0 -- -N` zoomed the canvas in enough to hit it. Pass the `--`
 explicitly. A bare negative delta parses as a flag instead.
 
@@ -3488,7 +3499,7 @@ Press `c` on an end. Pass: "An end has no way out." appears at the step's top
 centre. Repeat at a fit scale other than 1. Pass: the message still sits at
 that point.
 
-Take a call to another process with one numbered automatic way out. Press `c` on it, then drag from its handle to a step. Pass: both show the sentence about a way out that happens by itself. On a step at the top of the view, the box shows whole.
+Take a call to another process with one numbered automatic way out. Press `c` on it, then drag from one of its docking points to a step. Pass: both show the sentence about a way out that happens by itself. On a step at the top of the view, the box shows whole.
 
 ### The StyleX pilot: computed styles, not source (`stylex-phase-0-tooling`)
 
@@ -7286,7 +7297,7 @@ corner. "Closed" carries one reading "End: closed" at its top-right corner.
 
 Pass: each stamp prints mono uppercase text inside a 2px rule in ink, on the
 surface fill. No stamp tilts. No circle, no four-letter cut and no "•" appears
-on the canvas. Switch to the dark scheme. Pass: both stamps stay legible.
+on the canvas, with the pointer away from every step. Switch to the dark scheme. Pass: both stamps stay legible.
 
 **2. A long outcome.** Open the Settings tab's What it takes in and gives back
 view. Add the outcome `escalated_to_management`. On the Steps tab, choose
@@ -7334,7 +7345,7 @@ out, or to empty space to add a new step." The cursor reads crosshair.
 Point at a docking point of "Closed". Pass: the tooltip reads "An end has no
 way out.", and the cursor reads not-allowed.
 
-Set the zoom to 100%. Press 10px right of a docking point on the right side of
+Zoom in until a node draws at least 180px wide. Press 10px right of a docking point on the right side of
 "Manager Approval". Drag to "Finance Review". Pass: the connect gesture
 starts, and a new way out appears on release.
 
