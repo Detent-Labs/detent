@@ -198,7 +198,9 @@ would route today's paths differently.
 
 Two boxes can stand closer than two grid steps. The stubs then collide, and
 every candidate may cross a box. The function returns the candidate with the
-fewest crossings. A route always draws.
+fewest crossings. It never returns one that revisits a point. An opposing pair
+that faces each other at any distance also offers today's route as a
+candidate. A route always draws.
 
 ### A waypointed leg leaves a stored point outward
 

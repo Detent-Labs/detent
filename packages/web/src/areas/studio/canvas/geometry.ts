@@ -672,6 +672,23 @@ function simplify(points: Point[]): { points: Point[]; doubled: boolean } {
   return { points: out, doubled };
 }
 
+/** Whether a route revisits a point or lays one segment over another. */
+function retraces(points: Point[]): boolean {
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) if (points[i].x === points[j].x && points[i].y === points[j].y) return true;
+  }
+  for (let i = 1; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      const [a, b, c, e] = [points[i - 1], points[i], points[j - 1], points[j]];
+      const level = a.y === b.y && c.y === e.y && a.y === c.y;
+      const upright = a.x === b.x && c.x === e.x && a.x === c.x;
+      if (level && Math.min(a.x, b.x) < Math.max(c.x, e.x) && Math.min(c.x, e.x) < Math.max(a.x, b.x)) return true;
+      if (upright && Math.min(a.y, b.y) < Math.max(c.y, e.y) && Math.min(c.y, e.y) < Math.max(a.y, b.y)) return true;
+    }
+  }
+  return false;
+}
+
 /** The segments of a route that cross the inside of a box or run along its border. */
 function segmentsMeeting(points: Point[], boxes: Rect[]): number {
   let count = 0;
@@ -710,7 +727,8 @@ function channelBetween(a0: number, a1: number, b0: number, b1: number): number 
  * drops a candidate that doubles back, then takes the fewest segments, then the
  * shorter route, then the earlier candidate.
  *
- * A candidate that crosses a box or runs along a border loses to any that does
+ * A candidate that revisits a point or retraces a segment never wins, at any
+ * distance. One that crosses a box or runs along a border loses to any that does
  * not. Where none is clean (boxes closer than two grid steps) the one with the
  * fewest such segments wins, so a route always draws.
  */
@@ -742,16 +760,26 @@ export function routeBetweenEnds(source: RouteEnd, target: RouteEnd): Point[] {
   for (const x of xs) middles.push([{ x, y: from.y }, { x, y: to.y }]);
   for (const y of ys) middles.push([{ x: from.x, y }, { x: to.x, y }]);
 
+  const candidates = middles.map((middle) => [source.anchor, from, ...middle, to, target.anchor]);
+  // Opposing sides that face each other at any positive distance also offer
+  // the automatic route, which stays clean where the stubs would collide.
+  if (OPPOSING[source.side] === target.side && beyond > 0) {
+    candidates.unshift(routeEdge(source.anchor, target.anchor, DOCKING_LEAVING[source.side]));
+  }
+
   let best: Point[] | undefined;
   let bestScore: number[] = [];
-  for (const middle of middles) {
-    const { points, doubled } = simplify([source.anchor, from, ...middle, to, target.anchor]);
-    if (doubled) continue;
+  for (const candidate of candidates) {
+    const { points, doubled } = simplify(candidate);
+    if (doubled || retraces(points)) continue;
     const score = [segmentsMeeting(points, boxes), points.length - 1, lengthOf(points)];
     if (!best || score[0] < bestScore[0] || (score[0] === bestScore[0] && (score[1] < bestScore[1] || (score[1] === bestScore[1] && score[2] < bestScore[2])))) {
       best = points;
       bestScore = score;
     }
   }
-  return best ?? dedupe([source.anchor, { x: target.anchor.x, y: source.anchor.y }, target.anchor]);
+  // Two coincident anchors (touching boxes on facing midpoints) admit no route
+  // that revisits no point, so they return the two-point route of zero length.
+  const same = source.anchor.x === target.anchor.x && source.anchor.y === target.anchor.y;
+  return best ?? (same ? [source.anchor, target.anchor] : dedupe([source.anchor, { x: target.anchor.x, y: source.anchor.y }, target.anchor]));
 }

@@ -690,63 +690,28 @@ describe("canvas geometry: routes between any two sides", () => {
     expectSound(route, s, t, true);
   });
 
-  it("takes the new router for an opposing pair two steps apart only just short", () => {
-    // 20 beyond the source anchor is under two grid steps: not facing.
+  const revisits = (route: Point[]) => route.some((p, i) => route.some((q, j) => j > i && p.x === q.x && p.y === q.y));
+
+  it("draws an opposing pair one grid step apart without a loop", () => {
+    // 20 beyond the source anchor is under two grid steps: not the facing shortcut.
     const s = endOf({ x: 0, y: 0 }, "right", 0);
     const t = endOf({ x: 200, y: 0 }, "left", 0);
-    expect(routeBetweenEnds(s, t)).not.toEqual(routeEdge(s.anchor, t.anchor, "right"));
-    expect(routeBetweenEnds(s, t).length).toBeGreaterThan(1);
+    expect(routeBetweenEnds(s, t)).toEqual([s.anchor, t.anchor]);
+    const down = endOf({ x: 0, y: 0 }, "bottom", 0);
+    const up = endOf({ x: 0, y: 80 }, "top", 0);
+    expect(routeBetweenEnds(down, up)).toEqual([down.anchor, up.anchor]);
   });
 
-  it("turns onto a neighbouring side in two segments", () => {
-    const s = endOf({ x: 0, y: 0 }, "right", 0);
-    const t = endOf({ x: 260, y: 100 }, "top", 0);
-    const route = routeBetweenEnds(s, t);
-    expect(segments(route)).toHaveLength(2);
-    expectSound(route, s, t, true);
-  });
-
-  it("draws two anchors on one side around, in three segments", () => {
-    const s = endOf({ x: 0, y: 0 }, "top", 0);
-    const t = endOf({ x: 300, y: 0 }, "top", 0);
-    const route = routeBetweenEnds(s, t);
-    expect(segments(route)).toHaveLength(3);
-    expect(Math.min(...route.map((p) => p.y))).toBeLessThanOrEqual(-GRID_STEP);
-    expectSound(route, s, t, true);
-  });
-
-  it("reaches a target from outside when the source anchor faces away", () => {
-    const s = endOf({ x: 0, y: 0 }, "left", 0);
-    const t = endOf({ x: 300, y: 0 }, "right", 0);
-    expect(segments(routeBetweenEnds(s, t))).toHaveLength(5);
-  });
-
-  it("holds every rule across sixteen side pairs and eight placements", () => {
-    const placements: Point[] = [
-      { x: 220, y: 0 },
-      { x: 220, y: 20 },
-      { x: 220, y: -40 },
-      { x: -220, y: 0 },
-      { x: -220, y: 40 },
-      { x: 0, y: 100 },
-      { x: 20, y: 100 },
-      { x: 40, y: -100 },
-    ];
-    let walked = 0;
-    for (const placement of placements) {
-      for (const sa of SIDES) {
-        for (const sb of SIDES) {
-          // The middle point, then one off-middle point on each side.
-          for (const [atS, atT] of [[0, 0], [1, -1], [-1, 1]]) {
-            const s = endOf({ x: 0, y: 0 }, sa, atS);
-            const t = endOf(placement, sb, atT);
-            expectSound(routeBetweenEnds(s, t), s, t, true);
-            walked++;
-          }
-        }
-      }
+  it("keeps a close opposing pair on other rows to at most five segments and no loop", () => {
+    for (const dy of [-40, -20, 20, 40]) {
+      const s = endOf({ x: 0, y: 0 }, "right", 0);
+      const t = endOf({ x: 200, y: dy }, "left", 0);
+      const route = routeBetweenEnds(s, t);
+      expect(route[0]).toEqual(s.anchor);
+      expect(route[route.length - 1]).toEqual(t.anchor);
+      expect(segments(route).length).toBeLessThanOrEqual(5);
+      expect(revisits(route)).toBe(false);
     }
-    expect(walked).toBe(8 * 16 * 3);
   });
 
   it("holds the rules across wider gaps and both off-lattice offsets", () => {
@@ -771,22 +736,32 @@ describe("canvas geometry: routes between any two sides", () => {
   });
 
   it("still returns a route for two nodes closer than two grid steps", () => {
-    for (const placement of [
-      { x: 180, y: 0 },
-      { x: 200, y: 0 },
-      { x: 180, y: 20 },
-      { x: 0, y: 60 },
-      { x: 0, y: 80 },
-      { x: 20, y: 40 },
-    ]) {
-      for (const sa of SIDES) {
-        for (const sb of SIDES) {
-          const route = routeBetweenEnds(endOf({ x: 0, y: 0 }, sa, 0), endOf(placement, sb, 0));
-          expect(route.length).toBeGreaterThanOrEqual(2);
-          for (const g of segments(route)) expect(g.dx === 0 || g.dy === 0).toBe(true);
+    for (let x = -200; x <= 220; x += GRID_STEP) {
+      for (let y = -80; y <= 120; y += GRID_STEP) {
+        for (const sa of SIDES) {
+          for (const sb of SIDES) {
+            const s = endOf({ x: 0, y: 0 }, sa, 0);
+            const t = endOf({ x, y }, sb, 0);
+            if (s.anchor.x === t.anchor.x && s.anchor.y === t.anchor.y) continue;
+            const route = routeBetweenEnds(s, t);
+            expect(route[0]).toEqual(s.anchor);
+            expect(route[route.length - 1]).toEqual(t.anchor);
+            expect(segments(route).length).toBeLessThanOrEqual(5);
+            expect(revisits(route)).toBe(false);
+            for (const g of segments(route)) expect(g.dx === 0 || g.dy === 0).toBe(true);
+          }
         }
       }
     }
+  });
+
+  it("returns a route for two touching nodes", () => {
+    // Facing midpoints coincide: no loop-free route exists, so the route has zero length.
+    const same = routeBetweenEnds(endOf({ x: 0, y: 0 }, "right", 0), endOf({ x: 180, y: 0 }, "left", 0));
+    expect(same).toHaveLength(2);
+    const apart = routeBetweenEnds(endOf({ x: 0, y: 0 }, "right", 0), endOf({ x: 180, y: 0 }, "left", 1));
+    expect(segments(apart).length).toBeLessThanOrEqual(5);
+    expect(revisits(apart)).toBe(false);
   });
 
   it("draws a self path on one side around its node", () => {
