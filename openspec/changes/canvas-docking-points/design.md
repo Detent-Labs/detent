@@ -247,6 +247,16 @@ would then land on top of the target. The drop gesture module takes the rule.
 A drop on the source step takes the nearest point other than the pressed one.
 The canvas keeps self paths, and two identical anchors have no route.
 
+### A connect drag stores the places of the steps it joins
+
+A new path changes the depth the automatic placement reads. On a draft with
+no stored position, the target would jump a column under the points just
+chosen. The release therefore writes the drawn position of each joined step
+that stores none. That goes in the layout write that carries the points.
+
+Only the joined steps get a position. Every other step keeps the automatic
+placement, as after any step drag on such a draft.
+
 ### Draw order
 
 Docking points draw above the stamps and above every way-out sentence, as the
@@ -317,9 +327,9 @@ a tooling switch, which needs a change of its own.
 - [A stored point draws a long route after a far move] → The author hangs the
   end elsewhere. Arrange also resets it. The owner asked for a point that
   never moves by itself.
-- [An auto-placed step moves when the graph changes] → A stored point stays,
-  and the route redraws. The browser check covers a connect drag on a draft
-  with an empty layout.
+- [An auto-placed step moves when the graph changes] → A connect drag stores
+  the places of the steps it joins. A path added from the menu stores no
+  point, so a jump there costs nothing.
 - [A path retargeted on the step page keeps its target point] → Accepted, as
   for waypoints. The panels write no layout. An end handle or Arrange corrects
   it.

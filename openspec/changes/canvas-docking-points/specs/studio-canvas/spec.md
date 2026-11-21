@@ -359,6 +359,10 @@ halfway along a side, and the nearer point takes the press. A press deeper
 inside the node SHALL move the step, as it does today. The cursor SHALL read
 as a crosshair, and as not-allowed on an end step.
 
+A press target is smaller than 24px on both axes. The way-out menu and the
+step page SHALL each add a way out with no small target. That is the
+equivalent control WCAG 2.5.8 allows for a target under its floor.
+
 #### Scenario: Hovering the handle names the gesture
 
 - **WHEN** the author rests the pointer on a task step's connect handle
@@ -705,6 +709,27 @@ nothing, since it draws no point.
 
 - **WHEN** the author drags a collapsed group that holds both ends of a path
 - **THEN** the draft layout stores no docking point for that path
+
+### Requirement: A connect drag keeps its steps where the author saw them
+
+A connect drag SHALL store the drawn position of each step it joins that
+stores none. That store SHALL travel in the same layout write as the points.
+A new path can change where the automatic placement puts a step. The stored
+position keeps the step under the points the author chose.
+
+#### Scenario: A connect drag on an auto-placed draft moves no step
+
+- **WHEN** a draft's layout stores no position
+- **AND** the author drags from a point of "Review" to a point of "Approve"
+- **THEN** the draft layout stores a position for "Review" and for "Approve"
+- **AND** each equals the place that step drew at before the drag
+- **AND** neither step moves when the new path draws
+
+#### Scenario: A stored position stays as it is
+
+- **WHEN** "Review" already stores a position
+- **AND** the author drags from a point of "Review" to empty canvas
+- **THEN** the layout keeps that position for "Review"
 
 ### Requirement: A connect drag released on its own step joins two points
 
