@@ -537,8 +537,9 @@ A drag that moves steps SHALL first read every path that starts or ends on a
 moved step. An end of such a path may store no docking point. The drag SHALL
 store the point that end held before it. That store
 SHALL travel in the same layout write as the new positions. A press that moves
-no step SHALL store nothing. Opening a draft SHALL store nothing. A path from
-a step to itself SHALL store nothing either.
+no step SHALL store nothing. Opening a draft SHALL store nothing.
+
+A path from a step to itself SHALL store nothing either.
 
 #### Scenario: A first move keeps the side an author saw
 
