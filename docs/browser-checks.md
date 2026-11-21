@@ -1300,15 +1300,18 @@ Open a draft that you saved before this change. Pass: no path moves. The
 flow asserts the missing write and the missing "Unsaved changes".
 
 Open a draft with an empty layout. Drag from a docking point of one step to another step.
-Pass: the new path draws between the two points you chose. Auto-placed steps
-may move when the graph changes. Pass: a stored point stays on its step, and
-the route redraws.
+Pass: the new path draws between the two points you chose. Neither joined step
+moves, even on a draft that stored no position. Pass: a stored point stays on
+its step, and the route redraws.
 
-Check two known limits. On a short path, an end handle's press target can
+Check three known limits. On a short path, an end handle's press target can
 cover the midpoint square or a waypoint square. Pass: pressing the square's
 outer edge reaches it, or lengthening the path does. Take the shortest route,
 with two steps 20 units apart. Pass: the two targets cover the whole midpoint
 square, so only lengthening the path works.
+
+Two paths between the same regions can share a channel and then read as one
+line. Pass: moving a step apart separates them.
 
 Within 12 units of a path's end, the path line takes no double-click while its
 source step draws its points. Selecting the path selects that step. Pass: a
