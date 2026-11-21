@@ -27,7 +27,7 @@ const WRITE_DRAFT = "E2E writes";
 
 const SHELF = "step_3b5d7f10-0001-4a1c-8e2f-000000000001";
 const ISSUED = "step_3b5d7f10-0002-4a1c-8e2f-000000000002";
-const SPARE_ONE = "step_e2e_spare_one";
+const SPARE_TWO = "step_e2e_spare_two";
 const SHELF_PATH = "path_9c4e6a20-0001-4a1c-8e2f-000000000001";
 
 interface End {
@@ -116,6 +116,14 @@ const centreOf = (box: Box): Pt => ({ x: box.x + box.width / 2, y: box.y + box.h
 
 /** The node's own rectangle, without its focus ring or its stamps. */
 const nodeRect = (page: Page, stepId: string): Locator => page.locator(`.canvas-node[data-step-id="${stepId}"] > rect`).first();
+
+/** A node's canvas position, read off its own translate. */
+async function positionOf(page: Page, stepId: string): Promise<Pt> {
+  const transform = await page.locator(`.canvas-node[data-step-id="${stepId}"]`).getAttribute("transform");
+  const at = /translate\(\s*(-?[\d.]+)[ ,]+\s*(-?[\d.]+)\s*\)/.exec(transform ?? "");
+  if (!at) throw new Error(`${stepId} has no translate: ${transform}`);
+  return { x: Number(at[1]), y: Number(at[2]) };
+}
 
 const dockingSet = (page: Page, stepId: string): Locator => page.locator(`[data-docking-step-id="${stepId}"]`);
 
@@ -281,18 +289,22 @@ test("opening a draft with no stored point sends no write and draws no point", a
 test("a connect drag between two chosen points stores both and a reload keeps them", async ({ page }) => {
   const stub = await openMap(page, WRITE_DRAFT);
   const edges = await page.locator("[data-kind=edge]").count();
+  // Where each joined step draws before the drag, on a draft that stores no position.
+  const shelfBefore = await positionOf(page, SHELF);
+  const spareBefore = await positionOf(page, SPARE_TWO);
+  const spareBoxBefore = await boxOf(nodeRect(page, SPARE_TWO));
 
   await hoverStep(page, SHELF);
   const from = await pressTarget(page, SHELF, "bottom:0");
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   // Over the other step, whose points draw under the drag with a ring on the snap.
-  const over = centreOf(await boxOf(nodeRect(page, SPARE_ONE)));
+  const over = centreOf(await boxOf(nodeRect(page, SPARE_TWO)));
   await page.mouse.move(over.x, over.y, { steps: 12 });
-  await expect(dockingSet(page, SPARE_ONE)).toHaveCount(1);
-  const onto = await pressTarget(page, SPARE_ONE, "left:-1");
+  await expect(dockingSet(page, SPARE_TWO)).toHaveCount(1);
+  const onto = await pressTarget(page, SPARE_TWO, "left:-1");
   await page.mouse.move(onto.x, onto.y, { steps: 6 });
-  await expect(dockingSet(page, SPARE_ONE).locator('circle[r="10"]')).toHaveCount(1);
+  await expect(dockingSet(page, SPARE_TWO).locator('circle[r="10"]')).toHaveCount(1);
   await page.mouse.up();
 
   await expect(page.locator("[data-kind=edge]")).toHaveCount(edges + 1);
@@ -300,6 +312,11 @@ test("a connect drag between two chosen points stores both and a reload keeps th
   expect(Object.values(saved.layout.dockingPoints ?? {})).toEqual([
     { source: { side: "bottom", at: 0 }, target: { side: "left", at: -1 } },
   ]);
+  // The same write stores each joined step where it drew, so the new path moves neither.
+  expect(saved.layout[SHELF]).toEqual(shelfBefore);
+  expect(saved.layout[SPARE_TWO]).toEqual(spareBefore);
+  expect(await boxOf(nodeRect(page, SPARE_TWO))).toEqual(spareBoxBefore);
+  expect(await positionOf(page, SPARE_TWO)).toEqual(spareBefore);
 
   // The source step keeps no points drawn once the pointer leaves it.
   await leaveToEmptyCanvas(page);
@@ -312,8 +329,8 @@ test("a connect drag between two chosen points stores both and a reload keeps th
   await expect(page.locator("[data-kind=edge]")).toHaveCount(edges + 1);
   await hoverStep(page, SHELF);
   await expect(dockingPoint(page, SHELF, "bottom:0")).toHaveAttribute("data-docking-held", "true");
-  await hoverStep(page, SPARE_ONE);
-  await expect(dockingPoint(page, SPARE_ONE, "left:-1")).toHaveAttribute("data-docking-held", "true");
+  await hoverStep(page, SPARE_TWO);
+  await expect(dockingPoint(page, SPARE_TWO, "left:-1")).toHaveAttribute("data-docking-held", "true");
 });
 
 test("a step move stores the points of its path and the path keeps both sides", async ({ page }) => {

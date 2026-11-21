@@ -4,6 +4,7 @@ import {
   drawnPositions,
   COLUMN_WIDTH,
   layoutAfterArrange,
+  layoutAfterConnect,
   layoutAfterInsert,
   layoutAfterMove,
   readDockingPoints,
@@ -258,5 +259,33 @@ describe("layoutAfterMove", () => {
       path_2: { target: { side: "top", at: -3 } },
     });
     expect(layout.step_a).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe("layoutAfterConnect", () => {
+  const ends = { source: { side: "right", at: 0 }, target: { side: "left", at: 0 } } as const;
+
+  it("stores the drawn position of each joined step that stores none, with the points", () => {
+    const layout = { step_other: { x: 5, y: 5 } };
+    const next = layoutAfterConnect(layout, "path_1", ends, {
+      step_review: { x: 0, y: 0 },
+      step_approve: { x: 240, y: 0 },
+    });
+    expect(next.step_review).toEqual({ x: 0, y: 0 });
+    expect(next.step_approve).toEqual({ x: 240, y: 0 });
+    expect(next.step_other).toEqual({ x: 5, y: 5 });
+    expect(readDockingPoints(next)).toEqual({ path_1: ends });
+    expect(layout).toEqual({ step_other: { x: 5, y: 5 } });
+  });
+
+  it("keeps a position a step already stores", () => {
+    const layout = { step_review: { x: 100, y: 60 } };
+    const next = layoutAfterConnect(layout, "path_1", { source: ends.source }, {
+      step_review: { x: 0, y: 0 },
+      step_new: { x: 300, y: 80 },
+    });
+    expect(next.step_review).toEqual({ x: 100, y: 60 });
+    expect(next.step_new).toEqual({ x: 300, y: 80 });
+    expect(readDockingPoints(next)).toEqual({ path_1: { source: ends.source } });
   });
 });

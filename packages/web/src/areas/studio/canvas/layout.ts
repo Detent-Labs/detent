@@ -215,6 +215,25 @@ export function layoutAfterMove(
 }
 
 /**
+ * The layout after a connect release: one path's stored ends, and the drawn
+ * position of each step it joins that stores none. A step that stores a
+ * position keeps it. `drawn` holds the positions the canvas drew at release,
+ * for the joined steps only. The input is not mutated.
+ */
+export function layoutAfterConnect(
+  layout: Record<string, unknown>,
+  pathId: string,
+  ends: PathDockingEnds,
+  drawn: Record<string, Point>,
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...layout };
+  for (const [stepId, point] of Object.entries(drawn)) {
+    if (!isPoint(next[stepId])) next[stepId] = point;
+  }
+  return withDockingPoints(next, pathId, ends);
+}
+
+/**
  * The docking points a step move stores. For every path with an end on a moved
  * step, each end that stores no point takes the point it held before the move:
  * the automatic anchor, waypoints and the other end's stored point included,
