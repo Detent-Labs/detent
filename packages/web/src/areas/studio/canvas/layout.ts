@@ -222,8 +222,9 @@ export function layoutAfterMove(
  *
  * An end on a collapsed group's box stores nothing and ignores whatever its
  * hidden member stores. A path between two members of one collapsed group
- * stores nothing, and so does a path from a step to itself. A returned entry holds every end the path stores, so it
- * replaces the stored entry whole; a path that gains no end is absent.
+ * stores nothing, and so does a path from a step to itself. A returned entry
+ * holds every end the path stores, so it replaces the stored entry whole. A
+ * path that gains no end is absent.
  */
 export function pointsAfterMove(input: {
   paths: Array<{ id?: string; from: string; to?: string }>;

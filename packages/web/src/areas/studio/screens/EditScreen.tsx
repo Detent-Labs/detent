@@ -649,8 +649,8 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     setSaveState((s) => ({ ...s, layout: layoutAfterMove(s.layout, positions, points) }));
   };
 
-  // Overwrites every step's position at once, unlike onMoveCanvasPosition's one-step
-  // write, and clears every waypoint and every docking point too (design.md,
+  // Overwrites every step's position, where a move writes only the steps it
+  // moved, and clears every waypoint and every docking point too (design.md,
   // Decisions 2 and 4).
   // Gated by hasHandPlacedStep, through `ArrangeDialog`. The dialog runs before
   // the layout library loads. A library that fails to load leaves the layout as

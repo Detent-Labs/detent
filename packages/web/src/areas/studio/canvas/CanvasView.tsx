@@ -676,8 +676,8 @@ function EdgeLabel({
 
 /**
  * Interactive, hand-rolled SVG canvas (design.md: not Mermaid, not a graph
- * library). Node position writes to `saveState.layout` via `onMoveStep`
- * (not the Draft model); path creation writes through `useDraft()`/
+ * library). Node position writes to `saveState.layout` via `onMoveSteps`
+ * and `onMoveStep` (not the Draft model); path creation writes through `useDraft()`/
  * `mutate()`, the same surface `PathsPanel`'s "add path" action uses.
  */
 export function CanvasView({
@@ -1244,6 +1244,7 @@ export function CanvasView({
    * a release past the click threshold calls it.
    */
   const releaseMove = (moved: Record<string, Point>) => {
+    if (Object.keys(moved).length === 0) return;
     const paths = steps.flatMap((step) =>
       step.id ? (step.paths ?? []).map((path) => ({ id: path.id, from: step.id as string, to: path.to })) : [],
     );

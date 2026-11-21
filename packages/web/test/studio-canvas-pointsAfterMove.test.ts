@@ -48,13 +48,19 @@ describe("pointsAfterMove", () => {
   });
 
   // A free end turns toward the far box's centre, or toward its nearest
-  // waypoint, never toward the stored end's anchor. The stored end therefore
-  // never changes the free end's side, and no geometry separates this case
-  // from one that ignores the stored entry; the stored end is kept from the
-  // entry itself. The hidden-end tests below pin the same carry-through.
+  // waypoint, never toward the stored end's anchor. With the boxes apart, the
+  // stored end therefore never changes the free end's side, and only the
+  // stacked case below separates this test from a code path that ignores the
+  // stored entry. The hidden-end tests below pin the same carry-through.
   it("leaves an end that already stores a point and stores the other", () => {
     const points = run({ stored: { path_a: { source: { side: "top", at: -1 } } } });
     expect(points).toEqual({ path_a: { source: { side: "top", at: -1 }, target: { side: "left", at: 0 } } });
+  });
+
+  it("reads the free end against the stored end's entry for two boxes whose centres coincide", () => {
+    const stacked = { step_review: { x: 0, y: 0 }, step_approve: { x: 0, y: 0 } };
+    const points = run({ positions: stacked, stored: { path_a: { source: { side: "top", at: -1 } } } });
+    expect(points).toEqual({ path_a: { source: { side: "top", at: -1 }, target: { side: "right", at: 0 } } });
   });
 
   it("stores nothing for a path whose two ends already store a point", () => {
@@ -73,6 +79,13 @@ describe("pointsAfterMove", () => {
 
     it("stores the visible end and no end for the hidden one", () => {
       const points = run({ moved: ["step_review"], groups });
+      expect(points).toEqual({ path_a: { source: { side: "right", at: 0 } } });
+    });
+
+    it("reads the visible end against the collapsed group's box, not the hidden member's own node", () => {
+      const tall = { step_review: { x: 0, y: 0 }, step_approve: { x: 240, y: 400 }, step_sibling: { x: 240, y: 0 } };
+      const box: StepGroup[] = [{ id: "group_y", stepIds: ["step_approve", "step_sibling"], name: "Y", collapsed: true }];
+      const points = run({ moved: ["step_review"], positions: tall, groups: box });
       expect(points).toEqual({ path_a: { source: { side: "right", at: 0 } } });
     });
 
