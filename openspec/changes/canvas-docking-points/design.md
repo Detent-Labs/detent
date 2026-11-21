@@ -133,7 +133,7 @@ The new key gets four pure functions in `canvas/layout.ts`, beside `isPoint`.
 One reads `dockingPoints` defensively. One writes one path's ends and drops
 an empty entry. One returns the layout after an arrange, and one the layout
 after an insert. The last two also carry the waypoint clearing those writes do
-today. The edit screen calls them in place of its inline closures.
+today. The screen that owns the draft calls them in place of its inline closures.
 
 A fifth returns the layout after a step move. It takes the new positions and
 the points to store. Each of the five gets cases in the canvas layout test.
