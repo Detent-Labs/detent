@@ -72,12 +72,12 @@ static markup, or by the e2e flow of group 7.
 
 ## 7. The e2e flow
 
-- [ ] 7.1 Add `e2e/canvas-docking-points.e2e.ts` beside `canvas-keyboard.e2e.ts`. It opens a draft with an empty layout and asserts that no layout write follows.
-- [ ] 7.2 Add a connect drag between two chosen points, and assert the stored entry after a reload.
-- [ ] 7.3 Add a step move, and assert that the path keeps both sides.
-- [ ] 7.4 Add an end handle drag to another point, and assert that the Draft model stays equal.
-- [ ] 7.5 Add a press on a point under the end stamp, and a drag on an end handle. Assert a connect drag for the first and no pan for the second.
-- [ ] 7.6 Run `bun run e2e` in the devcontainer and paste its summary.
+- [x] 7.1 Add `e2e/canvas-docking-points.e2e.ts` beside `canvas-keyboard.e2e.ts`. It opens a draft with an empty layout and asserts that no layout write follows.
+- [x] 7.2 Add a connect drag between two chosen points, and assert the stored entry after a reload.
+- [x] 7.3 Add a step move, and assert that the path keeps both sides.
+- [x] 7.4 Add an end handle drag to another point, and assert that the Draft model stays equal.
+- [x] 7.5 Add a press on a point under the end stamp, and a drag on an end handle. Assert a connect drag for the first and no pan for the second.
+- [x] 7.6 Run `bun run e2e` in the devcontainer and paste its summary.
 
 ## 8. Words and records
 
