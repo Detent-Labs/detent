@@ -8,11 +8,11 @@ static markup, or by the e2e flow of group 7.
 
 ## 1. Docking point geometry
 
-- [ ] 1.1 Add the docking point type to `canvas/geometry.ts`, and the function that lists a box's points. Verify in `studio-canvas-geometry.test.ts` with cases for the counts per side and for the middle point.
-- [ ] 1.2 Add the nearest-point function over one box, with an option that excludes one point. Verify with cases for a position on a point, between two points, and at a corner.
-- [ ] 1.3 Add the function that turns a stored end into an anchor. It returns nothing for an unknown side, or for a position the side lacks. Verify with one case per rejection.
-- [ ] 1.4 Add the function that reads an automatic anchor back as a side and a position. Verify that each of the four midpoints reads as position 0.
-- [ ] 1.5 Add the press-target test for one point: 12 units outward and 6 inward. Verify with a press 10 units outside the border and one 10 units inside it.
+- [x] 1.1 Add the docking point type to `canvas/geometry.ts`, and the function that lists a box's points. Verify in `studio-canvas-geometry.test.ts` with cases for the counts per side and for the middle point.
+- [x] 1.2 Add the nearest-point function over one box, with an option that excludes one point. Verify with cases for a position on a point, between two points, and at a corner.
+- [x] 1.3 Add the function that turns a stored end into an anchor. It returns nothing for an unknown side, or for a position the side lacks. Verify with one case per rejection.
+- [x] 1.4 Add the function that reads an automatic anchor back as a side and a position. Verify that each of the four midpoints reads as position 0.
+- [x] 1.5 Add the press-target test for one point: 12 units outward and 6 inward. Verify with a press 10 units outside the border and one 10 units inside it.
 
 ## 2. Routes between any two sides
 

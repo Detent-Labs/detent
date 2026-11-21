@@ -16,6 +16,12 @@ import {
   GRID_STEP,
   NODE_WIDTH,
   NODE_HEIGHT,
+  dockingPointsOf,
+  nearestDockingPoint,
+  dockingAnchor,
+  dockingEndOfAnchor,
+  inPressTarget,
+  type DockingSide,
 } from "../src/areas/studio/canvas/geometry.js";
 import { COLUMN_WIDTH, ROW_HEIGHT } from "../src/areas/studio/canvas/layout.js";
 
@@ -504,5 +510,94 @@ describe("canvas geometry: a free lattice point", () => {
       expect(answer.x % GRID_STEP).toBe(0);
       expect(answer.y % GRID_STEP).toBe(0);
     }
+  });
+});
+
+describe("docking points", () => {
+  const box = { x: 100, y: 200 };
+  const sideOf = (s: DockingSide) => dockingPointsOf(box).filter((p) => p.side === s);
+
+  it("lists three points on each level-height side and seven on each top and bottom side", () => {
+    expect(sideOf("left").map((p) => p.at)).toEqual([-1, 0, 1]);
+    expect(sideOf("right").map((p) => p.at)).toEqual([-1, 0, 1]);
+    expect(sideOf("top").map((p) => p.at)).toEqual([-3, -2, -1, 0, 1, 2, 3]);
+    expect(sideOf("bottom").map((p) => p.at)).toEqual([-3, -2, -1, 0, 1, 2, 3]);
+    expect(dockingPointsOf(box)).toHaveLength(20);
+  });
+
+  it("puts position 0 at each side's midpoint and steps one grid step along the side", () => {
+    const at = (s: DockingSide, n: number) => sideOf(s).find((p) => p.at === n)!.point;
+    expect(at("right", 0)).toEqual({ x: 280, y: 230 });
+    expect(at("left", 0)).toEqual({ x: 100, y: 230 });
+    expect(at("top", 0)).toEqual({ x: 190, y: 200 });
+    expect(at("bottom", 0)).toEqual({ x: 190, y: 260 });
+    expect(at("top", 1)).toEqual({ x: 190 + GRID_STEP, y: 200 });
+    expect(at("right", 1)).toEqual({ x: 280, y: 230 + GRID_STEP });
+    expect(at("left", -1)).toEqual({ x: 100, y: 230 - GRID_STEP });
+  });
+
+  it("takes a size other than the node's and keeps the counts", () => {
+    const pts = dockingPointsOf({ x: 0, y: 0 }, { width: 100, height: 40 });
+    expect(pts).toHaveLength(20);
+    expect(pts.find((p) => p.side === "right" && p.at === 0)!.point).toEqual({ x: 100, y: 20 });
+  });
+
+  it("answers the point a position sits on", () => {
+    const p = nearestDockingPoint(box, { x: 190, y: 200 });
+    expect(p.side).toBe("top");
+    expect(p.at).toBe(0);
+  });
+
+  it("answers the nearer of two points when between them", () => {
+    const p = nearestDockingPoint(box, { x: 190 + 14, y: 190 });
+    expect(p).toMatchObject({ side: "top", at: 1 });
+  });
+
+  it("answers a corner's nearest point", () => {
+    const p = nearestDockingPoint(box, { x: 100, y: 200 });
+    expect(p).toMatchObject({ side: "left", at: -1 });
+  });
+
+  it("skips an excluded point", () => {
+    const p = nearestDockingPoint(box, { x: 190, y: 200 }, { exclude: { side: "top", at: 0 } });
+    expect(p.side).toBe("top");
+    expect(Math.abs(p.at)).toBe(1);
+  });
+
+  it("turns a stored end into an anchor", () => {
+    expect(dockingAnchor(box, { side: "bottom", at: 2 })).toEqual({ x: 190 + 2 * GRID_STEP, y: 260 });
+  });
+
+  it("rejects an unknown side", () => {
+    expect(dockingAnchor(box, { side: "middle" as never, at: 0 })).toBeUndefined();
+  });
+
+  it("rejects a position the side lacks", () => {
+    expect(dockingAnchor(box, { side: "right", at: 2 })).toBeUndefined();
+    expect(dockingAnchor(box, { side: "top", at: 4 })).toBeUndefined();
+    expect(dockingAnchor(box, { side: "top", at: 0.5 })).toBeUndefined();
+  });
+
+  it("reads each automatic midpoint back as position 0", () => {
+    for (const leaving of ["right", "left", "down", "up"] as const) {
+      const a = anchorSideToward(box, leaving === "right" ? { x: 1000, y: 230 } : leaving === "left" ? { x: -1000, y: 230 } : leaving === "down" ? { x: 190, y: 1000 } : { x: 190, y: -1000 });
+      const end = dockingEndOfAnchor(box, a.anchor)!;
+      expect(end.at).toBe(0);
+      const expected: Record<typeof leaving, DockingSide> = { right: "right", left: "left", down: "bottom", up: "top" };
+      expect(end.side).toBe(expected[leaving]);
+    }
+    expect(dockingEndOfAnchor(box, { x: 5, y: 5 })).toBeUndefined();
+  });
+
+  it("holds a press 10 units outside the border and not one 10 units inside", () => {
+    const top0 = dockingPointsOf(box).find((p) => p.side === "top" && p.at === 0)!;
+    expect(inPressTarget(top0, { x: 190, y: 190 })).toBe(true);
+    expect(inPressTarget(top0, { x: 190, y: 210 })).toBe(false);
+    expect(inPressTarget(top0, { x: 190, y: 205 })).toBe(true);
+    expect(inPressTarget(top0, { x: 190, y: 187 })).toBe(false);
+    expect(inPressTarget(top0, { x: 190 + 11, y: 200 })).toBe(false);
+    const right0 = dockingPointsOf(box).find((p) => p.side === "right" && p.at === 0)!;
+    expect(inPressTarget(right0, { x: 290, y: 230 })).toBe(true);
+    expect(inPressTarget(right0, { x: 270, y: 230 })).toBe(false);
   });
 });

@@ -445,3 +445,111 @@ export function routePath(points: Point[], style: EdgeStyle, radius = EDGE_CORNE
   const last = points[points.length - 1];
   return `${d} L${last.x},${last.y}`;
 }
+
+/** A side of a node's box, as a stored docking end names it. */
+export type DockingSide = "top" | "right" | "bottom" | "left";
+
+/**
+ * One end of a path as stored: a side and a whole-number position counted from
+ * that side's midpoint in grid steps. It grows rightward on a top or bottom
+ * side and downward on a left or right side.
+ */
+export interface DockingEnd {
+  side: DockingSide;
+  at: number;
+}
+
+/** A docking point of one box: its stored end and its canvas point. */
+export interface DockingPoint extends DockingEnd {
+  point: Point;
+}
+
+const DOCKING_SIDES: DockingSide[] = ["top", "right", "bottom", "left"];
+
+/** The largest `|at|` a side holds. Fixed counts of 7 and 3, independent of the box size. */
+const DOCKING_REACH: Record<DockingSide, number> = { top: 3, bottom: 3, left: 1, right: 1 };
+
+const DOCKING_LEAVING: Record<DockingSide, LeaveDirection> = { top: "up", right: "right", bottom: "down", left: "left" };
+
+const dockingPointAt = (node: Point, side: DockingSide, at: number, size: Size): Point => {
+  const mid = SIDE[DOCKING_LEAVING[side]](node, size);
+  return side === "top" || side === "bottom" ? { x: mid.x + at * GRID_STEP, y: mid.y } : { x: mid.x, y: mid.y + at * GRID_STEP };
+};
+
+/**
+ * Every docking point of a box: seven on the top and bottom sides, three on the
+ * left and right sides, one grid step apart, the middle one on the side's
+ * midpoint. Order is top, right, bottom, left, each from low `at` to high.
+ */
+export function dockingPointsOf(node: Point, size: Size = NODE_SIZE): DockingPoint[] {
+  const points: DockingPoint[] = [];
+  for (const side of DOCKING_SIDES) {
+    const reach = DOCKING_REACH[side];
+    for (let at = -reach; at <= reach; at++) points.push({ side, at, point: dockingPointAt(node, side, at, size) });
+  }
+  return points;
+}
+
+/**
+ * The docking point of a box nearest a position, by straight distance. A tie
+ * takes the earlier point in `dockingPointsOf` order. `exclude` skips one end,
+ * for a drop on the pressed step's own box.
+ */
+export function nearestDockingPoint(
+  node: Point,
+  position: Point,
+  options: { exclude?: DockingEnd; size?: Size } = {},
+): DockingPoint {
+  const { exclude, size = NODE_SIZE } = options;
+  let best: DockingPoint | undefined;
+  let bestDistance = Infinity;
+  for (const p of dockingPointsOf(node, size)) {
+    if (exclude && p.side === exclude.side && p.at === exclude.at) continue;
+    const d = Math.hypot(p.point.x - position.x, p.point.y - position.y);
+    if (d < bestDistance) {
+      best = p;
+      bestDistance = d;
+    }
+  }
+  return best as DockingPoint;
+}
+
+/**
+ * The anchor a stored end names on a box, or `undefined` for an unknown side or
+ * a position the side lacks (non-integer or beyond its reach).
+ */
+export function dockingAnchor(node: Point, end: DockingEnd, size: Size = NODE_SIZE): Point | undefined {
+  if (!DOCKING_SIDES.includes(end.side)) return undefined;
+  if (!Number.isInteger(end.at) || Math.abs(end.at) > DOCKING_REACH[end.side]) return undefined;
+  return dockingPointAt(node, end.side, end.at, size);
+}
+
+/**
+ * The stored end for an automatic anchor, which always sits on a side's
+ * midpoint. `undefined` when the anchor is no docking point of the box. A
+ * corner shared by two sides answers the earlier side in `dockingPointsOf` order.
+ */
+export function dockingEndOfAnchor(node: Point, anchor: Point, size: Size = NODE_SIZE): DockingEnd | undefined {
+  const hit = dockingPointsOf(node, size).find((p) => p.point.x === anchor.x && p.point.y === anchor.y);
+  return hit ? { side: hit.side, at: hit.at } : undefined;
+}
+
+/** Press target reach beyond a point's border, in user units. */
+export const PRESS_REACH_OUT = 12;
+/** Press target reach into the node from a point's border, in user units. */
+export const PRESS_REACH_IN = 6;
+
+/**
+ * Whether a press lands on one docking point's target: 12 units outward and 6
+ * inward across the border, and half a grid step either way along it, so
+ * neighbouring targets meet halfway. Bounds are inclusive.
+ */
+export function inPressTarget(target: DockingPoint, press: Point): boolean {
+  const dx = press.x - target.point.x;
+  const dy = press.y - target.point.y;
+  const along = target.side === "top" || target.side === "bottom" ? dx : dy;
+  if (Math.abs(along) > GRID_STEP / 2) return false;
+  const across = target.side === "top" ? dy : target.side === "bottom" ? -dy : target.side === "left" ? dx : -dx;
+  // across < 0 is outward for every side.
+  return across >= -PRESS_REACH_OUT && across <= PRESS_REACH_IN;
+}
