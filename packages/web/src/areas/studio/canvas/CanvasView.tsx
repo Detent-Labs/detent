@@ -485,9 +485,25 @@ const styles = stylex.create({
 function pointerMovesToStep(e: React.PointerEvent, stepId: string): boolean {
   const to = e.relatedTarget;
   if (!(to instanceof Element)) return false;
+  // The selector names attributes only; the id is compared in code, so an id
+  // holding a quote or a bracket cannot break it.
+  const host = to.closest(".canvas-node[data-step-id], [data-docking-step-id], [data-end-handle-step]");
+  if (!host) return false;
   return (
-    to.closest(`.canvas-node[data-step-id="${stepId}"], [data-docking-step-id="${stepId}"], [data-end-handle-step="${stepId}"]`) !== null
+    (host.classList.contains("canvas-node") && host.getAttribute("data-step-id") === stepId) ||
+    host.getAttribute("data-docking-step-id") === stepId ||
+    host.getAttribute("data-end-handle-step") === stepId
   );
+}
+
+/** The drawn positions of the listed steps, for the ones `positions` holds. */
+function pointsOf(stepIds: string[], positions: Record<string, Point>): Record<string, Point> {
+  const out: Record<string, Point> = {};
+  for (const id of stepIds) {
+    const at = positions[id];
+    if (at) out[id] = at;
+  }
+  return out;
 }
 
 /** The `<g>` holding a drawn group's member nodes. Both disclosure controls —
@@ -503,8 +519,8 @@ interface Props {
   /** A node or group drag's release: every mover's new position and the
    * docking points the move stores, for one layout write. */
   onMoveSteps: (positions: Record<string, Point>, points: Record<string, PathDockingEnds>) => void;
-  /** Overwrites every step's position at once and clears every waypoint,
-   * behind its own confirm gate (design.md, Decisions 2, 4 and 5). */
+  /** Overwrites every step's position at once and clears every waypoint and
+   * every stored docking point, behind its own confirm gate (design.md, Decisions 2, 4 and 5). */
   onArrange: () => void;
   /** The selection is a set, not one id (design.md): it is the interaction
    * state stages 30 to 34 build on, and multi-move and multi-delete come with
@@ -538,8 +554,11 @@ interface Props {
   dockingPoints: Record<string, PathDockingEnds>;
   onWaypointsChange: (pathId: string, points: Point[]) => void;
   /** Replaces one path's stored docking ends in the draft layout. A connect
-   * drag calls it for the path it adds. */
-  onDockingPointsChange: (pathId: string, ends: PathDockingEnds) => void;
+   * drag calls it for the path it adds, and an end handle release calls it for
+   * the path it re-hangs. The optional third argument holds the drawn
+   * positions of the steps a connect drag joins; each lands in the same layout
+   * write unless that step already stores a position. */
+  onDockingPointsChange: (pathId: string, ends: PathDockingEnds, drawn?: Record<string, Point>) => void;
   /** Presentation only, in the same `layout` blob (design.md). A group never
    * reaches `ProcessBody`, so the engine cannot see one. */
   groups: StepGroup[];
@@ -1385,8 +1404,9 @@ export function CanvasView({
 
   const onEndPointerMove = (e: React.PointerEvent) => trackPointer(endDrag, setEndDrag, { current: toSvgPoint(e) });
 
-  /** A release stores the dragged end alone. The other end keeps what it held,
-   * or its absence. Only the layout changes, never the Draft model. */
+  /** A release stores the dragged end. The other end keeps what it held, except
+   * on a self path that stores no end: `endDropEntry` stores both there. Only
+   * the layout changes, never the Draft model. */
   const onEndPointerUp = (e: React.PointerEvent) => {
     e.stopPropagation();
     if (!endDrag) return;
@@ -1562,7 +1582,10 @@ export function CanvasView({
       const targetStep = steps.find((s) => s.id === target.stepId);
       const path = newPath(sourceStep, targetStep, target.stepId, trigger, contentLocale, baseLocale, t("steps.unnamedStep"));
       updateInDraftArray(mutate, (d) => d.workflow?.steps?.[sourceIndex], { paths: [...existingPaths, path] });
-      if (path.id && ends) onDockingPointsChange(path.id, ends);
+      if (path.id && ends) {
+        const drawn = pointsOf([sourceStep.id, target.stepId], positionsById);
+        onDockingPointsChange(path.id, ends, drawn);
+      }
       return path.id ? { pathId: path.id, targetId: target.stepId } : undefined;
     }
     // The step first, then the path (design.md): a refused candidate never
@@ -1580,8 +1603,13 @@ export function CanvasView({
         source.paths.push(path);
       }
     });
-    if (step.id) onMoveStep(step.id, target.at);
-    if (path.id && ends) onDockingPointsChange(path.id, ends);
+    // With points, the new step's position and the source's drawn one travel
+    // in the points' own layout write.
+    if (step.id && path.id && ends) {
+      onDockingPointsChange(path.id, ends, { ...pointsOf([sourceStep.id], positionsById), [step.id]: target.at });
+    } else if (step.id) {
+      onMoveStep(step.id, target.at);
+    }
     return path.id && step.id ? { pathId: path.id, targetId: step.id } : undefined;
   };
 

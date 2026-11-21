@@ -309,9 +309,8 @@ describe("the canvas node's accessibility markup", () => {
     expect(block).toContain(`paddingInline: ${SENTENCE_PADDING},`);
   });
 
-  // The connect handle at a node's right middle is gone: a resting canvas
-  // draws no handle, and the docking points draw on a pointed-at or selected
-  // step (`studio-canvas-dockingPoints.test.tsx`).
+  // A resting canvas draws no handle and no docking point. The points draw on a
+  // pointed-at or selected step (`studio-canvas-dockingPoints.test.tsx`).
   it("draws no connect handle on a resting canvas", () => {
     expect(CANVAS.inner).not.toContain("data-connect-step-id");
     expect(CANVAS.inner).not.toContain("data-docking-point");

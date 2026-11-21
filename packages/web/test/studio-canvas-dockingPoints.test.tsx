@@ -118,7 +118,7 @@ describe("a selected step", () => {
     expect(setOf(html, "step_done")).toBe("");
   });
 
-  it("draws three points on each level side and seven on each upright one", () => {
+  it("draws three points on each upright side and seven on each level one", () => {
     for (const side of ["left", "right"]) expect(count(set, `data-docking-point="${side}:`)).toBe(3);
     for (const side of ["top", "bottom"]) expect(count(set, `data-docking-point="${side}:`)).toBe(7);
   });

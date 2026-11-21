@@ -20,6 +20,16 @@ import {
  * `refusalSentence` turns one into the author's words. */
 export type ConnectRefusal = { refusal: "end"; reason?: undefined } | { refusal: "trigger"; reason: string };
 
+/** Whether a point lies in a node's box grown by a press target's outward reach. */
+function inGrownBox(point: Point, n: NodePosition): boolean {
+  return (
+    point.x >= n.x - PRESS_REACH_OUT &&
+    point.x <= n.x + NODE_WIDTH + PRESS_REACH_OUT &&
+    point.y >= n.y - PRESS_REACH_OUT &&
+    point.y <= n.y + NODE_HEIGHT + PRESS_REACH_OUT
+  );
+}
+
 /**
  * The step a connect release or the snap ring reads. A box grown by the press
  * target's outward reach counts, so a release on the outer half of a ringed
@@ -32,14 +42,7 @@ export function hitTestGrownNode(point: Point, nodes: NodePosition[]): string | 
   if (inside) return inside;
   for (let i = nodes.length - 1; i >= 0; i--) {
     const n = nodes[i];
-    if (
-      point.x >= n.x - PRESS_REACH_OUT &&
-      point.x <= n.x + NODE_WIDTH + PRESS_REACH_OUT &&
-      point.y >= n.y - PRESS_REACH_OUT &&
-      point.y <= n.y + NODE_HEIGHT + PRESS_REACH_OUT
-    ) {
-      return n.id;
-    }
+    if (inGrownBox(point, n)) return n.id;
   }
   return undefined;
 }
@@ -155,6 +158,7 @@ export function resolveConnectDrop(input: {
   if (result.kind === "rejected") return result;
   if (result.kind === "create-step-and-connect") return { ...result, source: pressed };
   const drop = dropTargetOf(point, nodes, sourceStepId, pressed);
+  // Unreachable for non-overlapping boxes: the grown-box hit that made this a step drop also finds it here.
   if (!drop) return { kind: "create-step-and-connect", point, trigger: result.trigger, source: pressed };
   return { ...result, source: pressed, target: { side: drop.point.side, at: drop.point.at } };
 }
@@ -178,12 +182,7 @@ export function resolveEndDrop(input: {
   if (!own) return undefined;
   const inside = hitTestNode(point, nodes);
   if (inside !== undefined && inside !== stepId) return undefined;
-  const grown =
-    point.x >= own.x - PRESS_REACH_OUT &&
-    point.x <= own.x + NODE_WIDTH + PRESS_REACH_OUT &&
-    point.y >= own.y - PRESS_REACH_OUT &&
-    point.y <= own.y + NODE_HEIGHT + PRESS_REACH_OUT;
-  if (!grown) return undefined;
+  if (!inGrownBox(point, own)) return undefined;
   const { side, at } = nearestDockingPoint(own, point, { exclude });
   return { side, at };
 }

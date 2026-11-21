@@ -47,7 +47,9 @@ export function EndHandle({
   onPointerLeave: (e: React.PointerEvent) => void;
 }): React.JSX.Element {
   return (
-    <g className="panzoom-exclude" data-end-handle={end}
+    <g
+      className="panzoom-exclude"
+      data-end-handle={end}
       data-end-handle-step={stepId}
       data-path-id={pathId}
       aria-hidden="true"

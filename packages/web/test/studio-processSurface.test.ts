@@ -335,7 +335,7 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     expect(binding).toContain("onOpenStepPage?.(focus.stepId)");
     expect(binding).toContain("onOpenStepPage?.(owner.id, focus.pathId)");
     // Two from Enter, and one from each of the five double-click routes: the
-    // node, its connect handle, the edge group, the sentence and the midpoint
+    // node, its docking point, the edge group, the sentence and the midpoint
     // handle. An eighth would mean a single press reached it too.
     expect(code.match(/onOpenStepPage\?\.\(/g)).toHaveLength(7);
   });

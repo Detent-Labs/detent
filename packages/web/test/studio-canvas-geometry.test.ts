@@ -758,6 +758,15 @@ describe("canvas geometry: routes between any two sides", () => {
     expect(routeBetweenEnds(down, up)).toEqual([down.anchor, up.anchor]);
   });
 
+  it("takes the facing route for an opposing pair exactly two grid steps apart", () => {
+    // 40 beyond the source anchor meets the facing rule's bound (`>= 2 * GRID_STEP`).
+    for (const dy of [0, 20]) {
+      const s = endOf({ x: 0, y: 0 }, "right", 0);
+      const t = endOf({ x: 220, y: dy }, "left", 0);
+      expect(routeBetweenEnds(s, t)).toEqual(routeEdge(s.anchor, t.anchor, "right"));
+    }
+  });
+
   it("keeps a close opposing pair on other rows to at most five segments and no loop", () => {
     for (const dy of [-40, -20, 20, 40]) {
       const s = endOf({ x: 0, y: 0 }, "right", 0);
@@ -922,6 +931,24 @@ describe("canvas geometry: a waypointed route keeps its stored points", () => {
     const route = routeThroughWaypoints({ x: 0, y: 0 }, { x: 300, y: 0 }, [], {}, { source: { side: "top", at: 0 }, target: { side: "top", at: 0 } });
     expect(route.points).toHaveLength(4);
     expect(route.legStarts).toEqual([0]);
+  });
+
+  it("turns the unstored end of a self path to the opposing side of its stored one", () => {
+    const A = { x: 0, y: 0 };
+    const route = routeThroughWaypoints(A, A, [], {}, { target: { side: "right", at: 0 } });
+    const first = route.points[0];
+    const last = route.points[route.points.length - 1];
+    expect(last).toEqual({ x: 180, y: 30 });
+    expect(first).toEqual({ x: 0, y: 30 });
+    expect(route.points.length).toBeGreaterThan(2);
+  });
+
+  it("draws the automatic loop for a self path with two identical stored ends", () => {
+    const A = { x: 0, y: 0 };
+    const same = { side: "right", at: 0 } as const;
+    const route = routeThroughWaypoints(A, A, [], {}, { source: same, target: same });
+    expect(route.points).toEqual(routeThroughWaypoints(A, A).points);
+    expect(route.points.length).toBeGreaterThan(2);
   });
 
   it("turns the unstored end toward the far box", () => {

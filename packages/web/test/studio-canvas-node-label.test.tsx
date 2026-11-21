@@ -169,8 +169,8 @@ describe("the canvas node's label", () => {
 });
 
 describe("a label too long for its node", () => {
-  // The defect: "Confirm Completion to Contoso" ran out past the node's right
-  // border and painted over the connect handle. The clamp is CSS, so what the
+  // A long label such as "Confirm Completion to Contoso" must not run out past
+  // the node's right border and over the docking points. The clamp is CSS, so what the
   // markup can pin is the box it lives in and the text hover reads back.
   it("keeps the whole label in the box the clamp reads", () => {
     expect(ENGLISH[2].stepId).toBe("step_handover");

@@ -254,8 +254,19 @@ export function routeThroughWaypoints(
   const storedTarget = ends.target && dockingAnchor(target, ends.target, tz) ? ends.target : undefined;
   if (waypoints.length === 0) {
     if (storedSource || storedTarget) {
-      const s = routeEndOf(source, sz, storedSource, centreOf(target, tz));
-      const t = routeEndOf(target, tz, storedTarget, centreOf(source, sz));
+      let s = routeEndOf(source, sz, storedSource, centreOf(target, tz));
+      let t = routeEndOf(target, tz, storedTarget, centreOf(source, sz));
+      // Both anchors on one point of one box (a self path) would draw no line.
+      if (s.anchor.x === t.anchor.x && s.anchor.y === t.anchor.y) {
+        // Two identical stored ends take the automatic loop. One stored end
+        // keeps its point, and the other end turns to the opposing side.
+        if (storedSource && storedTarget) {
+          const a = anchorsForEdge(source, target, sizes);
+          return { points: routeEdge(a.source, a.target, a.leaving), legStarts: [0] };
+        }
+        if (storedSource) t = opposingEnd(t, s);
+        else s = opposingEnd(s, t);
+      }
       return { points: routeBetweenEnds(s, t), legStarts: [0] };
     }
     const a = anchorsForEdge(source, target, sizes);
@@ -313,6 +324,12 @@ function routeEndOf(node: Point, size: Size, stored: DockingEnd | undefined, tow
   if (stored) return { anchor: dockingAnchor(node, stored, size) as Point, side: stored.side, node, size };
   const turned = anchorSideToward(node, toward, size);
   return { anchor: turned.anchor, side: SIDE_OF_LEAVING[turned.leaving], node, size };
+}
+
+/** `end` turned to the side opposing `held`'s, at that side's midpoint. */
+function opposingEnd(end: RouteEnd, held: RouteEnd): RouteEnd {
+  const side = SIDE_OF_LEAVING[OPPOSITE[DOCKING_LEAVING[held.side]]];
+  return { ...end, side, anchor: dockingPointAt(end.node, side, 0, end.size) as Point };
 }
 
 /**
@@ -611,7 +628,7 @@ export function dockingEndOfAnchor(node: Point, anchor: Point, size: Size = NODE
 /** Press target reach beyond a point's border, in user units. */
 export const PRESS_REACH_OUT = 12;
 /** Press target reach into the node from a point's border, in user units. */
-export const PRESS_REACH_IN = 6;
+const PRESS_REACH_IN = 6;
 
 /**
  * Whether a press lands on one docking point's target: 12 units outward and 6
@@ -787,7 +804,7 @@ export function routeBetweenEnds(source: RouteEnd, target: RouteEnd): Point[] {
 
   const candidates = middles.map((middle) => [source.anchor, from, ...middle, to, target.anchor]);
   // Opposing sides facing each other at any positive distance, anchors level on
-  // the other axis, also offer today's straight one-segment route.
+  // the other axis, also offer the straight one-segment route.
   const level = d.x !== 0 ? source.anchor.y === target.anchor.y : source.anchor.x === target.anchor.x;
   if (OPPOSING[source.side] === target.side && beyond > 0 && level) candidates.unshift([source.anchor, target.anchor]);
 
@@ -802,7 +819,7 @@ export function routeBetweenEnds(source: RouteEnd, target: RouteEnd): Point[] {
       bestScore = score;
     }
   }
-  // Overlapping boxes keep this fallback, which may leave a box sideways: the route still draws.
+  // The final L runs only when no candidate survives, which needs overlapping boxes; it may leave a box sideways, and the route still draws.
   // Two coincident anchors (touching boxes on facing midpoints) admit no route
   // that revisits no point, so they return the two-point route of zero length.
   const same = source.anchor.x === target.anchor.x && source.anchor.y === target.anchor.y;
