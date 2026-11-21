@@ -5,8 +5,14 @@
  * so every flow stubs the `PUT`: nothing reaches the server, and publish.e2e.ts
  * and the other flows find both drafts as the seed left them. The stub records
  * each body the page sends, which is how a flow reads what the canvas stored.
- * The stub also answers a later `GET` with the last body saved, so a reload
- * reads back what the page wrote.
+ * The stub also answers a later `GET` with the last body saved. The reload
+ * flow therefore proves that the page re-reads `layout.dockingPoints` and draws
+ * the stored points. It does not prove the server's round trip of the layout
+ * blob: test/drafts.test.ts covers that, and this file does not.
+ *
+ * Flows that expect exact stored points and default positions hold only on the
+ * seed's drafts with an empty layout, and `openMap` asserts that precondition,
+ * so a file that saves before this one fails here with a clear message.
  *
  * Canvas units are not screen pixels, since Panzoom scales the canvas. Every
  * press position comes from an element's own `boundingBox()`.
@@ -96,6 +102,7 @@ async function openMap(page: Page, name: string): Promise<DraftStub> {
   await expect(page.getByRole("textbox", { name: "Process name" })).toHaveValue(name);
   await page.getByRole("tab", { name: "Map" }).click();
   await expect(page.locator(".canvas-node").first()).toBeVisible();
+  expect(stub.served().layout, "the seed's draft has an empty layout").toEqual({});
   return stub;
 }
 
@@ -120,6 +127,23 @@ async function pressTarget(page: Page, stepId: string, key: string): Promise<Pt>
   return centreOf(await boxOf(dockingPoint(page, stepId, key).locator("rect")));
 }
 
+/** The stored end of the step's point nearest a screen position, read off the drawn press targets. */
+async function pointUnder(page: Page, stepId: string, at: Pt): Promise<End> {
+  await expect(dockingSet(page, stepId)).toHaveCount(1);
+  const keys = await dockingSet(page, stepId)
+    .locator("[data-docking-point]")
+    .evaluateAll((els) => els.map((el) => el.getAttribute("data-docking-point") ?? ""));
+  let best: { key: string; distance: number } | undefined;
+  for (const key of keys) {
+    const centre = await pressTarget(page, stepId, key);
+    const distance = Math.hypot(centre.x - at.x, centre.y - at.y);
+    if (!best || distance < best.distance) best = { key, distance };
+  }
+  const [side, position] = (best?.key ?? "").split(":");
+  if (!side || position === undefined) throw new Error("the step draws no point");
+  return { side, at: Number(position) };
+}
+
 /** Rests the pointer on a node's middle and waits for its points to draw. */
 async function hoverStep(page: Page, stepId: string): Promise<void> {
   const at = centreOf(await boxOf(nodeRect(page, stepId)));
@@ -127,10 +151,23 @@ async function hoverStep(page: Page, stepId: string): Promise<void> {
   await expect(dockingSet(page, stepId)).toHaveCount(1);
 }
 
-/** A spot of empty canvas: right of the graph, inside the frame and the viewport. */
+/**
+ * A spot of empty canvas: the first one down the frame's right side where the
+ * canvas's own svg is the topmost element, so no node, route or control covers
+ * it. Fails when there is none.
+ */
 async function emptyCanvas(page: Page): Promise<Pt> {
   const frame = await boxOf(page.locator("[role=application]").locator(".."));
-  return { x: frame.x + frame.width - 60, y: frame.y + 200 };
+  const height = page.viewportSize()?.height ?? 0;
+  const x = frame.x + frame.width - 60;
+  const candidates: Pt[] = [];
+  for (let y = frame.y + 40; y < Math.min(frame.y + frame.height, height) - 8; y += 40) candidates.push({ x, y });
+  const found = await page.evaluate((spots) => {
+    const svg = document.querySelector("[role=application]");
+    return spots.find((spot) => document.elementFromPoint(spot.x, spot.y) === svg) ?? null;
+  }, candidates);
+  if (found === null) throw new Error("no spot of empty canvas: the svg is topmost nowhere along the frame's right side");
+  return found;
 }
 
 /** Moves the pointer onto empty canvas. */
@@ -214,6 +251,7 @@ test("opening a draft with no stored point sends no write and draws no point", a
 
   // A change would read Unsaved changes in the same frame, so none follows.
   await expect(unsaved(page)).toHaveCount(0);
+  // The "Unsaved changes" count is the proof: a change shows it at once, while this length can read 0 before the autosave pause ends.
   expect(stub.saves).toHaveLength(0);
 });
 
@@ -257,18 +295,33 @@ test("a connect drag between two chosen points stores both and a reload keeps th
 
 test("a step move stores the points of its path and the path keeps both sides", async ({ page }) => {
   const stub = await openMap(page, WRITE_DRAFT);
-  const start = centreOf(await boxOf(nodeRect(page, ISSUED)));
+  // Pan the graph up, so there is room two rows below the start step.
+  const free = await emptyCanvas(page);
+  const panned = await panOf(page);
+  await drag(page, free, { x: free.x, y: free.y - 150 });
+  await expect.poll(() => panOf(page)).not.toBe(panned);
+
+  // Drop the end step below the start step, two rows down and level with it, so
+  // the automatic rule would now pick bottom and top. The path must keep right and left.
+  const shelf = centreOf(await boxOf(nodeRect(page, SHELF)));
+  const issued = await boxOf(nodeRect(page, ISSUED));
+  const start = centreOf(issued);
+  const rows = 2 * 120 * (issued.width / 180);
+  const drop = { x: shelf.x, y: shelf.y + rows };
+  expect(drop.y, "two rows below the start step stay on screen").toBeLessThan(page.viewportSize()?.height ?? 0);
   await hoverStep(page, ISSUED);
-  await drag(page, start, { x: start.x, y: start.y + 110 });
+  await drag(page, start, drop);
 
   const saved = await nextSave(stub, 0);
   expect(saved.layout.dockingPoints).toEqual({
     [SHELF_PATH]: { source: { side: "right", at: 0 }, target: { side: "left", at: 0 } },
   });
-  expect(saved.layout[ISSUED]).toBeDefined();
+  const moved = saved.layout[ISSUED] as Pt;
+  expect(moved.y, "the end step stands below the start step, more than beside it").toBeGreaterThan(Math.abs(moved.x));
 
-  // The moved step is selected, so its points stay drawn. The path still ends on the same two.
+  // The moved step is selected, so its points stay drawn. Both ends sit on the stored points, not on the automatic ones.
   await expect(dockingPoint(page, ISSUED, "left:0")).toHaveAttribute("data-docking-held", "true");
+  await expect(dockingPoint(page, ISSUED, "top:0")).toHaveAttribute("data-docking-held", "false");
   await hoverStep(page, SHELF);
   await expect(dockingPoint(page, SHELF, "right:0")).toHaveAttribute("data-docking-held", "true");
   await expect(dockingPoint(page, SHELF, "bottom:0")).toHaveAttribute("data-docking-held", "false");
@@ -283,6 +336,7 @@ test("an end handle drag hangs an end on another point and leaves the Draft mode
   // A release over empty canvas changes nothing.
   await drag(page, grab, await emptyCanvas(page));
   await expect(unsaved(page)).toHaveCount(0);
+  // The "Unsaved changes" count is the proof, as in the first flow; the length alone could read 0 before the pause ends.
   expect(stub.saves).toHaveLength(0);
 
   // A release on another point of the step stores that end alone.
@@ -317,6 +371,8 @@ test("an end handle drag on a self path keeps the other end where it was", async
   await selectPath(page, selfPath);
   const source = endHandle(page, selfPath, "source");
   const grab = centreOf(await boxOf(source));
+  // Where the target end draws before the drag: the point of the step nearest its handle.
+  const targetEnd = await pointUnder(page, SHELF, centreOf(await boxOf(endHandle(page, selfPath, "target"))));
   await page.mouse.move(grab.x, grab.y);
   await page.mouse.down();
   const over = centreOf(await boxOf(nodeRect(page, SHELF)));
@@ -327,7 +383,7 @@ test("an end handle drag on a self path keeps the other end where it was", async
   await page.mouse.up();
 
   const saved = await nextSave(stub, 1);
-  expect(saved.layout.dockingPoints?.[selfPath]).toEqual({ source: { side: "top", at: 2 }, target: { side: "left", at: 0 } });
+  expect(saved.layout.dockingPoints?.[selfPath]).toEqual({ source: { side: "top", at: 2 }, target: targetEnd });
   expect(saved.body).toEqual(afterAdd.body);
 });
 
@@ -369,6 +425,7 @@ test("a press on a point under an end stamp starts a connect drag the end step r
   await expect(page.locator("div").filter({ hasText: /^An end has no way out\.$/ })).toBeVisible();
   await expect(page.locator("[data-kind=edge]")).toHaveCount(edges);
   await expect(unsaved(page)).toHaveCount(0);
+  // The "Unsaved changes" count is the proof, as in the first flow; the length alone could read 0 before the pause ends.
   expect(stub.saves).toHaveLength(0);
 });
 
@@ -396,7 +453,7 @@ test("a drag on an end handle does not pan the canvas", async ({ page }) => {
   await leaveToEmptyCanvas(page);
   const corner = await emptyCanvas(page);
   await drag(page, corner, { x: corner.x + 40, y: corner.y - 40 });
-  expect(await panOf(page)).not.toBe(before);
+  await expect.poll(() => panOf(page)).not.toBe(before);
 });
 
 test("a step keeps its points while the pointer moves onto an end handle that sits on it", async ({ page }) => {
