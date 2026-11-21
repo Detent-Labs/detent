@@ -247,15 +247,19 @@ would then land on top of the target. The drop gesture module takes the rule.
 A drop on the source step takes the nearest point other than the pressed one.
 The canvas keeps self paths, and two identical anchors have no route.
 
-### A connect drag stores the places of the steps it joins
+### A connect drag stores the place of every step
 
 A new path changes the depth the automatic placement reads. On a draft with
 no stored position, the target would jump a column under the points just
-chosen. The release therefore writes the drawn position of each joined step
-that stores none. That goes in the layout write that carries the points.
+chosen. The release therefore writes the drawn position of every step that
+stores none. That goes in the layout write that carries the points.
 
-Only the joined steps get a position. Every other step keeps the automatic
-placement, as after any step drag on such a draft.
+Storing the two joined steps alone lost. The automatic placement ignores
+stored positions, so it can put another step exactly on a stored one. A
+connect drag between two steps of the seeded draft did that.
+
+The draft then counts as hand-placed, and Arrange asks before it runs. A way
+out added from the menu or the step page stores no position, as before.
 
 ### Draw order
 
@@ -328,8 +332,10 @@ a tooling switch, which needs a change of its own.
   end elsewhere. Arrange also resets it. The owner asked for a point that
   never moves by itself.
 - [An auto-placed step moves when the graph changes] → A connect drag stores
-  the places of the steps it joins. A path added from the menu stores no
-  point, so a jump there costs nothing.
+  the place of every step. A path added from the menu stores no point, so a
+  jump there costs nothing.
+- [A connect drag ends the automatic reflow of a draft] → Arrange lays the
+  steps out again. The author chose points by hand, so the drawing is theirs.
 - [A path retargeted on the step page keeps its target point] → Accepted, as
   for waypoints. The panels write no layout. An end handle or Arrange corrects
   it.

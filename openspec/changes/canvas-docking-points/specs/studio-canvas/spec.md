@@ -710,26 +710,31 @@ nothing, since it draws no point.
 - **WHEN** the author drags a collapsed group that holds both ends of a path
 - **THEN** the draft layout stores no docking point for that path
 
-### Requirement: A connect drag keeps its steps where the author saw them
+### Requirement: A connect drag keeps every step where the author saw it
 
-A connect drag SHALL store the drawn position of each step it joins that
-stores none. That store SHALL travel in the same layout write as the points.
-A new path can change where the automatic placement puts a step. The stored
-position keeps the step under the points the author chose.
+A connect drag SHALL store the drawn position of every step that stores
+none. That store SHALL travel in the same layout write as the points. A new
+path can change where the automatic placement puts a step. The stored
+positions keep every step in place, so no step lands on another.
 
 #### Scenario: A connect drag on an auto-placed draft moves no step
 
 - **WHEN** a draft's layout stores no position
 - **AND** the author drags from a point of "Review" to a point of "Approve"
-- **THEN** the draft layout stores a position for "Review" and for "Approve"
+- **THEN** the draft layout stores a position for every step of the draft
 - **AND** each equals the place that step drew at before the drag
-- **AND** neither step moves when the new path draws
+- **AND** no step moves when the new path draws
 
 #### Scenario: A stored position stays as it is
 
 - **WHEN** "Review" already stores a position
 - **AND** the author drags from a point of "Review" to empty canvas
 - **THEN** the layout keeps that position for "Review"
+
+#### Scenario: A way out from the menu stores no position
+
+- **WHEN** a keyboard author adds a way out through the way-out menu
+- **THEN** the draft layout stores no position it did not store before
 
 ### Requirement: A connect drag released on its own step joins two points
 
