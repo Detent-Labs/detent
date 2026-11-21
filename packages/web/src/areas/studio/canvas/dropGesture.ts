@@ -157,3 +157,32 @@ export function resolveConnectDrop(input: {
   if (!drop) return { kind: "create-step-and-connect", point, trigger: result.trigger, source: pressed };
   return { ...result, source: pressed, target: { side: drop.point.side, at: drop.point.at } };
 }
+
+/**
+ * Where an end handle's release hangs its end: the nearest docking point of the
+ * end's own step, or `undefined` for a release that changes nothing. A release
+ * counts on the step's box or the box grown by a press target's outward reach.
+ * A release inside another step's box counts for nothing, even where that box
+ * overlaps the grown one. `exclude` skips one point, for the other end of a path
+ * that starts and ends on one step.
+ */
+export function resolveEndDrop(input: {
+  stepId: string;
+  nodes: NodePosition[];
+  point: Point;
+  exclude?: DockingEnd;
+}): DockingEnd | undefined {
+  const { stepId, nodes, point, exclude } = input;
+  const own = nodes.find((n) => n.id === stepId);
+  if (!own) return undefined;
+  const inside = hitTestNode(point, nodes);
+  if (inside !== undefined && inside !== stepId) return undefined;
+  const grown =
+    point.x >= own.x - PRESS_REACH_OUT &&
+    point.x <= own.x + NODE_WIDTH + PRESS_REACH_OUT &&
+    point.y >= own.y - PRESS_REACH_OUT &&
+    point.y <= own.y + NODE_HEIGHT + PRESS_REACH_OUT;
+  if (!grown) return undefined;
+  const { side, at } = nearestDockingPoint(own, point, { exclude });
+  return { side, at };
+}

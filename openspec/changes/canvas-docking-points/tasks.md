@@ -64,11 +64,11 @@ static markup, or by the e2e flow of group 7.
 
 ## 6. End handles
 
-- [ ] 6.1 Draw one end handle at each end of the selected path, with its press target and its tooltip from `studio.ts`. Verify in static markup that an unselected path draws none.
-- [ ] 6.2 Give each end handle the `panzoom-exclude` class. Verify in the same markup that it draws above the docking points.
-- [ ] 6.3 Add a pure `resolveEndDrop` that returns the new end, or nothing. Verify the scenario "An end moves to another point".
-- [ ] 6.4 Verify with 6.3 that a release away from the step returns nothing, and that a release over another step returns nothing.
-- [ ] 6.5 Wire the end handle drag to 6.3 and 3.2. Leave the gesture to the e2e flow.
+- [x] 6.1 Draw one end handle at each end of the selected path, with its press target and its tooltip from `studio.ts`. Verify in static markup that an unselected path draws none.
+- [x] 6.2 Give each end handle the `panzoom-exclude` class. Verify in the same markup that it draws above the docking points.
+- [x] 6.3 Add a pure `resolveEndDrop` that returns the new end, or nothing. Verify the scenario "An end moves to another point".
+- [x] 6.4 Verify with 6.3 that a release away from the step returns nothing, and that a release over another step returns nothing.
+- [x] 6.5 Wire the end handle drag to 6.3 and 3.2. Leave the gesture to the e2e flow.
 
 ## 7. The e2e flow
 

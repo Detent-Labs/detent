@@ -31,11 +31,12 @@ import {
   type NodePosition,
   type EdgeStyle,
 } from "./geometry";
+import { EndHandle, endHandlesOf, type EndHandleSpec } from "./EndHandle";
 import { toggleSelection, normalizeRect, nodesInRect } from "./selection";
 import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups";
 import { computeFit, fitInsets, revealPan, zoomAbout, ZOOM_KEY_FACTOR, MIN_SCALE, MAX_SCALE, type Fit } from "./fit";
 import { lastInputWasPointer } from "../focusScroll";
-import { checkConnectSource, dropTargetOf, pressedDockingPoint, resolveConnectDrop } from "./dropGesture";
+import { checkConnectSource, dropTargetOf, pressedDockingPoint, resolveConnectDrop, resolveEndDrop } from "./dropGesture";
 import { refusalSentence } from "./connection";
 import { menuNewStepSpot, wayOutMenuItems, type WayOutMenuItem } from "./wayOutMenuLogic";
 import { WayOutMenu, openWayOutMenu } from "./WayOutMenu";
@@ -1077,6 +1078,8 @@ export function CanvasView({
     start: Point;
     current: Point;
   } | null>(null);
+  // An end handle drag: the end's own step and the point it held at the press.
+  const [endDrag, setEndDrag] = useState<(EndHandleSpec & { start: Point; current: Point }) | null>(null);
   // The step the pointer rests on, whose docking points draw. Its own state,
   // outside every memo above: a pointer crossing ten steps redraws ten sets of
   // points and no route.
@@ -1369,6 +1372,29 @@ export function CanvasView({
       next.splice(insertAt, 0, landed);
       onWaypointsChange(pathId, next);
     }
+  };
+
+  const onEndPointerDown = (e: React.PointerEvent, handle: EndHandleSpec) => {
+    e.stopPropagation();
+    capturePointer(e);
+    const p = toSvgPoint(e);
+    setEndDrag({ ...handle, start: p, current: p });
+  };
+
+  const onEndPointerMove = (e: React.PointerEvent) => trackPointer(endDrag, setEndDrag, { current: toSvgPoint(e) });
+
+  /** A release stores the dragged end alone. The other end keeps what it held,
+   * or its absence. Only the layout changes, never the Draft model. */
+  const onEndPointerUp = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    if (!endDrag) return;
+    const { pathId, end, stepId, from, exclude, start } = endDrag;
+    const point = toSvgPoint(e);
+    setEndDrag(null);
+    if (!exceedsClickThreshold(dragDelta(start, point))) return;
+    const next = resolveEndDrop({ stepId, nodes: visibleNodePositions, point, exclude });
+    if (!next || (from && next.side === from.side && next.at === from.at)) return;
+    onDockingPointsChange(pathId, { ...dockingPoints[pathId], [end]: next });
   };
 
   const onWaypointDoubleClick = (e: React.MouseEvent, pathId: string, index: number) => {
@@ -1775,12 +1801,19 @@ export function CanvasView({
   // waypoint handles, so no sentence covers a point and takes its press. A
   // sentence may stand over a node's edge where the room runs out.
   const dockingSets: Array<{ stepId: string; x: number; y: number; isTerminal: boolean }> = [];
+  // The selected path's end handles ride above the docking points.
+  const endHandles: EndHandleSpec[] = [];
 
   // Which steps draw their points: the selected ones, the step the pointer
   // rests on, and during a connect drag the pressed step and the step under the
   // pointer. A drag ignores the resting pointer, whose events a captured
   // pointer no longer reports. The snap names the point the drag will land on.
   const snap = (() => {
+    if (endDrag) {
+      const end = resolveEndDrop({ stepId: endDrag.stepId, nodes: visibleNodePositions, point: endDrag.current, exclude: endDrag.exclude });
+      const point = end && positionsById[endDrag.stepId] ? dockingAnchor(positionsById[endDrag.stepId], end) : undefined;
+      return end && point ? { stepId: endDrag.stepId, point: { ...end, point } } : undefined;
+    }
     // A refused source draws no ring: the release shows the refusal.
     if (!connectDrag || connectDrag.refused) return undefined;
     return dropTargetOf(connectDrag.current, visibleNodePositions, connectDrag.sourceStepId, connectDrag.pressed);
@@ -1789,6 +1822,8 @@ export function CanvasView({
   if (connectDrag) {
     dockedStepIds.add(connectDrag.sourceStepId);
     if (snap) dockedStepIds.add(snap.stepId);
+  } else if (endDrag) {
+    dockedStepIds.add(endDrag.stepId);
   } else if (pointedStepId !== undefined) {
     dockedStepIds.add(pointedStepId);
   }
@@ -2028,6 +2063,16 @@ export function CanvasView({
                 pathId,
                 insertAt: legOfSegment(routed.legStarts, mid.segment),
               });
+              endHandles.push(
+                ...endHandlesOf({
+                  pathId,
+                  sourceId: step.id as string,
+                  targetId: path.to as string,
+                  route,
+                  positions: positionsById,
+                  hidden,
+                }),
+              );
             }
             const isInsertTarget = path.id !== undefined && path.id === insertTargetPathId;
             // A path with no id draws, but nothing can reference it, so the
@@ -2246,6 +2291,21 @@ export function CanvasView({
               })}
             </g>
           ))}
+
+          {endHandles.map((h) => {
+            const dragging = endDrag?.pathId === h.pathId && endDrag.end === h.end;
+            return (
+              <EndHandle
+                key={`${h.pathId}-${h.end}`}
+                at={dragging ? (snap?.point.point ?? endDrag.current) : h.anchor}
+                pathId={h.pathId}
+                end={h.end}
+                onPointerDown={(e) => onEndPointerDown(e, h)}
+                onPointerMove={onEndPointerMove}
+                onPointerUp={onEndPointerUp}
+              />
+            );
+          })}
 
           {/* Last of all, so no route, node, sentence, waypoint handle or
               docking point can take a press meant for a disclosure. A sentence's

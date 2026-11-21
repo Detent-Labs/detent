@@ -419,7 +419,7 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     expect(down).toContain('moveFocus({ kind: "step", stepId })');
     // Pointer capture and the drag stay as they were, and the drag keeps the pressed point.
     expect(down).toContain("capturePointer(e)");
-    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, pressed, start: p, current: p })");
+    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, pressed, refused, start: p, current: p })");
     // Without this the press's default focused the canvas svg, which drew
     // its outline around the whole graph.
     expect(points).toContain("onMouseDown={(e) => e.preventDefault()}");
@@ -439,7 +439,7 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     const up = code.slice(code.indexOf("const onHandlePointerUp"), code.indexOf("setConnectDrag(null);\n  };"));
     const guard = "if (!exceedsClickThreshold(dragDelta(connectDrag.start, point))) {";
 
-    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, pressed, start: p, current: p })");
+    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, pressed, refused, start: p, current: p })");
     expect(up).toContain(guard);
     // The guard returns before any write: a way out, a new step or a toast.
     // Both adds go through `addWayOut`, the one writer the menu shares.

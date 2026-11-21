@@ -237,3 +237,79 @@ describe("one point holding an incoming end and an outgoing end", () => {
     expect(count(set, 'data-docking-held="true"')).toBe(1);
   });
 });
+
+describe("a selected path's end handles", () => {
+  const html = render(["step_approve"], [], { selectedPathId: "path_a" });
+  const handles = html.match(/<g [^>]*data-end-handle="[^"]*"[^>]*>[\s\S]*?<\/g>/g) ?? [];
+
+  it("draws one handle at each end of the selected path and none on an unselected path", () => {
+    expect(handles.length).toBe(2);
+    expect(count(html, 'data-end-handle="source"')).toBe(1);
+    expect(count(html, 'data-end-handle="target"')).toBe(1);
+    for (const h of handles) expect(h).toContain('data-path-id="path_a"');
+    expect(render(["step_approve"])).not.toContain("data-end-handle");
+    const other = render(["step_approve"], [], { selectedPathId: "path_b" });
+    expect(count(other, "data-end-handle=")).toBe(2);
+    expect(other).not.toContain('data-end-handle="source" data-path-id="path_a"');
+  });
+
+  it("sits each handle on the path's drawn anchor, with a dot of radius 5 and a press target of radius 12", () => {
+    // path_a leaves the right middle of step_review (180, 30) and arrives at the left middle of step_approve (240, 30).
+    const source = handles.find((h) => h.includes('data-end-handle="source"')) ?? "";
+    const target = handles.find((h) => h.includes('data-end-handle="target"')) ?? "";
+    expect(source).toContain('cx="180" cy="30" r="5"');
+    expect(source).toContain('cx="180" cy="30" r="12"');
+    expect(target).toContain('cx="240" cy="30" r="5"');
+    expect(target).toContain('cx="240" cy="30" r="12"');
+  });
+
+  it("gives each handle the pan exclusion and the tooltip", () => {
+    for (const h of handles) {
+      expect(h).toMatch(/^<g [^>]*class="[^"]*\bpanzoom-exclude\b/);
+      expect(h).toContain("<title>Drag to another point on this step.</title>");
+    }
+    expect(t("canvas.endHandle")).toBe("Drag to another point on this step.");
+  });
+
+  it("draws the handles after every docking point and before the disclosures", () => {
+    const groups: StepGroup[] = [{ id: "group_x", stepIds: ["step_review", "step_approve"], name: "X" }];
+    const grouped = render(["step_approve"], groups, { selectedPathId: "path_a" });
+    expect(grouped.indexOf("data-end-handle")).toBeGreaterThan(grouped.lastIndexOf("data-docking-point="));
+    expect(grouped.indexOf("groupDisclosure")).toBeGreaterThan(grouped.lastIndexOf("data-end-handle="));
+  });
+
+  it("draws no handle on an end that sits on a collapsed group's box", () => {
+    const collapsed: StepGroup[] = [{ id: "group_x", stepIds: ["step_approve", "step_done"], name: "X", collapsed: true }];
+    const grouped = render([], collapsed, { selectedPathId: "path_a" });
+    expect(count(grouped, "data-end-handle=")).toBe(1);
+    expect(grouped).toContain('data-end-handle="source"');
+  });
+});
+
+describe("a path from a step to itself", () => {
+  const selfDraft: Draft = {
+    baseLocale: "en",
+    fields: [],
+    workflow: {
+      initialStep: "step_review" as never,
+      steps: [
+        {
+          id: "step_review" as never,
+          key: "review",
+          type: "task",
+          label: { en: "Review" },
+          paths: [{ id: "path_self" as never, to: "step_review" as never, trigger: "manual", label: "Again" }],
+        },
+      ],
+    },
+  };
+  const ends = { path_self: { source: { side: "right" as const, at: 0 }, target: { side: "top" as const, at: 0 } } };
+  const html = render([], [], { draft: selfDraft, dockingPoints: ends, selectedPathId: "path_self" });
+
+  it("draws both end handles, on the two points it holds", () => {
+    expect(html).toContain('data-end-handle="source"');
+    expect(html).toContain('data-end-handle="target"');
+    expect(html).toContain('cx="180" cy="30" r="5"');
+    expect(html).toContain('cx="90" cy="0" r="5"');
+  });
+});

@@ -4,6 +4,7 @@ import {
   dropTargetOf,
   hitTestGrownNode,
   pressedDockingPoint,
+  resolveEndDrop,
   resolveConnectDrop,
   resolveDropGesture,
 } from "../src/areas/studio/canvas/dropGesture.js";
@@ -213,5 +214,47 @@ describe("dropTargetOf", () => {
 
   it("returns nothing over empty canvas", () => {
     expect(dropTargetOf({ x: 900, y: 900 }, nodes, "step_a", pressed)).toBeUndefined();
+  });
+});
+
+describe("resolveEndDrop", () => {
+  // step_a spans x 0..180, y 0..60. step_b overlaps its grown box at x 186..366.
+  const nodes: NodePosition[] = [
+    { id: "step_a", x: 0, y: 0 },
+    { id: "step_b", x: 186, y: 0 },
+    { id: "step_far", x: 600, y: 0 },
+  ];
+
+  it("returns the nearest point of the end's own step for a release inside it", () => {
+    // Left of the top middle (90, 0) by one step: (70, 0).
+    expect(resolveEndDrop({ stepId: "step_a", nodes, point: { x: 70, y: 4 } })).toEqual({ side: "top", at: -1 });
+  });
+
+  it("counts a release on a press target outside the box as a release on the step", () => {
+    expect(resolveEndDrop({ stepId: "step_a", nodes, point: { x: -10, y: 30 } })).toEqual({ side: "left", at: 0 });
+  });
+
+  it("returns nothing for a release away from the step", () => {
+    expect(resolveEndDrop({ stepId: "step_a", nodes, point: { x: 300, y: 300 } })).toBeUndefined();
+    expect(resolveEndDrop({ stepId: "step_a", nodes, point: { x: -13, y: 30 } })).toBeUndefined();
+  });
+
+  it("returns nothing for a release over another step, even inside the end's grown box", () => {
+    // x 190 lies inside step_b's box and inside step_a's box grown by 12.
+    expect(resolveEndDrop({ stepId: "step_a", nodes, point: { x: 190, y: 30 } })).toBeUndefined();
+    expect(resolveEndDrop({ stepId: "step_a", nodes, point: { x: 650, y: 30 } })).toBeUndefined();
+  });
+
+  it("keeps a release between two grown boxes with the end's own step", () => {
+    // x 183 lies in neither box and in both grown boxes.
+    expect(resolveEndDrop({ stepId: "step_a", nodes, point: { x: 183, y: 30 } })).toEqual({ side: "right", at: 0 });
+  });
+
+  it("skips the excluded point", () => {
+    expect(resolveEndDrop({ stepId: "step_a", nodes, point: { x: 181, y: 31 }, exclude: { side: "right", at: 0 } })).not.toEqual({ side: "right", at: 0 });
+  });
+
+  it("returns nothing for a step it has no box for", () => {
+    expect(resolveEndDrop({ stepId: "step_gone", nodes, point: { x: 10, y: 10 } })).toBeUndefined();
   });
 });
