@@ -598,7 +598,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // The docking points read the same way, through `canvas/layout.ts`.
   const storedDockingPoints = saveState.layout.dockingPoints;
   // Memoized on the stored value, as `waypoints` is.
-  const dockingPoints = useMemo(() => readDockingPoints(saveState.layout), [storedDockingPoints]);
+  const dockingPoints = useMemo(() => readDockingPoints({ dockingPoints: storedDockingPoints }), [storedDockingPoints]);
 
   // The third reserved key in that blob. An entry that does not parse drops,
   // and so does a member the draft no longer holds: a step delete is an
@@ -644,7 +644,8 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   };
 
   // Overwrites every step's position at once, unlike onMoveCanvasPosition's one-step
-  // write, and clears every waypoint too (design.md, Decisions 2 and 4).
+  // write, and clears every waypoint and every docking point too (design.md,
+  // Decisions 2 and 4).
   // Gated by hasHandPlacedStep, through `ArrangeDialog`. The dialog runs before
   // the layout library loads. A library that fails to load leaves the layout as
   // it was and reports through the header bar's error banner (`studio-canvas`).
@@ -865,8 +866,8 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   };
 
   /** Combines the new step's position with clearing the split path's stored
-   * waypoints (design.md, Decision "The insert clears that path's
-   * waypoints") in the one `saveState.layout` write task 3.5 asks for, rather
+   * waypoints and its target docking point (design.md, Decision "The insert
+   * clears that path's waypoints") in one `saveState.layout` write, rather
    * than two separate `setSaveState` calls. */
   const onInsertLayoutWrite = (stepId: string, point: Point, splitPathId: string) => {
     setSaveState((s) => ({ ...s, layout: layoutAfterInsert(s.layout, stepId, point, splitPathId) }));

@@ -144,14 +144,17 @@ export function readDockingPoints(layout: Record<string, unknown>): Record<strin
 
 /**
  * A copy of `layout` with one path's stored ends replaced. An entry with no end
- * leaves no key, so a reset does not grow the blob. The input is not mutated.
+ * leaves no key, so a reset does not grow the blob. A stored value that is no
+ * plain object starts the record over. The input is not mutated.
  */
 export function withDockingPoints(
   layout: Record<string, unknown>,
   pathId: string,
   ends: PathDockingEnds,
 ): Record<string, unknown> {
-  const next = { ...(layout.dockingPoints as Record<string, PathDockingEnds> | undefined) };
+  const stored = layout.dockingPoints;
+  const next: Record<string, PathDockingEnds> =
+    stored && typeof stored === "object" && !Array.isArray(stored) ? { ...(stored as Record<string, PathDockingEnds>) } : {};
   const entry: PathDockingEnds = {};
   if (ends.source) entry.source = ends.source;
   if (ends.target) entry.target = ends.target;

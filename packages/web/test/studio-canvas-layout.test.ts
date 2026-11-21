@@ -169,6 +169,15 @@ describe("withDockingPoints", () => {
     const cleared = withDockingPoints(first, "path_a", {});
     expect((cleared.dockingPoints as Record<string, unknown>).path_a).toBeUndefined();
     expect("path_a" in (cleared.dockingPoints as Record<string, unknown>)).toBe(false);
+    expect(readDockingPoints(first)).toEqual({ path_a: { source: { side: "left", at: 0 } } });
+  });
+
+  it("starts from an empty record when the stored value is a string or an array", () => {
+    const end = { source: { side: "left" as const, at: 0 } };
+    for (const stored of ["not a record", ["path_x"]]) {
+      const next = withDockingPoints({ dockingPoints: stored }, "path_a", end);
+      expect(next.dockingPoints).toEqual({ path_a: end });
+    }
   });
 
   it("drops an end that is undefined", () => {
