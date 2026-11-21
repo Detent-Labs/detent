@@ -638,8 +638,8 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
 
   // One path's stored docking ends, from a connect drag or an end handle
   // release. Layout, as waypoints are: the Draft model never sees it. A connect
-  // drag also passes the drawn positions of the steps it joins; they land in
-  // the same write.
+  // drag also passes the drawn position of every step; each lands in the same
+  // write unless the step stores one.
   const onDockingPointsChange = (pathId: string, ends: PathDockingEnds, drawn?: Record<string, Point>) => {
     setSaveState((s) => ({ ...s, layout: layoutAfterConnect(s.layout, pathId, ends, drawn ?? {}) }));
   };

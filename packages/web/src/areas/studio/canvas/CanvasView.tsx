@@ -496,16 +496,6 @@ function pointerMovesToStep(e: React.PointerEvent, stepId: string): boolean {
   );
 }
 
-/** The drawn positions of the listed steps, for the ones `positions` holds. */
-function pointsOf(stepIds: string[], positions: Record<string, Point>): Record<string, Point> {
-  const out: Record<string, Point> = {};
-  for (const id of stepIds) {
-    const at = positions[id];
-    if (at) out[id] = at;
-  }
-  return out;
-}
-
 /** The `<g>` holding a drawn group's member nodes. Both disclosure controls —
  * the canvas's own and the selection toolbar's — name it in `aria-controls`,
  * so the id lives here rather than in either caller. */
@@ -556,7 +546,7 @@ interface Props {
   /** Replaces one path's stored docking ends in the draft layout. A connect
    * drag calls it for the path it adds, and an end handle release calls it for
    * the path it re-hangs. The optional third argument holds the drawn
-   * positions of the steps a connect drag joins; each lands in the same layout
+   * position of every step at a connect release; each lands in the same layout
    * write unless that step already stores a position. */
   onDockingPointsChange: (pathId: string, ends: PathDockingEnds, drawn?: Record<string, Point>) => void;
   /** Presentation only, in the same `layout` blob (design.md). A group never
@@ -1583,8 +1573,7 @@ export function CanvasView({
       const path = newPath(sourceStep, targetStep, target.stepId, trigger, contentLocale, baseLocale, t("steps.unnamedStep"));
       updateInDraftArray(mutate, (d) => d.workflow?.steps?.[sourceIndex], { paths: [...existingPaths, path] });
       if (path.id && ends) {
-        const drawn = pointsOf([sourceStep.id, target.stepId], positionsById);
-        onDockingPointsChange(path.id, ends, drawn);
+        onDockingPointsChange(path.id, ends, positionsById);
       }
       return path.id ? { pathId: path.id, targetId: target.stepId } : undefined;
     }
@@ -1603,10 +1592,10 @@ export function CanvasView({
         source.paths.push(path);
       }
     });
-    // With points, the new step's position and the source's drawn one travel
-    // in the points' own layout write.
+    // With points, the new step's position and every drawn one travel in the
+    // points' own layout write.
     if (step.id && path.id && ends) {
-      onDockingPointsChange(path.id, ends, { ...pointsOf([sourceStep.id], positionsById), [step.id]: target.at });
+      onDockingPointsChange(path.id, ends, { ...positionsById, [step.id]: target.at });
     } else if (step.id) {
       onMoveStep(step.id, target.at);
     }

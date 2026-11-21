@@ -264,28 +264,35 @@ describe("layoutAfterMove", () => {
 
 describe("layoutAfterConnect", () => {
   const ends = { source: { side: "right", at: 0 }, target: { side: "left", at: 0 } } as const;
+  const steps = [
+    step("step_review", [{ to: "step_other" }]),
+    step("step_other"),
+    step("step_approve"),
+    step("step_member"),
+  ];
 
-  it("stores the drawn position of each joined step that stores none, with the points", () => {
-    const layout = { step_other: { x: 5, y: 5 } };
-    const next = layoutAfterConnect(layout, "path_1", ends, {
-      step_review: { x: 0, y: 0 },
-      step_approve: { x: 240, y: 0 },
-    });
-    expect(next.step_review).toEqual({ x: 0, y: 0 });
-    expect(next.step_approve).toEqual({ x: 240, y: 0 });
-    expect(next.step_other).toEqual({ x: 5, y: 5 });
+  it("stores the drawn position of every step that stores none, with the points", () => {
+    const layout = {};
+    const drawn = drawnPositions(steps, "step_review", layout);
+    const next = layoutAfterConnect(layout, "path_1", ends, drawn);
+    for (const s of steps) expect(next[s.id]).toEqual(drawn[s.id]);
     expect(readDockingPoints(next)).toEqual({ path_1: ends });
-    expect(layout).toEqual({ step_other: { x: 5, y: 5 } });
+    expect(layout).toEqual({});
   });
 
   it("keeps a position a step already stores", () => {
-    const layout = { step_review: { x: 100, y: 60 } };
-    const next = layoutAfterConnect(layout, "path_1", { source: ends.source }, {
-      step_review: { x: 0, y: 0 },
-      step_new: { x: 300, y: 80 },
-    });
+    const layout: Record<string, unknown> = { step_review: { x: 100, y: 60 } };
+    const drawn: Record<string, { x: number; y: number }> = { ...drawnPositions(steps, "step_review", layout), step_new: { x: 300, y: 80 } };
+    const next = layoutAfterConnect(layout, "path_1", { source: ends.source }, drawn);
     expect(next.step_review).toEqual({ x: 100, y: 60 });
     expect(next.step_new).toEqual({ x: 300, y: 80 });
+    expect(next.step_approve).toEqual(drawn.step_approve);
     expect(readDockingPoints(next)).toEqual({ path_1: { source: ends.source } });
+  });
+
+  it("stores a hidden member's own position, not a group box's", () => {
+    const own = { step_review: { x: 0, y: 0 }, step_member: { x: 240, y: 120 } };
+    const next = layoutAfterConnect({}, "path_1", ends, own);
+    expect(next.step_member).toEqual({ x: 240, y: 120 });
   });
 });

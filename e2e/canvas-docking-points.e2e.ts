@@ -27,6 +27,7 @@ const WRITE_DRAFT = "E2E writes";
 
 const SHELF = "step_3b5d7f10-0001-4a1c-8e2f-000000000001";
 const ISSUED = "step_3b5d7f10-0002-4a1c-8e2f-000000000002";
+const SPARE_ONE = "step_e2e_spare_one";
 const SPARE_TWO = "step_e2e_spare_two";
 const SHELF_PATH = "path_9c4e6a20-0001-4a1c-8e2f-000000000001";
 
@@ -289,22 +290,22 @@ test("opening a draft with no stored point sends no write and draws no point", a
 test("a connect drag between two chosen points stores both and a reload keeps them", async ({ page }) => {
   const stub = await openMap(page, WRITE_DRAFT);
   const edges = await page.locator("[data-kind=edge]").count();
-  // Where each joined step draws before the drag, on a draft that stores no position.
-  const shelfBefore = await positionOf(page, SHELF);
-  const spareBefore = await positionOf(page, SPARE_TWO);
-  const spareBoxBefore = await boxOf(nodeRect(page, SPARE_TWO));
+  // Where every step draws before the drag, on a draft that stores no position.
+  const every = [SHELF, ISSUED, SPARE_ONE, SPARE_TWO];
+  const placesBefore = await Promise.all(every.map((id) => positionOf(page, id)));
+  const boxesBefore = await Promise.all(every.map((id) => boxOf(nodeRect(page, id))));
 
   await hoverStep(page, SHELF);
   const from = await pressTarget(page, SHELF, "bottom:0");
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   // Over the other step, whose points draw under the drag with a ring on the snap.
-  const over = centreOf(await boxOf(nodeRect(page, SPARE_TWO)));
+  const over = centreOf(await boxOf(nodeRect(page, SPARE_ONE)));
   await page.mouse.move(over.x, over.y, { steps: 12 });
-  await expect(dockingSet(page, SPARE_TWO)).toHaveCount(1);
-  const onto = await pressTarget(page, SPARE_TWO, "left:-1");
+  await expect(dockingSet(page, SPARE_ONE)).toHaveCount(1);
+  const onto = await pressTarget(page, SPARE_ONE, "left:-1");
   await page.mouse.move(onto.x, onto.y, { steps: 6 });
-  await expect(dockingSet(page, SPARE_TWO).locator('circle[r="10"]')).toHaveCount(1);
+  await expect(dockingSet(page, SPARE_ONE).locator('circle[r="10"]')).toHaveCount(1);
   await page.mouse.up();
 
   await expect(page.locator("[data-kind=edge]")).toHaveCount(edges + 1);
@@ -312,11 +313,12 @@ test("a connect drag between two chosen points stores both and a reload keeps th
   expect(Object.values(saved.layout.dockingPoints ?? {})).toEqual([
     { source: { side: "bottom", at: 0 }, target: { side: "left", at: -1 } },
   ]);
-  // The same write stores each joined step where it drew, so the new path moves neither.
-  expect(saved.layout[SHELF]).toEqual(shelfBefore);
-  expect(saved.layout[SPARE_TWO]).toEqual(spareBefore);
-  expect(await boxOf(nodeRect(page, SPARE_TWO))).toEqual(spareBoxBefore);
-  expect(await positionOf(page, SPARE_TWO)).toEqual(spareBefore);
+  // The same write stores every step where it drew. A store of the joined steps alone
+  // lets the auto-placed Spare Two land on the stored Spare One, and its box moves.
+  every.forEach((id, i) => expect(saved.layout[id], id).toEqual(placesBefore[i]));
+  for (const [i, id] of every.entries()) {
+    expect(await boxOf(nodeRect(page, id)), `${id} stays in place`).toEqual(boxesBefore[i]);
+  }
 
   // The source step keeps no points drawn once the pointer leaves it.
   await leaveToEmptyCanvas(page);
@@ -329,8 +331,8 @@ test("a connect drag between two chosen points stores both and a reload keeps th
   await expect(page.locator("[data-kind=edge]")).toHaveCount(edges + 1);
   await hoverStep(page, SHELF);
   await expect(dockingPoint(page, SHELF, "bottom:0")).toHaveAttribute("data-docking-held", "true");
-  await hoverStep(page, SPARE_TWO);
-  await expect(dockingPoint(page, SPARE_TWO, "left:-1")).toHaveAttribute("data-docking-held", "true");
+  await hoverStep(page, SPARE_ONE);
+  await expect(dockingPoint(page, SPARE_ONE, "left:-1")).toHaveAttribute("data-docking-held", "true");
 });
 
 test("a step move stores the points of its path and the path keeps both sides", async ({ page }) => {
@@ -407,6 +409,8 @@ test("an end handle drag on a self path keeps the other end where it was", async
   const selfPath = (await added.getAttribute("data-path-id")) ?? "";
   const afterAdd = await nextSave(stub, 0);
   expect(afterAdd.layout.dockingPoints ?? {}).not.toHaveProperty(selfPath);
+  // A way out from the menu stores no position either.
+  for (const id of [SHELF, ISSUED, SPARE_ONE, SPARE_TWO]) expect(afterAdd.layout, id).not.toHaveProperty(id);
 
   await selectPath(page, selfPath);
   const source = endHandle(page, selfPath, "source");

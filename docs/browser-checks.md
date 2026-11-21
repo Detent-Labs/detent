@@ -1300,9 +1300,10 @@ Open a draft that you saved before this change. Pass: no path moves. The
 flow asserts the missing write and the missing "Unsaved changes".
 
 Open a draft with an empty layout. Drag from a docking point of one step to another step.
-Pass: the new path draws between the two points you chose. Neither joined step
-moves, even on a draft that stored no position. Pass: a stored point stays on
-its step, and the route redraws.
+Pass: the new path draws between the two points you chose. No step moves, even
+on a draft that stored no position, since the drag stores every step's place.
+Pass: Arrange now asks before it moves them. A stored point stays on its step,
+and the route redraws.
 
 Check three known limits. On a short path, an end handle's press target can
 cover the midpoint square or a waypoint square. Pass: pressing the square's

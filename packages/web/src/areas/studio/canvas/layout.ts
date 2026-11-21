@@ -216,9 +216,9 @@ export function layoutAfterMove(
 
 /**
  * The layout after a connect release: one path's stored ends, and the drawn
- * position of each step it joins that stores none. A step that stores a
- * position keeps it. `drawn` holds the positions the canvas drew at release,
- * for the joined steps only. The input is not mutated.
+ * position of every step that stores none, so the new path moves no step. A step
+ * that stores a position keeps it. `drawn` holds the position each step drew at
+ * release, a hidden member's own included. The input is not mutated.
  */
 export function layoutAfterConnect(
   layout: Record<string, unknown>,
