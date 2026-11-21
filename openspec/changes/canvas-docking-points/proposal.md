@@ -20,13 +20,15 @@ arrives. A tidy drawing does not survive the next drag.
   none.
 - Every docking point is a connect handle. The single handle at the right
   middle of a node goes.
+- A press target reaches 12 units outward from a node's border and 6 inward.
+  The rest of the node still moves the step.
 - A connect drag starts at the point the author presses. Over a step it snaps
   to that step's nearest point, and the new path stores both points.
 - A path end stays on its stored point whatever moves. The store is the draft
   layout, under a new reserved key. The definition does not change.
 - A path end with no stored point keeps today's automatic rule. Moving a step
-  first stores the current points of every path on it. No path an author has
-  seen then changes its side.
+  first stores the current points of every path on it. No path then changes
+  its side through a step move.
 - A selected path draws a handle at each end. Dragging one hangs that end on
   another point of the same step.
 - Arrange removes every stored point, as it already removes every waypoint.
@@ -59,11 +61,22 @@ None.
   `layout.dockingPoints`, and the Arrange and insert writes.
 - `packages/web/src/areas/studio/canvas/arrange.ts`: the confirmation's
   trigger.
+- `packages/web/src/areas/studio/canvas/layout.ts`: the pure readers and
+  writers of the new layout key.
+- `packages/web/src/areas/studio/canvas/dropGesture.ts`: a release on a press
+  target counts as a release over that step.
+- `packages/web/src/areas/studio/canvas/sentencePlacement.ts`: the obstacle
+  for the old handle goes.
+- `packages/web/src/areas/studio/panels/confirmations.tsx`: the Arrange
+  dialog's second note.
+- `e2e/canvas-docking-points.e2e.ts`: a new smoke flow for the gestures.
 - `packages/web/src/i18n/catalogs/studio.ts`: the Arrange confirmation text
   and the end handle's tooltip.
 - `.claude/rules/ui-glossary.md`, `DESIGN.md` and `docs/browser-checks.md`:
-  the new term, its drawn form and its manual checks.
+  the new term, its drawn form and its manual checks. `ROADMAP.md` and
+  `docs/decisions.md` take the record and the moved citations.
 - No engine code, no HTTP route, no schema and no dependency changes. The
   server already stores `layout` as an opaque object.
 - The branch `spike/ui-sdk-canvas` rewrites the same connect code in
-  `CanvasView.tsx`. Whichever lands second rebases onto the other.
+  `CanvasView.tsx`. This change lands first. A later change that adopts the
+  spike carries the docking points over.

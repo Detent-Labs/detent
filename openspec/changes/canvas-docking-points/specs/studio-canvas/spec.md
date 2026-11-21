@@ -128,7 +128,7 @@ order. The midpoint handle sits on one leg of the route, and the new waypoint
 goes at that leg's own index.
 
 A route segment's index SHALL NOT stand in for a waypoint's index. One leg
-draws as one or two segments, so the route carries more segments than the list
+draws as one to four segments, so the route carries more segments than the list
 carries points.
 
 Double-clicking a waypoint handle SHALL delete that waypoint. A path whose
@@ -347,6 +347,41 @@ also say that each path goes back to the middle of a side.
 - **AND** the confirmation text says each path goes back to the middle of a
   side
 
+### Requirement: The connect handle explains its gesture
+
+The connect handle SHALL carry a hover tooltip that says what a drag from it
+does. It reads: "Drag to a step to add a way out, or to empty space to add a
+new step." An end step's handle SHALL read: "An end has no way out."
+
+Each docking point's press target SHALL reach 12px outward from the node's
+border and 6px inward. That holds at a canvas scale of 1. Neighbouring targets meet
+halfway along a side, and the nearer point takes the press. A press deeper
+inside the node SHALL move the step, as it does today. The cursor SHALL read
+as a crosshair, and as not-allowed on an end step.
+
+#### Scenario: Hovering the handle names the gesture
+
+- **WHEN** the author rests the pointer on a task step's connect handle
+- **THEN** the tooltip names both drags: to a step, and to empty space
+- **AND** the cursor is a crosshair
+
+#### Scenario: An end step's handle says why it does nothing
+
+- **WHEN** the author rests the pointer on an end step's connect handle
+- **THEN** a tooltip reads "An end has no way out."
+- **AND** the cursor reads not-allowed
+
+#### Scenario: The handle is easy to hit
+
+- **WHEN** the author presses 10px outward from a docking point on a node's
+  right side, at a canvas scale of 1
+- **THEN** the press starts a connect drag
+
+#### Scenario: A press inside the node moves the step
+
+- **WHEN** the author presses 10px inside a node's border and drags
+- **THEN** the step moves, and no connect drag starts
+
 ## ADDED Requirements
 
 ### Requirement: A step node carries fixed docking points
@@ -386,8 +421,9 @@ selected step. It SHALL draw them on a step under a connect drag or an end
 handle drag. In
 every other case the canvas SHALL draw none.
 
-A point that holds a path end SHALL draw filled, and a free point SHALL draw as an outline. A collapsed group's
-box SHALL draw none.
+A point that holds a path end SHALL draw filled, and a free point SHALL draw
+as an outline. An end step's points SHALL draw dashed. A collapsed group's box
+SHALL draw none.
 
 #### Scenario: A resting canvas draws no points
 
@@ -447,7 +483,8 @@ included.
 ### Requirement: A connect drag stores the points it joins
 
 A connect drag released over a step SHALL end on that step's docking point
-nearest to the release. The new path SHALL store the pressed point as its
+nearest to the release. A release on a press target of that step counts as a
+release over it. The new path SHALL store the pressed point as its
 source point and that nearest point as its target point. A drag released over
 empty canvas SHALL store the source point alone. A way out added by any route
 other than a drag SHALL store no point.
@@ -513,8 +550,7 @@ no step SHALL store nothing. Opening a draft SHALL store nothing.
 #### Scenario: A drag of several steps stores each of their paths
 
 - **WHEN** the selection holds two steps and the author drags one of them
-- **THEN** every path that starts or ends on either step stores both of its
-  points
+- **THEN** each path on either step stores every end that sits on a step node
 
 #### Scenario: A click on a step stores nothing
 
@@ -569,7 +605,8 @@ then draw an orthogonal route between its two anchors, on any pair of sides. The
 route SHALL leave each anchor outward, along that side's own axis. It SHALL
 hold at most five segments and SHALL NOT double back. Each turn SHALL sit a
 whole grid step clear of the node it leaves or enters. Two anchors on opposing
-sides SHALL take the route this capability already states for that pair.
+sides that face each other SHALL take the route this capability already
+states for that pair.
 
 #### Scenario: Stored opposing midpoints draw the automatic route
 
@@ -580,7 +617,9 @@ sides SHALL take the route this capability already states for that pair.
 #### Scenario: A turn onto a neighbouring side takes two segments
 
 - **WHEN** a path leaves the right-middle point of its source
-- **AND** arrives at the top-middle point of a target to the right and below
+- **AND** arrives at the top-middle point of a target
+- **AND** that point lies a grid step or more right of the source's right side
+- **AND** it lies a grid step or more below the source anchor
 - **THEN** the route holds two segments, one level and one upright
 
 #### Scenario: Two anchors on one side draw around
@@ -599,7 +638,7 @@ sides SHALL take the route this capability already states for that pair.
 ### Requirement: A route stays out of its own two boxes
 
 A route between two anchors SHALL NOT cross the inside of its source box or
-of its target box. This SHALL hold where the two boxes stand two grid steps
+of its target box. It SHALL NOT run along a border of either. Both SHALL hold where the two boxes stand two grid steps
 apart or more on one axis. Closer than that, the route SHALL still draw.
 
 #### Scenario: A route around its own source
@@ -619,8 +658,9 @@ apart or more on one axis. Closer than that, the route SHALL still draw.
 A path with waypoints SHALL run from its stored source point to the first
 waypoint. It SHALL run from the last waypoint to its stored target point. A leg at a
 stored point SHALL leave along that point's own side. Where the waypoint lies
-behind that side, the leg SHALL first run one grid step outward and then turn.
-That leg carries a gutter, and no other leg does.
+behind that side, the leg SHALL first run one grid step outward. It SHALL then
+pass the node one grid step clear, in at most four segments. That leg carries
+a gutter, and no other leg does.
 
 #### Scenario: A waypoint ahead of a stored point draws the plain leg
 
@@ -631,9 +671,56 @@ That leg carries a gutter, and no other leg does.
 #### Scenario: A waypoint behind a stored point draws around the node
 
 - **WHEN** a path stores the right-middle point of its source
-- **AND** its first waypoint lies to the left of the source node
+- **AND** its first waypoint lies to the left of the source node, on the
+  node's own row
 - **THEN** the route leaves the right side by one grid step before it turns
+- **AND** it passes above or below the node, one grid step clear
 - **AND** no segment crosses the inside of the source node
+
+### Requirement: A step move stores nothing for an end on a collapsed group's box
+
+A step move SHALL store nothing for a path end that sits on a collapsed
+group's box. The other end of that path SHALL store the point it held, read
+against the box. A path between two members of one collapsed group SHALL store
+nothing, since it draws no point.
+
+#### Scenario: A hidden end stores nothing
+
+- **WHEN** a path runs from "Review" to a step inside a collapsed group
+- **AND** neither end stores a docking point
+- **AND** the author drags "Review"
+- **THEN** the draft layout stores a source point for that path
+- **AND** it stores no target point for it
+
+#### Scenario: A path inside a collapsed group stores nothing
+
+- **WHEN** the author drags a collapsed group that holds both ends of a path
+- **THEN** the draft layout stores no docking point for that path
+
+### Requirement: A connect drag released on its own step joins two points
+
+A connect drag that ends on its source step SHALL take a target point other
+than the pressed one. That point SHALL be the nearest one to the release. The
+path SHALL draw around the node and SHALL NOT cross its inside.
+
+#### Scenario: A self path leaves and arrives at two points
+
+- **WHEN** the author drags from the top-middle point of "Review"
+- **AND** releases on "Review" beside that same point
+- **THEN** the new path leaves at the top-middle point
+- **AND** it arrives at a neighbouring point, outside the node
+
+### Requirement: A docking point has no panel route and no key
+
+A docking point is a drawing aid in the draft layout, as a waypoint is. It
+SHALL reach no definition. The canvas SHALL offer it through the pointer
+alone, with no panel route and no key.
+
+#### Scenario: Hanging an end leaves the definition alone
+
+- **WHEN** the author hangs a path end on another docking point
+- **THEN** the Draft model equals the one before the drag
+- **AND** the draft layout alone differs
 
 ### Requirement: Docking points persist in the draft layout
 
@@ -715,13 +802,13 @@ Expanding the group SHALL put the end back on that point.
 
 ### Requirement: Docking point logic lives in pure, tested functions
 
-Four more computations SHALL live in pure modules with `bun:test` coverage.
+Six more computations SHALL live in pure modules with `bun:test` coverage.
 The first returns the docking points of a box. The second returns the point
-nearest to a position. The third returns the route between two anchors and
-their sides. The fourth returns the points a step move stores. It
-reads the paths, the positions before the move and the stored points.
+nearest to a position. The third turns a stored end into an anchor. The
+fourth reads an anchor back as a side and a position.
 
-None of the four SHALL read the DOM.
+The fifth returns the route between two anchors and their sides. The sixth
+returns the points a step move stores. None of the six SHALL read the DOM.
 
 #### Scenario: The docking point computations hold without rendering
 
