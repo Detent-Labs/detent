@@ -81,12 +81,12 @@ static markup, or by the e2e flow of group 7.
 
 ## 8. Words and records
 
-- [ ] 8.1 Add *docking point* and *end handle* rows to the Map tab table of `.claude/rules/ui-glossary.md`. Rewrite its **dock** line so *docking point* is the one use of the word.
-- [ ] 8.2 Rewrite the Canvas section and the shapes paragraph of `DESIGN.md` with the drawn values. Verify with `/impeccable doctor`.
-- [ ] 8.3 Add a "Canvas docking points" entry to `docs/browser-checks.md`. It covers the hover state, the 6-unit inward reach, and a draft with an empty layout.
-- [ ] 8.4 Rewrite the floating-anchors entry there for a path with no stored point. Correct every line `git grep -n 'connect handle\|right-middle' -- docs/browser-checks.md` prints.
-- [ ] 8.5 Add this change to the stage 31 row of `ROADMAP.md`.
-- [ ] 8.6 Run the antislop linter on every Markdown file this group touched.
+- [x] 8.1 Add *docking point* and *end handle* rows to the Map tab table of `.claude/rules/ui-glossary.md`. Rewrite its **dock** line so *docking point* is the one use of the word.
+- [x] 8.2 Rewrite the Canvas section and the shapes paragraph of `DESIGN.md` with the drawn values. Verify with `/impeccable doctor`.
+- [x] 8.3 Add a "Canvas docking points" entry to `docs/browser-checks.md`. It covers the hover state, the 6-unit inward reach, and a draft with an empty layout.
+- [x] 8.4 Rewrite the floating-anchors entry there for a path with no stored point. Correct every line `git grep -n 'connect handle\|right-middle' -- docs/browser-checks.md` prints.
+- [x] 8.5 Add this change to the stage 31 row of `ROADMAP.md`.
+- [x] 8.6 Run the antislop linter on every Markdown file this group touched.
 
 ## 9. Verification
 

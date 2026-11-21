@@ -98,6 +98,8 @@ Every other term below belongs to one tab.
 | canvas | the graph surface an author draws a process on | `canvas/CanvasView.tsx` |
 | canvas bar | the row between the tab row and canvas: add controls, a reachability report, and selection controls | `canvas/CanvasBar.tsx` |
 | way-out menu | the popover `C` opens on a focused step. It lists the steps, then "A new step". An item adds a way out | `canvas/WayOutMenu.tsx` |
+| docking point | one of the twenty fixed points on a step's border. It draws on the canvas, and every one starts a connect drag | `canvas/CanvasView.tsx`, `canvas/geometry.ts` |
+| end handle | the control at each end of a selected path. A drag hangs that end on another docking point | `canvas/EndHandle.tsx` |
 | steps rail | the Steps tab's left column: one numbered row per step, in the draft's own order | `panels/StepsRail.tsx` |
 | grip | the steps rail's own drag control, trailing each row | `panels/StepsRail.tsx` (`GripVertical`) |
 | step page | the Steps tab's wide right column, open on the one selected step | `panels/StepPage.tsx` |
@@ -258,7 +260,7 @@ section body on the step page, or as a tab's or view's body elsewhere
 (`FieldCatalogPanel.tsx`, `DataSourcesPanel.tsx`, `ContractPanel.tsx`,
 `FieldMatrixPanel.tsx`).
 
-**dock** names nothing here any more, as a verb or as a noun. Nothing docks.
+**dock** names nothing here, as a verb or as a bare noun. Nothing docks. *Docking point* is the one use of the word.
 
 ## 2. Domain terms as the UI shows them
 
