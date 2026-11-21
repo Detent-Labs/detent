@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { CanvasView } from "../src/areas/studio/canvas/CanvasView.js";
 import { NODE_SIZE, routePath, routeThroughWaypoints, type DockingEnd, type Point } from "../src/areas/studio/canvas/geometry.js";
 import { drawnBox, type StepGroup } from "../src/areas/studio/canvas/groups.js";
-import type { PathDockingEnds } from "../src/areas/studio/canvas/layout.js";
+import { layoutAfterMove, pointsAfterMove, readDockingPoints, type PathDockingEnds } from "../src/areas/studio/canvas/layout.js";
 import { DraftProvider } from "../src/areas/studio/draft/store.js";
 import type { Draft } from "../src/areas/studio/draft/types.js";
 
@@ -133,5 +133,49 @@ describe("a path on a collapsed group's box", () => {
     const d = dOf({ approve: RIGHT_OF, groups: expanded, dockingPoints: stored });
     expect(d).toBe(expectedD(RIGHT_OF, stored.path_a));
     expect(d.endsWith(`${RIGHT_OF.x + NODE_SIZE.width / 2},${RIGHT_OF.y}`)).toBe(true);
+  });
+});
+
+describe("a path from a step to itself", () => {
+  it("draws the same route after a move of its step stores its points", () => {
+    const self: Draft = JSON.parse(JSON.stringify(DRAFT));
+    const steps = (self.workflow as { steps: Array<{ paths?: unknown[] }> }).steps;
+    steps[0].paths = [{ id: "path_a", to: "step_review", trigger: "manual", label: "Again" }];
+    const render = (layout: Record<string, unknown>) => {
+      const html = renderToStaticMarkup(
+        <DraftProvider initial={self} token="token">
+          <CanvasView
+            layout={layout}
+            onMoveStep={() => {}}
+            onMoveSteps={() => {}}
+            onArrange={() => {}}
+            selectedStepIds={[]}
+            onSelectStep={() => {}}
+            onSelectSteps={() => {}}
+            edgeStyle="step"
+            onEdgeStyleChange={() => {}}
+            waypoints={{}}
+            dockingPoints={readDockingPoints(layout)}
+            onWaypointsChange={() => {}}
+            groups={[]}
+            onGroupsChange={() => {}}
+          />
+        </DraftProvider>,
+      );
+      return (/<path d="([^"]*)"/.exec(html.slice(html.indexOf('data-path-id="path_a"'))) as RegExpExecArray)[1];
+    };
+    const before = layoutWith(RIGHT_OF);
+    const moved = { step_review: { x: 0, y: 0 } };
+    const points = pointsAfterMove({
+      paths: [{ id: "path_a", from: "step_review", to: "step_review" }],
+      moved: ["step_review"],
+      positions: { step_review: REVIEW, step_approve: RIGHT_OF, step_archive: { x: 480, y: 0 } },
+      stored: {},
+      waypoints: {},
+      groups: [],
+    });
+    const after = layoutAfterMove(before, moved, points);
+    expect(render(before)).toBe("M180,30 L200,30 L200,90 L-20,90 L-20,30 L0,30");
+    expect(render(after)).toBe(render(before));
   });
 });

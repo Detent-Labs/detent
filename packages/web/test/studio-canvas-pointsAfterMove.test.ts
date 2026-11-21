@@ -47,6 +47,11 @@ describe("pointsAfterMove", () => {
     expect(run({ moved: [] })).toEqual({});
   });
 
+  // A free end turns toward the far box's centre, or toward its nearest
+  // waypoint, never toward the stored end's anchor. The stored end therefore
+  // never changes the free end's side, and no geometry separates this case
+  // from one that ignores the stored entry; the stored end is kept from the
+  // entry itself. The hidden-end tests below pin the same carry-through.
   it("leaves an end that already stores a point and stores the other", () => {
     const points = run({ stored: { path_a: { source: { side: "top", at: -1 } } } });
     expect(points).toEqual({ path_a: { source: { side: "top", at: -1 }, target: { side: "left", at: 0 } } });
@@ -77,13 +82,6 @@ describe("pointsAfterMove", () => {
       expect(points).toEqual({ path_a: { source: { side: "right", at: 0 }, target: hidden } });
     });
 
-    it("stores no end for the hidden side whatever the hidden member stores", () => {
-      // The stored top point would turn the visible end otherwise.
-      const hidden = { side: "bottom" as const, at: 0 };
-      const points = run({ moved: ["step_review"], groups, stored: { path_a: { target: hidden } } });
-      expect(points.path_a?.source).toEqual({ side: "right", at: 0 });
-    });
-
     it("stores nothing for a path between two members of one collapsed group", () => {
       expect(run({ paths: [APPROVE_TO_ARCHIVE], moved: ["step_approve", "step_archive"], groups })).toEqual({});
     });
@@ -94,6 +92,13 @@ describe("pointsAfterMove", () => {
       expect(points.path_b?.source).toBeDefined();
       expect(points.path_b?.target).toBeDefined();
     });
+  });
+
+  it("stores nothing for a path from a step to itself, and keeps points it already stores", () => {
+    const self = { id: "path_self", from: "step_review", to: "step_review" };
+    expect(run({ paths: [self], moved: ["step_review"] })).toEqual({});
+    const stored = { path_self: { source: { side: "top" as const, at: 0 } } };
+    expect(run({ paths: [self], moved: ["step_review"], stored })).toEqual({});
   });
 
   it("skips a path with no id or no resolvable step", () => {

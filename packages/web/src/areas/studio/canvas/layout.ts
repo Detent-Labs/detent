@@ -222,7 +222,7 @@ export function layoutAfterMove(
  *
  * An end on a collapsed group's box stores nothing and ignores whatever its
  * hidden member stores. A path between two members of one collapsed group
- * stores nothing. A returned entry holds every end the path stores, so it
+ * stores nothing, and so does a path from a step to itself. A returned entry holds every end the path stores, so it
  * replaces the stored entry whole; a path that gains no end is absent.
  */
 export function pointsAfterMove(input: {
@@ -240,6 +240,8 @@ export function pointsAfterMove(input: {
   for (const path of input.paths) {
     if (!path.id || !path.to) continue;
     if (!moved.has(path.from) && !moved.has(path.to)) continue;
+    // Both ends ride with one step, so the automatic loop stays; stored ends stay untouched.
+    if (path.from === path.to) continue;
     const sourceBox = anchorBoxFor(path.from, groups, positions);
     const targetBox = anchorBoxFor(path.to, groups, positions);
     if (!sourceBox || !targetBox) continue;
