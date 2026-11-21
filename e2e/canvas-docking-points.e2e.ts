@@ -162,10 +162,9 @@ async function emptyCanvas(page: Page): Promise<Pt> {
   const x = frame.x + frame.width - 60;
   const candidates: Pt[] = [];
   for (let y = frame.y + 40; y < Math.min(frame.y + frame.height, height) - 8; y += 40) candidates.push({ x, y });
-  const found = await page.evaluate((spots) => {
-    const svg = document.querySelector("[role=application]");
-    return spots.find((spot) => document.elementFromPoint(spot.x, spot.y) === svg) ?? null;
-  }, candidates);
+  const found = await page
+    .locator("[role=application]")
+    .evaluate((svg, spots) => spots.find((spot) => svg.ownerDocument.elementFromPoint(spot.x, spot.y) === svg) ?? null, candidates);
   if (found === null) throw new Error("no spot of empty canvas: the svg is topmost nowhere along the frame's right side");
   return found;
 }
@@ -176,21 +175,35 @@ async function leaveToEmptyCanvas(page: Page): Promise<void> {
   await page.mouse.move(at.x, at.y, { steps: 6 });
 }
 
-/** The screen point at `fraction` along a path's drawn route. */
+/**
+ * The screen point at `fraction` along a path's drawn route. The route's own
+ * points come from its `d` attribute (the canvas style `step` draws lines
+ * only), and the start step's node, whose canvas position and screen box are
+ * both known, gives the scale and the offset.
+ */
 async function pointOnRoute(page: Page, pathId: string, fraction: number): Promise<Pt> {
-  return page.evaluate(
-    ({ id, along }) => {
-      const group = document.querySelector(`[data-kind="edge"][data-path-id="${id}"]`);
-      const routes = group?.querySelectorAll("path");
-      const route = routes?.[routes.length - 1];
-      const matrix = route?.getScreenCTM();
-      if (!route || !matrix) throw new Error(`no route for ${id}`);
-      const on = route.getPointAtLength(route.getTotalLength() * along);
-      const screen = new DOMPoint(on.x, on.y).matrixTransform(matrix);
-      return { x: screen.x, y: screen.y };
-    },
-    { id: pathId, along: fraction },
-  );
+  const d = await page.locator(`[data-kind="edge"][data-path-id="${pathId}"] path`).last().getAttribute("d");
+  if (d === null || /[^MLe\d.,\s-]/.test(d)) throw new Error(`no line route for ${pathId}: ${d}`);
+  const points = [...d.matchAll(/(-?[\d.]+(?:e-?\d+)?),(-?[\d.]+(?:e-?\d+)?)/g)].map((m) => ({ x: Number(m[1]), y: Number(m[2]) }));
+  const lengths = points.slice(1).map((p, i) => Math.hypot(p.x - (points[i] as Pt).x, p.y - (points[i] as Pt).y));
+  let left = lengths.reduce((sum, n) => sum + n, 0) * fraction;
+  let on = points[0] as Pt;
+  for (const [i, length] of lengths.entries()) {
+    const from = points[i] as Pt;
+    const to = points[i + 1] as Pt;
+    if (left <= length || i === lengths.length - 1) {
+      const along = length === 0 ? 0 : Math.min(left / length, 1);
+      on = { x: from.x + (to.x - from.x) * along, y: from.y + (to.y - from.y) * along };
+      break;
+    }
+    left -= length;
+  }
+  const transform = await page.locator(`.canvas-node[data-step-id="${SHELF}"]`).getAttribute("transform");
+  const origin = /translate\(\s*(-?[\d.]+)[ ,]+\s*(-?[\d.]+)\s*\)/.exec(transform ?? "");
+  if (!origin) throw new Error(`the start step has no translate: ${transform}`);
+  const box = await boxOf(nodeRect(page, SHELF));
+  const scale = box.width / 180;
+  return { x: box.x + (on.x - Number(origin[1])) * scale, y: box.y + (on.y - Number(origin[2])) * scale };
 }
 
 const endHandles = (page: Page, pathId: string): Locator => page.locator(`[data-end-handle][data-path-id="${pathId}"]`);
@@ -223,8 +236,18 @@ async function drag(page: Page, from: Pt, to: Pt): Promise<void> {
   await page.mouse.up();
 }
 
+/** The `attribute` of the topmost element at a screen point, or of its nearest ancestor matching `selector`. */
+const topmostAttribute = (page: Page, at: Pt, selector: string, attribute: string): Promise<string | null> =>
+  page
+    .locator("[role=application]")
+    .evaluate((svg, hit) => svg.ownerDocument.elementFromPoint(hit.x, hit.y)?.closest(hit.selector)?.getAttribute(hit.attribute) ?? null, {
+      ...at,
+      selector,
+      attribute,
+    });
+
 /** The Panzoom transform, which a pan rewrites. */
-const panOf = (page: Page): Promise<string> => page.locator("[role=application]").evaluate((el) => (el as SVGElement).style.transform);
+const panOf = (page: Page): Promise<string> => page.locator("[role=application]").evaluate((el) => el.style.transform);
 
 /** The state line's words while a change is unsaved. */
 const unsaved = (page: Page): Locator => page.locator("header").getByText("Unsaved changes", { exact: true });
@@ -407,11 +430,7 @@ test("a press on a point under an end stamp starts a connect drag the end step r
   expect(key, "a top point lies under the stamp").toBeDefined();
   await expect(dockingPoint(page, ISSUED, key as string)).toHaveAttribute("data-docking-end", "true");
   // The point's press target wins the hit test over the stamp.
-  const topmost = await page.evaluate(
-    ({ x, y }) => document.elementFromPoint(x, y)?.closest("[data-docking-point]")?.getAttribute("data-docking-point") ?? null,
-    press,
-  );
-  expect(topmost).toBe(key);
+  expect(await topmostAttribute(page, press, "[data-docking-point]", "data-docking-point")).toBe(key);
 
   await page.mouse.move(press.x, press.y);
   await page.mouse.down();
@@ -466,10 +485,7 @@ test("a step keeps its points while the pointer moves onto an end handle that si
   const handle = endHandle(page, SHELF_PATH, "target");
   const on = centreOf(await boxOf(handle));
   await page.mouse.move(on.x, on.y, { steps: 8 });
-  const topmost = await page.evaluate(
-    ({ x, y }) => document.elementFromPoint(x, y)?.closest("[data-end-handle]")?.getAttribute("data-end-handle") ?? null,
-    on,
-  );
+  const topmost = await topmostAttribute(page, on, "[data-end-handle]", "data-end-handle");
   expect(topmost, "the pointer rests on the target end handle").toBe("target");
   await expect(dockingSet(page, ISSUED)).toHaveCount(1);
 
