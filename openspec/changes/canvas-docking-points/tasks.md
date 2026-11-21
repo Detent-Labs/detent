@@ -16,14 +16,14 @@ static markup, or by the e2e flow of group 7.
 
 ## 2. Routes between any two sides
 
-- [ ] 2.1 Add the candidate-search router from `design.md`. Verify with the four scenarios of "A route joins any two sides".
-- [ ] 2.2 Add the rule that picks `routeEdge` or the new router. Verify that a facing opposing pair returns today's route, and that a pair facing away takes the new one.
-- [ ] 2.3 Add one test that walks sixteen side pairs over eight placements. Add offsets of 20 and 40 on the other axis, and one off-middle point per side.
-- [ ] 2.4 In that test, assert one axis per segment, the outward stub and no doubling back. Assert also at most five segments, no crossing of either box and no run along a border.
-- [ ] 2.5 Verify that two boxes closer than two grid steps still return a route, with a test for touching nodes.
-- [ ] 2.6 Verify a self path on one side and on two neighbouring sides. Neither crosses the inside of its node.
-- [ ] 2.7 Extend `routeThroughWaypoints` to take a stored point per end. Verify with both scenarios of "A waypointed route keeps its stored docking points". Add a case with a waypoint on the node's own row.
-- [ ] 2.8 Verify that every existing case in `studio-canvas-geometry.test.ts` still passes unchanged.
+- [x] 2.1 Add the candidate-search router from `design.md`. Verify with the four scenarios of "A route joins any two sides".
+- [x] 2.2 Add the rule that picks `routeEdge` or the new router. Verify that a facing opposing pair returns today's route, and that a pair facing away takes the new one.
+- [x] 2.3 Add one test that walks sixteen side pairs over eight placements. Add offsets of 20 and 40 on the other axis, and one off-middle point per side.
+- [x] 2.4 In that test, assert one axis per segment, the outward stub and no doubling back. Assert also at most five segments, no crossing of either box and no run along a border.
+- [x] 2.5 Verify that two boxes closer than two grid steps still return a route, with a test for touching nodes.
+- [x] 2.6 Verify a self path on one side and on two neighbouring sides. Neither crosses the inside of its node.
+- [x] 2.7 Extend `routeThroughWaypoints` to take a stored point per end. Verify with both scenarios of "A waypointed route keeps its stored docking points". Add a case with a waypoint on the node's own row.
+- [x] 2.8 Verify that every existing case in `studio-canvas-geometry.test.ts` still passes unchanged.
 
 ## 3. The layout store
 
