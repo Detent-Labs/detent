@@ -1,4 +1,12 @@
-import { isDockingEnd, snapToGrid, type DockingEnd, type Point } from "./geometry";
+import {
+  dockingEndOfAnchor,
+  isDockingEnd,
+  routeThroughWaypoints,
+  snapToGrid,
+  type DockingEnd,
+  type Point,
+} from "./geometry";
+import { anchorBoxFor, hiddenStepIds, type StepGroup } from "./groups";
 
 /** Structural, not the branded schema `Step` — this module only ever reads
  * `id` and `paths[].to`, so it stays decoupled from the full Draft shape. */
@@ -204,4 +212,54 @@ export function layoutAfterMove(
   let next: Record<string, unknown> = { ...layout, ...positions };
   for (const [pathId, ends] of Object.entries(points)) next = withDockingPoints(next, pathId, ends);
   return next;
+}
+
+/**
+ * The docking points a step move stores. For every path with an end on a moved
+ * step, each end that stores no point takes the point it held before the move:
+ * the automatic anchor, waypoints and the other end's stored point included,
+ * read back as a docking end. `positions` are the positions before the move.
+ *
+ * An end on a collapsed group's box stores nothing and ignores whatever its
+ * hidden member stores. A path between two members of one collapsed group
+ * stores nothing. A returned entry holds every end the path stores, so it
+ * replaces the stored entry whole; a path that gains no end is absent.
+ */
+export function pointsAfterMove(input: {
+  paths: Array<{ id?: string; from: string; to?: string }>;
+  moved: Iterable<string>;
+  positions: Record<string, Point>;
+  stored: Record<string, PathDockingEnds>;
+  waypoints: Record<string, Point[]>;
+  groups: StepGroup[];
+}): Record<string, PathDockingEnds> {
+  const { positions, stored, waypoints, groups } = input;
+  const moved = new Set(input.moved);
+  const hidden = hiddenStepIds(groups, positions);
+  const out: Record<string, PathDockingEnds> = {};
+  for (const path of input.paths) {
+    if (!path.id || !path.to) continue;
+    if (!moved.has(path.from) && !moved.has(path.to)) continue;
+    const sourceBox = anchorBoxFor(path.from, groups, positions);
+    const targetBox = anchorBoxFor(path.to, groups, positions);
+    if (!sourceBox || !targetBox) continue;
+    const sourceHidden = hidden.has(path.from);
+    const targetHidden = hidden.has(path.to);
+    if (sourceHidden && targetHidden && sourceBox.x === targetBox.x && sourceBox.y === targetBox.y) continue;
+    const entry = stored[path.id] ?? {};
+    const route = routeThroughWaypoints(
+      { x: sourceBox.x, y: sourceBox.y },
+      { x: targetBox.x, y: targetBox.y },
+      waypoints[path.id] ?? [],
+      { source: sourceBox, target: targetBox },
+      { source: sourceHidden ? undefined : entry.source, target: targetHidden ? undefined : entry.target },
+    );
+    const first = route.points[0];
+    const last = route.points[route.points.length - 1];
+    const source = entry.source ?? (sourceHidden || !first ? undefined : dockingEndOfAnchor(sourceBox, first, sourceBox));
+    const target = entry.target ?? (targetHidden || !last ? undefined : dockingEndOfAnchor(targetBox, last, targetBox));
+    if (source === entry.source && target === entry.target) continue;
+    out[path.id] = { ...(source ? { source } : {}), ...(target ? { target } : {}) };
+  }
+  return out;
 }

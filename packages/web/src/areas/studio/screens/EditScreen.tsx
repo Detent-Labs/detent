@@ -50,7 +50,7 @@ import {
 } from "../canvas/geometry.js";
 import { type StepGroup } from "../canvas/groups.js";
 import { arrangeSteps, hasHandPlacedStep } from "../canvas/arrange.js";
-import { drawnPositions, isPoint, layoutAfterArrange, layoutAfterInsert, readDockingPoints, type LayoutStep } from "../canvas/layout.js";
+import { drawnPositions, isPoint, layoutAfterArrange, layoutAfterInsert, layoutAfterMove, readDockingPoints, type LayoutStep, type PathDockingEnds } from "../canvas/layout.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { insertOnPath } from "../draft/insertOnPath.js";
@@ -641,6 +641,12 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   // model's `mutate()` (design.md: the two are separate existing surfaces).
   const onMoveCanvasPosition = (stepId: string, point: Point) => {
     setSaveState((s) => ({ ...s, layout: { ...s.layout, [stepId]: point } }));
+  };
+
+  // A drag's release: every mover's position and the docking points the move
+  // stores, in one layout write.
+  const onMoveCanvasPositions = (positions: Record<string, Point>, points: Record<string, PathDockingEnds>) => {
+    setSaveState((s) => ({ ...s, layout: layoutAfterMove(s.layout, positions, points) }));
   };
 
   // Overwrites every step's position at once, unlike onMoveCanvasPosition's one-step
@@ -1364,6 +1370,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                 <CanvasView
                   layout={saveState.layout}
                   onMoveStep={onMoveCanvasPosition}
+                  onMoveSteps={onMoveCanvasPositions}
                   onArrange={onArrange}
                   selectedStepIds={selectedStepIds}
                   onSelectStep={onSelectStep}

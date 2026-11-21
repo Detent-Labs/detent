@@ -9,7 +9,7 @@ import { newStep } from "../draft/createStep";
 import { newPath, triggerForNewPath } from "../draft/createPath";
 import { seedLocalizedText } from "../draft/localized-text";
 import { t } from "../catalog.js";
-import { drawnPositions, type LayoutStep, type PathDockingEnds } from "./layout";
+import { drawnPositions, pointsAfterMove, type LayoutStep, type PathDockingEnds } from "./layout";
 import {
   dragDelta,
   exceedsClickThreshold,
@@ -463,6 +463,9 @@ export function groupMembersDomId(groupId: string): string {
 interface Props {
   layout: Record<string, unknown>;
   onMoveStep: (stepId: string, point: Point) => void;
+  /** A node or group drag's release: every mover's new position and the
+   * docking points the move stores, for one layout write. */
+  onMoveSteps: (positions: Record<string, Point>, points: Record<string, PathDockingEnds>) => void;
   /** Overwrites every step's position at once and clears every waypoint,
    * behind its own confirm gate (design.md, Decisions 2, 4 and 5). */
   onArrange: () => void;
@@ -494,8 +497,8 @@ interface Props {
    * absent or malformed entry reads as no waypoints (design.md). */
   waypoints: Record<string, Point[]>;
   /** Every path's stored docking ends, read from `layout.dockingPoints` by
-   * `readDockingPoints`; keyed by path id. The view does not read it yet. */
-  dockingPoints?: Record<string, PathDockingEnds>;
+   * `readDockingPoints`; keyed by path id. */
+  dockingPoints: Record<string, PathDockingEnds>;
   onWaypointsChange: (pathId: string, points: Point[]) => void;
   /** Presentation only, in the same `layout` blob (design.md). A group never
    * reaches `ProcessBody`, so the engine cannot see one. */
@@ -680,6 +683,7 @@ function EdgeLabel({
 export function CanvasView({
   layout,
   onMoveStep,
+  onMoveSteps,
   onArrange,
   selectedStepIds,
   onSelectStep,
@@ -689,6 +693,7 @@ export function CanvasView({
   edgeStyle,
   onEdgeStyleChange,
   waypoints,
+  dockingPoints,
   onWaypointsChange,
   groups,
   onGroupsChange,
@@ -912,6 +917,7 @@ export function CanvasView({
         // different sides. With waypoints they face the first and the
         // last of those instead.
         const pathWaypoints = (path.id !== undefined ? waypoints[path.id] : undefined) ?? [];
+        const storedEnds = path.id !== undefined ? dockingPoints[path.id] : undefined;
         // A collapsed group's box stands in for a hidden member, so the
         // route ends on the box rather than on a step nobody can see. Two
         // members of one collapsed group have nothing to draw between.
@@ -928,6 +934,12 @@ export function CanvasView({
           {
             source: { width: sourceBox.width, height: sourceBox.height },
             target: { width: targetBox.width, height: targetBox.height },
+          },
+          // A box on a collapsed group takes the automatic side, whatever its
+          // hidden member stores. The stored entry stays in the layout.
+          {
+            source: hidden.has(step.id) ? undefined : storedEnds?.source,
+            target: hidden.has(path.to) ? undefined : storedEnds?.target,
           },
         );
         out.push({
@@ -948,7 +960,7 @@ export function CanvasView({
       }
     }
     return out;
-  }, [steps, draft.fields, contentLocale, baseLocale, loadedChildren, waypoints, groups, positionsById, hidden]);
+  }, [steps, draft.fields, contentLocale, baseLocale, loadedChildren, waypoints, dockingPoints, groups, positionsById, hidden]);
 
   // Where each sentence stands (design.md D5): clear of every drawn node, its
   // label and its stamps, the start arrow, every arrowhead, every group's
@@ -1225,16 +1237,34 @@ export function CanvasView({
 
   const onGroupPointerMove = (e: React.PointerEvent) => trackPointer(groupDrag, setGroupDrag, { current: toSvgPoint(e) });
 
+  /**
+   * One layout write for a release that moved steps: every new position, and
+   * the docking points of the paths on them. `positionsById` still holds the
+   * geometry before the move, which is what the stored points must keep. Only
+   * a release past the click threshold calls it.
+   */
+  const releaseMove = (moved: Record<string, Point>) => {
+    const paths = steps.flatMap((step) =>
+      step.id ? (step.paths ?? []).map((path) => ({ id: path.id, from: step.id as string, to: path.to })) : [],
+    );
+    onMoveSteps(
+      moved,
+      pointsAfterMove({ paths, moved: Object.keys(moved), positions: positionsById, stored: dockingPoints, waypoints, groups }),
+    );
+  };
+
   const onGroupPointerUp = (e: React.PointerEvent, group: StepGroup) => {
     e.stopPropagation();
     if (!groupDrag) return;
     const delta = dragDelta(groupDrag.startPointer, groupDrag.current);
     setGroupDrag(null);
     if (exceedsClickThreshold(delta)) {
+      const moved: Record<string, Point> = {};
       for (const id of group.stepIds) {
         const start = groupDrag.startPos[id];
-        if (start) onMoveStep(id, snapToGrid({ x: start.x + delta.x, y: start.y + delta.y }));
+        if (start) moved[id] = snapToGrid({ x: start.x + delta.x, y: start.y + delta.y });
       }
+      releaseMove(moved);
       return;
     }
     // Under the threshold this is a click, and a click on the box selects
@@ -1297,10 +1327,12 @@ export function CanvasView({
       // click. Each mover rounds its own result, not the shared delta — every
       // layout constant is a whole multiple of GRID_STEP, so a group on the
       // lattice keeps its relative offsets and each member stays on it.
+      const moved: Record<string, Point> = {};
       for (const id of nodeDrag.stepIds) {
         const start = nodeDrag.startPos[id];
-        if (start) onMoveStep(id, snapToGrid({ x: start.x + delta.x, y: start.y + delta.y }));
+        if (start) moved[id] = snapToGrid({ x: start.x + delta.x, y: start.y + delta.y });
       }
+      releaseMove(moved);
       // Dragging a node the set did not hold makes it the whole selection.
       if (!selectedStepIds.includes(nodeDrag.stepId)) onSelectStep(nodeDrag.stepId);
     } else if (e.shiftKey) {

@@ -54,6 +54,7 @@ function renderCanvas(baseLocale: string): string {
       <CanvasView
         layout={LAYOUT}
         onMoveStep={() => {}}
+        onMoveSteps={() => {}}
         onArrange={() => {}}
         selectedStepIds={[]}
         onSelectStep={() => {}}
@@ -61,6 +62,7 @@ function renderCanvas(baseLocale: string): string {
         edgeStyle="step"
         onEdgeStyleChange={() => {}}
         waypoints={{}}
+        dockingPoints={{}}
         onWaypointsChange={() => {}}
         groups={[]}
         onGroupsChange={() => {}}

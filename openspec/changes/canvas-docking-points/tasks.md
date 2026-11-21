@@ -38,13 +38,13 @@ static markup, or by the e2e flow of group 7.
 
 ## 4. Stored points on the canvas
 
-- [ ] 4.1 Route each path with its stored points. Verify in static markup that a path with no entry renders the same `d` attribute as before.
-- [ ] 4.2 Verify both scenarios of "A path end stays on its stored docking point". Render one stored entry at two positions.
-- [ ] 4.3 Anchor a path on a collapsed group's box by the automatic rule, whatever its member stores. Verify with both scenarios of that requirement.
-- [ ] 4.4 Add the pure function that returns the points a step move stores. Verify with cases for one step and for two steps. Add one for an end that already stores a point.
-- [ ] 4.5 Add cases to 4.4 for an end on a collapsed group's box, and for a path inside a collapsed group. Each matches its scenario in the delta spec.
-- [ ] 4.6 Replace both per-step move loops with one callback that calls 4.4 and then 3.5. Verify with `bun run typecheck`, and leave the drag to the e2e flow.
-- [ ] 4.7 Verify by reading that a release under the click threshold reaches no layout write. Cover the older-draft case in the e2e flow.
+- [x] 4.1 Route each path with its stored points. Verify in static markup that a path with no entry renders the same `d` attribute as before.
+- [x] 4.2 Verify both scenarios of "A path end stays on its stored docking point". Render one stored entry at two positions.
+- [x] 4.3 Anchor a path on a collapsed group's box by the automatic rule, whatever its member stores. Verify with both scenarios of that requirement.
+- [x] 4.4 Add the pure function that returns the points a step move stores. Verify with cases for one step and for two steps. Add one for an end that already stores a point.
+- [x] 4.5 Add cases to 4.4 for an end on a collapsed group's box, and for a path inside a collapsed group. Each matches its scenario in the delta spec.
+- [x] 4.6 Replace both per-step move loops with one callback that calls 4.4 and then 3.5. Verify with `bun run typecheck`, and leave the drag to the e2e flow.
+- [x] 4.7 Verify by reading that a release under the click threshold reaches no layout write. Cover the older-draft case in the e2e flow.
 
 ## 5. Docking points as connect handles
 
