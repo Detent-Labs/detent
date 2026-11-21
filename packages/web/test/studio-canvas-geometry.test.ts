@@ -517,7 +517,7 @@ describe("docking points", () => {
   const box = { x: 100, y: 200 };
   const sideOf = (s: DockingSide) => dockingPointsOf(box).filter((p) => p.side === s);
 
-  it("lists three points on each level-height side and seven on each top and bottom side", () => {
+  it("lists three points on each upright side and seven on each level side", () => {
     expect(sideOf("left").map((p) => p.at)).toEqual([-1, 0, 1]);
     expect(sideOf("right").map((p) => p.at)).toEqual([-1, 0, 1]);
     expect(sideOf("top").map((p) => p.at)).toEqual([-3, -2, -1, 0, 1, 2, 3]);
@@ -560,8 +560,7 @@ describe("docking points", () => {
 
   it("skips an excluded point", () => {
     const p = nearestDockingPoint(box, { x: 190, y: 200 }, { exclude: { side: "top", at: 0 } });
-    expect(p.side).toBe("top");
-    expect(Math.abs(p.at)).toBe(1);
+    expect({ side: p.side, at: p.at }).toEqual({ side: "top", at: -1 });
   });
 
   it("turns a stored end into an anchor", () => {
@@ -599,5 +598,13 @@ describe("docking points", () => {
     const right0 = dockingPointsOf(box).find((p) => p.side === "right" && p.at === 0)!;
     expect(inPressTarget(right0, { x: 290, y: 230 })).toBe(true);
     expect(inPressTarget(right0, { x: 270, y: 230 })).toBe(false);
+  });
+
+  it("holds the press target bounds inclusively", () => {
+    const top0 = dockingPointsOf(box).find((p) => p.side === "top" && p.at === 0)!;
+    expect(inPressTarget(top0, { x: 190, y: 200 - 12 })).toBe(true);
+    expect(inPressTarget(top0, { x: 190, y: 200 + 6 })).toBe(true);
+    expect(inPressTarget(top0, { x: 190 + 10, y: 200 })).toBe(true);
+    expect(inPressTarget(top0, { x: 190 - 10, y: 200 })).toBe(true);
   });
 });
