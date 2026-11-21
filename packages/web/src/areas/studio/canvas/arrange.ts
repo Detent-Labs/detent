@@ -1,5 +1,5 @@
 import type * as Dagre from "@dagrejs/dagre";
-import { autoPlaceSteps, COLUMN_WIDTH, ROW_HEIGHT, type LayoutStep } from "./layout";
+import { autoPlaceSteps, COLUMN_WIDTH, readDockingPoints, ROW_HEIGHT, type LayoutStep } from "./layout";
 import { NODE_SIZE, type Point } from "./geometry";
 import { drawnBox, groupOf, type Box, type StepGroup } from "./groups";
 
@@ -135,14 +135,15 @@ export async function arrangeSteps(
 
 /**
  * Whether a draft holds anything an arrange could discard: an explicit
- * author action, and only that, writes either kind. A step still on the
- * auto-placed default carries no `layout[stepId]` entry, and a waypoint
- * reaches `layout.waypoints` on its own, with no step ever hand-placed
+ * author action, and only that, writes any kind. A step still on the
+ * auto-placed default carries no `layout[stepId]` entry, and a waypoint or a
+ * docking point reaches the layout on its own, with no step ever hand-placed
  * first (design.md, Decision 5).
  */
 export function hasHandPlacedStep(steps: LayoutStep[], layout: Record<string, unknown>): boolean {
   const hasPlacedStep = steps.some((s) => s.id && layout[s.id] !== undefined);
   if (hasPlacedStep) return true;
   const waypoints = layout.waypoints;
-  return !!waypoints && typeof waypoints === "object" && Object.keys(waypoints).length > 0;
+  if (waypoints && typeof waypoints === "object" && Object.keys(waypoints).length > 0) return true;
+  return Object.keys(readDockingPoints(layout)).length > 0;
 }

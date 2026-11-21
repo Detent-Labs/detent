@@ -1,4 +1,4 @@
-import type { Point } from "./geometry";
+import { isDockingEnd, snapToGrid, type DockingEnd, type Point } from "./geometry";
 
 /** Structural, not the branded schema `Step` — this module only ever reads
  * `id` and `paths[].to`, so it stays decoupled from the full Draft shape. */
@@ -114,4 +114,91 @@ export function drawnPositions(
     drawn[s.id] = isPoint(stored) ? stored : (autoPlaced[s.id] ?? { x: 0, y: 0 });
   }
   return drawn;
+}
+
+/** The stored ends of one path. Either end may be absent. */
+export interface PathDockingEnds {
+  source?: DockingEnd;
+  target?: DockingEnd;
+}
+
+/**
+ * Every path's stored docking ends, keyed by path id, from `layout.dockingPoints`.
+ * An end that is not a well-formed `DockingEnd` drops, and so does an entry left
+ * with no end, so a draft saved by a later version still draws.
+ */
+export function readDockingPoints(layout: Record<string, unknown>): Record<string, PathDockingEnds> {
+  const stored = layout.dockingPoints;
+  const out: Record<string, PathDockingEnds> = {};
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) return out;
+  for (const [pathId, entry] of Object.entries(stored as Record<string, unknown>)) {
+    if (!entry || typeof entry !== "object") continue;
+    const { source, target } = entry as { source?: unknown; target?: unknown };
+    const ends: PathDockingEnds = {};
+    if (isDockingEnd(source)) ends.source = source;
+    if (isDockingEnd(target)) ends.target = target;
+    if (ends.source || ends.target) out[pathId] = ends;
+  }
+  return out;
+}
+
+/**
+ * A copy of `layout` with one path's stored ends replaced. An entry with no end
+ * leaves no key, so a reset does not grow the blob. The input is not mutated.
+ */
+export function withDockingPoints(
+  layout: Record<string, unknown>,
+  pathId: string,
+  ends: PathDockingEnds,
+): Record<string, unknown> {
+  const next = { ...(layout.dockingPoints as Record<string, PathDockingEnds> | undefined) };
+  const entry: PathDockingEnds = {};
+  if (ends.source) entry.source = ends.source;
+  if (ends.target) entry.target = ends.target;
+  if (entry.source || entry.target) next[pathId] = entry;
+  else delete next[pathId];
+  return { ...layout, dockingPoints: next };
+}
+
+/**
+ * The layout after an arrange: every arranged step at its grid-snapped
+ * position, and no waypoint and no docking point left on any path.
+ */
+export function layoutAfterArrange(
+  layout: Record<string, unknown>,
+  arranged: Record<string, Point>,
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...layout, waypoints: {}, dockingPoints: {} };
+  for (const [stepId, point] of Object.entries(arranged)) next[stepId] = snapToGrid(point);
+  return next;
+}
+
+/**
+ * The layout after a step drops onto a path: the new step's position, the split
+ * path's waypoints cleared, its source end kept and its target end cleared.
+ */
+export function layoutAfterInsert(
+  layout: Record<string, unknown>,
+  stepId: string,
+  point: Point,
+  splitPathId: string,
+): Record<string, unknown> {
+  const waypoints = { ...(layout.waypoints as Record<string, Point[]> | undefined) };
+  delete waypoints[splitPathId];
+  const { source } = readDockingPoints(layout)[splitPathId] ?? {};
+  return withDockingPoints({ ...layout, [stepId]: point, waypoints }, splitPathId, { source });
+}
+
+/**
+ * The layout after a step move: every moved position and every path's stored
+ * ends in one result. A path absent from `points` keeps its entry.
+ */
+export function layoutAfterMove(
+  layout: Record<string, unknown>,
+  positions: Record<string, Point>,
+  points: Record<string, PathDockingEnds>,
+): Record<string, unknown> {
+  let next: Record<string, unknown> = { ...layout, ...positions };
+  for (const [pathId, ends] of Object.entries(points)) next = withDockingPoints(next, pathId, ends);
+  return next;
 }

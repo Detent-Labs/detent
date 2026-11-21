@@ -50,7 +50,7 @@ import {
 } from "../canvas/geometry.js";
 import { type StepGroup } from "../canvas/groups.js";
 import { arrangeSteps, hasHandPlacedStep } from "../canvas/arrange.js";
-import { drawnPositions, isPoint, type LayoutStep } from "../canvas/layout.js";
+import { drawnPositions, isPoint, layoutAfterArrange, layoutAfterInsert, readDockingPoints, type LayoutStep } from "../canvas/layout.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { insertOnPath } from "../draft/insertOnPath.js";
@@ -595,6 +595,11 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     return out;
   }, [storedWaypoints]);
 
+  // The docking points read the same way, through `canvas/layout.ts`.
+  const storedDockingPoints = saveState.layout.dockingPoints;
+  // Memoized on the stored value, as `waypoints` is.
+  const dockingPoints = useMemo(() => readDockingPoints(saveState.layout), [storedDockingPoints]);
+
   // The third reserved key in that blob. An entry that does not parse drops,
   // and so does a member the draft no longer holds: a step delete is an
   // ordinary edit, and it must not strand a box or fail the render.
@@ -661,11 +666,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
       actions.reportError(e);
       return;
     }
-    setSaveState((s) => {
-      const next: Record<string, unknown> = { ...s.layout, waypoints: {} };
-      for (const [stepId, point] of Object.entries(arranged)) next[stepId] = snapToGrid(point);
-      return { ...s, layout: next };
-    });
+    setSaveState((s) => ({ ...s, layout: layoutAfterArrange(s.layout, arranged) }));
   };
 
   // The second argument carries a clicked path's id (task 3.13); a node
@@ -868,11 +869,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
    * waypoints") in the one `saveState.layout` write task 3.5 asks for, rather
    * than two separate `setSaveState` calls. */
   const onInsertLayoutWrite = (stepId: string, point: Point, splitPathId: string) => {
-    setSaveState((s) => {
-      const nextWaypoints = { ...(s.layout.waypoints as Record<string, Point[]> | undefined) };
-      delete nextWaypoints[splitPathId];
-      return { ...s, layout: { ...s.layout, [stepId]: point, waypoints: nextWaypoints } };
-    });
+    setSaveState((s) => ({ ...s, layout: layoutAfterInsert(s.layout, stepId, point, splitPathId) }));
   };
 
   /** The one draft-mutation method every step-creating control on this screen
@@ -1384,6 +1381,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                   edgeStyle={edgeStyle}
                   onEdgeStyleChange={onEdgeStyleChange}
                   waypoints={waypoints}
+                  dockingPoints={dockingPoints}
                   onWaypointsChange={onWaypointsChange}
                   groups={groups}
                   onGroupsChange={onGroupsChange}

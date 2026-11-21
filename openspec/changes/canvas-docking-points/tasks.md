@@ -27,14 +27,14 @@ static markup, or by the e2e flow of group 7.
 
 ## 3. The layout store
 
-- [ ] 3.1 Add `readDockingPoints(layout)` to `canvas/layout.ts`. Verify in `studio-canvas-layout.test.ts` with an absent key, a malformed entry and a position the side lacks.
-- [ ] 3.2 Add `withDockingPoints(layout, pathId, ends)` there. Verify that a write then a read returns the ends, and that an empty entry leaves no key.
-- [ ] 3.3 Add `layoutAfterArrange` there, and call it from `runArrange` in `EditScreen.tsx`. Verify that it empties `waypoints` and `dockingPoints`.
-- [ ] 3.4 Add `layoutAfterInsert` there, and call it from the insert write. Verify that it keeps the source end, and drops the target end and the waypoints.
-- [ ] 3.5 Add `layoutAfterMove(layout, positions, points)` there. Verify that it writes every position and every point in one result.
-- [ ] 3.6 Make `hasHandPlacedStep` in `arrange.ts` read the new key, and keep its name. Verify in `studio-canvas-arrange.test.ts` that a draft with stored points alone confirms.
-- [ ] 3.7 Add the key `arrangeDialog.points` to `studio.ts`, and a second `DialogNote` in `confirmations.tsx`. Correct the body array in `studio-confirmations.test.tsx`.
-- [ ] 3.8 Read the stored points in `EditScreen.tsx` through 3.1, and pass them to `CanvasView`. Verify with `bun run typecheck`.
+- [x] 3.1 Add `readDockingPoints(layout)` to `canvas/layout.ts`. Verify in `studio-canvas-layout.test.ts` with an absent key, a malformed entry and a position the side lacks.
+- [x] 3.2 Add `withDockingPoints(layout, pathId, ends)` there. Verify that a write then a read returns the ends, and that an empty entry leaves no key.
+- [x] 3.3 Add `layoutAfterArrange` there, and call it from `runArrange` in `EditScreen.tsx`. Verify that it empties `waypoints` and `dockingPoints`.
+- [x] 3.4 Add `layoutAfterInsert` there, and call it from the insert write. Verify that it keeps the source end, and drops the target end and the waypoints.
+- [x] 3.5 Add `layoutAfterMove(layout, positions, points)` there. Verify that it writes every position and every point in one result.
+- [x] 3.6 Make `hasHandPlacedStep` in `arrange.ts` read the new key, and keep its name. Verify in `studio-canvas-arrange.test.ts` that a draft with stored points alone confirms.
+- [x] 3.7 Add the key `arrangeDialog.points` to `studio.ts`, and a second `DialogNote` in `confirmations.tsx`. Correct the body array in `studio-confirmations.test.tsx`.
+- [x] 3.8 Read the stored points in `EditScreen.tsx` through 3.1, and pass them to `CanvasView`. Verify with `bun run typecheck`.
 
 ## 4. Stored points on the canvas
 

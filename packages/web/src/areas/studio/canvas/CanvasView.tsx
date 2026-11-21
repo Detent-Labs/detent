@@ -9,7 +9,7 @@ import { newStep } from "../draft/createStep";
 import { newPath, triggerForNewPath } from "../draft/createPath";
 import { seedLocalizedText } from "../draft/localized-text";
 import { t } from "../catalog.js";
-import { drawnPositions, type LayoutStep } from "./layout";
+import { drawnPositions, type LayoutStep, type PathDockingEnds } from "./layout";
 import {
   dragDelta,
   exceedsClickThreshold,
@@ -493,6 +493,9 @@ interface Props {
   /** Per path id, in the same opaque `layout` blob as node positions. An
    * absent or malformed entry reads as no waypoints (design.md). */
   waypoints: Record<string, Point[]>;
+  /** Every path's stored docking ends, read from `layout.dockingPoints` by
+   * `readDockingPoints`; keyed by path id. The view does not read it yet. */
+  dockingPoints?: Record<string, PathDockingEnds>;
   onWaypointsChange: (pathId: string, points: Point[]) => void;
   /** Presentation only, in the same `layout` blob (design.md). A group never
    * reaches `ProcessBody`, so the engine cannot see one. */

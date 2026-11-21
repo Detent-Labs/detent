@@ -35,6 +35,7 @@ export const en = {
   "leaveDialog.confirmJson": "Leave without applying",
   "arrangeDialog.heading": "Arrange every step?",
   "arrangeDialog.body": "Every step moves to a new place, and each path loses the bends placed on it.",
+  "arrangeDialog.points": "Each path goes back to the middle of a side.",
   "arrangeDialog.confirm": "Arrange",
   "restoreDialog.heading": "Replace your current changes?",
   "restoreDialog.body": "The restored copy takes their place.",

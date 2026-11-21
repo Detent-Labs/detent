@@ -579,12 +579,22 @@ export function nearestDockingPoint(
 }
 
 /**
+ * Whether untrusted JSON is a stored end: an object naming one of the four
+ * sides and a whole-number position that side holds.
+ */
+export function isDockingEnd(value: unknown): value is DockingEnd {
+  if (!value || typeof value !== "object") return false;
+  const { side, at } = value as { side?: unknown; at?: unknown };
+  if (typeof side !== "string" || !DOCKING_SIDES.includes(side as DockingSide)) return false;
+  return typeof at === "number" && Number.isInteger(at) && Math.abs(at) <= DOCKING_REACH[side as DockingSide];
+}
+
+/**
  * The anchor a stored end names on a box, or `undefined` for an unknown side or
  * a position the side lacks (non-integer or beyond its reach).
  */
 export function dockingAnchor(node: Point, end: DockingEnd, size: Size = NODE_SIZE): Point | undefined {
-  if (!DOCKING_SIDES.includes(end.side)) return undefined;
-  if (!Number.isInteger(end.at) || Math.abs(end.at) > DOCKING_REACH[end.side]) return undefined;
+  if (!isDockingEnd(end)) return undefined;
   return dockingPointAt(node, end.side, end.at, size);
 }
 
