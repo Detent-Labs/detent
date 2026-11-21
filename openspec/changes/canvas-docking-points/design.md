@@ -198,9 +198,10 @@ would route today's paths differently.
 
 Two boxes can stand closer than two grid steps. The stubs then collide, and
 every candidate may cross a box. The function returns the candidate with the
-fewest crossings. It never returns one that revisits a point. An opposing pair
-that faces each other at any distance also offers today's route as a
-candidate. A route always draws.
+fewest crossings. It never returns one that revisits a point. A level opposing
+pair that faces each other at any distance also offers the straight segment.
+Every route between two boxes that do not overlap leaves outward. Two
+overlapping boxes still get a route, and the outward rule yields there.
 
 ### A waypointed leg leaves a stored point outward
 
