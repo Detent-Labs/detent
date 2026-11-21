@@ -82,6 +82,15 @@ function pointOf(set: string, key: string): string {
   return set.slice(open, close);
 }
 
+/** The class string of the dot a point draws. Compiled classes hash, so tests
+ * compare these between elements and never name one. */
+function dotClassOf(set: string, key: string): string {
+  const circle = /<circle [^>]*>/.exec(pointOf(set, key))?.[0] ?? "";
+  const cls = /class="([^"]*)"/.exec(circle)?.[1];
+  expect(cls).toBeString();
+  return cls as string;
+}
+
 const count = (text: string, needle: string) => text.split(needle).length - 1;
 
 describe("a resting canvas", () => {
@@ -128,6 +137,21 @@ describe("a selected step", () => {
     expect(count(set, 'data-docking-held="true"')).toBe(2);
   });
 
+  it("draws a held point's dot in a form that differs from a free point's", () => {
+    expect(dotClassOf(set, "left:0")).toBe(dotClassOf(set, "right:0"));
+    expect(dotClassOf(set, "left:0")).not.toBe(dotClassOf(set, "top:0"));
+    expect(dotClassOf(set, "top:0")).toBe(dotClassOf(set, "bottom:3"));
+  });
+
+  it("draws a free point alike on every task step", () => {
+    const other = setOf(render(["step_review"]), "step_review");
+    expect(dotClassOf(other, "top:0")).toBe(dotClassOf(set, "top:0"));
+  });
+
+  it("hides the set from the accessibility tree", () => {
+    expect(set).toMatch(/^data-docking-step-id="step_approve" aria-hidden="true"/);
+  });
+
   it("draws no connect handle at the right middle", () => {
     expect(html).not.toContain("data-connect-step-id");
     expect(html).not.toContain('r="7"');
@@ -153,6 +177,22 @@ describe("an end step's points", () => {
     expect(count(set, "data-docking-point=")).toBe(20);
     expect(count(set, 'data-docking-end="true"')).toBe(20);
     expect(pointOf(set, "left:0")).toContain(`<title>${t("canvas.connectHandleEnd")}</title>`);
+  });
+});
+
+describe("an end step's dots", () => {
+  const html = render(["step_done", "step_approve"]);
+  const end = setOf(html, "step_done");
+  const task = setOf(html, "step_approve");
+
+  it("share one form, which differs from the free and the held form", () => {
+    const keys = [...end.matchAll(/data-docking-point="([^"]*)"/g)].map((m) => m[1]);
+    expect(keys.length).toBe(20);
+    const forms = new Set(keys.map((k) => dotClassOf(end, k)));
+    expect(forms.size).toBe(1);
+    const [form] = [...forms];
+    expect(form).not.toBe(dotClassOf(task, "top:0"));
+    expect(form).not.toBe(dotClassOf(task, "right:0"));
   });
 });
 
