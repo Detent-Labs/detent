@@ -761,11 +761,10 @@ export function routeBetweenEnds(source: RouteEnd, target: RouteEnd): Point[] {
   for (const y of ys) middles.push([{ x: from.x, y }, { x: to.x, y }]);
 
   const candidates = middles.map((middle) => [source.anchor, from, ...middle, to, target.anchor]);
-  // Opposing sides that face each other at any positive distance also offer
-  // the automatic route, which stays clean where the stubs would collide.
-  if (OPPOSING[source.side] === target.side && beyond > 0) {
-    candidates.unshift(routeEdge(source.anchor, target.anchor, DOCKING_LEAVING[source.side]));
-  }
+  // Opposing sides facing each other at any positive distance, anchors level on
+  // the other axis, also offer today's straight one-segment route.
+  const level = d.x !== 0 ? source.anchor.y === target.anchor.y : source.anchor.x === target.anchor.x;
+  if (OPPOSING[source.side] === target.side && beyond > 0 && level) candidates.unshift([source.anchor, target.anchor]);
 
   let best: Point[] | undefined;
   let bestScore: number[] = [];
@@ -778,6 +777,7 @@ export function routeBetweenEnds(source: RouteEnd, target: RouteEnd): Point[] {
       bestScore = score;
     }
   }
+  // Overlapping boxes keep this fallback, which may leave a box sideways: the route still draws.
   // Two coincident anchors (touching boxes on facing midpoints) admit no route
   // that revisits no point, so they return the two-point route of zero length.
   const same = source.anchor.x === target.anchor.x && source.anchor.y === target.anchor.y;

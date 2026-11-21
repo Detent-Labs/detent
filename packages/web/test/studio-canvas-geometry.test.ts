@@ -690,6 +690,61 @@ describe("canvas geometry: routes between any two sides", () => {
     expectSound(route, s, t, true);
   });
 
+  it("turns onto a neighbouring side in two segments", () => {
+    const s = endOf({ x: 0, y: 0 }, "right", 0);
+    const t = endOf({ x: 260, y: 100 }, "top", 0);
+    const route = routeBetweenEnds(s, t);
+    expect(segments(route)).toHaveLength(2);
+    expectSound(route, s, t, true);
+  });
+
+  it("draws two anchors on one side around, in three segments", () => {
+    const s = endOf({ x: 0, y: 0 }, "top", 0);
+    const t = endOf({ x: 300, y: 0 }, "top", 0);
+    const route = routeBetweenEnds(s, t);
+    expect(segments(route)).toHaveLength(3);
+    expect(Math.min(...route.map((p) => p.y))).toBeLessThanOrEqual(-GRID_STEP);
+    expectSound(route, s, t, true);
+  });
+
+  it("holds every rule across sixteen side pairs and eight placements", () => {
+    const placements: Point[] = [
+      { x: 220, y: 0 },
+      { x: 220, y: 20 },
+      { x: 220, y: -40 },
+      { x: -220, y: 0 },
+      { x: -220, y: 40 },
+      { x: 0, y: 100 },
+      { x: 20, y: 100 },
+      { x: 40, y: -100 },
+    ];
+    let walked = 0;
+    for (const placement of placements) {
+      for (const sa of SIDES) {
+        for (const sb of SIDES) {
+          // The middle point, then one off-middle point on each side.
+          for (const [atS, atT] of [[0, 0], [1, -1], [-1, 1]]) {
+            const s = endOf({ x: 0, y: 0 }, sa, atS);
+            const t = endOf(placement, sb, atT);
+            expectSound(routeBetweenEnds(s, t), s, t, true);
+            walked++;
+          }
+        }
+      }
+    }
+    expect(walked).toBe(8 * 16 * 3);
+  });
+
+
+  const overlap = (a: Point, b: Point) => a.x < b.x + NODE_WIDTH && b.x < a.x + NODE_WIDTH && a.y < b.y + NODE_HEIGHT && b.y < a.y + NODE_HEIGHT;
+  function expectOutward(route: Point[], s: RouteEnd, t: RouteEnd) {
+    const segs = segments(route);
+    expect(Math.sign(segs[0].dx)).toBe(OUT[s.side].x);
+    expect(Math.sign(segs[0].dy)).toBe(OUT[s.side].y);
+    const last = segs[segs.length - 1];
+    expect(Math.sign(last.dx)).toBe(0 - OUT[t.side].x + 0);
+    expect(Math.sign(last.dy)).toBe(0 - OUT[t.side].y + 0);
+  }
   const revisits = (route: Point[]) => route.some((p, i) => route.some((q, j) => j > i && p.x === q.x && p.y === q.y));
 
   it("draws an opposing pair one grid step apart without a loop", () => {
@@ -711,6 +766,7 @@ describe("canvas geometry: routes between any two sides", () => {
       expect(route[route.length - 1]).toEqual(t.anchor);
       expect(segments(route).length).toBeLessThanOrEqual(5);
       expect(revisits(route)).toBe(false);
+      expectOutward(route, s, t);
     }
   });
 
@@ -739,9 +795,9 @@ describe("canvas geometry: routes between any two sides", () => {
     for (let x = -200; x <= 220; x += GRID_STEP) {
       for (let y = -80; y <= 120; y += GRID_STEP) {
         for (const sa of SIDES) {
-          for (const sb of SIDES) {
-            const s = endOf({ x: 0, y: 0 }, sa, 0);
-            const t = endOf({ x, y }, sb, 0);
+          for (const sb of SIDES) for (const [atS, atT] of [[0, 0], [1, -1]]) {
+            const s = endOf({ x: 0, y: 0 }, sa, atS);
+            const t = endOf({ x, y }, sb, atT);
             if (s.anchor.x === t.anchor.x && s.anchor.y === t.anchor.y) continue;
             const route = routeBetweenEnds(s, t);
             expect(route[0]).toEqual(s.anchor);
@@ -749,7 +805,19 @@ describe("canvas geometry: routes between any two sides", () => {
             expect(segments(route).length).toBeLessThanOrEqual(5);
             expect(revisits(route)).toBe(false);
             for (const g of segments(route)) expect(g.dx === 0 || g.dy === 0).toBe(true);
+            if (!overlap(s.node, t.node)) expectOutward(route, s, t);
           }
+        }
+      }
+    }
+  });
+
+  it("still returns a route for two overlapping nodes", () => {
+    for (const placement of [{ x: -120, y: -20 }, { x: 20, y: 20 }, { x: 0, y: 0 }, { x: 100, y: -40 }]) {
+      for (const sa of SIDES) {
+        for (const sb of SIDES) {
+          const route = routeBetweenEnds(endOf({ x: 0, y: 0 }, sa, 0), endOf(placement, sb, 0));
+          expect(route.length).toBeGreaterThanOrEqual(2);
         }
       }
     }
