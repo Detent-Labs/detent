@@ -4,7 +4,7 @@ import { endHandlesOf } from "../src/areas/studio/canvas/EndHandle.js";
 const positions = { step_a: { x: 0, y: 0 }, step_b: { x: 240, y: 0 } };
 
 describe("endHandlesOf", () => {
-  it("returns a handle at the route's first and last point, each holding its own point", () => {
+  it("returns a handle at the route's first and last point, excluding nothing", () => {
     const handles = endHandlesOf({
       pathId: "path_1",
       sourceId: "step_a",
@@ -14,8 +14,8 @@ describe("endHandlesOf", () => {
       hidden: new Set(),
     });
     expect(handles).toEqual([
-      { pathId: "path_1", end: "source", stepId: "step_a", anchor: { x: 180, y: 30 }, from: { side: "right", at: 0 }, exclude: undefined },
-      { pathId: "path_1", end: "target", stepId: "step_b", anchor: { x: 240, y: 30 }, from: { side: "left", at: 0 }, exclude: undefined },
+      { pathId: "path_1", end: "source", stepId: "step_a", anchor: { x: 180, y: 30 }, exclude: undefined },
+      { pathId: "path_1", end: "target", stepId: "step_b", anchor: { x: 240, y: 30 }, exclude: undefined },
     ]);
   });
 

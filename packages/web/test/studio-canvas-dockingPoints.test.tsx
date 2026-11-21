@@ -271,6 +271,11 @@ describe("a selected path's end handles", () => {
     expect(t("canvas.endHandle")).toBe("Drag to another point on this step.");
   });
 
+  it("names the step each handle hangs on, so a pointer moving onto it keeps the step's points", () => {
+    expect(handles.find((h) => h.includes('data-end-handle="source"'))).toContain('data-end-handle-step="step_review"');
+    expect(handles.find((h) => h.includes('data-end-handle="target"'))).toContain('data-end-handle-step="step_approve"');
+  });
+
   it("draws the handles after every docking point and before the disclosures", () => {
     const groups: StepGroup[] = [{ id: "group_x", stepIds: ["step_review", "step_approve"], name: "X" }];
     const grouped = render(["step_approve"], groups, { selectedPathId: "path_a" });
@@ -311,5 +316,14 @@ describe("a path from a step to itself", () => {
     expect(html).toContain('data-end-handle="target"');
     expect(html).toContain('cx="180" cy="30" r="5"');
     expect(html).toContain('cx="90" cy="0" r="5"');
+  });
+
+  it("keeps the target end on the left middle once the source end is re-hung, as the re-hang stores both", () => {
+    // The write an unstored self path gets for a source re-hang to top:0: the target stays on left:0.
+    const rehung = { path_self: { source: { side: "top" as const, at: 0 }, target: { side: "left" as const, at: 0 } } };
+    const after = render([], [], { draft: selfDraft, dockingPoints: rehung, selectedPathId: "path_self" });
+    expect(after).toContain('data-end-handle="source"');
+    expect(after).toContain('cx="90" cy="0" r="5"');
+    expect(after).toContain('cx="0" cy="30" r="5"');
   });
 });

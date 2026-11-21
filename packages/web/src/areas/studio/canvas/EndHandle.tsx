@@ -31,19 +31,28 @@ export function EndHandle({
   at,
   pathId,
   end,
+  stepId,
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onPointerLeave,
 }: {
   at: Point;
   pathId: string;
   end: "source" | "target";
+  stepId: string;
   onPointerDown: (e: React.PointerEvent) => void;
   onPointerMove: (e: React.PointerEvent) => void;
   onPointerUp: (e: React.PointerEvent) => void;
+  onPointerLeave: (e: React.PointerEvent) => void;
 }): React.JSX.Element {
   return (
-    <g className="panzoom-exclude" data-end-handle={end} data-path-id={pathId} aria-hidden="true">
+    <g className="panzoom-exclude" data-end-handle={end}
+      data-end-handle-step={stepId}
+      data-path-id={pathId}
+      aria-hidden="true"
+      onPointerLeave={onPointerLeave}
+    >
       <circle cx={at.x} cy={at.y} r={END_HANDLE_RADIUS} {...stylex.props(styles.dot)} />
       <circle
         cx={at.x}
@@ -63,14 +72,14 @@ export function EndHandle({
   );
 }
 
-/** One end handle to draw: where it sits, the step it hangs on, the point it
- * holds now, and the point a drag may not take. */
+/** One end handle to draw: where it sits, the step it hangs on, and the point a
+ * drag may not take. On a path that starts and ends on one step, `exclude` is
+ * the point the other end holds; on any other path it is absent. */
 export interface EndHandleSpec {
   pathId: string;
   end: "source" | "target";
   stepId: string;
   anchor: Point;
-  from: DockingEnd | undefined;
   exclude: DockingEnd | undefined;
 }
 
@@ -98,10 +107,10 @@ export function endHandlesOf(input: {
   const self = sourceId === targetId;
   const out: EndHandleSpec[] = [];
   if (!hidden.has(sourceId)) {
-    out.push({ pathId, end: "source", stepId: sourceId, anchor: first, from: sourceHeld, exclude: self ? targetHeld : undefined });
+    out.push({ pathId, end: "source", stepId: sourceId, anchor: first, exclude: self ? targetHeld : undefined });
   }
   if (!hidden.has(targetId)) {
-    out.push({ pathId, end: "target", stepId: targetId, anchor: last, from: targetHeld, exclude: self ? sourceHeld : undefined });
+    out.push({ pathId, end: "target", stepId: targetId, anchor: last, exclude: self ? sourceHeld : undefined });
   }
   return out;
 }

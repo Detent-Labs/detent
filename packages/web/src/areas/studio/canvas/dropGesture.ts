@@ -1,4 +1,5 @@
 import type { PathTrigger } from "workflow-engine/schema";
+import type { PathDockingEnds } from "./layout";
 import { checkConnection, type ConnectionCandidate } from "./connection";
 import {
   dockingPointsOf,
@@ -185,4 +186,28 @@ export function resolveEndDrop(input: {
   if (!grown) return undefined;
   const { side, at } = nearestDockingPoint(own, point, { exclude });
   return { side, at };
+}
+
+/**
+ * The layout entry a re-hang writes, or `undefined` where nothing changes. The
+ * dragged end takes `next`. A release on the point the end already stores
+ * changes nothing, while an unstored end stores its release even on its own
+ * automatic point. The other end keeps what it stores, or its absence. On a path
+ * that starts and ends on one step, `otherHeld` is the point the other end
+ * draws on: an unstored other end stores it, since an end with one stored
+ * neighbour on its own step no longer turns away on its own.
+ */
+export function endDropEntry(
+  entry: PathDockingEnds | undefined,
+  end: "source" | "target",
+  next: DockingEnd | undefined,
+  otherHeld?: DockingEnd,
+): PathDockingEnds | undefined {
+  if (!next) return undefined;
+  const stored = entry?.[end];
+  if (stored && stored.side === next.side && stored.at === next.at) return undefined;
+  const other = end === "source" ? "target" : "source";
+  const written: PathDockingEnds = { ...entry, [end]: next };
+  if (otherHeld && !entry?.[other]) written[other] = otherHeld;
+  return written;
 }

@@ -5,6 +5,7 @@ import {
   hitTestGrownNode,
   pressedDockingPoint,
   resolveEndDrop,
+  endDropEntry,
   resolveConnectDrop,
   resolveDropGesture,
 } from "../src/areas/studio/canvas/dropGesture.js";
@@ -251,10 +252,42 @@ describe("resolveEndDrop", () => {
   });
 
   it("skips the excluded point", () => {
-    expect(resolveEndDrop({ stepId: "step_a", nodes, point: { x: 181, y: 31 }, exclude: { side: "right", at: 0 } })).not.toEqual({ side: "right", at: 0 });
+    expect(resolveEndDrop({ stepId: "step_a", nodes, point: { x: 181, y: 31 }, exclude: { side: "right", at: 0 } })).toEqual({ side: "right", at: 1 });
   });
 
   it("returns nothing for a step it has no box for", () => {
     expect(resolveEndDrop({ stepId: "step_gone", nodes, point: { x: 10, y: 10 } })).toBeUndefined();
+  });
+});
+
+describe("endDropEntry", () => {
+  const left = { side: "left" as const, at: 0 };
+  const top = { side: "top" as const, at: 0 };
+  const right = { side: "right" as const, at: 0 };
+
+  it("stores an unstored end released on its own automatic point", () => {
+    expect(endDropEntry(undefined, "target", left)).toEqual({ target: left });
+    expect(endDropEntry({ source: right }, "target", left)).toEqual({ source: right, target: left });
+  });
+
+  it("writes nothing for a release equal to the stored point, or for no release point", () => {
+    expect(endDropEntry({ target: left }, "target", { ...left })).toBeUndefined();
+    expect(endDropEntry({ target: left }, "target", undefined)).toBeUndefined();
+  });
+
+  it("replaces the dragged end and leaves the other end's value or absence alone", () => {
+    expect(endDropEntry({ source: right, target: left }, "target", top)).toEqual({ source: right, target: top });
+    expect(endDropEntry({ target: left }, "target", top)).toEqual({ target: top });
+    expect(endDropEntry({ source: right }, "source", top)).toEqual({ source: top });
+  });
+
+  it("stores the other end's held point on a self path that stores none, so it stays where it was drawn", () => {
+    // An unstored self path draws source right:0 and target left:0. Re-hanging the source keeps the target on left:0.
+    expect(endDropEntry(undefined, "source", top, left)).toEqual({ source: top, target: left });
+    expect(endDropEntry(undefined, "target", top, right)).toEqual({ source: right, target: top });
+  });
+
+  it("keeps a stored other end on a self path", () => {
+    expect(endDropEntry({ target: right }, "source", top, left)).toEqual({ source: top, target: right });
   });
 });

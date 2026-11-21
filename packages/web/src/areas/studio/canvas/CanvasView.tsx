@@ -36,7 +36,7 @@ import { toggleSelection, normalizeRect, nodesInRect } from "./selection";
 import { drawnBox, hiddenStepIds, anchorBoxFor, type StepGroup } from "./groups";
 import { computeFit, fitInsets, revealPan, zoomAbout, ZOOM_KEY_FACTOR, MIN_SCALE, MAX_SCALE, type Fit } from "./fit";
 import { lastInputWasPointer } from "../focusScroll";
-import { checkConnectSource, dropTargetOf, pressedDockingPoint, resolveConnectDrop, resolveEndDrop } from "./dropGesture";
+import { checkConnectSource, dropTargetOf, endDropEntry, hitTestGrownNode, pressedDockingPoint, resolveConnectDrop, resolveEndDrop } from "./dropGesture";
 import { refusalSentence } from "./connection";
 import { menuNewStepSpot, wayOutMenuItems, type WayOutMenuItem } from "./wayOutMenuLogic";
 import { WayOutMenu, openWayOutMenu } from "./WayOutMenu";
@@ -485,7 +485,9 @@ const styles = stylex.create({
 function pointerMovesToStep(e: React.PointerEvent, stepId: string): boolean {
   const to = e.relatedTarget;
   if (!(to instanceof Element)) return false;
-  return to.closest(`.canvas-node[data-step-id="${stepId}"], [data-docking-step-id="${stepId}"]`) !== null;
+  return (
+    to.closest(`.canvas-node[data-step-id="${stepId}"], [data-docking-step-id="${stepId}"], [data-end-handle-step="${stepId}"]`) !== null
+  );
 }
 
 /** The `<g>` holding a drawn group's member nodes. Both disclosure controls —
@@ -1388,13 +1390,13 @@ export function CanvasView({
   const onEndPointerUp = (e: React.PointerEvent) => {
     e.stopPropagation();
     if (!endDrag) return;
-    const { pathId, end, stepId, from, exclude, start } = endDrag;
+    const { pathId, end, stepId, exclude, start } = endDrag;
     const point = toSvgPoint(e);
     setEndDrag(null);
     if (!exceedsClickThreshold(dragDelta(start, point))) return;
     const next = resolveEndDrop({ stepId, nodes: visibleNodePositions, point, exclude });
-    if (!next || (from && next.side === from.side && next.at === from.at)) return;
-    onDockingPointsChange(pathId, { ...dockingPoints[pathId], [end]: next });
+    const entry = endDropEntry(dockingPoints[pathId], end, next, exclude);
+    if (entry) onDockingPointsChange(pathId, entry);
   };
 
   const onWaypointDoubleClick = (e: React.MouseEvent, pathId: string, index: number) => {
@@ -1821,7 +1823,10 @@ export function CanvasView({
   const dockedStepIds = new Set<string>(selectedStepIds);
   if (connectDrag) {
     dockedStepIds.add(connectDrag.sourceStepId);
-    if (snap) dockedStepIds.add(snap.stepId);
+    // The step under the pointer draws its points even where the source is
+    // refused and no ring shows.
+    const under = hitTestGrownNode(connectDrag.current, visibleNodePositions);
+    if (under !== undefined) dockedStepIds.add(under);
   } else if (endDrag) {
     dockedStepIds.add(endDrag.stepId);
   } else if (pointedStepId !== undefined) {
@@ -2300,6 +2305,10 @@ export function CanvasView({
                 at={dragging ? (snap?.point.point ?? endDrag.current) : h.anchor}
                 pathId={h.pathId}
                 end={h.end}
+                stepId={h.stepId}
+                onPointerLeave={(e) => {
+                  if (!pointerMovesToStep(e, h.stepId)) setPointedStepId(undefined);
+                }}
                 onPointerDown={(e) => onEndPointerDown(e, h)}
                 onPointerMove={onEndPointerMove}
                 onPointerUp={onEndPointerUp}
