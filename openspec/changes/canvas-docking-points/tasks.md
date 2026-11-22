@@ -95,13 +95,13 @@ static markup, or by the e2e flow of group 7.
 
 ## 9. Verification
 
-- [ ] 9.1 Run `bun run typecheck` and paste its output.
-- [ ] 9.2 Run `bun run build` and paste its output.
-- [ ] 9.3 Run the full `bun test` with `DATABASE_URL` set, and paste the pass, skip and fail counts.
-- [ ] 9.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host, and the same with `whitespace.sh`.
-- [ ] 9.5 Walk the new `docs/browser-checks.md` entry in a real browser on the production build. Cover a resting canvas, a pointed-at step, a connect drag and a step move.
-- [ ] 9.6 In the same walk, cover an end handle drag, Arrange and an older draft. Cover a connect drag on an empty layout too.
-- [ ] 9.7 Run `/impeccable critique` and `/impeccable audit` on the Map tab route, and resolve what each reports.
+- [x] 9.1 Run `bun run typecheck` and paste its output.
+- [x] 9.2 Run `bun run build` and paste its output.
+- [x] 9.3 Run the full `bun test` with `DATABASE_URL` set, and paste the pass, skip and fail counts.
+- [x] 9.4 Run `sh scripts/gates/range.sh < /dev/null | sh scripts/gates/prose.sh` on the host, and the same with `whitespace.sh`.
+- [x] 9.5 Walk the new `docs/browser-checks.md` entry in a real browser on the production build. Cover a resting canvas, a pointed-at step, a connect drag and a step move.
+- [x] 9.6 In the same walk, cover an end handle drag, Arrange and an older draft. Cover a connect drag on an empty layout too.
+- [x] 9.7 Run `/impeccable critique` and `/impeccable audit` on the Map tab route, and resolve what each reports.
 
 ## Workflow follow-up
 
