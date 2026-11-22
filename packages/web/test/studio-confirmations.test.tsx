@@ -50,7 +50,7 @@ const CASES: Expected[] = [
     name: "ArrangeDialog",
     element: <ArrangeDialog {...handlers} />,
     heading: "Arrange every step?",
-    body: ["Every step moves to a new place, and each path loses the bends placed on it.", NO_UNDO],
+    body: ["Every step moves to a new place, and each path loses the bends placed on it.", "Each path goes back to the middle of a side.", NO_UNDO],
     confirm: "Arrange",
   },
   {

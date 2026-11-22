@@ -65,8 +65,8 @@ const FREE_LATTICE_POINT_STEP_LIMIT = 500;
  * Performs its own rect test rather than importing `nodesInRect` from
  * `selection.ts`, which already imports this module; the reverse import
  * would make a cycle. The test itself is the same inclusive bound
- * `hitTestNode` and `nodesInRect` use, so a step placed edge-to-edge with
- * another still counts as clear.
+ * `hitTestNode` and `nodesInRect` use, so a candidate that touches another
+ * rect edge-to-edge counts as overlapping and the walk goes on.
  */
 export function freeLatticePoint(wanted: Point, placed: NodePosition[]): Point {
   let candidate = wanted;
@@ -226,8 +226,11 @@ export interface WaypointRoute {
  * edge dragged over a step therefore leaves the top side, which is the whole
  * point of dragging the waypoint up there.
  *
- * A path with no waypoints takes `routeEdge` unchanged, so it draws exactly as
- * it drew before waypoints existed.
+ * A path with no waypoints and no stored end takes `routeEdge` unchanged, so it
+ * draws exactly as it drew before waypoints existed. A stored end anchors on its
+ * docking point in place of the turned anchor. With no waypoints, a stored end
+ * sends the path to `routeBetweenEnds`. With waypoints, the leg at a stored end
+ * leaves along that end's side (`legFromStoredEnd`).
  *
  * `legStarts` is not decoration. `midpointOfRoute` returns an index into the
  * drawn polyline's segments, and one leg draws as one or two of them, so that
@@ -241,16 +244,43 @@ export function routeThroughWaypoints(
   // node size. This is the one function the canvas calls per path, so a size
   // on the anchor rule alone would never reach it.
   sizes: { source?: Size; target?: Size } = {},
+  // A stored docking end per side of the path. An end with none, or with one
+  // its box lacks, takes the automatic rule.
+  ends: { source?: DockingEnd; target?: DockingEnd } = {},
 ): WaypointRoute {
   const sz = sizes.source ?? NODE_SIZE;
   const tz = sizes.target ?? NODE_SIZE;
+  const storedSource = ends.source && dockingAnchor(source, ends.source, sz) ? ends.source : undefined;
+  const storedTarget = ends.target && dockingAnchor(target, ends.target, tz) ? ends.target : undefined;
   if (waypoints.length === 0) {
+    if (storedSource || storedTarget) {
+      let s = routeEndOf(source, sz, storedSource, centreOf(target, tz));
+      let t = routeEndOf(target, tz, storedTarget, centreOf(source, sz));
+      // Both anchors on one point of one box (a self path) would draw no line.
+      // Two boxes that touch keep the zero-length route their shared point gives.
+      const oneBox = source.x === target.x && source.y === target.y && sz.width === tz.width && sz.height === tz.height;
+      if (oneBox && s.anchor.x === t.anchor.x && s.anchor.y === t.anchor.y) {
+        // Two identical stored ends take the automatic loop. One stored end
+        // keeps its point, and the other end turns to the opposing side.
+        if (storedSource && storedTarget) {
+          const a = anchorsForEdge(source, target, sizes);
+          return { points: routeEdge(a.source, a.target, a.leaving), legStarts: [0] };
+        }
+        if (storedSource) t = opposingEnd(t, s);
+        else s = opposingEnd(s, t);
+      }
+      return { points: routeBetweenEnds(s, t), legStarts: [0] };
+    }
     const a = anchorsForEdge(source, target, sizes);
     return { points: routeEdge(a.source, a.target, a.leaving), legStarts: [0] };
   }
 
-  const from = anchorSideToward(source, waypoints[0], sz);
-  const to = anchorSideToward(target, waypoints[waypoints.length - 1], tz);
+  const sourceEnd = storedSource && routeEndOf(source, sz, storedSource, waypoints[0]);
+  const targetEnd = storedTarget && routeEndOf(target, tz, storedTarget, waypoints[waypoints.length - 1]);
+  const from = sourceEnd ? { anchor: sourceEnd.anchor, leaving: DOCKING_LEAVING[sourceEnd.side] } : anchorSideToward(source, waypoints[0], sz);
+  const to = targetEnd
+    ? { anchor: targetEnd.anchor, leaving: DOCKING_LEAVING[targetEnd.side] }
+    : anchorSideToward(target, waypoints[waypoints.length - 1], tz);
   const chain = [from.anchor, ...waypoints, to.anchor];
   const last = chain.length - 2;
 
@@ -273,12 +303,65 @@ export function routeThroughWaypoints(
           : Math.abs(b.x - a.x) >= Math.abs(b.y - a.y)
             ? "x"
             : "y";
-    for (const p of routeLeg(a, b, leading)) {
+    const leg =
+      i === 0 && sourceEnd
+        ? legFromStoredEnd(sourceEnd, b)
+        : i === last && targetEnd
+          ? legFromStoredEnd(targetEnd, a).reverse()
+          : routeLeg(a, b, leading);
+    for (const p of leg) {
       const tail = points[points.length - 1];
       if (!tail || tail.x !== p.x || tail.y !== p.y) points.push(p);
     }
   }
   return { points, legStarts };
+}
+
+/**
+ * A path end for the router. A stored end names its side and anchor. Any other
+ * turns toward `toward` and takes that side's midpoint, which is the automatic
+ * rule.
+ */
+function routeEndOf(node: Point, size: Size, stored: DockingEnd | undefined, toward: Point): RouteEnd {
+  if (stored) return { anchor: dockingAnchor(node, stored, size) as Point, side: stored.side, node, size };
+  const turned = anchorSideToward(node, toward, size);
+  return { anchor: turned.anchor, side: SIDE_OF_LEAVING[turned.leaving], node, size };
+}
+
+/** `end` turned to the side opposing `held`'s, at that side's midpoint. */
+function opposingEnd(end: RouteEnd, held: RouteEnd): RouteEnd {
+  const side = SIDE_OF_LEAVING[OPPOSITE[DOCKING_LEAVING[held.side]]];
+  return { ...end, side, anchor: dockingPointAt(end.node, side, 0, end.size) as Point };
+}
+
+/**
+ * The leg from a stored end to the waypoint after it. A waypoint ahead of the
+ * side takes the plain leg, leading along the side's axis. One level with the
+ * side or behind it first gets a stub of one grid step outward.
+ *
+ * The leg then turns along the side to the waypoint's own coordinate on that
+ * axis, which a node's span plus one grid step may contain. It then first
+ * passes the nearer corner, one grid step clear, and takes its L from there:
+ * four segments at most. A tie takes the lower coordinate. This is the one leg
+ * with a gutter, since only an anchor has a box to clear.
+ */
+function legFromStoredEnd(end: RouteEnd, waypoint: Point): Point[] {
+  const d = OUTWARD[end.side];
+  const a = end.anchor;
+  if ((waypoint.x - a.x) * d.x + (waypoint.y - a.y) * d.y > 0) return routeLeg(a, waypoint, d.x !== 0 ? "x" : "y");
+
+  const stub = { x: a.x + d.x * GRID_STEP, y: a.y + d.y * GRID_STEP };
+  const r = rectOf(end.node, end.size);
+  const level = d.x !== 0;
+  const wanted = level ? waypoint.y : waypoint.x;
+  const lo = (level ? r.y0 : r.x0) - GRID_STEP;
+  const hi = (level ? r.y1 : r.x1) + GRID_STEP;
+  const clear = wanted <= lo || wanted >= hi;
+  const turn = clear ? wanted : Math.abs(wanted - lo) <= Math.abs(wanted - hi) ? lo : hi;
+  const raw = level
+    ? [a, stub, { x: stub.x, y: turn }, { x: waypoint.x, y: turn }, waypoint]
+    : [a, stub, { x: turn, y: stub.y }, { x: turn, y: waypoint.y }, waypoint];
+  return simplify(raw).points;
 }
 
 /**
@@ -444,4 +527,303 @@ export function routePath(points: Point[], style: EdgeStyle, radius = EDGE_CORNE
   }
   const last = points[points.length - 1];
   return `${d} L${last.x},${last.y}`;
+}
+
+/** A side of a node's box, as a stored docking end names it. */
+export type DockingSide = "top" | "right" | "bottom" | "left";
+
+/**
+ * One end of a path as stored: a side and a whole-number position counted from
+ * that side's midpoint in grid steps. It grows rightward on a top or bottom
+ * side and downward on a left or right side.
+ */
+export interface DockingEnd {
+  side: DockingSide;
+  at: number;
+}
+
+/** A docking point of one box: its stored end and its canvas point. */
+export interface DockingPoint extends DockingEnd {
+  point: Point;
+}
+
+const DOCKING_SIDES: DockingSide[] = ["top", "right", "bottom", "left"];
+
+/** The largest `|at|` a side holds. Fixed counts of 7 and 3, independent of the box size. */
+const DOCKING_REACH: Record<DockingSide, number> = { top: 3, bottom: 3, left: 1, right: 1 };
+
+const DOCKING_LEAVING: Record<DockingSide, LeaveDirection> = { top: "up", right: "right", bottom: "down", left: "left" };
+
+const dockingPointAt = (node: Point, side: DockingSide, at: number, size: Size): Point => {
+  const mid = SIDE[DOCKING_LEAVING[side]](node, size);
+  return side === "top" || side === "bottom" ? { x: mid.x + at * GRID_STEP, y: mid.y } : { x: mid.x, y: mid.y + at * GRID_STEP };
+};
+
+/**
+ * Every docking point of a box: seven on the top and bottom sides, three on the
+ * left and right sides, one grid step apart, the middle one on the side's
+ * midpoint. Order is top, right, bottom, left, each from low `at` to high.
+ */
+export function dockingPointsOf(node: Point, size: Size = NODE_SIZE): DockingPoint[] {
+  const points: DockingPoint[] = [];
+  for (const side of DOCKING_SIDES) {
+    const reach = DOCKING_REACH[side];
+    for (let at = -reach; at <= reach; at++) points.push({ side, at, point: dockingPointAt(node, side, at, size) });
+  }
+  return points;
+}
+
+/**
+ * The docking point of a box nearest a position, by straight distance. A tie
+ * takes the earlier point in `dockingPointsOf` order. `exclude` skips one end,
+ * for a drop on the pressed step's own box.
+ */
+export function nearestDockingPoint(
+  node: Point,
+  position: Point,
+  options: { exclude?: DockingEnd; size?: Size } = {},
+): DockingPoint {
+  const { exclude, size = NODE_SIZE } = options;
+  let best: DockingPoint | undefined;
+  let bestDistance = Infinity;
+  for (const p of dockingPointsOf(node, size)) {
+    if (exclude && p.side === exclude.side && p.at === exclude.at) continue;
+    const d = Math.hypot(p.point.x - position.x, p.point.y - position.y);
+    if (d < bestDistance) {
+      best = p;
+      bestDistance = d;
+    }
+  }
+  return best as DockingPoint;
+}
+
+/**
+ * Whether untrusted JSON is a stored end: an object naming one of the four
+ * sides and a whole-number position that side holds.
+ */
+export function isDockingEnd(value: unknown): value is DockingEnd {
+  if (!value || typeof value !== "object") return false;
+  const { side, at } = value as { side?: unknown; at?: unknown };
+  if (typeof side !== "string" || !DOCKING_SIDES.includes(side as DockingSide)) return false;
+  return typeof at === "number" && Number.isInteger(at) && Math.abs(at) <= DOCKING_REACH[side as DockingSide];
+}
+
+/**
+ * The anchor a stored end names on a box, or `undefined` for an unknown side or
+ * a position the side lacks (non-integer or beyond its reach).
+ */
+export function dockingAnchor(node: Point, end: DockingEnd, size: Size = NODE_SIZE): Point | undefined {
+  if (!isDockingEnd(end)) return undefined;
+  return dockingPointAt(node, end.side, end.at, size);
+}
+
+/**
+ * The stored end for an automatic anchor, which always sits on a side's
+ * midpoint. `undefined` when the anchor is no docking point of the box. A
+ * corner shared by two sides answers the earlier side in `dockingPointsOf` order.
+ */
+export function dockingEndOfAnchor(node: Point, anchor: Point, size: Size = NODE_SIZE): DockingEnd | undefined {
+  const hit = dockingPointsOf(node, size).find((p) => p.point.x === anchor.x && p.point.y === anchor.y);
+  return hit ? { side: hit.side, at: hit.at } : undefined;
+}
+
+/** Press target reach beyond a point's border, in user units. */
+export const PRESS_REACH_OUT = 12;
+/** Press target reach into the node from a point's border, in user units. */
+const PRESS_REACH_IN = 6;
+
+/**
+ * Whether a press lands on one docking point's target: 12 units outward and 6
+ * inward across the border, and half a grid step either way along it, so
+ * neighbouring targets meet halfway. Bounds are inclusive.
+ */
+export function inPressTarget(target: DockingPoint, press: Point): boolean {
+  const dx = press.x - target.point.x;
+  const dy = press.y - target.point.y;
+  const along = target.side === "top" || target.side === "bottom" ? dx : dy;
+  if (Math.abs(along) > GRID_STEP / 2) return false;
+  const across = target.side === "top" ? dy : target.side === "bottom" ? -dy : target.side === "left" ? dx : -dx;
+  // across < 0 is outward for every side.
+  return across >= -PRESS_REACH_OUT && across <= PRESS_REACH_IN;
+}
+
+/**
+ * One docking point's press target as rect attributes, the rectangle
+ * `inPressTarget` tests: 12 units outward from the border, 6 inward, and half a
+ * grid step either way along the side.
+ */
+export function pressTargetRect(p: DockingPoint): { x: number; y: number; width: number; height: number } {
+  const half = GRID_STEP / 2;
+  const { x, y } = p.point;
+  const depth = PRESS_REACH_OUT + PRESS_REACH_IN;
+  if (p.side === "top") return { x: x - half, y: y - PRESS_REACH_OUT, width: GRID_STEP, height: depth };
+  if (p.side === "bottom") return { x: x - half, y: y - PRESS_REACH_IN, width: GRID_STEP, height: depth };
+  if (p.side === "left") return { x: x - PRESS_REACH_OUT, y: y - half, width: depth, height: GRID_STEP };
+  return { x: x - PRESS_REACH_IN, y: y - half, width: depth, height: GRID_STEP };
+}
+
+/**
+ * One end of a path as the router reads it: the anchor, the side it sits on,
+ * and the box that side belongs to.
+ */
+export interface RouteEnd {
+  anchor: Point;
+  side: DockingSide;
+  node: Point;
+  size: Size;
+}
+
+const OUTWARD: Record<DockingSide, Point> = { top: { x: 0, y: -1 }, right: { x: 1, y: 0 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 } };
+
+const OPPOSING: Record<DockingSide, DockingSide> = { top: "bottom", bottom: "top", left: "right", right: "left" };
+
+const SIDE_OF_LEAVING: Record<LeaveDirection, DockingSide> = { right: "right", left: "left", down: "bottom", up: "top" };
+
+interface Rect {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+const rectOf = (n: Point, z: Size): Rect => ({ x0: n.x, y0: n.y, x1: n.x + z.width, y1: n.y + z.height });
+
+/**
+ * Drops repeated points and merges runs that continue in one direction.
+ * `doubled` reports two neighbouring segments on one axis running opposite
+ * ways, which no route may hold.
+ */
+function simplify(points: Point[]): { points: Point[]; doubled: boolean } {
+  const out: Point[] = [];
+  let doubled = false;
+  for (const p of dedupe(points)) {
+    while (out.length >= 2) {
+      const a = out[out.length - 2];
+      const b = out[out.length - 1];
+      const sx1 = Math.sign(b.x - a.x);
+      const sy1 = Math.sign(b.y - a.y);
+      const sx2 = Math.sign(p.x - b.x);
+      const sy2 = Math.sign(p.y - b.y);
+      if (sx1 * sy2 - sy1 * sx2 !== 0) break;
+      if (sx1 * sx2 + sy1 * sy2 < 0) {
+        doubled = true;
+        break;
+      }
+      out.pop();
+    }
+    out.push(p);
+  }
+  return { points: out, doubled };
+}
+
+/** Whether a route revisits a point or lays one segment over another. */
+function retraces(points: Point[]): boolean {
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) if (points[i].x === points[j].x && points[i].y === points[j].y) return true;
+  }
+  for (let i = 1; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      const [a, b, c, e] = [points[i - 1], points[i], points[j - 1], points[j]];
+      const level = a.y === b.y && c.y === e.y && a.y === c.y;
+      const upright = a.x === b.x && c.x === e.x && a.x === c.x;
+      if (level && Math.min(a.x, b.x) < Math.max(c.x, e.x) && Math.min(c.x, e.x) < Math.max(a.x, b.x)) return true;
+      if (upright && Math.min(a.y, b.y) < Math.max(c.y, e.y) && Math.min(c.y, e.y) < Math.max(a.y, b.y)) return true;
+    }
+  }
+  return false;
+}
+
+/** The segments of a route that cross the inside of a box or run along its border. */
+function segmentsMeeting(points: Point[], boxes: Rect[]): number {
+  let count = 0;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    for (const r of boxes) {
+      const meets =
+        a.y === b.y
+          ? a.y >= r.y0 && a.y <= r.y1 && Math.min(a.x, b.x) < r.x1 && Math.max(a.x, b.x) > r.x0
+          : a.x >= r.x0 && a.x <= r.x1 && Math.min(a.y, b.y) < r.y1 && Math.max(a.y, b.y) > r.y0;
+      if (meets) count++;
+    }
+  }
+  return count;
+}
+
+const lengthOf = (points: Point[]): number => points.slice(1).reduce((sum, p, i) => sum + Math.abs(p.x - points[i].x) + Math.abs(p.y - points[i].y), 0);
+
+/** The lattice line nearest halfway between two boxes along one axis. */
+function channelBetween(a0: number, a1: number, b0: number, b1: number): number {
+  const mid = a1 <= b0 ? (a1 + b0) / 2 : b1 <= a0 ? (b1 + a0) / 2 : (a0 + a1 + b0 + b1) / 4;
+  return Math.round(mid / GRID_STEP) * GRID_STEP;
+}
+
+/**
+ * The orthogonal route between two anchors on any pair of sides.
+ *
+ * Opposing sides that face each other (the target anchor two grid steps or more
+ * beyond the source anchor along the leaving axis) take `routeEdge`, so that
+ * pair draws as it always did. Every other pair, and every pair on one box,
+ * takes a search: each anchor gets a stub one grid step outward, and candidate
+ * middles join the two stub ends with up to three segments. A candidate's
+ * coordinates come from the stub ends, the channel between the boxes and a
+ * line one grid step outside each box and outside both together. The search
+ * drops a candidate that doubles back, then takes the fewest segments, then the
+ * shorter route, then the earlier candidate.
+ *
+ * A candidate that revisits a point or retraces a segment never wins, at any
+ * distance. One that crosses a box or runs along a border loses to any that does
+ * not. Where none is clean (boxes closer than two grid steps) the one with the
+ * fewest such segments wins, so a route always draws.
+ */
+export function routeBetweenEnds(source: RouteEnd, target: RouteEnd): Point[] {
+  const d = OUTWARD[source.side];
+  const beyond = (target.anchor.x - source.anchor.x) * d.x + (target.anchor.y - source.anchor.y) * d.y;
+  if (OPPOSING[source.side] === target.side && beyond >= 2 * GRID_STEP) {
+    return routeEdge(source.anchor, target.anchor, DOCKING_LEAVING[source.side]);
+  }
+
+  const boxes = [rectOf(source.node, source.size), rectOf(target.node, target.size)];
+  const [a, b] = boxes;
+  const dt = OUTWARD[target.side];
+  const from = { x: source.anchor.x + d.x * GRID_STEP, y: source.anchor.y + d.y * GRID_STEP };
+  const to = { x: target.anchor.x + dt.x * GRID_STEP, y: target.anchor.y + dt.y * GRID_STEP };
+
+  const xs = new Set<number>([from.x, to.x, channelBetween(a.x0, a.x1, b.x0, b.x1)]);
+  const ys = new Set<number>([from.y, to.y, channelBetween(a.y0, a.y1, b.y0, b.y1)]);
+  for (const r of [a, b]) {
+    xs.add(r.x0 - GRID_STEP).add(r.x1 + GRID_STEP);
+    ys.add(r.y0 - GRID_STEP).add(r.y1 + GRID_STEP);
+  }
+  xs.add(Math.min(a.x0, b.x0) - GRID_STEP).add(Math.max(a.x1, b.x1) + GRID_STEP);
+  ys.add(Math.min(a.y0, b.y0) - GRID_STEP).add(Math.max(a.y1, b.y1) + GRID_STEP);
+
+  // The empty middle joins the stub ends directly, so it needs them on one axis.
+  const middles: Point[][] = from.x === to.x || from.y === to.y ? [[]] : [];
+  middles.push([{ x: to.x, y: from.y }], [{ x: from.x, y: to.y }]);
+  for (const x of xs) middles.push([{ x, y: from.y }, { x, y: to.y }]);
+  for (const y of ys) middles.push([{ x: from.x, y }, { x: to.x, y }]);
+
+  const candidates = middles.map((middle) => [source.anchor, from, ...middle, to, target.anchor]);
+  // Opposing sides facing each other at any positive distance, anchors level on
+  // the other axis, also offer the straight one-segment route.
+  const level = d.x !== 0 ? source.anchor.y === target.anchor.y : source.anchor.x === target.anchor.x;
+  if (OPPOSING[source.side] === target.side && beyond > 0 && level) candidates.unshift([source.anchor, target.anchor]);
+
+  let best: Point[] | undefined;
+  let bestScore: number[] = [];
+  for (const candidate of candidates) {
+    const { points, doubled } = simplify(candidate);
+    if (doubled || retraces(points)) continue;
+    const score = [segmentsMeeting(points, boxes), points.length - 1, lengthOf(points)];
+    if (!best || score[0] < bestScore[0] || (score[0] === bestScore[0] && (score[1] < bestScore[1] || (score[1] === bestScore[1] && score[2] < bestScore[2])))) {
+      best = points;
+      bestScore = score;
+    }
+  }
+  // The final L runs only when no candidate survives, which needs overlapping boxes; it may leave a box sideways, and the route still draws.
+  // Two coincident anchors (touching boxes on facing midpoints) admit no route
+  // that revisits no point, so they return the two-point route of zero length.
+  const same = source.anchor.x === target.anchor.x && source.anchor.y === target.anchor.y;
+  return best ?? (same ? [source.anchor, target.anchor] : dedupe([source.anchor, { x: target.anchor.x, y: source.anchor.y }, target.anchor]));
 }

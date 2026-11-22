@@ -41,6 +41,7 @@ export function ArrangeDialog({ triggerRef, onCancel, onConfirm }: ConfirmationP
       confirm={<DestructiveConfirm onClick={onConfirm}>{t("arrangeDialog.confirm")}</DestructiveConfirm>}
     >
       <DialogNote>{t("arrangeDialog.body")}</DialogNote>
+      <DialogNote>{t("arrangeDialog.points")}</DialogNote>
       <DialogNote>{t("dialog.noUndo")}</DialogNote>
     </StudioDialog>
   );

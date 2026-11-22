@@ -1,11 +1,11 @@
 import type * as Dagre from "@dagrejs/dagre";
-import { autoPlaceSteps, COLUMN_WIDTH, ROW_HEIGHT, type LayoutStep } from "./layout";
+import { COLUMN_WIDTH, drawnPositions, readDockingPoints, ROW_HEIGHT, type LayoutStep } from "./layout";
 import { NODE_SIZE, type Point } from "./geometry";
 import { drawnBox, groupOf, type Box, type StepGroup } from "./groups";
 
 /** Every step's stored or rendered position, the same fallback
  * `CanvasView.tsx`'s own `positionOf` applies: an explicit `layout[stepId]`
- * where one is a real point, else `autoPlaceSteps`'s computed default. Group
+ * where one is a real point, else the computed default `drawnPositions` applies. Group
  * sizing needs every member resolved to a real point, which `existingLayout`
  * alone cannot promise (design.md, Decision 3). */
 function resolvePositions(
@@ -13,16 +13,7 @@ function resolvePositions(
   initialStepId: string | undefined,
   existingLayout: Record<string, unknown>,
 ): Record<string, Point> {
-  const autoPlaced = autoPlaceSteps(steps, initialStepId, existingLayout);
-  const resolved: Record<string, Point> = { ...autoPlaced };
-  for (const s of steps) {
-    if (!s.id) continue;
-    const recorded = existingLayout[s.id];
-    if (recorded && typeof (recorded as Point).x === "number" && typeof (recorded as Point).y === "number") {
-      resolved[s.id] = recorded as Point;
-    }
-  }
-  return resolved;
+  return drawnPositions(steps, initialStepId, existingLayout);
 }
 
 /** A dagre-returned point is a node's CENTER; this codebase's own `Point`
@@ -135,14 +126,15 @@ export async function arrangeSteps(
 
 /**
  * Whether a draft holds anything an arrange could discard: an explicit
- * author action, and only that, writes either kind. A step still on the
- * auto-placed default carries no `layout[stepId]` entry, and a waypoint
- * reaches `layout.waypoints` on its own, with no step ever hand-placed
+ * author action, and only that, writes any kind. A step still on the
+ * auto-placed default carries no `layout[stepId]` entry, and a waypoint or a
+ * docking point reaches the layout on its own, with no step ever hand-placed
  * first (design.md, Decision 5).
  */
 export function hasHandPlacedStep(steps: LayoutStep[], layout: Record<string, unknown>): boolean {
   const hasPlacedStep = steps.some((s) => s.id && layout[s.id] !== undefined);
   if (hasPlacedStep) return true;
   const waypoints = layout.waypoints;
-  return !!waypoints && typeof waypoints === "object" && Object.keys(waypoints).length > 0;
+  if (waypoints && typeof waypoints === "object" && Object.keys(waypoints).length > 0) return true;
+  return Object.keys(readDockingPoints(layout)).length > 0;
 }
