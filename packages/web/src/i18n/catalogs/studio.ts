@@ -35,6 +35,7 @@ export const en = {
   "leaveDialog.confirmJson": "Leave without applying",
   "arrangeDialog.heading": "Arrange every step?",
   "arrangeDialog.body": "Every step moves to a new place, and each path loses the bends placed on it.",
+  "arrangeDialog.points": "Each path goes back to the middle of a side.",
   "arrangeDialog.confirm": "Arrange",
   "restoreDialog.heading": "Replace your current changes?",
   "restoreDialog.body": "The restored copy takes their place.",
@@ -1209,6 +1210,7 @@ export const en = {
   "canvas.otherwise": "Otherwise",
   "canvas.connectHandle": "Drag to a step to add a way out, or to empty space to add a new step.",
   "canvas.connectHandleEnd": "An end has no way out.",
+  "canvas.endHandle": "Drag to another point on this step.",
   "canvas.connectRefused": "This step cannot take another way out here.",
   "canvas.connectNeedsOrder": "“{step}” already has a way out that happens by itself. Add the next one under {section}, and give it a number.",
 

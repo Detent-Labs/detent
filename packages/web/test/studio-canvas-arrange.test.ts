@@ -119,6 +119,17 @@ describe("hasHandPlacedStep", () => {
     expect(hasHandPlacedStep(steps, { waypoints: { path_1: [{ x: 1, y: 1 }] } })).toBe(true);
   });
 
+  it("reports true on a draft with only a stored docking point", () => {
+    const steps = [step("step_a"), step("step_b")];
+    expect(hasHandPlacedStep(steps, { dockingPoints: { path_1: { source: { side: "right", at: 0 } } } })).toBe(true);
+  });
+
+  it("reports false on a draft whose docking points are empty or malformed", () => {
+    const steps = [step("step_a"), step("step_b")];
+    expect(hasHandPlacedStep(steps, { dockingPoints: {} })).toBe(false);
+    expect(hasHandPlacedStep(steps, { dockingPoints: { path_1: { source: { side: "nowhere", at: 0 } } } })).toBe(false);
+  });
+
   it("reports false on a draft with neither a stored step position nor a waypoint", () => {
     const steps = [step("step_a"), step("step_b")];
     expect(hasHandPlacedStep(steps, {})).toBe(false);
