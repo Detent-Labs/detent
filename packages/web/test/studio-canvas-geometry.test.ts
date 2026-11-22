@@ -758,13 +758,22 @@ describe("canvas geometry: routes between any two sides", () => {
     expect(routeBetweenEnds(down, up)).toEqual([down.anchor, up.anchor]);
   });
 
-  it("takes the facing route for an opposing pair exactly two grid steps apart", () => {
-    // 40 beyond the source anchor meets the facing rule's bound (`>= 2 * GRID_STEP`).
-    for (const dy of [0, 20]) {
-      const s = endOf({ x: 0, y: 0 }, "right", 0);
-      const t = endOf({ x: 220, y: dy }, "left", 0);
-      expect(routeBetweenEnds(s, t)).toEqual(routeEdge(s.anchor, t.anchor, "right"));
+  it("takes the facing route at two grid steps and the router's own at one", () => {
+    // At exactly 40 units the router's search lands on the `routeEdge` route for every row and
+    // offset probed, so no placement there separates `>=` from `>` in the facing rule. The test
+    // documents that with both outputs side by side.
+    for (const dy of [0, 10, 20, 40, -20]) {
+      for (const at of [-1, 0, 1]) {
+        const s = endOf({ x: 0, y: 0 }, "right", at);
+        const t = endOf({ x: 220, y: dy }, "left", 0);
+        expect(routeBetweenEnds(s, t)).toEqual(routeEdge(s.anchor, t.anchor, "right"));
+      }
     }
+    // At one grid step the rule does not apply, and the two routes differ.
+    const s = endOf({ x: 0, y: 0 }, "right", 0);
+    const t = endOf({ x: 200, y: 10 }, "left", 0);
+    expect(routeBetweenEnds(s, t)).not.toEqual(routeEdge(s.anchor, t.anchor, "right"));
+    expect(routeBetweenEnds(s, t)).toHaveLength(6);
   });
 
   it("keeps a close opposing pair on other rows to at most five segments and no loop", () => {
@@ -949,6 +958,11 @@ describe("canvas geometry: a waypointed route keeps its stored points", () => {
     const route = routeThroughWaypoints(A, A, [], {}, { source: same, target: same });
     expect(route.points).toEqual(routeThroughWaypoints(A, A).points);
     expect(route.points.length).toBeGreaterThan(2);
+  });
+
+  it("keeps the zero-length route for two touching boxes whose stored ends share a point", () => {
+    const route = routeThroughWaypoints({ x: 0, y: 0 }, { x: 180, y: 0 }, [], {}, { source: { side: "right", at: 0 }, target: { side: "left", at: 0 } });
+    expect(route.points).toEqual([{ x: 180, y: 30 }, { x: 180, y: 30 }]);
   });
 
   it("turns the unstored end toward the far box", () => {

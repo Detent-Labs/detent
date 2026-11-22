@@ -257,7 +257,9 @@ export function routeThroughWaypoints(
       let s = routeEndOf(source, sz, storedSource, centreOf(target, tz));
       let t = routeEndOf(target, tz, storedTarget, centreOf(source, sz));
       // Both anchors on one point of one box (a self path) would draw no line.
-      if (s.anchor.x === t.anchor.x && s.anchor.y === t.anchor.y) {
+      // Two boxes that touch keep the zero-length route their shared point gives.
+      const oneBox = source.x === target.x && source.y === target.y && sz.width === tz.width && sz.height === tz.height;
+      if (oneBox && s.anchor.x === t.anchor.x && s.anchor.y === t.anchor.y) {
         // Two identical stored ends take the automatic loop. One stored end
         // keeps its point, and the other end turns to the opposing side.
         if (storedSource && storedTarget) {

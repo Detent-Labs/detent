@@ -296,3 +296,54 @@ describe("layoutAfterConnect", () => {
     expect(next.step_member).toEqual({ x: 240, y: 120 });
   });
 });
+
+describe("drawnPositions clears stored steps", () => {
+  const overlaps = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    a.x <= b.x + 180 && a.x + 180 >= b.x && a.y <= b.y + 60 && a.y + 60 >= b.y;
+  const anyOverlap = (all: Record<string, { x: number; y: number }>) => {
+    const ids = Object.keys(all);
+    return ids.some((a, i) => ids.slice(i + 1).some((b) => overlaps(all[a], all[b])));
+  };
+
+  it("draws a draft that stores no position exactly as autoPlaceSteps computes it", () => {
+    const graphs = [
+      [step("a", [{ to: "b" }]), step("b", [{ to: "c" }]), step("c")],
+      [step("a", [{ to: "b" }, { to: "c" }]), step("b", [{ to: "d" }]), step("c", [{ to: "e" }]), step("d"), step("e")],
+      [step("a"), step("x"), step("y"), step("z", [{ to: "a" }])],
+      [step("a", [{ to: "a" }])],
+    ];
+    for (const steps of graphs) {
+      expect(drawnPositions(steps, steps[0].id, {})).toEqual(autoPlaceSteps(steps, steps[0].id, {}));
+    }
+    expect(drawnPositions(graphs[0], "missing", {})).toEqual(autoPlaceSteps(graphs[0], "missing", {}));
+  });
+
+  it("moves a computed position off a stored step's slot, to the nearest free lattice point on its right", () => {
+    // The four steps store their automatic slots; a fifth, listed before the last two, computes the slot of "c".
+    const steps = [step("a", [{ to: "b" }]), step("b"), step("e"), step("c"), step("d")];
+    const layout = { a: { x: 0, y: 0 }, b: { x: 240, y: 0 }, c: { x: 480, y: 120 }, d: { x: 480, y: 240 } };
+    expect(autoPlaceSteps(steps, "a", layout).e).toEqual({ x: 480, y: 0 });
+    layout.c = { x: 480, y: 0 };
+    const drawn = drawnPositions(steps, "a", layout);
+    expect(drawn.e).toEqual({ x: 680, y: 0 });
+    expect(drawn.c).toEqual({ x: 480, y: 0 });
+    expect(anyOverlap(drawn)).toBe(false);
+  });
+
+  it("keeps two auto-placed steps off one slot", () => {
+    const steps = [
+      step("a", [{ to: "b" }, { to: "c" }]),
+      step("b", [{ to: "d" }]),
+      step("c", [{ to: "e" }]),
+      step("d"),
+      step("e"),
+    ];
+    const layout = { b: { x: 240, y: 120 } };
+    const first = drawnPositions(steps, "a", layout);
+    // `freeLatticePoint` walks right by a node width plus one grid step.
+    expect(first.c).toEqual({ x: 440, y: 120 });
+    expect(first.e).toEqual({ x: 680, y: 120 });
+    expect(anyOverlap(first)).toBe(false);
+    expect(drawnPositions(steps, "a", layout)).toEqual(first);
+  });
+});

@@ -1,9 +1,11 @@
 import {
   dockingEndOfAnchor,
   isDockingEnd,
+  freeLatticePoint,
   routeThroughWaypoints,
   snapToGrid,
   type DockingEnd,
+  type NodePosition,
   type Point,
 } from "./geometry";
 import { anchorBoxFor, hiddenStepIds, type StepGroup } from "./groups";
@@ -101,8 +103,8 @@ export function isPoint(value: unknown): value is Point {
  *
  * Three sources answer, in order. A stored `layout` entry wins where it parses
  * as a point, so a step keeps where its author dragged it. A step absent from
- * the blob takes the `autoPlaceSteps` default, which is what the canvas draws
- * for a step nobody has dragged. A step neither source places takes the
+ * the blob takes the `autoPlaceSteps` default, moved right to the nearest free
+ * lattice point where it would overlap another step. A step neither source places takes the
  * origin, so a caller never reads `undefined` out of the record.
  *
  * The rule has this one home. `CanvasView.positionOf` and the canvas bar's own
@@ -116,10 +118,25 @@ export function drawnPositions(
 ): Record<string, Point> {
   const autoPlaced = autoPlaceSteps(steps, initialStepId, layout);
   const drawn: Record<string, Point> = {};
+  // Every stored step is occupied from the start. A computed position that
+  // overlaps an occupied one moves right to the nearest free lattice point, in
+  // step order, and then counts as occupied for the next. A draft that stores
+  // nothing keeps `autoPlaceSteps`'s slots, which never overlap.
+  const occupied: NodePosition[] = [];
   for (const s of steps) {
     if (!s.id) continue;
     const stored = layout[s.id];
-    drawn[s.id] = isPoint(stored) ? stored : (autoPlaced[s.id] ?? { x: 0, y: 0 });
+    if (isPoint(stored)) {
+      drawn[s.id] = stored;
+      occupied.push({ id: s.id, ...stored });
+    }
+  }
+  for (const s of steps) {
+    if (!s.id || isPoint(layout[s.id])) continue;
+    const at = autoPlaced[s.id] ?? { x: 0, y: 0 };
+    const placed = occupied.length === 0 ? at : freeLatticePoint(at, occupied);
+    drawn[s.id] = placed;
+    occupied.push({ id: s.id, ...placed });
   }
   return drawn;
 }
