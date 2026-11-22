@@ -21,6 +21,7 @@
  * following the DATABASE_URL / AUTH_JWT_SECRET convention.
  */
 
+import type { Socket, TLSOptions } from "bun";
 import { z } from "zod";
 import { emailAddressSchema, emailsForUserIds } from "../auth/users.js";
 import { durationMs } from "../engine/duration.js";
@@ -77,7 +78,7 @@ export const notificationEmailConfigSchema = z
  */
 export type NotificationEmailResult = { messageId: string; recipients: string[] };
 
-type Reply = { code: number; text: string };
+type Reply = { code: number; text: string; lines: string[] };
 
 type SmtpEnv = { host: string; port: number; user?: string; password?: string; from: string };
 
@@ -118,25 +119,77 @@ function requireOk(reply: Reply, what: string): Reply {
  * The socket is mutable because STARTTLS replaces it: upgradeTLS returns a new
  * TLS socket, and everything after the handshake writes to that one.
  */
-class SmtpWire {
+export class SmtpWire {
+  /** The session step in progress. A failure that ends the wire names it. */
+  readonly phase = { current: "connect" };
   private buffer = "";
   private ready: Reply[] = [];
   private waiter: { resolve: (r: Reply) => void; reject: (e: Error) => void } | null = null;
   private failure: Error | null = null;
+  // True from the STARTTLS upgrade until the TLS handshake completes.
+  private handshaking = false;
+  // True once the upgrade began. From then on only the attached TLS socket
+  // feeds the reply reader. The raw TCP socket keeps calling `handlers` with the
+  // bytes on the wire: plain text, the server's handshake records, later
+  // ciphertext. The TLS layer reads those itself, so none of them is a reply.
+  private upgraded = false;
+  private handshakeWaiter: { resolve: () => void; reject: (e: Error) => void } | null = null;
   // Structural rather than `Socket<T>`: Bun.connect hands back a
   // `Socket<undefined>` and upgradeTLS a `Socket<unknown>`, and the wire needs
   // neither generic — only these two methods.
   private socket: { write(data: string): unknown; end(): unknown } | null = null;
 
-  /** Handlers for both the plain and the upgraded socket — the wire is the same either way. */
+  /** Handlers for both sockets. After the upgrade, `data` and `handshake` read only the attached TLS socket. */
   readonly handlers = {
-    data: (_s: unknown, chunk: Uint8Array) => this.onData(chunk),
-    error: (_s: unknown, err: Error) => this.fail(err),
-    close: () => this.fail(new Error("notification.email: the SMTP server closed the connection")),
+    data: (s: unknown, chunk: Uint8Array) => {
+      if (this.upgraded && s !== this.socket) return;
+      this.onData(chunk);
+    },
+    handshake: (s: unknown, success: boolean, authorizationError: Error | null) => {
+      if (this.upgraded && s !== this.socket) return;
+      if (success && !authorizationError) {
+        this.handshaking = false;
+        const waiter = this.handshakeWaiter;
+        this.handshakeWaiter = null;
+        waiter?.resolve();
+        return;
+      }
+      const cause = authorizationError ?? new Error("handshake refused");
+      this.fail(
+        new Error(`notification.email: the TLS handshake failed during ${this.phase.current}: ${cause.message}`, { cause }),
+      );
+    },
+    error: (_s: unknown, err: Error) =>
+      this.fail(
+        new Error(`notification.email: the SMTP connection failed during ${this.phase.current}: ${err.message}`, { cause: err }),
+      ),
+    close: () =>
+      this.fail(new Error(`notification.email: the SMTP server closed the connection during ${this.phase.current}`)),
   };
 
   attach(socket: { write(data: string): unknown; end(): unknown }): void {
     this.socket = socket;
+  }
+
+  /**
+   * Called when STARTTLS gets its 2xx, right before upgradeTLS. Drops every
+   * reply the plain socket still holds (RFC 3207 §4.2). The caller attaches the
+   * TLS socket in the same tick, and only that socket is read from then on.
+   */
+  beginTls(): void {
+    this.buffer = "";
+    this.ready = [];
+    this.upgraded = true;
+    this.handshaking = true;
+  }
+
+  /** Resolve when the TLS handshake completes, or reject with whatever ended the session first. */
+  tlsReady(): Promise<void> {
+    if (this.failure) return Promise.reject(this.failure);
+    if (!this.handshaking) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+      this.handshakeWaiter = { resolve, reject };
+    });
   }
 
   write(line: string): void {
@@ -185,6 +238,11 @@ class SmtpWire {
 
   private fail(err: Error): void {
     this.failure ??= err;
+    const handshakeWaiter = this.handshakeWaiter;
+    if (handshakeWaiter) {
+      this.handshakeWaiter = null;
+      handshakeWaiter.reject(this.failure);
+    }
     const waiter = this.waiter;
     if (waiter) {
       this.waiter = null;
@@ -212,7 +270,11 @@ function completeReplyEnd(buf: string): number {
 function parseReply(raw: string): Reply {
   const lines = raw.split("\r\n").filter((l) => l.length > 0);
   const last = lines[lines.length - 1] ?? "";
-  return { code: Number(last.slice(0, 3)), text: lines.map((l) => l.slice(4)).join(" ").trim() };
+  return {
+    code: Number(last.slice(0, 3)),
+    text: lines.map((l) => l.slice(4)).join(" ").trim(),
+    lines: lines.map((l) => l.slice(4).trim()),
+  };
 }
 
 /** RFC 2047 encoding, applied only when the subject leaves printable ASCII. */
@@ -271,6 +333,26 @@ function buildMessageId(idempotencyKey: string, from: string, batchNumber?: numb
   return `<${idempotencyKey}${suffix}@${domain}>`;
 }
 
+/** True when an EHLO extension line, any line after the first, opens with the STARTTLS keyword. */
+function offersStartTls(ehlo: Reply): boolean {
+  return ehlo.lines.slice(1).some((line) => line.split(/\s/)[0]?.toUpperCase() === "STARTTLS");
+}
+
+/**
+ * Upgrades the connection to TLS and resolves once the handshake completes.
+ * Named separately from "STARTTLS": a failure from here on is the TLS
+ * handshake, not the command. The step starts before the upgrade, so a failure
+ * that fires while upgradeTLS runs names it too. `extraTls` exists for the
+ * tests, which trust a test CA. `runSession` passes none.
+ */
+export async function startTls(wire: SmtpWire, socket: Socket<undefined>, host: string, extraTls: TLSOptions = {}): Promise<void> {
+  wire.phase.current = "TLS handshake";
+  wire.beginTls();
+  const [, tlsSocket] = socket.upgradeTLS({ tls: { ...extraTls, serverName: host }, socket: wire.handlers });
+  wire.attach(tlsSocket);
+  await wire.tlsReady();
+}
+
 /** One SMTP session: the whole conversation for one batch, ending with the point of no return. */
 async function runSession(
   wire: SmtpWire,
@@ -278,8 +360,8 @@ async function runSession(
   recipients: string[],
   env: SmtpEnv,
   messageId: string,
-  phase: { current: string },
 ): Promise<void> {
+  const { phase } = wire;
   phase.current = "connect";
   const socket = await Bun.connect({ hostname: env.host, port: env.port, socket: wire.handlers });
   wire.attach(socket);
@@ -290,16 +372,13 @@ async function runSession(
   wire.write(`EHLO ${clientName(env.from)}\r\n`);
   let ehlo = requireOk(await wire.next(), "EHLO");
 
-  if (/\bSTARTTLS\b/i.test(ehlo.text)) {
+  // The first line carries the server's own name, so only the extension lines
+  // (RFC 5321 §4.1.1.1) can offer STARTTLS.
+  if (offersStartTls(ehlo)) {
     phase.current = "STARTTLS";
     wire.write("STARTTLS\r\n");
     requireOk(await wire.next(), "STARTTLS");
-    const [, tlsSocket] = socket.upgradeTLS({ tls: { serverName: env.host }, socket: wire.handlers });
-    wire.attach(tlsSocket);
-    // Named separately from "STARTTLS": a stall here is the TLS handshake, not
-    // the command. Without the distinction an operator reads only "the session
-    // timed out" and has no reason to suspect the certificate or the upgrade.
-    phase.current = "TLS handshake";
+    await startTls(wire, socket, env.host);
     wire.write(`EHLO ${clientName(env.from)}\r\n`);
     ehlo = requireOk(await wire.next(), "EHLO after STARTTLS");
   } else if (env.user) {
@@ -360,20 +439,17 @@ async function deliverBatch(
   timeoutMs: number,
 ): Promise<void> {
   const wire = new SmtpWire();
-  // The session step that was waiting when the bound fired. A bare "the session
-  // timed out" leaves an operator without the one fact that localizes the fault.
-  const phase = { current: "connect" };
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
     timeoutHandle = setTimeout(() => {
       // Release the socket rather than waiting for the outbox's claim lease.
       wire.close();
-      reject(new Error(`notification.email: the SMTP session exceeded ${timeoutMs}ms during ${phase.current}`));
+      reject(new Error(`notification.email: the SMTP session exceeded ${timeoutMs}ms during ${wire.phase.current}`));
     }, timeoutMs);
   });
 
   try {
-    await Promise.race([runSession(wire, config, batch, env, messageId, phase), deadline]);
+    await Promise.race([runSession(wire, config, batch, env, messageId), deadline]);
   } finally {
     clearTimeout(timeoutHandle);
     wire.close();

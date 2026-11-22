@@ -82,6 +82,7 @@ function renderCanvas(): string {
       <CanvasView
         layout={LAYOUT}
         onMoveStep={() => {}}
+        onMoveSteps={() => {}}
         onArrange={() => {}}
         selectedStepIds={[]}
         onSelectStep={() => {}}
@@ -89,6 +90,8 @@ function renderCanvas(): string {
         edgeStyle="step"
         onEdgeStyleChange={() => {}}
         waypoints={{}}
+        dockingPoints={{}}
+        onDockingPointsChange={() => {}}
         onWaypointsChange={() => {}}
         groups={GROUPS}
         onGroupsChange={() => {}}
@@ -172,7 +175,6 @@ const CANVAS = elementsOf(HTML, (openTag) => isTag(openTag, "svg", "svg"))[0];
 
 const NODES = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "g", "canvas-node"));
 const EDGES = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "g", "edgeGroup"));
-const HANDLES = elementsOf(CANVAS.inner, (openTag) => openTag.startsWith("<g ") && attr(openTag, "data-connect-step-id") !== undefined);
 const DISCLOSURES = elementsOf(CANVAS.inner, (openTag) => isTag(openTag, "button", "groupDisclosure"));
 
 describe("the canvas node's accessibility markup", () => {
@@ -307,41 +309,14 @@ describe("the canvas node's accessibility markup", () => {
     expect(block).toContain(`paddingInline: ${SENTENCE_PADDING},`);
   });
 
-  // The defect: a connect handle with no word for its gesture.
-  it("titles each connect handle with its gesture, and an end's with why it has none", () => {
-    const titleOf = (stepId: string) => {
-      const handle = HANDLES.find((h) => attr(h.open, "data-connect-step-id") === stepId);
-      return elementsOf(handle?.inner ?? "", (openTag) => openTag.startsWith("<title")).map((title) => title.inner);
-    };
-    expect(titleOf("step_capture")).toEqual([t("canvas.connectHandle")]);
-    expect(titleOf("step_review")).toEqual([t("canvas.connectHandle")]);
-    expect(titleOf("step_reject")).toEqual([t("canvas.connectHandleEnd")]);
+  // A resting canvas draws no handle and no docking point. The points draw on a
+  // pointed-at or selected step (`studio-canvas-dockingPoints.test.tsx`).
+  it("draws no connect handle on a resting canvas", () => {
+    expect(CANVAS.inner).not.toContain("data-connect-step-id");
+    expect(CANVAS.inner).not.toContain("data-docking-point");
+    for (const node of NODES) expect(node.inner).not.toContain("<circle");
     expect(t("canvas.connectHandle")).toBe("Drag to a step to add a way out, or to empty space to add a new step.");
     expect(t("canvas.connectHandleEnd")).toBe("An end has no way out.");
-  });
-
-  // The defect: a sentence drawn over a connect handle, which took the press
-  // that starts a connect drag. Each handle now draws after every sentence
-  // and every node, and before the disclosures, which stay last.
-  it("draws each connect handle above every sentence, at its node's right edge", () => {
-    expect(HANDLES.map((h) => attr(h.open, "data-connect-step-id"))).toEqual(["step_capture", "step_review", "step_reject"]);
-    for (const node of NODES) expect(node.inner).not.toContain("<circle");
-    const firstHandle = CANVAS.inner.indexOf("data-connect-step-id=");
-    const lastSentence = CANVAS.inner.lastIndexOf("edgeLabel");
-    const firstDisclosure = CANVAS.inner.indexOf("groupDisclosure");
-    expect(lastSentence).toBeGreaterThan(-1);
-    expect(firstHandle).toBeGreaterThan(lastSentence);
-    expect(firstDisclosure).toBeGreaterThan(CANVAS.inner.lastIndexOf("data-connect-step-id="));
-    for (const handle of HANDLES) {
-      expect(attr(handle.open, "aria-hidden")).toBe("true");
-      expect((attr(handle.open, "class") ?? "").split(" ")).toContain("panzoom-exclude");
-    }
-    // step_review stands at (240, 0): its handle sits at (420, 30).
-    const review = HANDLES.find((h) => attr(h.open, "data-connect-step-id") === "step_review");
-    const circles = elementsOf(review?.inner ?? "", (openTag) => openTag.startsWith("<circle"));
-    expect(circles.length).toBe(2);
-    expect(review?.inner).toContain('cx="420" cy="30" r="7"');
-    expect(review?.inner).toContain('cx="420" cy="30" r="12"');
   });
 
   // The defect: a disclosure reporting one state in both, so the author never
@@ -416,5 +391,54 @@ describe("the canvas node's accessibility markup", () => {
       expect(controls).toBeString();
       expect(elementsOf(CANVAS.inner, (openTag) => openTag.startsWith("<g") && attr(openTag, "id") === controls).length).toBe(1);
     }
+  });
+
+  // The defect class: a live region added at the moment its text arrives,
+  // which no engine announces reliably.
+  it("renders an empty polite status region in the first markup", () => {
+    const regions = [...HTML.matchAll(/<p\b[^>]*role="status"[^>]*>([^<]*)<\/p>/g)];
+    expect(regions.length).toBe(1);
+    expect(regions[0][0]).toContain('aria-live="polite"');
+    expect(regions[0][1]).toBe("");
+    expect(HTML.indexOf(regions[0][0])).toBeGreaterThan(HTML.indexOf("</svg>"));
+  });
+
+  // A screen reader learns the way-out menu's key; no visible hint draws.
+  it("tells a screen reader each step answers C", () => {
+    for (const node of NODES) expect(attr(node.open, "aria-keyshortcuts")).toBe("C");
+    expect(CANVAS.inner).not.toContain(">C<");
+  });
+});
+
+describe("the way-out menu's markup", () => {
+  const POPOVER = elementsOf(HTML, (openTag) => openTag.startsWith("<div ") && attr(openTag, "popover") === "auto")[0];
+  const MENU = elementsOf(POPOVER.inner, (openTag) => attr(openTag, "role") === "menu")[0];
+  const HEADING = elementsOf(POPOVER.inner, (openTag) => openTag.startsWith("<p "))[0];
+
+  // Panzoom's press handler and the wheel zoom bind on the frame, the root
+  // element, so a menu inside it would pan on a press.
+  it("stands outside the canvas frame", () => {
+    const frame = elementsOf(HTML, (openTag) => openTag.startsWith("<div "))[0];
+    expect(frame.inner).not.toContain('popover="auto"');
+    expect(HTML.indexOf('popover="auto"')).toBeGreaterThan(HTML.indexOf("</svg>"));
+  });
+
+  it("heads the menu outside role=menu, and labels the menu by that heading", () => {
+    expect(HEADING.inner).toBe(t("canvas.wayOutMenuHeading"));
+    expect(MENU.inner).not.toContain(t("canvas.wayOutMenuHeading"));
+    expect(attr(MENU.open, "aria-labelledby")).toBe(attr(HEADING.open, "id"));
+  });
+
+  it("lists the visible steps in draft order as menu items, then a separator and a new step", () => {
+    const items = elementsOf(MENU.inner, (openTag) => openTag.startsWith("<button "));
+    for (const item of items) {
+      expect(attr(item.open, "role")).toBe("menuitem");
+      expect(attr(item.open, "tabindex")).toBe("-1");
+    }
+    // approve and archive hide inside the collapsed group.
+    expect(items.map((item) => item.inner)).toEqual(["Capture the request", "Review the request", "Reject", t("canvas.wayOutMenuNewStep")]);
+    const separator = MENU.inner.indexOf('role="separator"');
+    expect(separator).toBeGreaterThan(MENU.inner.indexOf("Reject"));
+    expect(separator).toBeLessThan(MENU.inner.indexOf(t("canvas.wayOutMenuNewStep")));
   });
 });

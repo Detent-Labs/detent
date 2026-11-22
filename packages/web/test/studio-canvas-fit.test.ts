@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { computeFit, MIN_SCALE, FIT_GUTTER, type Box, type Insets, type Fit } from "../src/areas/studio/canvas/fit.js";
+import { readFileSync } from "node:fs";
+import { computeFit, fitInsets, revealPan, zoomAbout, ZOOM_KEY_FACTOR, MAX_SCALE, MIN_SCALE, FIT_GUTTER, type Box, type Insets, type Fit } from "../src/areas/studio/canvas/fit.js";
 
 /**
  * Where the content box lands on screen, in the element's own pixel space.
@@ -177,5 +178,143 @@ describe("canvas fit: an empty canvas", () => {
 
   it("returns a neutral fit for a zero-sized element", () => {
     expect(computeFit(GRAPH, { width: 0, height: 0 }, INSETS)).toEqual({ scale: 1, x: 0, y: 0 });
+  });
+});
+
+describe("canvas fit: the insets", () => {
+  it("clears the toolbar's bottom edge plus the gutter on top, the gutter elsewhere", () => {
+    expect(fitInsets(46)).toEqual({ top: 46 + FIT_GUTTER, right: FIT_GUTTER, bottom: FIT_GUTTER, left: FIT_GUTTER });
+  });
+});
+
+describe("canvas fit: revealPan", () => {
+  const view = { width: 800, height: 600 };
+  const insets = fitInsets(46);
+  // Room between the insets: x 16..784, y 62..584.
+
+  for (const scale of [1, 0.5, 2]) {
+    const current: Fit = { scale, x: 30, y: -20 };
+    const tag = `at scale ${scale}`;
+
+    it(`leaves a box in view where it is, ${tag}`, () => {
+      const box: Box = { x: 100, y: 100, width: 100, height: 60 };
+      expect(revealPan(box, view, insets, current)).toEqual(current);
+    });
+
+    it(`shifts a box past the right edge left until it meets the inset, ${tag}`, () => {
+      const box: Box = { x: 750, y: 100, width: 100, height: 60 };
+      const next = revealPan(box, view, insets, current);
+      expect(next.scale).toBe(scale);
+      expect(next.y).toBe(current.y);
+      expect(next.x).toBeCloseTo(current.x - (850 - (800 - FIT_GUTTER)) / scale, 9);
+    });
+
+    it(`shifts a box past the left edge right until it meets the inset, ${tag}`, () => {
+      const box: Box = { x: -40, y: 100, width: 100, height: 60 };
+      const next = revealPan(box, view, insets, current);
+      expect(next.x).toBeCloseTo(current.x + (FIT_GUTTER + 40) / scale, 9);
+      expect(next.y).toBe(current.y);
+    });
+
+    it(`shifts a box past the bottom edge up until it meets the inset, ${tag}`, () => {
+      const box: Box = { x: 100, y: 560, width: 100, height: 60 };
+      const next = revealPan(box, view, insets, current);
+      expect(next.y).toBeCloseTo(current.y - (620 - (600 - FIT_GUTTER)) / scale, 9);
+      expect(next.x).toBe(current.x);
+    });
+
+    it(`shifts a box under the toolbar inset down, ${tag}`, () => {
+      const box: Box = { x: 100, y: 20, width: 100, height: 60 };
+      const next = revealPan(box, view, insets, current);
+      expect(next.y).toBeCloseTo(current.y + (insets.top - 20) / scale, 9);
+      expect(next.x).toBe(current.x);
+    });
+
+    it(`aligns a box wider than the room to the left inset, ${tag}`, () => {
+      const box: Box = { x: 300, y: 100, width: 900, height: 60 };
+      const next = revealPan(box, view, insets, current);
+      expect(next.x).toBeCloseTo(current.x + (insets.left - 300) / scale, 9);
+    });
+
+    it(`aligns a box taller than the room to the top inset, ${tag}`, () => {
+      const box: Box = { x: 100, y: 300, width: 100, height: 700 };
+      const next = revealPan(box, view, insets, current);
+      expect(next.y).toBeCloseTo(current.y + (insets.top - 300) / scale, 9);
+    });
+
+    it(`puts the revealed box inside the room, ${tag}`, () => {
+      const box: Box = { x: 790, y: 590, width: 100, height: 60 };
+      const next = revealPan(box, view, insets, current);
+      const dx = (next.x - current.x) * scale;
+      const dy = (next.y - current.y) * scale;
+      expect(box.x + dx + box.width).toBeCloseTo(view.width - insets.right, 9);
+      expect(box.y + dy + box.height).toBeCloseTo(view.height - insets.bottom, 9);
+    });
+  }
+});
+
+describe("canvas fit: zoomAbout", () => {
+  const view = { width: 800, height: 600 };
+  const centre = { x: 400, y: 300 };
+
+  /** Where a user-space point lands on screen: `C + s * (p + t - C)`. */
+  const screenOf = (fit: Fit, p: { x: number; y: number }) => ({
+    x: centre.x + fit.scale * (p.x + fit.x - centre.x),
+    y: centre.y + fit.scale * (p.y + fit.y - centre.y),
+  });
+
+  it("steps by 1.25 each way", () => {
+    expect(ZOOM_KEY_FACTOR).toBe(1.25);
+  });
+
+  for (const [from, to] of [
+    [1, 1.25],
+    [1, 0.8],
+    [0.5, 0.625],
+    [1.5, 1.2],
+  ] as const) {
+    it(`keeps the anchor's screen point fixed going ${from} to ${to}`, () => {
+      const current: Fit = { scale: from, x: 30, y: -20 };
+      // The anchor's screen point, and the user-space point under it.
+      const anchor = { x: 150, y: 480 };
+      const under = { x: centre.x + (anchor.x - centre.x) / from - current.x, y: centre.y + (anchor.y - centre.y) / from - current.y };
+      const next = zoomAbout(current, to, anchor, view);
+      expect(next.scale).toBeCloseTo(to, 10);
+      const after = screenOf(next, under);
+      expect(after.x).toBeCloseTo(anchor.x, 6);
+      expect(after.y).toBeCloseTo(anchor.y, 6);
+    });
+  }
+
+  it("leaves the pan as it was for a centre anchor", () => {
+    const current: Fit = { scale: 1, x: 30, y: -20 };
+    expect(zoomAbout(current, 1.25, centre, view)).toEqual({ scale: 1.25, x: 30, y: -20 });
+  });
+
+  it("clamps at MAX_SCALE", () => {
+    const next = zoomAbout({ scale: 1.9, x: 0, y: 0 }, 1.9 * ZOOM_KEY_FACTOR, { x: 100, y: 100 }, view);
+    expect(next.scale).toBe(MAX_SCALE);
+  });
+
+  it("clamps at MIN_SCALE", () => {
+    const next = zoomAbout({ scale: 0.3, x: 0, y: 0 }, 0.3 / ZOOM_KEY_FACTOR, { x: 100, y: 100 }, view);
+    expect(next.scale).toBe(MIN_SCALE);
+  });
+
+  it("changes nothing at a bound it already holds", () => {
+    const current: Fit = { scale: MAX_SCALE, x: 12, y: 7 };
+    expect(zoomAbout(current, MAX_SCALE * ZOOM_KEY_FACTOR, { x: 100, y: 100 }, view)).toEqual(current);
+  });
+});
+
+describe("canvas frame: clips instead of scrolling", () => {
+  const source = readFileSync(new URL("../src/areas/studio/canvas/CanvasView.tsx", import.meta.url), "utf8");
+
+  it("sets overflow: \"clip\" on the wrap style", () => {
+    expect(/wrap: \{[^}]*?overflow: "clip"/s.test(source)).toBe(true);
+  });
+
+  it("passes overflow: \"clip\" to Panzoom", () => {
+    expect(/Panzoom\(el, \{[^}]*?overflow: "clip"/s.test(source)).toBe(true);
   });
 });

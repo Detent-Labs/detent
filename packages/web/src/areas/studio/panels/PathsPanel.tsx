@@ -7,6 +7,7 @@ import type { DraftField } from "../draft/fields";
 import { newPath, pathWithTrigger, triggerForNewPath } from "../draft/createPath";
 import { removeAt, replaceAt, updateAt } from "../draft/list-ops";
 import { t } from "../catalog.js";
+import { wayOutNameId } from "../draft/process-tabs.js";
 import { plainStepTextMap, stepTextMap, wayOutHeading } from "./shared/optionText";
 import { StudioSelect } from "./shared/StudioSelect";
 import { ConditionInput } from "./shared/ConditionInput";
@@ -267,6 +268,7 @@ export function PathsPanel({
             </span>
             <input
               type="text"
+              id={path.id === undefined ? undefined : wayOutNameId(path.id)}
               value={path.label ?? ""}
               onChange={(e) => updatePath(index, { label: e.target.value })}
             />

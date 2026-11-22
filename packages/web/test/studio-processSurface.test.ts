@@ -335,7 +335,7 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     expect(binding).toContain("onOpenStepPage?.(focus.stepId)");
     expect(binding).toContain("onOpenStepPage?.(owner.id, focus.pathId)");
     // Two from Enter, and one from each of the five double-click routes: the
-    // node, its connect handle, the edge group, the sentence and the midpoint
+    // node, its docking point, the edge group, the sentence and the midpoint
     // handle. An eighth would mean a single press reached it too.
     expect(code.match(/onOpenStepPage\?\.\(/g)).toHaveLength(7);
   });
@@ -394,47 +394,80 @@ describe("the canvas opens the Steps tab, and keeps its own selection behavior",
     expect(press).toContain('if (label.pathId !== undefined) moveFocus({ kind: "path", pathId: label.pathId, from: "source" })');
   });
 
-  it("opens the step from a double-click on its connect handle, which draws outside the node", () => {
+  it("opens the step from a double-click on its docking points, which draw outside the node", () => {
     const code = stripComments(read(CANVAS));
-    const handles = code.slice(code.indexOf("{connectHandles.map("));
-    const handler = handles.slice(handles.indexOf("onDoubleClick={(e) => {"), handles.indexOf("}}"));
+    const points = code.slice(code.indexOf("{dockingSets.map("));
+    const from = points.indexOf("onDoubleClick={(e) => {");
+    const handler = points.slice(from, points.indexOf("}}", from));
 
-    expect(handler).toContain("onSelectStep(h.stepId)");
-    expect(handler).toContain("onOpenStepPage?.(h.stepId)");
-    // A handle blocks no sentence, since it draws above them all; only the
-    // placement's fallback weighs it (`studio-sentencePlacement.test.ts`).
-    expect(code).toContain("handleObstacle(at)");
-    expect(code.indexOf("{connectHandles.map(")).toBeGreaterThan(code.indexOf("{edgeLabels.map("));
-    expect(code.indexOf("{connectHandles.map(")).toBeGreaterThan(code.indexOf("{waypointHandles.map("));
-    expect(code.indexOf("{disclosures.map(")).toBeGreaterThan(code.indexOf("{connectHandles.map("));
+    expect(from).toBeGreaterThan(-1);
+    expect(handler).toContain("onSelectStep(set.stepId)");
+    expect(handler).toContain("onOpenStepPage?.(set.stepId)");
+    // The points draw above every sentence and every waypoint handle, and the
+    // disclosures stay last. No obstacle stands for them on a resting canvas.
+    expect(code).not.toContain("handleObstacle");
+    expect(code.indexOf("{dockingSets.map(")).toBeGreaterThan(code.indexOf("{edgeLabels.map("));
+    expect(code.indexOf("{dockingSets.map(")).toBeGreaterThan(code.indexOf("{waypointHandles.map("));
+    expect(code.indexOf("{disclosures.map(")).toBeGreaterThan(code.indexOf("{dockingSets.map("));
   });
 
-  it("keeps focus on the node from a press on its connect handle, and moves the roving stop there", () => {
+  it("keeps focus on the node from a press on a docking point, and moves the roving stop there", () => {
     const code = stripComments(read(CANVAS));
     const down = code.slice(code.indexOf("const onHandlePointerDown"), code.indexOf("const onHandlePointerMove"));
-    const handles = code.slice(code.indexOf("{connectHandles.map("), code.indexOf("{disclosures.map("));
+    const points = code.slice(code.indexOf("{dockingSets.map("), code.indexOf("{disclosures.map("));
 
     expect(down).toContain('moveFocus({ kind: "step", stepId })');
-    // Pointer capture and the drag stay as they were.
+    // Pointer capture and the drag stay as they were, and the drag keeps the pressed point.
     expect(down).toContain("capturePointer(e)");
-    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, start: p, current: p })");
+    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, pressed, refused, start: p, current: p })");
     // Without this the press's default focused the canvas svg, which drew
     // its outline around the whole graph.
-    expect(handles).toContain("onMouseDown={(e) => e.preventDefault()}");
+    expect(points).toContain("onMouseDown={(e) => e.preventDefault()}");
   });
 
-  it("writes nothing from a click on the connect handle, only from a drag past the threshold", () => {
+  it("resolves a press to the nearest point of the pressed step", () => {
+    const code = stripComments(read(CANVAS));
+    const points = code.slice(code.indexOf("{dockingSets.map("), code.indexOf("{disclosures.map("));
+
+    expect(points).toContain("pressedDockingPoint({ x: set.x, y: set.y }, toSvgPoint(e))");
+    expect(points).toContain("onHandlePointerDown(e, set.stepId, { side: pressed.side, at: pressed.at })");
+  });
+
+  it("writes nothing from a click on a docking point, only from a drag past the threshold", () => {
     const code = stripComments(read(CANVAS));
     const down = code.slice(code.indexOf("const onHandlePointerDown"), code.indexOf("const onHandlePointerMove"));
     const up = code.slice(code.indexOf("const onHandlePointerUp"), code.indexOf("setConnectDrag(null);\n  };"));
     const guard = "if (!exceedsClickThreshold(dragDelta(connectDrag.start, point))) {";
 
-    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, start: p, current: p })");
+    expect(down).toContain("setConnectDrag({ sourceStepId: stepId, pressed, refused, start: p, current: p })");
     expect(up).toContain(guard);
     // The guard returns before any write: a way out, a new step or a toast.
+    // Both adds go through `addWayOut`, the one writer the menu shares.
     const afterGuard = up.indexOf("return;", up.indexOf(guard));
-    for (const write of ["resolveDropGesture(", "updateInDraftArray(", "mutate(", "showRejection("]) {
+    for (const write of ["resolveConnectDrop(", "addWayOut(", "showRejection("]) {
       expect(up.indexOf(write)).toBeGreaterThan(afterGuard);
+    }
+  });
+
+  it("treats a press under the click threshold as a press on the node", () => {
+    const code = stripComments(read(CANVAS));
+    const up = code.slice(code.indexOf("const onHandlePointerUp"), code.indexOf("setConnectDrag(null);\n  };"));
+    const from = up.indexOf("if (!exceedsClickThreshold");
+    const guard = up.slice(from, up.indexOf("return;", from));
+
+    expect(guard).toContain("onSelectSteps(toggleSelection(selectedStepIds, sourceStepId))");
+    expect(guard).toContain("onSelectStep(sourceStepId)");
+  });
+
+  it("keeps the pointed-at step out of the route memos' dependency lists", () => {
+    const code = stripComments(read(CANVAS));
+    expect(code).toContain("const [pointedStepId, setPointedStepId] = useState");
+    for (const memo of ["const drawnPaths = useMemo(", "const sentenceBoxes = useMemo(", "const heldPoints = useMemo("]) {
+      const at = code.indexOf(memo);
+      expect(at).toBeGreaterThan(-1);
+      const deps = code.slice(code.indexOf("\n  }, [", at), code.indexOf("]);", code.indexOf("\n  }, [", at)));
+      expect(deps).not.toContain("pointedStepId");
+      expect(deps).not.toContain("connectDrag");
     }
   });
 

@@ -95,3 +95,52 @@ export function computeFit(content: Box, element: Size, insets: Insets): Fit {
     y: (targetY - centreY) / scale + centreY - contentY,
   };
 }
+
+/**
+ * The insets every framing reads: the toolbar's bottom edge plus the gutter
+ * on top, the gutter on the other three sides. Shared by `measureFit` and the
+ * reveal on focus, so the two cannot drift.
+ */
+export function fitInsets(toolbarBottom: number): Insets {
+  return { top: toolbarBottom + FIT_GUTTER, right: FIT_GUTTER, bottom: FIT_GUTTER, left: FIT_GUTTER };
+}
+
+/** The shift, in screen pixels, that brings one axis of a target into the room. */
+function revealShift(start: number, length: number, low: number, high: number): number {
+  if (length > high - low) return low - start;
+  if (start < low) return low - start;
+  if (start + length > high) return high - (start + length);
+  return 0;
+}
+
+/**
+ * The pan that brings `target` inside `view` minus `insets`, by the least
+ * distance. `target` is in the frame's pixel space, as `getBoundingClientRect`
+ * reads it. A target larger than the room aligns its leading edge to the
+ * inset. A shift of `d` screen pixels moves the pan by `d / scale`, per the
+ * projection above, and the scale stays as it was.
+ */
+export function revealPan(target: Box, view: Size, insets: Insets, current: Fit): Fit {
+  const dx = revealShift(target.x, target.width, insets.left, view.width - insets.right);
+  const dy = revealShift(target.y, target.height, insets.top, view.height - insets.bottom);
+  return { scale: current.scale, x: current.x + dx / current.scale, y: current.y + dy / current.scale };
+}
+
+/** The factor one zoom key applies, each way. */
+export const ZOOM_KEY_FACTOR = 1.25;
+
+/**
+ * The fit at `toScale` (clamped to the bounds) that keeps `anchor`, a screen
+ * point in the frame's pixel space, where it is. From the projection above,
+ * the pan moves by `(anchor - C) * (1/s' - 1/s)`, with `C` the view centre. An
+ * anchor at the centre leaves the pan as it was.
+ */
+export function zoomAbout(current: Fit, toScale: number, anchor: { x: number; y: number }, view: Size): Fit {
+  const scale = Math.min(Math.max(toScale, MIN_SCALE), MAX_SCALE);
+  const k = 1 / scale - 1 / current.scale;
+  return {
+    scale,
+    x: current.x + (anchor.x - view.width / 2) * k,
+    y: current.y + (anchor.y - view.height / 2) * k,
+  };
+}

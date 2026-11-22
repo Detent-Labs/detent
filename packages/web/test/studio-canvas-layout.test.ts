@@ -1,5 +1,15 @@
 import { describe, expect, it } from "bun:test";
-import { autoPlaceSteps, drawnPositions, COLUMN_WIDTH } from "../src/areas/studio/canvas/layout.js";
+import {
+  autoPlaceSteps,
+  drawnPositions,
+  COLUMN_WIDTH,
+  layoutAfterArrange,
+  layoutAfterConnect,
+  layoutAfterInsert,
+  layoutAfterMove,
+  readDockingPoints,
+  withDockingPoints,
+} from "../src/areas/studio/canvas/layout.js";
 
 function step(id: string, paths: Array<{ to: string }> = []) {
   return { id, paths };
@@ -88,5 +98,337 @@ describe("canvas drawn positions", () => {
   it("keys the record by step id alone, so a reserved blob key stays out", () => {
     const drawn = drawnPositions(steps, "step_a", { waypoints: {}, groups: [], canvasEdgeStyle: "step" });
     expect(Object.keys(drawn).sort()).toEqual(["step_a", "step_b"]);
+  });
+});
+
+describe("readDockingPoints", () => {
+  it("reads nothing when the key is absent", () => {
+    expect(readDockingPoints({})).toEqual({});
+  });
+
+  it("reads nothing when the key is not an object", () => {
+    expect(readDockingPoints({ dockingPoints: "x" })).toEqual({});
+    expect(readDockingPoints({ dockingPoints: null })).toEqual({});
+    expect(readDockingPoints({ dockingPoints: [] })).toEqual({});
+  });
+
+  it("reads a well-formed source and target", () => {
+    const entry = { source: { side: "bottom" as const, at: 3 }, target: { side: "left" as const, at: -1 } };
+    expect(readDockingPoints({ dockingPoints: { path_a: entry } })).toEqual({ path_a: entry });
+  });
+
+  it("drops a malformed end and keeps the valid one", () => {
+    const read = readDockingPoints({
+      dockingPoints: { path_a: { source: { side: "middle", at: 0 }, target: { side: "top", at: 1 } } },
+    });
+    expect(read).toEqual({ path_a: { target: { side: "top", at: 1 } } });
+  });
+
+  it("drops an end that is not an object, a non-integer or a non-number position", () => {
+    const read = readDockingPoints({
+      dockingPoints: {
+        path_a: { source: "right", target: null },
+        path_b: { source: { side: "right", at: 0.5 }, target: { side: "right", at: "0" } },
+      },
+    });
+    expect(read).toEqual({});
+  });
+
+  it("drops a position the side lacks", () => {
+    const read = readDockingPoints({
+      dockingPoints: {
+        path_a: { source: { side: "left", at: 2 }, target: { side: "right", at: -2 } },
+        path_b: { source: { side: "top", at: 4 }, target: { side: "bottom", at: -3 } },
+      },
+    });
+    expect(read).toEqual({ path_b: { target: { side: "bottom", at: -3 } } });
+  });
+
+  it("drops an entry that is not an object", () => {
+    expect(readDockingPoints({ dockingPoints: { path_a: 5, path_b: null } })).toEqual({});
+  });
+});
+
+describe("withDockingPoints", () => {
+  it("returns the ends a write stored, and leaves the input layout alone", () => {
+    const layout = { step_a: { x: 1, y: 2 } };
+    const ends = { source: { side: "right" as const, at: 0 }, target: { side: "top" as const, at: -2 } };
+    const next = withDockingPoints(layout, "path_a", ends);
+    expect(readDockingPoints(next)).toEqual({ path_a: ends });
+    expect(next.step_a).toEqual({ x: 1, y: 2 });
+    expect(layout).toEqual({ step_a: { x: 1, y: 2 } });
+  });
+
+  it("keeps the other paths' entries", () => {
+    const first = withDockingPoints({}, "path_a", { source: { side: "left", at: 1 } });
+    const second = withDockingPoints(first, "path_b", { target: { side: "left", at: -1 } });
+    expect(Object.keys(readDockingPoints(second)).sort()).toEqual(["path_a", "path_b"]);
+  });
+
+  it("leaves no key for an empty entry", () => {
+    const first = withDockingPoints({}, "path_a", { source: { side: "left", at: 0 } });
+    const cleared = withDockingPoints(first, "path_a", {});
+    expect((cleared.dockingPoints as Record<string, unknown>).path_a).toBeUndefined();
+    expect("path_a" in (cleared.dockingPoints as Record<string, unknown>)).toBe(false);
+    expect(readDockingPoints(first)).toEqual({ path_a: { source: { side: "left", at: 0 } } });
+  });
+
+  it("starts from an empty record when the stored value is a string or an array", () => {
+    const end = { source: { side: "left" as const, at: 0 } };
+    for (const stored of ["not a record", ["path_x"]]) {
+      const next = withDockingPoints({ dockingPoints: stored }, "path_a", end);
+      expect(next.dockingPoints).toEqual({ path_a: end });
+    }
+  });
+
+  it("drops an end that is undefined", () => {
+    const next = withDockingPoints({}, "path_a", { source: { side: "left", at: 0 }, target: undefined });
+    expect(Object.keys((next.dockingPoints as Record<string, Record<string, unknown>>).path_a)).toEqual(["source"]);
+  });
+});
+
+describe("layoutAfterArrange", () => {
+  it("empties waypoints and dockingPoints and writes every position snapped to the grid", () => {
+    const layout = {
+      step_a: { x: 1, y: 1 },
+      canvasEdgeStyle: "step",
+      waypoints: { path_a: [{ x: 5, y: 5 }] },
+      dockingPoints: { path_a: { source: { side: "right", at: 0 } } },
+    };
+    const next = layoutAfterArrange(layout, { step_a: { x: 31, y: 49 }, step_b: { x: 100, y: 0 } });
+    expect(next.waypoints).toEqual({});
+    expect(next.dockingPoints).toEqual({});
+    expect(next.step_a).toEqual({ x: 40, y: 40 });
+    expect(next.step_b).toEqual({ x: 100, y: 0 });
+    expect(next.canvasEdgeStyle).toBe("step");
+    expect(layout.waypoints.path_a).toHaveLength(1);
+  });
+});
+
+describe("layoutAfterInsert", () => {
+  const source = { side: "bottom" as const, at: 0 };
+  const layout = {
+    step_a: { x: 0, y: 0 },
+    waypoints: { path_a: [{ x: 5, y: 5 }], path_b: [{ x: 7, y: 7 }] },
+    dockingPoints: {
+      path_a: { source, target: { side: "left", at: 1 } },
+      path_b: { source: { side: "top", at: 0 } },
+    },
+  };
+
+  it("keeps the source end, drops the target end and the waypoints of the split path", () => {
+    const next = layoutAfterInsert(layout, "step_new", { x: 60, y: 80 }, "path_a");
+    expect(next.step_new).toEqual({ x: 60, y: 80 });
+    expect((next.waypoints as Record<string, unknown>).path_a).toBeUndefined();
+    expect((next.waypoints as Record<string, unknown>).path_b).toEqual([{ x: 7, y: 7 }]);
+    expect(readDockingPoints(next).path_a).toEqual({ source });
+    expect(readDockingPoints(next).path_b).toEqual({ source: { side: "top", at: 0 } });
+  });
+
+  it("leaves no entry when the split path stored only a target end", () => {
+    const only = { dockingPoints: { path_a: { target: { side: "left", at: 0 } } } };
+    const next = layoutAfterInsert(only, "step_new", { x: 0, y: 0 }, "path_a");
+    expect(readDockingPoints(next)).toEqual({});
+    expect("path_a" in (next.dockingPoints as Record<string, unknown>)).toBe(false);
+  });
+
+  it("works on a layout with neither key", () => {
+    const next = layoutAfterInsert({}, "step_new", { x: 1, y: 2 }, "path_a");
+    expect(next.step_new).toEqual({ x: 1, y: 2 });
+    expect(next.waypoints).toEqual({});
+    expect(readDockingPoints(next)).toEqual({});
+  });
+});
+
+describe("layoutAfterMove", () => {
+  it("writes every position and every point in one result", () => {
+    const layout = {
+      step_a: { x: 0, y: 0 },
+      dockingPoints: { path_old: { source: { side: "left", at: 0 } } },
+    };
+    const next = layoutAfterMove(
+      layout,
+      { step_a: { x: 20, y: 40 }, step_b: { x: 60, y: 80 } },
+      { path_1: { source: { side: "right", at: 1 } }, path_2: { target: { side: "top", at: -3 } } },
+    );
+    expect(next.step_a).toEqual({ x: 20, y: 40 });
+    expect(next.step_b).toEqual({ x: 60, y: 80 });
+    expect(readDockingPoints(next)).toEqual({
+      path_old: { source: { side: "left", at: 0 } },
+      path_1: { source: { side: "right", at: 1 } },
+      path_2: { target: { side: "top", at: -3 } },
+    });
+    expect(layout.step_a).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe("layoutAfterConnect", () => {
+  const ends = { source: { side: "right", at: 0 }, target: { side: "left", at: 0 } } as const;
+  const steps = [
+    step("step_review", [{ to: "step_other" }]),
+    step("step_other"),
+    step("step_approve"),
+    step("step_member"),
+  ];
+
+  it("stores the drawn position of every step that stores none, with the points", () => {
+    const layout = {};
+    const drawn = drawnPositions(steps, "step_review", layout);
+    const next = layoutAfterConnect(layout, "path_1", ends, drawn);
+    for (const s of steps) expect(next[s.id]).toEqual(drawn[s.id]);
+    expect(readDockingPoints(next)).toEqual({ path_1: ends });
+    expect(layout).toEqual({});
+  });
+
+  it("keeps a position a step already stores", () => {
+    const layout: Record<string, unknown> = { step_review: { x: 100, y: 60 } };
+    const drawn: Record<string, { x: number; y: number }> = { ...drawnPositions(steps, "step_review", layout), step_new: { x: 300, y: 80 } };
+    const next = layoutAfterConnect(layout, "path_1", { source: ends.source }, drawn);
+    expect(next.step_review).toEqual({ x: 100, y: 60 });
+    expect(next.step_new).toEqual({ x: 300, y: 80 });
+    expect(next.step_approve).toEqual(drawn.step_approve);
+    expect(readDockingPoints(next)).toEqual({ path_1: { source: ends.source } });
+  });
+
+  it("stores a hidden member's own position, not a group box's", () => {
+    const own = { step_review: { x: 0, y: 0 }, step_member: { x: 240, y: 120 } };
+    const next = layoutAfterConnect({}, "path_1", ends, own);
+    expect(next.step_member).toEqual({ x: 240, y: 120 });
+  });
+});
+
+describe("drawnPositions clears stored steps", () => {
+  const overlaps = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    a.x <= b.x + 180 && a.x + 180 >= b.x && a.y <= b.y + 60 && a.y + 60 >= b.y;
+  const anyOverlap = (all: Record<string, { x: number; y: number }>) => {
+    const ids = Object.keys(all);
+    return ids.some((a, i) => ids.slice(i + 1).some((b) => overlaps(all[a], all[b])));
+  };
+
+  it("draws a draft that stores no position exactly as autoPlaceSteps computes it", () => {
+    const graphs = [
+      [step("a", [{ to: "b" }]), step("b", [{ to: "c" }]), step("c")],
+      [step("a", [{ to: "b" }, { to: "c" }]), step("b", [{ to: "d" }]), step("c", [{ to: "e" }]), step("d"), step("e")],
+      [step("a"), step("x"), step("y"), step("z", [{ to: "a" }])],
+      [step("a", [{ to: "a" }])],
+    ];
+    for (const steps of graphs) {
+      expect(drawnPositions(steps, steps[0].id, {})).toEqual(autoPlaceSteps(steps, steps[0].id, {}));
+    }
+    expect(drawnPositions(graphs[0], "missing", {})).toEqual(autoPlaceSteps(graphs[0], "missing", {}));
+  });
+
+  it("moves a computed position off a stored step's slot, to the nearest free lattice point on its right", () => {
+    // The four steps store their automatic slots; a fifth, listed before the last two, computes the slot of "c".
+    const steps = [step("a", [{ to: "b" }]), step("b"), step("e"), step("c"), step("d")];
+    const layout = { a: { x: 0, y: 0 }, b: { x: 240, y: 0 }, c: { x: 480, y: 120 }, d: { x: 480, y: 240 } };
+    expect(autoPlaceSteps(steps, "a", layout).e).toEqual({ x: 480, y: 0 });
+    layout.c = { x: 480, y: 0 };
+    const drawn = drawnPositions(steps, "a", layout);
+    expect(drawn.e).toEqual({ x: 680, y: 0 });
+    expect(drawn.c).toEqual({ x: 480, y: 0 });
+    expect(anyOverlap(drawn)).toBe(false);
+  });
+
+  it("moves only the colliding step, and clears the steps it kept", () => {
+    const steps = [
+      step("a", [{ to: "b" }, { to: "c" }]),
+      step("b", [{ to: "d" }]),
+      step("c", [{ to: "e" }]),
+      step("d"),
+      step("e"),
+    ];
+    const layout = { b: { x: 240, y: 120 } };
+    const first = drawnPositions(steps, "a", layout);
+    // Only "c" collides with a stored step. "e" overlaps nothing stored and stays on its slot, and
+    // "c" walks right past it, by a node width plus one grid step at a time.
+    expect(first.c).toEqual({ x: 840, y: 120 });
+    expect(first.e).toEqual({ x: 480, y: 120 });
+    expect(anyOverlap(first)).toBe(false);
+    expect(drawnPositions(steps, "a", layout)).toEqual(first);
+  });
+
+  const chain = (order: string[]) =>
+    order.map((id) => step(id, id === "a" ? [{ to: "b" }] : id === "b" ? [{ to: "c" }] : id === "c" ? [{ to: "d" }] : id === "d" ? [{ to: "e" }] : []));
+
+  it("moves only the step on a stored slot, whatever the order of the steps", () => {
+    const layout = { z: { x: 240, y: 0 } };
+    const flow = drawnPositions(chain(["a", "b", "c", "d", "e", "z"]), "a", layout);
+    const reversed = drawnPositions(chain(["z", "e", "d", "c", "b", "a"]), "a", layout);
+    for (const drawn of [flow, reversed]) {
+      expect(drawn.a).toEqual({ x: 0, y: 0 });
+      expect(drawn.c).toEqual({ x: 480, y: 0 });
+      expect(drawn.d).toEqual({ x: 720, y: 0 });
+      expect(drawn.e).toEqual({ x: 960, y: 0 });
+      expect(drawn.b).toEqual({ x: 1240, y: 0 });
+      expect(anyOverlap(drawn)).toBe(false);
+    }
+  });
+
+  it("keeps every step where it was when a stored step only touches one", () => {
+    const steps = [
+      step("a", [{ to: "x1" }, { to: "x2" }, { to: "x3" }]),
+      step("x1", [{ to: "y1" }]),
+      step("x2", [{ to: "y2" }]),
+      step("x3", [{ to: "y3" }]),
+      step("y1"),
+      step("y2"),
+      step("y3"),
+      step("z"),
+    ];
+    const layout = { z: { x: 240, y: 60 } };
+    const slots = autoPlaceSteps(steps, "a", layout);
+    const drawn = drawnPositions(steps, "a", layout);
+    for (const s of steps) if (s.id !== "z") expect(drawn[s.id]).toEqual(slots[s.id]);
+  });
+
+  it("ends two colliding steps on different places", () => {
+    const steps = [step("a", [{ to: "b" }]), step("b", [{ to: "c" }]), step("c"), step("z1"), step("z2")];
+    const layout = { z1: { x: 240, y: 0 }, z2: { x: 480, y: 0 } };
+    const drawn = drawnPositions(steps, "a", layout);
+    expect(drawn.b).not.toEqual(drawn.c);
+    expect(anyOverlap(drawn)).toBe(false);
+    expect(drawnPositions(steps, "a", layout)).toEqual(drawn);
+  });
+
+  it("gives a step with a malformed stored value a real slot, and reads no reserved key as a position", () => {
+    const steps = [step("a", [{ to: "b" }]), step("b")];
+    const clean = drawnPositions(steps, "a", {});
+    const drawn = drawnPositions(steps, "a", { b: "oops", waypoints: {}, dockingPoints: {}, groups: [] });
+    expect(drawn).toEqual(clean);
+    expect(autoPlaceSteps(steps, "a", { b: { x: "1" } }).b).toEqual({ x: 240, y: 0 });
+  });
+
+  it("draws a duplicate step id once, at its first placement", () => {
+    const steps = [step("a", [{ to: "b" }]), step("b"), step("b")];
+    const drawn = drawnPositions(steps, "a", { a: { x: 0, y: 0 } });
+    expect(drawn.b).toEqual({ x: 240, y: 0 });
+  });
+
+  it("never moves an auto-placed step whose slot strictly overlaps no stored step", () => {
+    let seed = 7;
+    const next = (n: number) => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed % n;
+    };
+    const strict = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      a.x < b.x + 180 && a.x + 180 > b.x && a.y < b.y + 60 && a.y + 60 > b.y;
+    for (let round = 0; round < 60; round++) {
+      const n = 4 + next(9);
+      const ids = Array.from({ length: n }, (_, i) => `s${i}`);
+      const steps = ids.map((id) => step(id, Array.from({ length: next(3) }, () => ({ to: ids[next(n)] }))));
+      const layout: Record<string, unknown> = {};
+      for (const id of ids) if (next(3) === 0) layout[id] = { x: next(60) * 20, y: next(15) * 20 };
+      const slots = autoPlaceSteps(steps, ids[0], layout);
+      const drawn = drawnPositions(steps, ids[0], layout);
+      for (const id of ids) {
+        if (layout[id]) {
+          expect(drawn[id]).toEqual(layout[id] as { x: number; y: number });
+          continue;
+        }
+        const hit = ids.some((o) => layout[o] && strict(slots[id], layout[o] as { x: number; y: number }));
+        if (!hit) expect(drawn[id]).toEqual(slots[id]);
+      }
+    }
   });
 });

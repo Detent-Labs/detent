@@ -1104,7 +1104,9 @@ holds standing on the process, a `process-access-roles` concern outside what thi
 On the Map, double-click a step to open it on the Steps tab. Double-click a
 way out to open its step with **Ways out** unfolded. To add a way out, drag
 from the dot on a step's right edge to another step. Drop it on empty space
-and Studio adds a new step there.
+and Studio adds a new step there. From the keyboard, focus a step and press
+`C`. The menu "Way out to …" lists the steps, then "A new step". Press Enter on
+one to add the way out. The keys `+`, `-` and `0` zoom the map and fit it.
 
 Checks reads as a plain count, like any other tab, until something blocks a
 publish. Then the count itself turns red. Open the tab to see what Studio

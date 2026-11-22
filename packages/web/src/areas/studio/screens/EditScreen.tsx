@@ -30,7 +30,7 @@ import { useFetchOnce } from "../panels/shared/useFetchOnce.js";
 import { stepTextMap } from "../panels/shared/optionText.js";
 import type { DraftRecord, PublishResult } from "../api/types.js";
 import { DEFAULT_TAB, FIELDS_VIEWS, SETTINGS_VIEWS, type ProcessTab, type Route, type TabView } from "../routing.js";
-import { checkTarget, fixPendingFocus, formEditorReturnTab, pendingFocusLands, placeAction, processTabCounts, STEP_PAGE_NAME_ID, surfaceTab, type CheckTarget, type FixRequest, type PendingFocus } from "../draft/process-tabs.js";
+import { checkTarget, fixPendingFocus, formEditorReturnTab, pendingFocusLands, placeAction, processTabCounts, STEP_PAGE_NAME_ID, surfaceTab, wayOutNameId, type CheckTarget, type FixRequest, type PendingFocus } from "../draft/process-tabs.js";
 import { checksDotState, groupChecksBySource } from "../draft/checksRail.js";
 import { structuralBannerStands } from "../draft/startGaps.js";
 import { issueText } from "../draft/issues.js";
@@ -50,7 +50,7 @@ import {
 } from "../canvas/geometry.js";
 import { type StepGroup } from "../canvas/groups.js";
 import { arrangeSteps, hasHandPlacedStep } from "../canvas/arrange.js";
-import { drawnPositions, isPoint, type LayoutStep } from "../canvas/layout.js";
+import { drawnPositions, isPoint, layoutAfterArrange, layoutAfterConnect, layoutAfterInsert, layoutAfterMove, readDockingPoints, type LayoutStep, type PathDockingEnds } from "../canvas/layout.js";
 import { newStep, type StepKind } from "../draft/createStep.js";
 import { addToDraftArray } from "../draft/draft-array-crud.js";
 import { insertOnPath } from "../draft/insertOnPath.js";
@@ -595,6 +595,11 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     return out;
   }, [storedWaypoints]);
 
+  // The docking points read the same way, through `canvas/layout.ts`.
+  const storedDockingPoints = saveState.layout.dockingPoints;
+  // Memoized on the stored value, as `waypoints` is.
+  const dockingPoints = useMemo(() => readDockingPoints({ dockingPoints: storedDockingPoints }), [storedDockingPoints]);
+
   // The third reserved key in that blob. An entry that does not parse drops,
   // and so does a member the draft no longer holds: a step delete is an
   // ordinary edit, and it must not strand a box or fail the render.
@@ -631,6 +636,14 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     });
   };
 
+  // One path's stored docking ends, from a connect drag or an end handle
+  // release. Layout, as waypoints are: the Draft model never sees it. A connect
+  // drag also passes the drawn position of every step; each lands in the same
+  // write unless the step stores one.
+  const onDockingPointsChange = (pathId: string, ends: PathDockingEnds, drawn?: Record<string, Point>) => {
+    setSaveState((s) => ({ ...s, layout: layoutAfterConnect(s.layout, pathId, ends, drawn ?? {}) }));
+  };
+
   // Position is not body — it lives in `saveState.layout` (round-tripped
   // opaquely by DraftToolbar's save call already), never in the Draft
   // model's `mutate()` (design.md: the two are separate existing surfaces).
@@ -638,8 +651,15 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
     setSaveState((s) => ({ ...s, layout: { ...s.layout, [stepId]: point } }));
   };
 
-  // Overwrites every step's position at once, unlike onMoveCanvasPosition's one-step
-  // write, and clears every waypoint too (design.md, Decisions 2 and 4).
+  // A drag's release: every mover's position and the docking points the move
+  // stores, in one layout write.
+  const onMoveCanvasPositions = (positions: Record<string, Point>, points: Record<string, PathDockingEnds>) => {
+    setSaveState((s) => ({ ...s, layout: layoutAfterMove(s.layout, positions, points) }));
+  };
+
+  // Overwrites every step's position, where a move writes only the steps it
+  // moved, and clears every waypoint and every docking point too (design.md,
+  // Decisions 2 and 4).
   // Gated by hasHandPlacedStep, through `ArrangeDialog`. The dialog runs before
   // the layout library loads. A library that fails to load leaves the layout as
   // it was and reports through the header bar's error banner (`studio-canvas`).
@@ -661,11 +681,7 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
       actions.reportError(e);
       return;
     }
-    setSaveState((s) => {
-      const next: Record<string, unknown> = { ...s.layout, waypoints: {} };
-      for (const [stepId, point] of Object.entries(arranged)) next[stepId] = snapToGrid(point);
-      return { ...s, layout: next };
-    });
+    setSaveState((s) => ({ ...s, layout: layoutAfterArrange(s.layout, arranged) }));
   };
 
   // The second argument carries a clicked path's id (task 3.13); a node
@@ -864,15 +880,11 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   };
 
   /** Combines the new step's position with clearing the split path's stored
-   * waypoints (design.md, Decision "The insert clears that path's
-   * waypoints") in the one `saveState.layout` write task 3.5 asks for, rather
+   * waypoints and its target docking point (design.md, Decision "The insert
+   * clears that path's waypoints") in one `saveState.layout` write, rather
    * than two separate `setSaveState` calls. */
   const onInsertLayoutWrite = (stepId: string, point: Point, splitPathId: string) => {
-    setSaveState((s) => {
-      const nextWaypoints = { ...(s.layout.waypoints as Record<string, Point[]> | undefined) };
-      delete nextWaypoints[splitPathId];
-      return { ...s, layout: { ...s.layout, [stepId]: point, waypoints: nextWaypoints } };
-    });
+    setSaveState((s) => ({ ...s, layout: layoutAfterInsert(s.layout, stepId, point, splitPathId) }));
   };
 
   /** The one draft-mutation method every step-creating control on this screen
@@ -894,7 +906,8 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   /** The rail foot's three add controls, through the same creation path the
    * canvas bar's own drop uses. The new step opens on the page at once
    * (`studio-step-page`). It gets no position of its own: the Steps tab shows
-   * no canvas, so `autoPlaceSteps` places it when the Map tab next draws. */
+   * no canvas, so `drawnPositions` places it when the Map tab next draws, and moves
+   * it right where its slot overlaps a stored step. */
   const onAddStep = (kind: StepKind) => {
     const created = newStep(kind, seedLocalizedText(contentLocale));
     appendStep(created);
@@ -1366,19 +1379,28 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
                 <CanvasView
                   layout={saveState.layout}
                   onMoveStep={onMoveCanvasPosition}
+                  onMoveSteps={onMoveCanvasPositions}
                   onArrange={onArrange}
                   selectedStepIds={selectedStepIds}
                   onSelectStep={onSelectStep}
                   onSelectSteps={onSelectSteps}
-                  onOpenStepPage={(_stepId, pathId) => {
-                    if (pathId !== undefined) setWaysOutRequest((n) => n + 1);
+                  onOpenStepPage={(stepId, pathId) => {
+                    if (pathId !== undefined) {
+                      setWaysOutRequest((n) => n + 1);
+                      setSectionRequest({ stepId, section: "paths" });
+                      setPendingFocus({ tab: "steps", elementId: wayOutNameId(pathId) });
+                    } else {
+                      setPendingFocus({ tab: "steps", elementId: STEP_PAGE_NAME_ID });
+                    }
                     goToTab("steps");
                   }}
                   selectedPathId={selectedPathId}
                   edgeStyle={edgeStyle}
                   onEdgeStyleChange={onEdgeStyleChange}
                   waypoints={waypoints}
+                  dockingPoints={dockingPoints}
                   onWaypointsChange={onWaypointsChange}
+                  onDockingPointsChange={onDockingPointsChange}
                   groups={groups}
                   onGroupsChange={onGroupsChange}
                   insertTargetPathId={insertTargetPathId}

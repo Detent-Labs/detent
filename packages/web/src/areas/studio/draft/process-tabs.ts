@@ -60,6 +60,11 @@ export function sectionHeaderId(section: SectionName): string {
   return `step-section-${section}`;
 }
 
+/** The DOM id of one way out's Name input in the step page's Ways out section. */
+export function wayOutNameId(pathId: string): string {
+  return `way-out-name-${pathId}`;
+}
+
 /** Where a press on a Checks row lands: the tab, its view, what the tab selects
  * and opens there, and what takes focus. A target naming no finer place hands
  * focus to its tab. */

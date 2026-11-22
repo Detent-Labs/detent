@@ -141,9 +141,6 @@ export function labelObstacle(at: Point): Obstacle {
 
 /** The arrowhead's box at a route's end, each side. */
 export const ARROWHEAD_BOX = 12;
-/** The connect handle's dot as the fallback weighs it: 14 across, grown by
- * `NODE_CLEARANCE` each side. */
-export const HANDLE_BOX = 18;
 /** The start arrow's run left of the initial step, and its box's height. */
 export const START_ARROW_LENGTH = 24;
 export const START_ARROW_BOX_HEIGHT = 10;
@@ -159,22 +156,6 @@ export function arrowheadObstacle(route: Point[]): Obstacle {
   const end = route[route.length - 1];
   const half = ARROWHEAD_BOX / 2;
   return { x: end.x - half, y: end.y - half, width: ARROWHEAD_BOX, height: ARROWHEAD_BOX, weight: COVER_WEIGHT };
-}
-
-/** A node's connect handle. It blocks nothing: the handle draws above every
- * sentence, and a blocking handle forced a gap's sentences into the fallback.
- * There it counts as content, so a box that must overlap keeps to a node's
- * border band rather than the dot. */
-export function handleObstacle(at: Point): Obstacle {
-  const half = HANDLE_BOX / 2;
-  return {
-    x: at.x + NODE_WIDTH - half,
-    y: at.y + NODE_HEIGHT / 2 - half,
-    width: HANDLE_BOX,
-    height: HANDLE_BOX,
-    weight: COVER_WEIGHT,
-    blocks: false,
-  };
 }
 
 /** The start arrow left of the initial step, at its mid-height: blocking. */

@@ -63,13 +63,13 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 | `@types/react` | 19.3.0 | MIT |
 | `@types/react-dom` | 19.3.0 | MIT |
 | `@vitejs/plugin-react` | 6.1.2 | MIT |
-| `jose` | 6.2.4 | MIT |
+| `jose` | 6.2.15 | MIT |
 | `lucide-react` | 1.61.0 | ISC |
-| `oxlint` | 1.85.0 | MIT |
+| `oxlint` | 1.92.0 | MIT |
 | `react` | 19.3.1 | MIT |
 | `react-dom` | 19.3.1 | MIT |
 | `typescript` | 7.0.2 | Apache-2.0 |
-| `vite` | 8.3.5 | MIT |
+| `vite` | 8.3.8 | MIT |
 | `zod` | 4.6.7 | MIT |
 
 `react` and `react-dom` resolve once, at 19.3.1. `packages/web` declares
