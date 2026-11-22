@@ -26,6 +26,11 @@ export function noteInputModality(modality: InputModality): void {
   lastInputModality = modality;
 }
 
+/** True when the last input was a pointer press. */
+export function lastInputWasPointer(): boolean {
+  return lastInputModality === "pointer";
+}
+
 /** Installs once, at module load, guarded for a no-DOM environment
  * (bun:test mounts none). A capture-phase listener sees the event before any
  * `stopPropagation` downstream, so no descendant can hide its input kind

@@ -43,34 +43,61 @@ a `saveState.layout` change from any other source would be.
 
 ### Requirement: A step with no recorded layout position is auto-placed on load, without writing to the draft
 
-A step id absent from the loaded draft's `layout` SHALL be given a
-deterministic on-screen position, computed client-side from a breadth-first
-traversal by depth from `initialStep` (depth selects the column, traversal
-order among siblings at the same depth selects the row). This computed
-position SHALL be used for rendering only and SHALL NOT be written into
-`layout` — a save issued before that step is ever dragged
-SHALL persist `layout` unchanged for that step id (absent, per
-`process-drafts`' existing tolerance for partial layout), not the computed
-default.
+A step id absent from the loaded draft's `layout` SHALL get a deterministic
+on-screen position. The canvas computes it from a breadth-first traversal by
+depth from `initialStep`. Depth selects the column. Traversal order among the
+steps of one depth selects the row.
+
+A computed position can overlap a step with a stored position. It SHALL then
+move right until it clears every step. A step that only touches another
+SHALL stay. Every other computed position SHALL stay where it is. A draft that
+stores no position SHALL draw as it drew before this rule.
+
+The computed position SHALL serve rendering only. A save before the step is
+ever dragged SHALL leave `layout` without an entry for that step id. A connect
+drag is the one exception, and its own requirement states what it stores.
 
 #### Scenario: An empty layout still renders every step at a distinct position
 
-- **WHEN** a draft with `layout: {}` and three or more steps is opened
+- **WHEN** an author opens a draft with `layout: {}` and three or more steps
 - **THEN** every step renders at a computed position and no two steps
   occupy the same coordinates
 
 #### Scenario: An untouched auto-placed step is not persisted
 
-- **WHEN** a draft with a step absent from `layout` is opened, an unrelated
-  field is edited through a panel, and the draft is saved
+- **WHEN** an author opens a draft with a step absent from `layout`
+- **AND** edits an unrelated field through a panel, and the draft saves
 - **THEN** the saved `layout` still has no entry for that step id
 
 #### Scenario: Dragging an auto-placed step persists only that step
 
-- **WHEN** a draft has two steps absent from `layout`, and only one of them
-  is dragged before save
+- **WHEN** a draft has two steps absent from `layout`
+- **AND** the author drags only one of them before the save
 - **THEN** the saved `layout` has an entry for the dragged step and still no
   entry for the other
+
+#### Scenario: An auto-placed step clears a stored one
+
+- **WHEN** a draft stores a position for "Review" on an automatic slot
+- **AND** a new step's computed position is that same slot
+- **THEN** the new step draws to the right of that slot, clear of every step
+- **AND** no two steps occupy the same coordinates
+
+#### Scenario: Only the overlapping step moves
+
+- **WHEN** a stored step sits on the automatic slot of one step in a row
+- **THEN** that one step moves right
+- **AND** every other auto-placed step of the row draws where it drew before
+
+#### Scenario: A touching step stays
+
+- **WHEN** a stored step's edge touches an auto-placed step and overlaps none
+- **THEN** every auto-placed step draws where it drew before
+
+#### Scenario: A draft with no stored position keeps its drawing
+
+- **WHEN** a draft with `layout: {}` opens
+- **THEN** every step draws where it drew before this rule
 
 ### Requirement: Dragging to a step creates a path; dragging to empty canvas creates a step and a path
 
@@ -591,9 +618,15 @@ The connect handle SHALL carry a hover tooltip that says what a drag from it
 does. It reads: "Drag to a step to add a way out, or to empty space to add a
 new step." An end step's handle SHALL read: "An end has no way out."
 
-The handle's pointer target SHALL measure at least 24px across at a canvas
-scale of 1. Its drawn dot stays the size it is. Its cursor SHALL read as a
-crosshair, and as not-allowed on an end step.
+Each docking point's press target SHALL reach 12px outward from the node's
+border and 6px inward. That holds at a canvas scale of 1. Neighbouring targets meet
+halfway along a side, and the nearer point takes the press. A press deeper
+inside the node SHALL move the step, as it does today. The cursor SHALL read
+as a crosshair, and as not-allowed on an end step.
+
+A press target is smaller than 24px on both axes. The way-out menu SHALL add
+a way out from the canvas itself, with no small target. That is the
+equivalent control WCAG 2.5.8 allows for a target under its floor.
 
 #### Scenario: Hovering the handle names the gesture
 
@@ -609,9 +642,14 @@ crosshair, and as not-allowed on an end step.
 
 #### Scenario: The handle is easy to hit
 
-- **WHEN** the author presses 10px right of the handle's centre, at a canvas
-  scale of 1
+- **WHEN** the author presses 10px outward from a docking point on a node's
+  right side, at a canvas scale of 1
 - **THEN** the press starts a connect drag
+
+#### Scenario: A press inside the node moves the step
+
+- **WHEN** the author presses 10px inside a node's border and drags
+- **THEN** the step moves, and no connect drag starts
 
 ### Requirement: The connect handle draws above the way-out sentences
 
@@ -831,8 +869,10 @@ already-existing panel actions.
 The canvas spends one gesture where the panels spend four operations, and
 reaches the same draft.
 
-Selection and traversal answer the keyboard directly now. A drag gesture stays
-pointer-driven, and the panel route is its keyboard equivalent.
+Selection, traversal and connecting two steps answer the keyboard on the
+canvas itself. The way-out menu is the connect drag's keyboard route there. The
+panel route stays a keyboard equivalent beside it. Every other drag keeps the
+panel route as its keyboard equivalent.
 
 #### Scenario: A step and its paths remain deletable without the canvas
 
@@ -851,6 +891,17 @@ pointer-driven, and the panel route is its keyboard equivalent.
 - **AND** adds a path on the new step naming the old target
 - **THEN** the draft matches what one drop on that path produces
 - **AND** it differs in the new step's position and the cleared waypoints
+
+#### Scenario: A way out added from the keyboard has a panel route too
+
+- **WHEN** a keyboard author adds a way out from "Review" to "Booking Error"
+  through the way-out menu
+- **THEN** the step page's Ways out section can add the same way out from the
+  keyboard
+- **AND** that way out takes the same trigger, name and key
+
+<!-- Why: a MODIFIED block keeps the base heading and every base scenario word for word. -->
+<!-- antislop: allow passive-voice -->
 
 ### Requirement: The canvas is keyboard-operable, and traversal follows the paths
 
@@ -1233,7 +1284,7 @@ button is HTML, so the outline follows its shape already.
 
 ### Requirement: Canvas interaction logic is tested as pure functions, independent of rendering
 
-Twelve computations SHALL live in pure modules with `bun:test` coverage. Five
+Twenty-one computations SHALL live in pure modules with `bun:test` coverage. Five
 came first: hit-testing, drag-delta computation, the auto-place traversal, the
 connection-validity predicate and the fit-to-view computation.
 
@@ -1258,11 +1309,22 @@ path through its owning step. A path lives at `workflow.steps[i].paths`, and no 
 collection holds one.
 
 It returns the next focus, and it is total over a deep-partial draft. `packages/web/src/areas/app/screens/inboxLogic.ts` sets that
-convention. The tests need not cover the SVG rendering or the pointer-event
-wiring.
+convention.
+
+The keyboard adds the last nine. The reveal returns the pan that brings one
+box into view. The inset reading returns the room the view leaves around it.
+The zoom step returns the transform that keeps one point in place.
+
+The menu's item list returns the items in order. The type-ahead and the menu's
+key step each return the next item. The source check returns a connect refusal
+or none, and the refusal sentence returns that refusal's words. The new-step
+spot returns where "A new step" lands. None of the nine reads the DOM.
+
+The tests need not cover the SVG rendering or the pointer-event wiring.
 
 #### Scenario: Connection validity holds without rendering
 
+<!-- antislop: allow negation-habit -->
 - **WHEN** a test gives the connection-validity predicate a step's existing
   paths and a candidate path
 - **THEN** it returns accept or reject-with-reason, and the test needs no DOM
@@ -1270,6 +1332,7 @@ wiring.
 
 #### Scenario: The fit computation holds without rendering
 
+<!-- antislop: allow negation-habit -->
 - **WHEN** a test gives the fit-to-view computation a content bounding box and
   a viewport size
 - **THEN** it returns a zoom level and a pan offset, and the test needs no DOM
@@ -1277,6 +1340,7 @@ wiring.
 
 #### Scenario: The selection toggle and the overlap test hold without rendering
 
+<!-- antislop: allow negation-habit -->
 - **WHEN** a test gives the toggle a list of ids and one more id
 - **AND** gives the overlap test a rectangle and a list of node positions
 - **THEN** each returns its own list of ids, and the test needs no DOM or
@@ -1284,6 +1348,7 @@ wiring.
 
 #### Scenario: The edge route holds without rendering
 
+<!-- antislop: allow negation-habit -->
 - **WHEN** a test gives the routing computation a source anchor, a target
   anchor and a style
 - **THEN** it returns the route's corner points, and the test needs no DOM or
@@ -1291,12 +1356,14 @@ wiring.
 
 #### Scenario: The anchor rule holds without rendering
 
+<!-- antislop: allow negation-habit -->
 - **WHEN** a test gives the anchor rule a node position and a facing point
 - **THEN** it returns that node's anchor and the side it leaves on
 - **AND** the test needs no DOM or canvas rendering
 
 #### Scenario: The group rules hold without rendering
 
+<!-- antislop: allow negation-habit -->
 - **WHEN** a test gives the group rules a list of groups and a list of node
   positions
 - **THEN** it returns each group's box, the hidden step ids, and the box a
@@ -1305,6 +1372,7 @@ wiring.
 
 #### Scenario: The waypoint route holds without rendering
 
+<!-- antislop: allow negation-habit -->
 - **WHEN** a test gives the waypoint route two node positions and a list of
   points
 - **THEN** it returns one polyline through every point in that list
@@ -1313,11 +1381,34 @@ wiring.
 
 #### Scenario: The traversal step holds without rendering
 
+<!-- antislop: allow negation-habit -->
 - **WHEN** a test gives the traversal step a focus, a key, a draft's steps, its
   groups and its initial step
 - **THEN** it returns the next focus, naming the step, the path, the group or
   the `<svg>` root that takes it
 - **AND** the test needs no DOM or canvas rendering
+
+#### Scenario: The reveal holds without rendering
+
+- **WHEN** a test gives the reveal a box, the view's size, its insets and the
+  current transform
+- **THEN** it returns the new pan at the same zoom level
+- **AND** the test does not need a DOM or canvas rendering
+
+#### Scenario: The zoom step holds without rendering
+
+- **WHEN** a test gives the zoom step a transform, a target level, an anchor
+  point and the view's size
+- **THEN** it returns a clamped level and a pan that keeps the anchor in place
+- **AND** the test does not need a DOM or canvas rendering
+
+#### Scenario: The menu's item list holds without rendering
+
+- **WHEN** a test gives the item list the draft's steps, the hidden step ids
+  and the step texts
+- **THEN** it returns the step items in the draft's order, then the separator
+  and "A new step"
+- **AND** the test does not need a DOM or canvas rendering
 
 ### Requirement: Layout computation does not re-run on pointer movement
 
@@ -1350,6 +1441,7 @@ a profile rather than added speculatively.
 
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The structure surface lays out a canvas ribbon, a steps register and the configuration pane
 
 The Canvas tab SHALL carry the canvas bar and the canvas, in that order. The
@@ -1553,6 +1645,7 @@ An end step declares its outcome on departure.
 <!-- The heading repeats the live spec's wording verbatim, so a delta can match it. -->
 
 <!-- antislop: allow synonym-rotation -->
+
 ### Requirement: The configuration pane's sections follow the performed-by control
 
 The step page's sections SHALL follow the performed-by control. A section
@@ -2418,16 +2511,17 @@ path joins, and an arrange moves both.
 Arrange SHALL ask the author to confirm before it runs, in the studio's
 dialog form. This holds
 whenever the draft carries at least one step with an explicit stored
-position, or at least one waypoint. A draft with neither SHALL arrange
-with no confirmation, since nothing hand-placed is at risk. The
-confirmation text SHALL say that each path loses the bends placed on it, the
-author's word for a waypoint.
+position, or at least one waypoint. One stored docking point SHALL ask for it
+too. A draft with none of the three SHALL arrange with no confirmation, since
+nothing hand-placed is at risk. The confirmation text SHALL say that each
+path loses the bends placed on it, the author's word for a waypoint. It SHALL
+also say that each path goes back to the middle of a side.
 
 #### Scenario: A brand-new canvas arranges without a confirmation
 
 - **WHEN** every step in the draft is still at its computed default,
   with no explicit stored position
-- **AND** no path in the draft carries a waypoint
+- **AND** no path in the draft carries a waypoint or a stored docking point
 - **AND** an author activates Arrange
 - **THEN** the layout updates with no confirmation step
 
@@ -2455,6 +2549,16 @@ author's word for a waypoint.
 - **WHEN** the draft carries at least one waypoint and an author
   activates Arrange
 - **THEN** the confirmation text says each path loses the bends placed on it
+
+#### Scenario: A draft with stored docking points alone confirms before arranging
+
+- **WHEN** no step carries an explicit stored position and no path carries a
+  waypoint
+- **AND** one path stores a docking point
+- **AND** an author activates Arrange
+- **THEN** Arrange asks the author to confirm before the layout updates
+- **AND** the confirmation text says each path goes back to the middle of a
+  side
 
 ### Requirement: Removing steps from the canvas confirms first
 
@@ -2631,11 +2735,14 @@ The set SHALL be empty after the delete.
 A path SHALL render as an orthogonal route rather than a straight line. Every
 segment SHALL lie on one axis.
 
-Each anchor SHALL sit at the midpoint of one side of its own box. That side
-is the one the box turns toward the next point on the route. For the source
-anchor that point is the first waypoint. Without waypoints it is the target
-box's centre. For the target anchor it is the last waypoint, or the source
-box's centre.
+A path end that stores a docking point SHALL anchor on that point. The
+paragraphs below that choose a side govern an end that stores none.
+
+Each such anchor SHALL sit at the midpoint of one side of its own box. That
+side is the one the box turns toward the next point on the route. For the
+source anchor that point is the first waypoint. Without waypoints it is the
+target box's centre. For the target anchor it is the last waypoint, or the
+source box's centre.
 
 A box is a step node at the canvas node size. It is also a collapsed group, at
 the group box's own size. The anchor rule SHALL read that size rather than
@@ -2645,9 +2752,10 @@ The larger of the two offsets SHALL pick the axis. A horizontal offset larger
 than the vertical one SHALL put the anchor on a left or a right side.
 Otherwise it SHALL sit on a top or a bottom side.
 
-A path with no waypoints SHALL therefore draw exactly as it drew before
-waypoints existed. Its two anchors read offsets that negate each other
-exactly. They land on opposing sides, and both leave on one axis.
+A path with no waypoints and no stored docking point SHALL therefore draw
+exactly as it drew before waypoints existed. Its two anchors read offsets that
+negate each other exactly. They land on opposing sides, and both leave on one
+axis.
 
 A zero offset on the chosen axis SHALL put the anchor on the right
 side. Two steps stacked on one position reach that case, and every path SHALL
@@ -2671,7 +2779,9 @@ lie on the drawn route.
 <!-- Why: the line repeats the live spec's wording verbatim; this change edits another sentence of the block. -->
 A leg between two points SHALL draw as one straight segment, or as two when
 the points share no axis. It SHALL carry no gutter. The gutter clears the node
-an anchor sits on, and a waypoint has no box to clear.
+an anchor sits on, and a waypoint has no box to clear. A leg at a stored
+docking point can face away from its waypoint. That leg is the one exception,
+and the docking point requirements state it.
 
 The route SHALL NOT double back on itself at any point. Two consecutive
 segments on one axis SHALL NOT travel in opposite directions.
@@ -2685,8 +2795,9 @@ SHALL NOT carry a style of its own. Switching the toolbar control SHALL
 re-route the path between the same waypoints.
 
 The segment count SHALL follow from the two anchors, on both axes. It governs
-a path with no waypoints. A waypointed route takes its count from its legs
-instead.
+a path with no waypoints whose anchors sit on opposing sides. A waypointed
+route takes its count from its legs instead. A path whose anchors sit on any
+other pair of sides takes the route the docking point requirements state.
 
 A target is ahead when its entry anchor sits beyond the source's exit anchor.
 That reading runs along the leaving axis, in the leaving direction. An anchor
@@ -2699,7 +2810,7 @@ reach the target's entry edge from outside it.
 
 Each turn SHALL sit a whole grid step clear of the node it leaves or enters.
 That clearance runs along the axis the anchor leaves on. The turn's
-other coordinate follows the anchor, which sits at the node's own middle.
+other coordinate follows the anchor.
 
 Two styles SHALL ship, and no third. `step` draws square corners.
 `smoothstep` draws the same route with rounded ones. There SHALL be no
@@ -2716,13 +2827,13 @@ anchors.
 A way out's sentence SHALL sit on its own route, by the placement rule this
 capability states for it.
 
-The connect handle SHALL stay at the source node's right-middle, whatever
-anchor a path leaving that node takes. The handle is a control an author
-presses. A handle that moved under the pointer would be harder to press.
+A connect handle SHALL stay on its own docking point, whatever anchor a path
+on that node takes. The handle is a control an author presses. A handle that
+moved under the pointer would be harder to press.
 
-The drag-to-connect preview SHALL stay a straight line from that handle. It
-follows the pointer and reaches no target. It has neither a route to draw nor
-a side to face.
+The drag-to-connect preview SHALL stay a straight line from the pressed
+handle. It follows the pointer. Over a step it SHALL end on that step's
+nearest docking point. It has no route to draw.
 
 A selected path SHALL draw one handle at each of its waypoints, and one at the
 route's midpoint. An unselected path SHALL draw none. The canvas holds at most
@@ -2745,7 +2856,7 @@ order. The midpoint handle sits on one leg of the route, and the new waypoint
 goes at that leg's own index.
 
 A route segment's index SHALL NOT stand in for a waypoint's index. One leg
-draws as one or two segments, so the route carries more segments than the list
+draws as one to four segments, so the route carries more segments than the list
 carries points.
 
 Double-clicking a waypoint handle SHALL delete that waypoint. A path whose
@@ -2755,11 +2866,13 @@ reset, and nothing stores what the route was before.
 #### Scenario: A path along one row draws straight
 
 - **WHEN** a step has a path to a step placed to its right on the same row
+- **AND** neither end stores a docking point
 - **THEN** the path renders as one horizontal segment, and it turns no corner
 
 #### Scenario: A path to a step ahead of it on another row turns two corners
 
 - **WHEN** a step has a path to a step placed to its right and one row down
+- **AND** neither end stores a docking point
 - **AND** the horizontal gap is the larger of the two
 - **THEN** the path renders as three axis-aligned segments, leaving the source
   horizontally and entering the target horizontally
@@ -2767,6 +2880,7 @@ reset, and nothing stores what the route was before.
 #### Scenario: A path to a step below it leaves the bottom side
 
 - **WHEN** a step has a path to a step placed below it
+- **AND** neither end stores a docking point
 - **AND** the vertical gap is the larger of the two
 - **THEN** the path leaves the source's bottom-middle and enters the target's
   top-middle
@@ -2775,6 +2889,7 @@ reset, and nothing stores what the route was before.
 #### Scenario: A path to a step above it leaves the top side
 
 - **WHEN** a step has a path to a step placed above it
+- **AND** neither end stores a docking point
 - **AND** the vertical gap is the larger of the two
 - **THEN** the path leaves the source's top-middle and enters the target's
   bottom-middle
@@ -2782,6 +2897,7 @@ reset, and nothing stores what the route was before.
 #### Scenario: A path to a step behind it on the same row draws straight
 
 - **WHEN** a step has a path to a step placed to its left on the same row
+- **AND** neither end stores a docking point
 - **AND** the two nodes do not overlap on the horizontal
 - **THEN** the path leaves the source's left-middle and enters the target's
   right-middle
@@ -2790,6 +2906,7 @@ reset, and nothing stores what the route was before.
 #### Scenario: A path to a step behind it reaches the entry edge from outside
 
 - **WHEN** a step has a path to a step placed to its left and one row down
+- **AND** neither end stores a docking point
 - **AND** the two nodes overlap on the horizontal
 - **THEN** the path renders as five axis-aligned segments
 - **AND** it enters the target from outside the target's entry edge
@@ -2831,15 +2948,17 @@ reset, and nothing stores what the route was before.
 #### Scenario: The connect handle stays put while the anchor moves
 
 - **WHEN** a step's only path leaves its bottom side
-- **THEN** that step's connect handle still sits at its right-middle
-- **AND** a drag from that handle still previews as a straight line to the
+- **THEN** each of that step's connect handles still sits on its own docking
+  point
+- **AND** a drag from one of them still previews as a straight line to the
   pointer
 
 #### Scenario: Dragging a step moves its anchors
 
 - **WHEN** the developer drags a target step from the right of its source to
   below it
-- **THEN** the path's anchors move to the facing sides, with no reload
+- **THEN** both anchors move with their own steps, with no reload
+- **AND** each stays on the docking point it held before the drag
 
 #### Scenario: A waypointed route passes through its waypoint
 
@@ -2863,6 +2982,7 @@ reset, and nothing stores what the route was before.
 
 - **WHEN** a path to a step on its right carries a first waypoint above the
   source
+- **AND** its source end stores no docking point
 - **THEN** the route leaves the source's top side rather than its right side
 
 #### Scenario: The style still governs a waypointed route
@@ -2899,6 +3019,474 @@ reset, and nothing stores what the route was before.
 
 - **WHEN** the developer deletes a path's only waypoint
 - **THEN** the path draws the route it drew before any waypoint existed
+
+### Requirement: A step node carries fixed docking points
+
+Every step node SHALL carry docking points on its border. The left and the
+right side SHALL hold three each. The top and the bottom side SHALL hold seven
+each. Neighbours SHALL stand one grid step apart, and the middle point of a
+side SHALL sit at that side's midpoint.
+
+A docking point has no direction. A path SHALL be free to leave from any
+point and to arrive at any point. Several path ends SHALL be free to share
+one.
+
+#### Scenario: A node carries twenty points
+
+- **WHEN** the canvas draws the docking points of one step node
+- **THEN** it draws three on the left side and three on the right side
+- **AND** it draws seven on the top side and seven on the bottom side
+
+#### Scenario: The middle point sits at the side's midpoint
+
+- **WHEN** the canvas draws a node's docking points
+- **THEN** the second point on its right side sits at that side's midpoint
+- **AND** the fourth point on its top side sits at that side's midpoint
+
+#### Scenario: One point takes a path in and a path out
+
+- **WHEN** a path arrives at the top-middle point of step "Review"
+- **AND** the author drags a new way out from that same point to another step
+- **THEN** both paths end on that one point
+
+### Requirement: Docking points draw on a pointed-at or selected step, and during a drag
+
+The canvas SHALL draw a step's docking points while the pointer rests on that
+step. A point's press target counts as the step. It SHALL draw them on a
+selected step. It SHALL draw them on a step under a connect drag or an end
+handle drag. In
+every other case the canvas SHALL draw none.
+
+A point that holds a path end SHALL draw filled, and a free point SHALL draw
+as an outline. An end step's points SHALL draw dashed. A collapsed group's box
+SHALL draw none.
+
+#### Scenario: A resting canvas draws no points
+
+- **WHEN** the selection is empty and the pointer rests on empty canvas
+- **THEN** the canvas draws no docking point
+
+#### Scenario: Pointing at a step draws its points
+
+- **WHEN** the author rests the pointer on the node of step "Review"
+- **THEN** the canvas draws the twenty docking points of "Review"
+- **AND** it draws none on any other step
+
+#### Scenario: A selected step keeps its points
+
+- **WHEN** the author selects step "Review" and moves the pointer away
+- **THEN** the canvas still draws the docking points of "Review"
+
+#### Scenario: A held point draws filled
+
+- **WHEN** a path leaves the right-middle point of a selected step
+- **THEN** that point draws filled, and a point no path end sits on draws as
+  an outline
+
+### Requirement: Every docking point is a connect handle
+
+A press on a drawn docking point SHALL start a connect drag from that point.
+A step node SHALL have no other connect handle, so the handle at a node's
+right middle goes. Where the press targets of two points overlap, the point
+nearer to the press SHALL take it. Every rule this capability states for the
+connect handle SHALL hold for each docking point, an end step's refusal
+included.
+
+#### Scenario: A drag starts at the pressed point
+
+- **WHEN** the author presses the first point on the top side of "Review" and
+  drags
+- **THEN** the connect preview starts at that point
+
+#### Scenario: A press between two points takes the nearer one
+
+- **WHEN** the author presses 4px left of the middle point on a node's top
+  side, at a canvas scale of 1
+- **THEN** the connect drag starts at the middle point
+
+#### Scenario: A resting node draws no handle
+
+- **WHEN** the canvas draws a step the pointer is away from, with no selection
+- **THEN** the node draws no connect handle at its right middle
+
+#### Scenario: An end step's points refuse a drag
+
+- **WHEN** the author presses a docking point of an end step and drags to
+  another step
+- **THEN** no new path exists in the Draft model
+- **AND** the inline rejection appears, as it does today
+
+### Requirement: A connect drag stores the points it joins
+
+A connect drag released over a step SHALL end on that step's docking point
+nearest to the release. A release on a press target of that step counts as a
+release over it. The new path SHALL store the pressed point as its
+source point and that nearest point as its target point. A drag released over
+empty canvas SHALL store the source point alone. A way out added by any route
+other than a drag SHALL store no point.
+
+#### Scenario: A drag between two steps stores both points
+
+- **WHEN** the author drags from the bottom-middle point of "Review"
+- **AND** releases nearest to the first point on the left side of "Approve"
+- **THEN** the new path leaves "Review" at its bottom-middle point
+- **AND** it arrives at the first point on the left side of "Approve"
+- **AND** the draft layout stores both points for that path
+
+#### Scenario: A drag to empty canvas stores the source point
+
+- **WHEN** the author drags from the top-middle point of "Review" to empty
+  canvas
+- **THEN** the new path leaves "Review" at its top-middle point
+- **AND** the draft layout stores no target point for that path
+
+#### Scenario: A way out added from the menu stores no point
+
+- **WHEN** a keyboard author adds a way out through the way-out menu
+- **THEN** the draft layout stores no docking point for that path
+- **AND** each end takes the midpoint of the side the automatic rule picks
+
+### Requirement: A path end stays on its stored docking point
+
+A path end that stores a docking point SHALL anchor on that point. It SHALL
+stay there when its own step moves, and when the step at the path's other end
+moves. A waypoint change SHALL leave it there too. The route between the two
+anchors SHALL redraw, and neither anchor SHALL change its point.
+
+#### Scenario: Moving a step leaves the path on its points
+
+- **WHEN** a path stores the right-middle point of "Review" and the left-middle
+  point of "Approve"
+- **AND** the author drags "Approve" from the right of "Review" to below it
+- **THEN** the path still leaves "Review" at its right-middle point
+- **AND** it still arrives at the left-middle point of "Approve"
+
+#### Scenario: Bending a path leaves its ends on their points
+
+- **WHEN** a path stores both of its points
+- **AND** the author drags its midpoint handle above both steps
+- **THEN** each end still sits on the point it stored
+
+### Requirement: A step move stores the points of the paths on it
+
+A drag that moves steps SHALL first read every path that starts or ends on a
+moved step. An end of such a path may store no docking point. The drag SHALL
+store the point that end held before it. That store
+SHALL travel in the same layout write as the new positions. A press that moves
+no step SHALL store nothing. Opening a draft SHALL store nothing.
+
+A path from a step to itself SHALL store nothing either.
+
+#### Scenario: A first move keeps the side an author saw
+
+- **WHEN** a path stores no docking point and leaves "Review" at its
+  right-middle point for "Approve" on its right
+- **AND** the author drags "Approve" to below "Review"
+- **THEN** the path still leaves "Review" at its right-middle point
+- **AND** the draft layout now stores both points of that path
+
+#### Scenario: A drag of several steps stores each of their paths
+
+- **WHEN** the selection holds two steps and the author drags one of them
+- **THEN** each path on either step stores every end that sits on a step node
+
+#### Scenario: A path from a step to itself stores nothing
+
+- **WHEN** a path leads from "Review" back to "Review" and stores no point
+- **AND** the author drags "Review"
+- **THEN** the draft layout stores no docking point for that path
+- **AND** the path draws the loop it drew before the drag
+
+#### Scenario: A click on a step stores nothing
+
+- **WHEN** the author presses and releases on a node with no pointer movement
+- **THEN** the draft layout stores no new docking point
+
+#### Scenario: Opening an older draft writes nothing
+
+- **WHEN** a draft whose layout has no `dockingPoints` key opens on the Map tab
+- **THEN** the state line does not read Unsaved changes
+- **AND** every path draws the route it drew before this change
+
+### Requirement: A selected path's end hangs on another point of its step
+
+A selected path SHALL draw one end handle at each of its two ends. Dragging
+an end handle SHALL draw the docking points of that end's own step. A release
+on that step or on one of its press targets SHALL store the nearest point for
+that end. A release anywhere else SHALL change nothing. The drag
+SHALL leave the Draft model as it was. The handle's tooltip SHALL read: "Drag
+to another point on this step."
+
+#### Scenario: An end moves to another point
+
+- **WHEN** the author selects a path that arrives at the left-middle point of
+  "Approve"
+- **AND** drags its target end handle to the top-middle point of "Approve"
+- **THEN** the path arrives at the top-middle point of "Approve"
+- **AND** its source end keeps the point it had
+
+#### Scenario: A release away from the step changes nothing
+
+- **WHEN** the author drags an end handle and releases over empty canvas
+- **THEN** the end sits on the point it had before the drag
+
+#### Scenario: A release over another step changes nothing
+
+- **WHEN** the author drags the target end handle of a path into "Approve"
+- **AND** releases over the node of "Reject"
+- **THEN** the path still names "Approve" as its target
+- **AND** the end sits on the point it had before the drag
+
+#### Scenario: The end handle takes the press over its docking point
+
+- **WHEN** a selected path's end handle sits on a drawn docking point
+- **AND** the author presses there and drags
+- **THEN** the drag moves that end, and no connect drag starts
+
+### Requirement: A route joins any two sides
+
+A path may have no waypoints and at least one stored docking point. It SHALL
+then draw an orthogonal route between its two anchors, on any pair of sides. The
+route SHALL leave each anchor outward, along that side's own axis. It SHALL
+hold at most five segments and SHALL NOT double back. Each turn SHALL sit a
+whole grid step clear of the node it leaves or enters. Two anchors on opposing
+sides that face each other SHALL take the route this capability already
+states for that pair.
+
+#### Scenario: Stored opposing midpoints draw the automatic route
+
+- **WHEN** a path stores the right-middle point of its source and the
+  left-middle point of a target on its right
+- **THEN** it draws the route it would draw with no stored point
+
+#### Scenario: A turn onto a neighbouring side takes two segments
+
+- **WHEN** a path leaves the right-middle point of its source
+- **AND** arrives at the top-middle point of a target
+- **AND** that point lies a grid step or more right of the source's right side
+- **AND** it lies a grid step or more below the source anchor
+- **THEN** the route holds two segments, one level and one upright
+
+#### Scenario: Two anchors on one side draw around
+
+- **WHEN** a path leaves the top-middle point of its source
+- **AND** arrives at the top-middle point of a target on the same row
+- **THEN** the route holds three segments and passes above both nodes
+
+#### Scenario: An anchor facing away reaches the target from outside
+
+- **WHEN** a path leaves the left-middle point of its source
+- **AND** arrives at the right-middle point of a target on the source's right
+- **THEN** the route holds five segments
+- **AND** every segment lies on one axis
+
+### Requirement: A route stays out of its own two boxes
+
+A route between two anchors SHALL NOT cross the inside of its source box or
+of its target box. It SHALL NOT run along a border of either. Both SHALL hold where the two boxes stand two grid steps
+apart or more on one axis. Closer than that, the route SHALL still draw.
+
+#### Scenario: A route around its own source
+
+- **WHEN** a path leaves the left-middle point of its source
+- **AND** its target stands on the source's right, two grid steps away or more
+- **THEN** no segment of the route crosses the inside of either node
+
+#### Scenario: Two touching nodes still draw a path
+
+- **WHEN** a path with stored points joins two nodes that stand closer than
+  two grid steps
+- **THEN** the canvas draws a route for it
+
+### Requirement: A waypointed route keeps its stored docking points
+
+A path with waypoints SHALL run from its stored source point to the first
+waypoint. It SHALL run from the last waypoint to its stored target point. A leg at a
+stored point SHALL leave along that point's own side. Where the waypoint lies
+behind that side, the leg SHALL first run one grid step outward. It SHALL then
+pass the node one grid step clear, in at most four segments. That leg carries
+a gutter, and no other leg does.
+
+#### Scenario: A waypoint ahead of a stored point draws the plain leg
+
+- **WHEN** a path stores the right-middle point of its source
+- **AND** its first waypoint lies to the right of that point
+- **THEN** the first leg draws as one segment, or as two
+
+#### Scenario: A waypoint behind a stored point draws around the node
+
+- **WHEN** a path stores the right-middle point of its source
+- **AND** its first waypoint lies to the left of the source node, on the
+  node's own row
+- **THEN** the route leaves the right side by one grid step before it turns
+- **AND** it passes above or below the node, one grid step clear
+- **AND** no segment crosses the inside of the source node
+
+### Requirement: A step move stores nothing for an end on a collapsed group's box
+
+A step move SHALL store nothing for a path end that sits on a collapsed
+group's box. The other end of that path SHALL store the point it held, read
+against the box. A path between two members of one collapsed group SHALL store
+nothing, since it draws no point.
+
+#### Scenario: A hidden end stores nothing
+
+- **WHEN** a path runs from "Review" to a step inside a collapsed group
+- **AND** neither end stores a docking point
+- **AND** the author drags "Review"
+- **THEN** the draft layout stores a source point for that path
+- **AND** it stores no target point for it
+
+#### Scenario: A path inside a collapsed group stores nothing
+
+- **WHEN** the author drags a collapsed group that holds both ends of a path
+- **THEN** the draft layout stores no docking point for that path
+
+### Requirement: A connect drag keeps every step where the author saw it
+
+A connect drag SHALL store the drawn position of every step that stores
+none. That store SHALL travel in the same layout write as the points. A new
+path can change where the automatic placement puts a step. The stored
+positions keep every step in place, so no step lands on another.
+
+#### Scenario: A connect drag on an auto-placed draft moves no step
+
+- **WHEN** a draft's layout stores no position
+- **AND** the author drags from a point of "Review" to a point of "Approve"
+- **THEN** the draft layout stores a position for every step of the draft
+- **AND** each equals the place that step drew at before the drag
+- **AND** no step moves when the new path draws
+
+#### Scenario: A stored position stays as it is
+
+- **WHEN** "Review" already stores a position
+- **AND** the author drags from a point of "Review" to empty canvas
+- **THEN** the layout keeps that position for "Review"
+
+#### Scenario: A way out from the menu stores no position
+
+- **WHEN** a keyboard author adds a way out through the way-out menu
+- **THEN** the draft layout stores no position it did not store before
+
+### Requirement: A connect drag released on its own step joins two points
+
+A connect drag that ends on its source step SHALL take a target point other
+than the pressed one. That point SHALL be the nearest one to the release. The
+path SHALL draw around the node and SHALL NOT cross its inside.
+
+#### Scenario: A self path leaves and arrives at two points
+
+- **WHEN** the author drags from the top-middle point of "Review"
+- **AND** releases on "Review" beside that same point
+- **THEN** the new path leaves at the top-middle point
+- **AND** it arrives at a neighbouring point, outside the node
+
+### Requirement: A docking point has no panel route and no key
+
+A docking point is a drawing aid in the draft layout, as a waypoint is. It
+SHALL reach no definition. The canvas SHALL offer it through the pointer
+alone, with no panel route and no key.
+
+#### Scenario: Hanging an end leaves the definition alone
+
+- **WHEN** the author hangs a path end on another docking point
+- **THEN** the Draft model equals the one before the drag
+- **AND** the draft layout alone differs
+
+### Requirement: Docking points persist in the draft layout
+
+A path's stored points SHALL persist as `layout.dockingPoints[pathId]`, the
+fourth reserved key of that blob. An entry holds a source end, a target end or
+both. Each end names a side and a whole-number position counted from that
+side's middle point. There SHALL be no schema change and no API change. An
+absent entry or end SHALL read as no stored point. So SHALL an end naming no
+side, or a position the side does not hold.
+
+#### Scenario: Stored points survive a save and a reload
+
+- **WHEN** the author connects two steps by a drag and the draft saves
+- **AND** the author opens that draft's canvas again
+- **THEN** the path leaves and arrives at the same two points
+
+#### Scenario: A malformed entry falls back
+
+- **WHEN** a draft's `layout.dockingPoints` entry is not an object of ends
+- **THEN** both ends of that path take the automatic side
+- **AND** the render does not fail
+
+#### Scenario: A position the side does not hold falls back
+
+- **WHEN** a stored source end names the left side and a position five from
+  its middle
+- **THEN** that end takes the automatic side
+- **AND** the target end keeps its own stored point
+
+#### Scenario: A deleted path may leave its entry behind
+
+- **WHEN** the author deletes a path that stores docking points
+- **THEN** the canvas draws the remaining paths as before
+- **AND** the published body has no docking point
+
+### Requirement: Arrange clears the draft's stored docking points
+
+Activating Arrange SHALL clear every entry from the draft's stored docking
+points. An author chose each point for the places the two steps held, and an
+arrange moves both. Every path SHALL then take the automatic side again.
+
+#### Scenario: Arrange clears a stored point
+
+- **WHEN** a path stores both of its points and an author confirms Arrange
+- **THEN** the saved layout has no docking point for that path afterward
+- **AND** each of its ends sits at the midpoint of a side
+
+### Requirement: The insert keeps the split path's source point
+
+A step dropped on a path SHALL leave the retargeted path's stored source
+point in place. It SHALL clear that path's stored target point, since the path
+now ends on another step. The new path SHALL store no point.
+
+#### Scenario: The retargeted path keeps where it leaves
+
+- **WHEN** a path stores the bottom-middle point of "Submit" and a point on
+  "Approve"
+- **AND** the developer drops a new Step on that path
+- **THEN** the path still leaves "Submit" at its bottom-middle point
+- **AND** the layout stores no target point for it
+- **AND** the layout stores no point for the new path
+
+### Requirement: A path on a collapsed group's box takes the automatic side
+
+A path end that sits on a collapsed group's box SHALL take the automatic
+side on that box. A point stored for the hidden member SHALL stay stored.
+Expanding the group SHALL put the end back on that point.
+
+#### Scenario: Collapsing and expanding keeps a stored point
+
+- **WHEN** a path stores the top-middle point of a step inside a group
+- **AND** the developer collapses that group and expands it again
+- **THEN** the path ends on the top-middle point of that step
+
+#### Scenario: A collapsed box draws the automatic anchor
+
+- **WHEN** a path stores a point on a step inside a collapsed group
+- **THEN** the path ends at the midpoint of one side of the group's box
+
+### Requirement: Docking point logic lives in pure, tested functions
+
+Six more computations SHALL live in pure modules with `bun:test` coverage.
+The first returns the docking points of a box. The second returns the point
+nearest to a position. The third turns a stored end into an anchor. The
+fourth reads an anchor back as a side and a position.
+
+The fifth returns the route between two anchors and their sides. The sixth
+returns the points a step move stores. None of the six SHALL read the DOM.
+
+#### Scenario: The docking point computations hold without rendering
+
+- **WHEN** a test gives the nearest-point computation a box and a position
+- **AND** gives the route computation two anchors and their two sides
+- **THEN** each returns its result
+- **AND** each test runs without a DOM or a rendered canvas
 
 <!-- Why: the header must match the base spec character for character, or the
      delta adds a requirement rather than modifying one. -->
@@ -3404,3 +3992,349 @@ command SHALL then tell the author the load failed.
 - **WHEN** the author runs the Arrange command
 - **THEN** the browser requests the library's chunk once, and the command
   repositions every step as before
+
+### Requirement: The canvas frame clips the graph without scrolling
+
+The canvas frame SHALL clip the graph without being a scroll container. Its
+scroll offsets SHALL stay at zero, whatever takes focus inside it. Each focus
+move the canvas makes itself SHALL ask the browser not to scroll. Pan and zoom
+SHALL stay the one way the view moves.
+
+#### Scenario: A focus move off the visible canvas leaves the frame unscrolled
+
+- **WHEN** the canvas stands at 200 percent zoom
+- **AND** a keyboard author moves focus to a step outside the visible canvas
+- **THEN** the frame's horizontal and vertical scroll offsets both read 0
+- **AND** the step draws where the pan transform puts it
+
+#### Scenario: Fit to view frames the graph after a focus move
+
+- **WHEN** a keyboard author moved focus across the whole graph at 200 percent
+  zoom
+- **AND** the author then activates "Fit to view"
+- **THEN** the framing matches the one "Fit to view" gives on a fresh open
+
+### Requirement: A keyboard focus move reveals the focused element
+
+A keyboard focus move SHALL bring the step, way out or group disclosure it
+lands on fully into view. The canvas SHALL pan by the least amount
+that does so. It SHALL keep its zoom level. The visible area leaves out the
+toolbar and the gutter of "Fit to view".
+
+An element larger than that area SHALL align to the area's top-left corner. An
+element already in view SHALL move nothing. A pointer press SHALL reveal
+nothing.
+
+#### Scenario: A step past the right edge comes into view
+
+- **WHEN** focus sits on a step, and the next step in the draft's order stands
+  past the canvas's right edge
+- **AND** the keyboard author presses Down
+- **THEN** the graph pans left until that step's focus ring stands 16px inside
+  the canvas edge
+- **AND** the zoom level stays as it was
+
+#### Scenario: A step under the toolbar comes clear of it
+
+- **WHEN** a keyboard author moves focus to a step that sits under the toolbar
+- **THEN** the graph pans down until the step stands 16px below the toolbar
+
+#### Scenario: Tab into the canvas reveals the entry step
+
+- **WHEN** the draft's initial step stands outside the visible canvas
+- **AND** a keyboard author tabs into the canvas
+- **THEN** focus lands on the initial step, and the graph pans it into view
+
+#### Scenario: An element in view moves nothing
+
+- **WHEN** a keyboard author moves focus to a way out already fully in view
+- **THEN** the graph keeps its pan and its zoom
+
+#### Scenario: An element larger than the view aligns to its top-left
+
+- **WHEN** a keyboard author moves focus to a way out whose route is wider than
+  the visible area
+- **THEN** the route's leftmost point stands 16px inside the canvas's left edge
+
+#### Scenario: A pointer press reveals nothing
+
+- **WHEN** an author clicks a step that stands half outside the visible canvas
+- **THEN** the graph keeps its pan, and the click selects the step
+
+### Requirement: Zoom keys scale the canvas
+
+With focus on the canvas's `<svg>` or an element inside it, `+` and `=` SHALL
+zoom in by a factor of 1.25.
+The `-` key SHALL zoom out by the same factor. The zoom level SHALL stay
+between the canvas's least and greatest level. The `0` key SHALL run "Fit to
+view". A key pressed with Ctrl, Meta or Alt SHALL reach the browser untouched.
+
+A zoom key SHALL keep the focused element's centre in place on screen. On a
+root focus, the view's centre SHALL stay in place instead.
+
+#### Scenario: Plus zooms in about the focused step
+
+- **WHEN** the canvas stands at 100 percent zoom and a step holds focus
+- **AND** the keyboard author presses `+`
+- **THEN** the canvas stands at 125 percent
+- **AND** the focused step's centre stays at the same point on screen
+
+#### Scenario: Minus zooms out about the view's centre from the root
+
+- **WHEN** the canvas `<svg>` itself holds focus at 100 percent zoom
+- **AND** the keyboard author presses `-`
+- **THEN** the canvas stands at 80 percent
+- **AND** the graph point under the view's centre stays there
+
+#### Scenario: The greatest level holds
+
+- **WHEN** the canvas stands at its greatest zoom level
+- **AND** the keyboard author presses `=`
+- **THEN** the zoom level stays where it is
+
+#### Scenario: Zero frames the graph
+
+- **WHEN** a keyboard author presses `0` inside the canvas
+- **THEN** the canvas shows the framing "Fit to view" gives
+
+#### Scenario: A modifier leaves the key to the browser
+
+- **WHEN** a keyboard author presses Ctrl and `+` inside the canvas
+- **THEN** the canvas keeps its own zoom level
+- **AND** the browser zooms the page
+
+### Requirement: The canvas announces through one polite live region
+
+The canvas SHALL hold one live region. It is polite and visually hidden, and
+it lays out inside the canvas frame. It SHALL stay mounted while the canvas
+shows. Each zoom key SHALL announce the new level, as in "Map at 125 percent".
+An added way out and a refused source SHALL announce too.
+
+A zoom level and an added way out SHALL read from the studio catalog, in the
+author's words. Neither SHALL say "edge", "node" or "port". A refusal SHALL
+read the sentence the drop shows.
+
+#### Scenario: A zoom key announces the level
+
+- **WHEN** a keyboard author presses `+` at 100 percent zoom
+- **THEN** the live region reads "Map at 125 percent"
+
+#### Scenario: The region stands before its first announcement
+
+- **WHEN** the Map tab first shows a draft
+- **THEN** the canvas frame already holds the empty live region
+
+### Requirement: Opening from the canvas lands focus on the step page
+
+Enter on a focused step SHALL move focus to the step page's Name input, once
+the Steps tab shows. Enter on a focused way out SHALL open Ways out on its
+source step. Focus SHALL then move to that way out's own Name input, in its
+row. A double-click SHALL land focus the same way. Focus SHALL NOT fall to the
+page body.
+
+#### Scenario: Enter on a step lands on its Name input
+
+- **WHEN** focus sits on the step "Review" and the author presses Enter
+- **THEN** the Steps tab shows "Review", and its Name input holds focus
+
+#### Scenario: Enter on a way out lands on its row
+
+- **WHEN** focus sits on the way out "Approve" from "Review"
+- **AND** the author presses Enter
+- **THEN** the Steps tab shows "Review" with Ways out open
+- **AND** the Name input in the row of "Approve" holds focus
+
+#### Scenario: A double-click lands the same way
+
+- **WHEN** the author double-clicks the step "Review"
+- **THEN** its Name input on the step page holds focus
+
+### Requirement: C opens the way-out menu on a focused step
+
+On a focused step, the `C` key SHALL open a menu anchored at that step,
+headed "Way out to …". It SHALL list the draft's steps in the draft's order,
+each by the text its node prints. The source step SHALL stand in the list. A
+step hidden inside a collapsed group SHALL NOT.
+
+A separator SHALL follow the steps, then the item "A new step". The first item
+SHALL take focus. Shift SHALL change nothing. With Ctrl, Meta or Alt, the key
+SHALL reach the browser untouched.
+
+#### Scenario: The menu lists the steps, then a new step
+
+- **WHEN** a draft holds "Review", "Booking Error" and "Done", in that order
+- **AND** the keyboard author presses `C` on "Review"
+- **THEN** a menu headed "Way out to …" opens beside "Review"
+- **AND** it lists "Review", "Booking Error" and "Done", a separator, then "A
+  new step"
+- **AND** "Review" holds focus
+
+#### Scenario: A lowercase c opens the menu
+
+- **WHEN** focus sits on "Review"
+- **AND** the keyboard author presses `c` with no modifier
+- **THEN** the menu headed "Way out to …" opens beside "Review"
+
+#### Scenario: A collapsed group hides its members from the menu
+
+- **WHEN** "Done" sits inside a collapsed group
+- **AND** the keyboard author presses `C` on "Review"
+- **THEN** the menu does not list "Done"
+
+#### Scenario: C answers a step alone
+
+- **WHEN** focus sits on a way out, a group's disclosure or the `<svg>` root
+- **AND** the keyboard author presses `C`
+- **THEN** no menu opens
+
+#### Scenario: A screen reader learns the key
+
+- **WHEN** the canvas draws a step
+- **THEN** the step carries `aria-keyshortcuts="C"`, and no visible key hint
+  draws
+
+### Requirement: The way-out menu answers the keyboard
+
+Down and Up SHALL move focus through the menu's items, wrapping at either end.
+Home and End SHALL reach the first and the last item. A typed letter SHALL
+move focus to the next item whose text starts with it. Enter SHALL add the way
+out the focused item names.
+
+Escape SHALL close the menu and add nothing. Tab SHALL do the same. Either one
+SHALL return focus to the source step. A press outside the menu SHALL close it
+and add nothing.
+
+#### Scenario: A typed letter jumps by name
+
+- **WHEN** the menu lists "Review", "Booking Error" and "Done"
+- **AND** the keyboard author types `b`
+- **THEN** "Booking Error" holds focus
+
+#### Scenario: Escape returns to the step
+
+- **WHEN** the menu is open on "Review"
+- **AND** the keyboard author presses Escape
+- **THEN** the menu closes, and "Review" holds focus
+- **AND** the draft has no new way out
+
+#### Scenario: Down wraps at the end
+
+- **WHEN** "A new step" holds focus
+- **AND** the keyboard author presses Down
+- **THEN** the first item holds focus
+
+### Requirement: The way-out menu adds what a connect drop adds
+
+Enter on a step's item SHALL add the way out a connect drop on that step adds.
+Enter on "A new step" SHALL add the step and the way out a drop on empty canvas
+adds. Each way out SHALL come from the drop's own `newPath` call, with its
+trigger, name and key. Focus SHALL then move to the new way out, and the live
+region SHALL announce it.
+
+#### Scenario: Enter adds a way out to an existing step
+
+- **WHEN** the menu is open on "Review", which has no way out yet
+- **AND** the keyboard author presses Enter on "Booking Error"
+- **THEN** a manual way out from "Review" to "Booking Error" exists, named
+  "Review → Booking Error"
+- **AND** that way out holds focus
+- **AND** the live region reads "Added a way out from Review to Booking Error."
+
+#### Scenario: Enter on a new step adds a step and a way out
+
+- **WHEN** the menu is open on "Review", and the place one column right of it
+  is free
+- **AND** the keyboard author presses Enter on "A new step"
+- **THEN** a new task step exists one column right of "Review"
+- **AND** a way out from "Review" to the new step exists
+- **AND** the live region names the text the new step's node prints
+
+#### Scenario: A subprocess source takes an automatic way out
+
+- **WHEN** the menu is open on a subprocess step with no way out
+- **AND** the keyboard author presses Enter on any item
+- **THEN** the new way out is automatic, as a connect drop's would be
+
+#### Scenario: The source itself is a target
+
+- **WHEN** the menu is open on "Review"
+- **AND** the keyboard author presses Enter on "Review"
+- **THEN** a way out from "Review" back to "Review" exists, as a drop on
+  "Review" adds
+
+### Requirement: The menu places a new step beside its source
+
+A new step the way-out menu adds SHALL stand one column right of its source
+when that spot is free. Otherwise it SHALL stand at the first free lattice
+point to the right of that spot. No step SHALL overlap it, a step hidden in a
+collapsed group included. The canvas SHALL then pan by the least distance
+that shows the new step and its way out whole.
+
+#### Scenario: A taken spot moves the new step right
+
+- **WHEN** the step "Booking Error" stands one column right of "Review"
+- **AND** the keyboard author presses Enter on "A new step" in the menu on
+  "Review"
+- **THEN** the new step stands at the first free lattice point right of that
+  spot
+
+#### Scenario: A new step past the edge comes into view
+
+- **WHEN** the keyboard author presses Enter on "A new step" and the spot
+  lies past the frame's right edge
+- **THEN** the canvas pans until the new step and its way out stand whole in
+  the frame
+- **AND** the new step overlaps no step
+
+### Requirement: A refused source opens no menu
+
+The `C` key SHALL open no menu on a step the connect drop refuses as a source.
+A terminal step is one. A step whose existing paths reject the new way out's
+trigger is another. The canvas SHALL show the refusal the drop shows, beside
+the step. The live region SHALL announce the same text.
+
+Focus SHALL stay on the step, and the draft SHALL stay unchanged. One shared
+check SHALL decide the refusal for the drop and the key.
+
+#### Scenario: An end refuses the key
+
+- **WHEN** focus sits on an end
+- **AND** the keyboard author presses `C`
+- **THEN** no menu opens, "An end has no way out." shows beside the end, and
+  the live region reads it
+
+### Requirement: A refusal reads the author's words
+
+A connect refusal, from the drop or the key, SHALL read a studio catalog
+sentence in the author's words. It SHALL NOT print the engine's rule text. An
+end SHALL read "An end has no way out.", the connect handle's own sentence. A
+missing order SHALL read the canvas's own sentence, since the checks rail's
+sentence does not fit a valid step. Every other trigger refusal SHALL read the
+checks rail's sentence for the same rule. Any other rule SHALL read one general
+catalog sentence.
+
+#### Scenario: An inconsistent source refuses the key
+
+- **WHEN** focus sits on "Check credit", a call to another process with one way
+  out
+- **AND** that way out happens by itself and carries the number 1
+- **AND** the keyboard author presses `C`
+- **THEN** no menu opens
+- **AND** "“Check credit” already has a way out that happens by itself. Add the
+  next one under Ways out, and give it a number." appears beside the step
+- **AND** the engine's text "automatic paths need a priority" appears nowhere
+
+#### Scenario: A drop's refusal reads the same sentence
+
+- **WHEN** the author drags a connect handle from "Check credit" and drops it
+  on another step
+- **THEN** the canvas shows the sentence the `C` key shows
+- **AND** the draft does not gain a way out
+
+#### Scenario: A mixed source reads the checks rail's sentence
+
+- **WHEN** focus sits on a call to another process whose one way out a person
+  chooses
+- **AND** the keyboard author presses `C`
+- **THEN** no menu opens, and the checks rail's sentence for mixed ways out
+  appears beside the step

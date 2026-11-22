@@ -305,7 +305,7 @@ Stage detail: `docs/roadmap-history.md`. Same numbers, same order.
 | 28 | Zod v4 migration | `migrate-to-zod-v4` | `development-toolchain`, `studio-plugin-config-form` |
 | 29 | Table-shaped data sources | `table-shaped-data-sources` | `db-data-source-type`, `persistence`, `data-list-administration`, `definition-contract`, `data-source-resolution`, `runtime-api`, `runtime-events`, `form-ui`, `admin-app`, `studio-column-mapping-form`, `studio-app` |
 | 30 | Canvas edge routing styles (step/smoothstep) | `canvas-edge-routing-styles` | `studio-canvas` |
-| 31 | Custom and floating canvas edges (floating anchors, drop-to-insert on a path) | `canvas-floating-anchors`, `canvas-edge-affordances` | `studio-canvas` |
+| 31 | Custom and floating canvas edges (floating anchors, drop-to-insert on a path) | `canvas-floating-anchors`, `canvas-edge-affordances`, `canvas-docking-points` | `studio-canvas` |
 | 32 | Shape per step/path kind on the canvas | `canvas-subprocess-step-shape` | `studio-canvas` |
 | 33 | Editable edges with draggable control points | `canvas-edge-waypoints` | `studio-canvas` |
 | 34 | Selection grouping (group/ungroup nodes) | `canvas-multi-select`, `canvas-step-groups` | `studio-canvas` |

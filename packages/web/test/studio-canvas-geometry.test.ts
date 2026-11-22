@@ -16,6 +16,16 @@ import {
   GRID_STEP,
   NODE_WIDTH,
   NODE_HEIGHT,
+  dockingPointsOf,
+  nearestDockingPoint,
+  dockingAnchor,
+  dockingEndOfAnchor,
+  inPressTarget,
+  pressTargetRect,
+  routeBetweenEnds,
+  type DockingSide,
+  type RouteEnd,
+  type Point,
 } from "../src/areas/studio/canvas/geometry.js";
 import { COLUMN_WIDTH, ROW_HEIGHT } from "../src/areas/studio/canvas/layout.js";
 
@@ -504,5 +514,487 @@ describe("canvas geometry: a free lattice point", () => {
       expect(answer.x % GRID_STEP).toBe(0);
       expect(answer.y % GRID_STEP).toBe(0);
     }
+  });
+});
+
+describe("docking points", () => {
+  const box = { x: 100, y: 200 };
+  const sideOf = (s: DockingSide) => dockingPointsOf(box).filter((p) => p.side === s);
+
+  it("lists three points on each upright side and seven on each level side", () => {
+    expect(sideOf("left").map((p) => p.at)).toEqual([-1, 0, 1]);
+    expect(sideOf("right").map((p) => p.at)).toEqual([-1, 0, 1]);
+    expect(sideOf("top").map((p) => p.at)).toEqual([-3, -2, -1, 0, 1, 2, 3]);
+    expect(sideOf("bottom").map((p) => p.at)).toEqual([-3, -2, -1, 0, 1, 2, 3]);
+    expect(dockingPointsOf(box)).toHaveLength(20);
+  });
+
+  it("puts position 0 at each side's midpoint and steps one grid step along the side", () => {
+    const at = (s: DockingSide, n: number) => sideOf(s).find((p) => p.at === n)!.point;
+    expect(at("right", 0)).toEqual({ x: 280, y: 230 });
+    expect(at("left", 0)).toEqual({ x: 100, y: 230 });
+    expect(at("top", 0)).toEqual({ x: 190, y: 200 });
+    expect(at("bottom", 0)).toEqual({ x: 190, y: 260 });
+    expect(at("top", 1)).toEqual({ x: 190 + GRID_STEP, y: 200 });
+    expect(at("right", 1)).toEqual({ x: 280, y: 230 + GRID_STEP });
+    expect(at("left", -1)).toEqual({ x: 100, y: 230 - GRID_STEP });
+  });
+
+  it("takes a size other than the node's and keeps the counts", () => {
+    const pts = dockingPointsOf({ x: 0, y: 0 }, { width: 100, height: 40 });
+    expect(pts).toHaveLength(20);
+    expect(pts.find((p) => p.side === "right" && p.at === 0)!.point).toEqual({ x: 100, y: 20 });
+  });
+
+  it("answers the point a position sits on", () => {
+    const p = nearestDockingPoint(box, { x: 190, y: 200 });
+    expect(p.side).toBe("top");
+    expect(p.at).toBe(0);
+  });
+
+  it("answers the nearer of two points when between them", () => {
+    const p = nearestDockingPoint(box, { x: 190 + 14, y: 190 });
+    expect(p).toMatchObject({ side: "top", at: 1 });
+  });
+
+  it("answers a corner's nearest point", () => {
+    const p = nearestDockingPoint(box, { x: 100, y: 200 });
+    expect(p).toMatchObject({ side: "left", at: -1 });
+  });
+
+  it("skips an excluded point", () => {
+    const p = nearestDockingPoint(box, { x: 190, y: 200 }, { exclude: { side: "top", at: 0 } });
+    expect({ side: p.side, at: p.at }).toEqual({ side: "top", at: -1 });
+  });
+
+  it("turns a stored end into an anchor", () => {
+    expect(dockingAnchor(box, { side: "bottom", at: 2 })).toEqual({ x: 190 + 2 * GRID_STEP, y: 260 });
+  });
+
+  it("rejects an unknown side", () => {
+    expect(dockingAnchor(box, { side: "middle" as never, at: 0 })).toBeUndefined();
+  });
+
+  it("rejects a position the side lacks", () => {
+    expect(dockingAnchor(box, { side: "right", at: 2 })).toBeUndefined();
+    expect(dockingAnchor(box, { side: "top", at: 4 })).toBeUndefined();
+    expect(dockingAnchor(box, { side: "top", at: 0.5 })).toBeUndefined();
+  });
+
+  it("reads each automatic midpoint back as position 0", () => {
+    for (const leaving of ["right", "left", "down", "up"] as const) {
+      const a = anchorSideToward(box, leaving === "right" ? { x: 1000, y: 230 } : leaving === "left" ? { x: -1000, y: 230 } : leaving === "down" ? { x: 190, y: 1000 } : { x: 190, y: -1000 });
+      const end = dockingEndOfAnchor(box, a.anchor)!;
+      expect(end.at).toBe(0);
+      const expected: Record<typeof leaving, DockingSide> = { right: "right", left: "left", down: "bottom", up: "top" };
+      expect(end.side).toBe(expected[leaving]);
+    }
+    expect(dockingEndOfAnchor(box, { x: 5, y: 5 })).toBeUndefined();
+  });
+
+  it("holds a press 10 units outside the border and not one 10 units inside", () => {
+    const top0 = dockingPointsOf(box).find((p) => p.side === "top" && p.at === 0)!;
+    expect(inPressTarget(top0, { x: 190, y: 190 })).toBe(true);
+    expect(inPressTarget(top0, { x: 190, y: 210 })).toBe(false);
+    expect(inPressTarget(top0, { x: 190, y: 205 })).toBe(true);
+    expect(inPressTarget(top0, { x: 190, y: 187 })).toBe(false);
+    expect(inPressTarget(top0, { x: 190 + 11, y: 200 })).toBe(false);
+    const right0 = dockingPointsOf(box).find((p) => p.side === "right" && p.at === 0)!;
+    expect(inPressTarget(right0, { x: 290, y: 230 })).toBe(true);
+    expect(inPressTarget(right0, { x: 270, y: 230 })).toBe(false);
+  });
+
+  it("holds the press target bounds inclusively", () => {
+    const top0 = dockingPointsOf(box).find((p) => p.side === "top" && p.at === 0)!;
+    expect(inPressTarget(top0, { x: 190, y: 200 - 12 })).toBe(true);
+    expect(inPressTarget(top0, { x: 190, y: 200 + 6 })).toBe(true);
+    expect(inPressTarget(top0, { x: 190 + 10, y: 200 })).toBe(true);
+    expect(inPressTarget(top0, { x: 190 - 10, y: 200 })).toBe(true);
+  });
+});
+
+describe("canvas geometry: routes between any two sides", () => {
+  const SIZE = { width: NODE_WIDTH, height: NODE_HEIGHT };
+  const OUT: Record<DockingSide, Point> = { top: { x: 0, y: -1 }, right: { x: 1, y: 0 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 } };
+  const SIDES: DockingSide[] = ["top", "right", "bottom", "left"];
+
+  const endOf = (node: Point, side: DockingSide, at: number): RouteEnd => ({
+    anchor: dockingAnchor(node, { side, at })!,
+    side,
+    node,
+    size: SIZE,
+  });
+  const segments = (pts: Point[]) => pts.slice(1).map((p, i) => ({ a: pts[i], b: p, dx: p.x - pts[i].x, dy: p.y - pts[i].y }));
+  // A segment meets a box when it touches the open interior or lies along a border.
+  const meetsBox = (a: Point, b: Point, n: Point) => {
+    const x0 = n.x;
+    const x1 = n.x + NODE_WIDTH;
+    const y0 = n.y;
+    const y1 = n.y + NODE_HEIGHT;
+    if (a.y === b.y) return a.y >= y0 && a.y <= y1 && Math.min(a.x, b.x) < x1 && Math.max(a.x, b.x) > x0;
+    return a.x >= x0 && a.x <= x1 && Math.min(a.y, b.y) < y1 && Math.max(a.y, b.y) > y0;
+  };
+
+  function expectSound(route: Point[], s: RouteEnd, t: RouteEnd, clear: boolean) {
+    const segs = segments(route);
+    expect(route[0]).toEqual(s.anchor);
+    expect(route[route.length - 1]).toEqual(t.anchor);
+    expect(segs.length).toBeLessThanOrEqual(5);
+    for (const g of segs) expect(g.dx === 0 || g.dy === 0).toBe(true);
+    for (const g of segs) expect(g.dx !== 0 || g.dy !== 0).toBe(true);
+    // The first segment leaves outward and the last arrives inward, a grid step or more.
+    const first = segs[0];
+    expect(Math.sign(first.dx)).toBe(OUT[s.side].x);
+    expect(Math.sign(first.dy)).toBe(OUT[s.side].y);
+    expect(Math.abs(first.dx) + Math.abs(first.dy)).toBeGreaterThanOrEqual(GRID_STEP);
+    const last = segs[segs.length - 1];
+    expect(Math.sign(last.dx)).toBe(0 - OUT[t.side].x + 0);
+    expect(Math.sign(last.dy)).toBe(0 - OUT[t.side].y + 0);
+    expect(Math.abs(last.dx) + Math.abs(last.dy)).toBeGreaterThanOrEqual(GRID_STEP);
+    // No doubling back: neighbours on one axis never run opposite ways.
+    for (let i = 1; i < segs.length; i++) {
+      const p = segs[i - 1];
+      const q = segs[i];
+      expect(p.dx * q.dx < 0 || p.dy * q.dy < 0).toBe(false);
+    }
+    if (clear) for (const g of segs) for (const n of [s.node, t.node]) expect(meetsBox(g.a, g.b, n)).toBe(false);
+  }
+
+  it("draws stored opposing midpoints as the automatic route", () => {
+    const src = { x: 0, y: 0 };
+    const tgt = { x: 300, y: 80 };
+    const s = endOf(src, "right", 0);
+    const t = endOf(tgt, "left", 0);
+    expect(routeBetweenEnds(s, t)).toEqual(routeEdge(s.anchor, t.anchor, "right"));
+  });
+
+  it("takes the automatic route for each facing opposing pair", () => {
+    const cases: [DockingSide, DockingSide, Point][] = [
+      ["right", "left", { x: 300, y: 40 }],
+      ["left", "right", { x: -300, y: 40 }],
+      ["bottom", "top", { x: 40, y: 200 }],
+      ["top", "bottom", { x: 40, y: -200 }],
+    ];
+    const leaving = { right: "right", left: "left", bottom: "down", top: "up" } as const;
+    for (const [a, b, tgt] of cases) {
+      const s = endOf({ x: 0, y: 0 }, a, 0);
+      const t = endOf(tgt, b, 0);
+      expect(routeBetweenEnds(s, t)).toEqual(routeEdge(s.anchor, t.anchor, leaving[a]));
+    }
+  });
+
+  it("sends an opposing pair that faces away through the new router", () => {
+    const s = endOf({ x: 0, y: 0 }, "left", 0);
+    const t = endOf({ x: 300, y: 0 }, "right", 0);
+    const route = routeBetweenEnds(s, t);
+    expect(route).toHaveLength(6);
+    expectSound(route, s, t, true);
+  });
+
+  it("turns onto a neighbouring side in two segments", () => {
+    const s = endOf({ x: 0, y: 0 }, "right", 0);
+    const t = endOf({ x: 260, y: 100 }, "top", 0);
+    const route = routeBetweenEnds(s, t);
+    expect(segments(route)).toHaveLength(2);
+    expectSound(route, s, t, true);
+  });
+
+  it("draws two anchors on one side around, in three segments", () => {
+    const s = endOf({ x: 0, y: 0 }, "top", 0);
+    const t = endOf({ x: 300, y: 0 }, "top", 0);
+    const route = routeBetweenEnds(s, t);
+    expect(segments(route)).toHaveLength(3);
+    expect(Math.min(...route.map((p) => p.y))).toBeLessThanOrEqual(-GRID_STEP);
+    expectSound(route, s, t, true);
+  });
+
+  it("holds every rule across sixteen side pairs and eight placements", () => {
+    const placements: Point[] = [
+      { x: 220, y: 0 },
+      { x: 220, y: 20 },
+      { x: 220, y: -40 },
+      { x: -220, y: 0 },
+      { x: -220, y: 40 },
+      { x: 0, y: 100 },
+      { x: 20, y: 100 },
+      { x: 40, y: -100 },
+    ];
+    let walked = 0;
+    for (const placement of placements) {
+      for (const sa of SIDES) {
+        for (const sb of SIDES) {
+          // The middle point, then one off-middle point on each side.
+          for (const [atS, atT] of [[0, 0], [1, -1], [-1, 1]]) {
+            const s = endOf({ x: 0, y: 0 }, sa, atS);
+            const t = endOf(placement, sb, atT);
+            expectSound(routeBetweenEnds(s, t), s, t, true);
+            walked++;
+          }
+        }
+      }
+    }
+    expect(walked).toBe(8 * 16 * 3);
+  });
+
+
+  const overlap = (a: Point, b: Point) => a.x < b.x + NODE_WIDTH && b.x < a.x + NODE_WIDTH && a.y < b.y + NODE_HEIGHT && b.y < a.y + NODE_HEIGHT;
+  function expectOutward(route: Point[], s: RouteEnd, t: RouteEnd) {
+    const segs = segments(route);
+    expect(Math.sign(segs[0].dx)).toBe(OUT[s.side].x);
+    expect(Math.sign(segs[0].dy)).toBe(OUT[s.side].y);
+    const last = segs[segs.length - 1];
+    expect(Math.sign(last.dx)).toBe(0 - OUT[t.side].x + 0);
+    expect(Math.sign(last.dy)).toBe(0 - OUT[t.side].y + 0);
+  }
+  const revisits = (route: Point[]) => route.some((p, i) => route.some((q, j) => j > i && p.x === q.x && p.y === q.y));
+
+  it("draws an opposing pair one grid step apart without a loop", () => {
+    // 20 beyond the source anchor is under two grid steps: not the facing shortcut.
+    const s = endOf({ x: 0, y: 0 }, "right", 0);
+    const t = endOf({ x: 200, y: 0 }, "left", 0);
+    expect(routeBetweenEnds(s, t)).toEqual([s.anchor, t.anchor]);
+    const down = endOf({ x: 0, y: 0 }, "bottom", 0);
+    const up = endOf({ x: 0, y: 80 }, "top", 0);
+    expect(routeBetweenEnds(down, up)).toEqual([down.anchor, up.anchor]);
+  });
+
+  it("takes the facing route at two grid steps and the router's own at one", () => {
+    // At exactly 40 units the router's search lands on the `routeEdge` route for every row and
+    // offset probed, so no placement there separates `>=` from `>` in the facing rule. The test
+    // documents that with both outputs side by side.
+    for (const dy of [0, 10, 20, 40, -20]) {
+      for (const at of [-1, 0, 1]) {
+        const s = endOf({ x: 0, y: 0 }, "right", at);
+        const t = endOf({ x: 220, y: dy }, "left", 0);
+        expect(routeBetweenEnds(s, t)).toEqual(routeEdge(s.anchor, t.anchor, "right"));
+      }
+    }
+    // At one grid step the rule does not apply, and the two routes differ.
+    const s = endOf({ x: 0, y: 0 }, "right", 0);
+    const t = endOf({ x: 200, y: 10 }, "left", 0);
+    expect(routeBetweenEnds(s, t)).not.toEqual(routeEdge(s.anchor, t.anchor, "right"));
+    expect(routeBetweenEnds(s, t)).toHaveLength(6);
+  });
+
+  it("keeps a close opposing pair on other rows to at most five segments and no loop", () => {
+    for (const dy of [-40, -20, 20, 40]) {
+      const s = endOf({ x: 0, y: 0 }, "right", 0);
+      const t = endOf({ x: 200, y: dy }, "left", 0);
+      const route = routeBetweenEnds(s, t);
+      expect(route[0]).toEqual(s.anchor);
+      expect(route[route.length - 1]).toEqual(t.anchor);
+      expect(segments(route).length).toBeLessThanOrEqual(5);
+      expect(revisits(route)).toBe(false);
+      expectOutward(route, s, t);
+    }
+  });
+
+  it("holds the rules across wider gaps and both off-lattice offsets", () => {
+    for (const gap of [60, 100, 200]) {
+      for (const cross of [-40, -20, 0, 20, 40]) {
+        for (const placement of [
+          { x: 180 + gap, y: cross },
+          { x: -180 - gap, y: cross },
+          { x: cross, y: 60 + gap },
+          { x: cross, y: -60 - gap },
+        ]) {
+          for (const sa of SIDES) {
+            for (const sb of SIDES) {
+              const s = endOf({ x: 0, y: 0 }, sa, 0);
+              const t = endOf(placement, sb, 0);
+              expectSound(routeBetweenEnds(s, t), s, t, true);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("still returns a route for two nodes closer than two grid steps", () => {
+    for (let x = -200; x <= 220; x += GRID_STEP) {
+      for (let y = -80; y <= 120; y += GRID_STEP) {
+        for (const sa of SIDES) {
+          for (const sb of SIDES) for (const [atS, atT] of [[0, 0], [1, -1]]) {
+            const s = endOf({ x: 0, y: 0 }, sa, atS);
+            const t = endOf({ x, y }, sb, atT);
+            if (s.anchor.x === t.anchor.x && s.anchor.y === t.anchor.y) continue;
+            const route = routeBetweenEnds(s, t);
+            expect(route[0]).toEqual(s.anchor);
+            expect(route[route.length - 1]).toEqual(t.anchor);
+            expect(segments(route).length).toBeLessThanOrEqual(5);
+            expect(revisits(route)).toBe(false);
+            for (const g of segments(route)) expect(g.dx === 0 || g.dy === 0).toBe(true);
+            if (!overlap(s.node, t.node)) expectOutward(route, s, t);
+          }
+        }
+      }
+    }
+  });
+
+  it("still returns a route for two overlapping nodes", () => {
+    for (const placement of [{ x: -120, y: -20 }, { x: 20, y: 20 }, { x: 0, y: 0 }, { x: 100, y: -40 }]) {
+      for (const sa of SIDES) {
+        for (const sb of SIDES) {
+          const route = routeBetweenEnds(endOf({ x: 0, y: 0 }, sa, 0), endOf(placement, sb, 0));
+          expect(route.length).toBeGreaterThanOrEqual(2);
+        }
+      }
+    }
+  });
+
+  it("returns a route for two touching nodes", () => {
+    // Facing midpoints coincide: no loop-free route exists, so the route has zero length.
+    const same = routeBetweenEnds(endOf({ x: 0, y: 0 }, "right", 0), endOf({ x: 180, y: 0 }, "left", 0));
+    expect(same).toHaveLength(2);
+    const apart = routeBetweenEnds(endOf({ x: 0, y: 0 }, "right", 0), endOf({ x: 180, y: 0 }, "left", 1));
+    expect(segments(apart).length).toBeLessThanOrEqual(5);
+    expect(revisits(apart)).toBe(false);
+  });
+
+  it("draws a self path on one side around its node", () => {
+    for (const side of SIDES) {
+      const s = endOf({ x: 0, y: 0 }, side, -1);
+      const t = endOf({ x: 0, y: 0 }, side, 1);
+      expectSound(routeBetweenEnds(s, t), s, t, true);
+    }
+  });
+
+  it("draws a self path on two neighbouring sides around its node", () => {
+    for (const [sa, sb] of [["top", "right"], ["right", "bottom"], ["bottom", "left"], ["left", "top"], ["right", "top"], ["top", "left"]] as const) {
+      const s = endOf({ x: 0, y: 0 }, sa, 0);
+      const t = endOf({ x: 0, y: 0 }, sb, 0);
+      expectSound(routeBetweenEnds(s, t), s, t, true);
+    }
+  });
+});
+
+describe("canvas geometry: a waypointed route keeps its stored points", () => {
+  const src = { x: 200, y: 0 };
+  const tgt = { x: 700, y: 0 };
+  const inside = (p: Point, n: Point) => p.x > n.x && p.x < n.x + NODE_WIDTH && p.y > n.y && p.y < n.y + NODE_HEIGHT;
+  const crossesNode = (pts: Point[], n: Point) =>
+    pts.slice(1).some((q, i) => {
+      const p = pts[i];
+      const x0 = n.x;
+      const x1 = n.x + NODE_WIDTH;
+      const y0 = n.y;
+      const y1 = n.y + NODE_HEIGHT;
+      if (p.y === q.y) return p.y >= y0 && p.y <= y1 && Math.min(p.x, q.x) < x1 && Math.max(p.x, q.x) > x0;
+      return p.x >= x0 && p.x <= x1 && Math.min(p.y, q.y) < y1 && Math.max(p.y, q.y) > y0;
+    });
+
+  it("returns what it returns today when no end is stored", () => {
+    const ws = [{ x: 400, y: -140 }];
+    expect(routeThroughWaypoints(src, tgt, ws, {}, {})).toEqual(routeThroughWaypoints(src, tgt, ws));
+    expect(routeThroughWaypoints(src, tgt, [], {}, {})).toEqual(routeThroughWaypoints(src, tgt));
+  });
+
+  it("starts at the stored source point and draws the plain leg to a waypoint ahead", () => {
+    const route = routeThroughWaypoints(src, tgt, [{ x: 480, y: -100 }], {}, { source: { side: "right", at: 0 } });
+    expect(route.points[0]).toEqual({ x: 380, y: 30 });
+    // One segment or two before the waypoint.
+    const w = route.points.findIndex((p) => p.x === 480 && p.y === -100);
+    expect(route.legStarts[1]).toBe(w);
+    expect(w).toBeLessThanOrEqual(2);
+    expect(route.points[1]).toEqual({ x: 480, y: 30 });
+  });
+
+  it("ends at the stored target point", () => {
+    const route = routeThroughWaypoints(src, tgt, [{ x: 520, y: 200 }], {}, { target: { side: "bottom", at: 1 } });
+    expect(route.points[route.points.length - 1]).toEqual({ x: 700 + 90 + GRID_STEP, y: 60 });
+  });
+
+  it("goes around the node when the waypoint lies behind a stored point on the node's row", () => {
+    const route = routeThroughWaypoints(src, tgt, [{ x: 100, y: 30 }], {}, { source: { side: "right", at: 0 } });
+    const pts = route.points;
+    expect(pts[0]).toEqual({ x: 380, y: 30 });
+    expect(pts[1]).toEqual({ x: 400, y: 30 });
+    expect(pts.some((p) => p.x === 100 && p.y === 30)).toBe(true);
+    expect(pts.some((p) => p.y === -GRID_STEP || p.y === NODE_HEIGHT + GRID_STEP)).toBe(true);
+    expect(crossesNode(pts.slice(0, route.legStarts[1] + 1), src)).toBe(false);
+    expect(route.legStarts[1] - route.legStarts[0]).toBeLessThanOrEqual(4);
+    for (const p of pts) expect(inside(p, src)).toBe(false);
+    for (let i = 1; i < pts.length; i++) expect(pts[i].x === pts[i - 1].x || pts[i].y === pts[i - 1].y).toBe(true);
+  });
+
+  it("goes around for a waypoint behind a stored top point, and for a target end", () => {
+    const top = routeThroughWaypoints(src, tgt, [{ x: 290, y: 200 }], {}, { source: { side: "top", at: 0 } });
+    expect(top.points[1]).toEqual({ x: 290, y: -GRID_STEP });
+    expect(crossesNode(top.points.slice(0, top.legStarts[1] + 1), src)).toBe(false);
+    const end = routeThroughWaypoints(src, tgt, [{ x: 900, y: 30 }], {}, { target: { side: "left", at: 0 } });
+    const last = end.points;
+    expect(last[last.length - 1]).toEqual({ x: 700, y: 30 });
+    expect(last[last.length - 2]).toEqual({ x: 680, y: 30 });
+    expect(crossesNode(last.slice(end.legStarts[1]), tgt)).toBe(false);
+  });
+
+  it("reports one leg start per leg when a leg holds four segments", () => {
+    const route = routeThroughWaypoints(src, tgt, [{ x: 100, y: 30 }, { x: 100, y: 300 }], {}, { source: { side: "right", at: 0 } });
+    expect(route.legStarts).toHaveLength(3);
+    expect(route.legStarts[0]).toBe(0);
+    expect(route.points[route.legStarts[1]]).toEqual({ x: 100, y: 30 });
+    expect(route.points[route.legStarts[2]]).toEqual({ x: 100, y: 300 });
+  });
+
+  it("routes a path with stored ends and no waypoints through the router", () => {
+    const route = routeThroughWaypoints({ x: 0, y: 0 }, { x: 300, y: 0 }, [], {}, { source: { side: "top", at: 0 }, target: { side: "top", at: 0 } });
+    expect(route.points).toHaveLength(4);
+    expect(route.legStarts).toEqual([0]);
+  });
+
+  it("turns the unstored end of a self path to the opposing side of its stored one", () => {
+    const A = { x: 0, y: 0 };
+    const route = routeThroughWaypoints(A, A, [], {}, { target: { side: "right", at: 0 } });
+    const first = route.points[0];
+    const last = route.points[route.points.length - 1];
+    expect(last).toEqual({ x: 180, y: 30 });
+    expect(first).toEqual({ x: 0, y: 30 });
+    expect(route.points.length).toBeGreaterThan(2);
+  });
+
+  it("draws the automatic loop for a self path with two identical stored ends", () => {
+    const A = { x: 0, y: 0 };
+    const same = { side: "right", at: 0 } as const;
+    const route = routeThroughWaypoints(A, A, [], {}, { source: same, target: same });
+    expect(route.points).toEqual(routeThroughWaypoints(A, A).points);
+    expect(route.points.length).toBeGreaterThan(2);
+  });
+
+  it("keeps the zero-length route for two touching boxes whose stored ends share a point", () => {
+    const route = routeThroughWaypoints({ x: 0, y: 0 }, { x: 180, y: 0 }, [], {}, { source: { side: "right", at: 0 }, target: { side: "left", at: 0 } });
+    expect(route.points).toEqual([{ x: 180, y: 30 }, { x: 180, y: 30 }]);
+  });
+
+  it("turns the unstored end toward the far box", () => {
+    const route = routeThroughWaypoints({ x: 0, y: 0 }, { x: 300, y: 0 }, [], {}, { source: { side: "right", at: 1 } });
+    expect(route.points[0]).toEqual({ x: 180, y: 50 });
+    expect(route.points[route.points.length - 1]).toEqual({ x: 300, y: 30 });
+  });
+});
+
+describe("pressTargetRect", () => {
+  const node = { x: 200, y: 200 };
+  const points = dockingPointsOf(node);
+
+  it("holds every corner of the rect inside the hit test, and a point one unit beyond it outside", () => {
+    for (const p of points) {
+      const r = pressTargetRect(p);
+      for (const x of [r.x, r.x + r.width]) {
+        for (const y of [r.y, r.y + r.height]) {
+          expect(inPressTarget(p, { x, y })).toBe(true);
+        }
+      }
+      expect(inPressTarget(p, { x: r.x - 1, y: r.y })).toBe(false);
+      expect(inPressTarget(p, { x: r.x + r.width + 1, y: r.y + r.height })).toBe(false);
+      expect(inPressTarget(p, { x: r.x, y: r.y - 1 })).toBe(false);
+      expect(inPressTarget(p, { x: r.x + r.width, y: r.y + r.height + 1 })).toBe(false);
+    }
+  });
+
+  it("reaches 12 units outward and 6 inward", () => {
+    const top0 = points.find((p) => p.side === "top" && p.at === 0)!;
+    expect(pressTargetRect(top0)).toEqual({ x: top0.point.x - 10, y: top0.point.y - 12, width: 20, height: 18 });
+    const right0 = points.find((p) => p.side === "right" && p.at === 0)!;
+    expect(pressTargetRect(right0)).toEqual({ x: right0.point.x - 6, y: right0.point.y - 10, width: 18, height: 20 });
   });
 });

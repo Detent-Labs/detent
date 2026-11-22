@@ -456,8 +456,8 @@ One shape breaks the rectangle. The register tab cuts its trailing edge with
 `clip-path: polygon(0 0, 100% 0, calc(100% - 0.4rem) 100%, 0 100%)`. It reads
 as a divider tab slotted into a ledger, never as a pill.
 
-The canvas draws SVG geometry, and two of its shapes curve. A circle of
-radius 7 marks a connect handle. A path turns each corner on an 8px arc. The
+The canvas draws SVG geometry, and two of its shapes curve. Circles mark a
+docking point and an end handle. A path turns each corner on an 8px arc. The
 canvas stamp stays a straight rectangle, as every other stamp does.
 
 ### Named Rules
@@ -745,11 +745,25 @@ own.
   2px rule in the text role frames it on the surface. It marks the initial
   step at the top-left corner and an end at the top-right. A long stamp
   wraps onto more lines and grows upward. It never clips.
+- **Docking point:** a resting canvas draws none. A pointed-at or selected step
+  draws twenty, three on each upright side and seven on each level side.
+- **Free docking point:** a circle of radius 3.5 on paper, with a 1.25px slate
+  stroke.
+- **Held docking point:** a circle of radius 3.5 filled slate.
+- **End step's docking point:** a circle of radius 3.5, unfilled, with a 1.25px
+  dashed slate stroke.
+- **Snap target:** during a drag, a circle of radius 5 filled accent. A 2px
+  accent ring of radius 10 surrounds it.
+- **End handle:** a circle of radius 5 filled accent, with a 1px accent stroke.
+  It marks each end of a selected path.
+- **Press targets:** a docking point's target is transparent. It reaches 12
+  units outward from the border and 6 inward. An end handle's target is a
+  transparent circle of radius 12, above every point target.
 - **Focus:** a 2px dashed accent ring around the step.
 - **Marquee:** a 1px dashed accent box over the accent at 8%.
 
 The two structural rule weights govern the page. The canvas draws its own
-strokes, at 1, 1.5, 2 and 3px.
+strokes, at 1, 1.25, 1.5, 2 and 3px.
 
 ### The Warning Callout
 
