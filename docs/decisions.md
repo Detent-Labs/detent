@@ -812,11 +812,11 @@ recorded rather than fixed. The RAIL tags are local to this section.
   before Remove step joined it. Risk: a keyboard or screen-reader user loses
   their place after every removal (WCAG 2.4.3, and 4.1.3 for the silence). The
   fix moves focus to the canvas's own tab stop, which
-  `packages/web/src/areas/studio/canvas/CanvasView.tsx:1160-1164` already reassigns,
+  `packages/web/src/areas/studio/canvas/CanvasView.tsx:1159-1164` already reassigns,
   and announces the removal in a polite live region. The canvas now holds one
   such region, which a removal can reuse.
 - **The canvas node's focus ring draws dashed.** `nodeFocusRing` sets
-  `stroke-dasharray: 5 4` (`packages/web/src/areas/studio/canvas/CanvasView.tsx:255`),
+  `stroke-dasharray: 5 4` (`packages/web/src/areas/studio/canvas/CanvasView.tsx:254`),
   while `design-language.md` asks for a solid 2px ring. Found in the
   `studio-canvas-keyboard-access` browser walk. The style predates that change.
   Risk: a dashed ring reads as not there yet.
