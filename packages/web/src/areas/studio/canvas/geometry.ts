@@ -65,8 +65,8 @@ const FREE_LATTICE_POINT_STEP_LIMIT = 500;
  * Performs its own rect test rather than importing `nodesInRect` from
  * `selection.ts`, which already imports this module; the reverse import
  * would make a cycle. The test itself is the same inclusive bound
- * `hitTestNode` and `nodesInRect` use, so a step placed edge-to-edge with
- * another still counts as clear.
+ * `hitTestNode` and `nodesInRect` use, so a candidate that touches another
+ * rect edge-to-edge counts as overlapping and the walk goes on.
  */
 export function freeLatticePoint(wanted: Point, placed: NodePosition[]): Point {
   let candidate = wanted;

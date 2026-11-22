@@ -330,7 +330,7 @@ describe("drawnPositions clears stored steps", () => {
     expect(anyOverlap(drawn)).toBe(false);
   });
 
-  it("keeps two auto-placed steps off one slot", () => {
+  it("moves only the colliding step, and clears the steps it kept", () => {
     const steps = [
       step("a", [{ to: "b" }, { to: "c" }]),
       step("b", [{ to: "d" }]),
@@ -340,10 +340,95 @@ describe("drawnPositions clears stored steps", () => {
     ];
     const layout = { b: { x: 240, y: 120 } };
     const first = drawnPositions(steps, "a", layout);
-    // `freeLatticePoint` walks right by a node width plus one grid step.
-    expect(first.c).toEqual({ x: 440, y: 120 });
-    expect(first.e).toEqual({ x: 680, y: 120 });
+    // Only "c" collides with a stored step. "e" overlaps nothing stored and stays on its slot, and
+    // "c" walks right past it, by a node width plus one grid step at a time.
+    expect(first.c).toEqual({ x: 840, y: 120 });
+    expect(first.e).toEqual({ x: 480, y: 120 });
     expect(anyOverlap(first)).toBe(false);
     expect(drawnPositions(steps, "a", layout)).toEqual(first);
+  });
+
+  const chain = (order: string[]) =>
+    order.map((id) => step(id, id === "a" ? [{ to: "b" }] : id === "b" ? [{ to: "c" }] : id === "c" ? [{ to: "d" }] : id === "d" ? [{ to: "e" }] : []));
+
+  it("moves only the step on a stored slot, whatever the order of the steps", () => {
+    const layout = { z: { x: 240, y: 0 } };
+    const flow = drawnPositions(chain(["a", "b", "c", "d", "e", "z"]), "a", layout);
+    const reversed = drawnPositions(chain(["z", "e", "d", "c", "b", "a"]), "a", layout);
+    for (const drawn of [flow, reversed]) {
+      expect(drawn.a).toEqual({ x: 0, y: 0 });
+      expect(drawn.c).toEqual({ x: 480, y: 0 });
+      expect(drawn.d).toEqual({ x: 720, y: 0 });
+      expect(drawn.e).toEqual({ x: 960, y: 0 });
+      expect(drawn.b).toEqual({ x: 1240, y: 0 });
+      expect(anyOverlap(drawn)).toBe(false);
+    }
+  });
+
+  it("keeps every step where it was when a stored step only touches one", () => {
+    const steps = [
+      step("a", [{ to: "x1" }, { to: "x2" }, { to: "x3" }]),
+      step("x1", [{ to: "y1" }]),
+      step("x2", [{ to: "y2" }]),
+      step("x3", [{ to: "y3" }]),
+      step("y1"),
+      step("y2"),
+      step("y3"),
+      step("z"),
+    ];
+    const layout = { z: { x: 240, y: 60 } };
+    const slots = autoPlaceSteps(steps, "a", layout);
+    const drawn = drawnPositions(steps, "a", layout);
+    for (const s of steps) if (s.id !== "z") expect(drawn[s.id]).toEqual(slots[s.id]);
+  });
+
+  it("ends two colliding steps on different places", () => {
+    const steps = [step("a", [{ to: "b" }]), step("b", [{ to: "c" }]), step("c"), step("z1"), step("z2")];
+    const layout = { z1: { x: 240, y: 0 }, z2: { x: 480, y: 0 } };
+    const drawn = drawnPositions(steps, "a", layout);
+    expect(drawn.b).not.toEqual(drawn.c);
+    expect(anyOverlap(drawn)).toBe(false);
+    expect(drawnPositions(steps, "a", layout)).toEqual(drawn);
+  });
+
+  it("gives a step with a malformed stored value a real slot, and reads no reserved key as a position", () => {
+    const steps = [step("a", [{ to: "b" }]), step("b")];
+    const clean = drawnPositions(steps, "a", {});
+    const drawn = drawnPositions(steps, "a", { b: "oops", waypoints: {}, dockingPoints: {}, groups: [] });
+    expect(drawn).toEqual(clean);
+    expect(autoPlaceSteps(steps, "a", { b: { x: "1" } }).b).toEqual({ x: 240, y: 0 });
+  });
+
+  it("draws a duplicate step id once, at its first placement", () => {
+    const steps = [step("a", [{ to: "b" }]), step("b"), step("b")];
+    const drawn = drawnPositions(steps, "a", { a: { x: 0, y: 0 } });
+    expect(drawn.b).toEqual({ x: 240, y: 0 });
+  });
+
+  it("never moves an auto-placed step whose slot strictly overlaps no stored step", () => {
+    let seed = 7;
+    const next = (n: number) => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed % n;
+    };
+    const strict = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      a.x < b.x + 180 && a.x + 180 > b.x && a.y < b.y + 60 && a.y + 60 > b.y;
+    for (let round = 0; round < 60; round++) {
+      const n = 4 + next(9);
+      const ids = Array.from({ length: n }, (_, i) => `s${i}`);
+      const steps = ids.map((id) => step(id, Array.from({ length: next(3) }, () => ({ to: ids[next(n)] }))));
+      const layout: Record<string, unknown> = {};
+      for (const id of ids) if (next(3) === 0) layout[id] = { x: next(60) * 20, y: next(15) * 20 };
+      const slots = autoPlaceSteps(steps, ids[0], layout);
+      const drawn = drawnPositions(steps, ids[0], layout);
+      for (const id of ids) {
+        if (layout[id]) {
+          expect(drawn[id]).toEqual(layout[id] as { x: number; y: number });
+          continue;
+        }
+        const hit = ids.some((o) => layout[o] && strict(slots[id], layout[o] as { x: number; y: number }));
+        if (!hit) expect(drawn[id]).toEqual(slots[id]);
+      }
+    }
   });
 });

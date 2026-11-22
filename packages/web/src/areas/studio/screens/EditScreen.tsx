@@ -906,7 +906,8 @@ function ProcessSurface({ processId, formStepId, tab, view, stepId, token, roles
   /** The rail foot's three add controls, through the same creation path the
    * canvas bar's own drop uses. The new step opens on the page at once
    * (`studio-step-page`). It gets no position of its own: the Steps tab shows
-   * no canvas, so `autoPlaceSteps` places it when the Map tab next draws. */
+   * no canvas, so `drawnPositions` places it when the Map tab next draws, and moves
+   * it right where its slot overlaps a stored step. */
   const onAddStep = (kind: StepKind) => {
     const created = newStep(kind, seedLocalizedText(contentLocale));
     appendStep(created);

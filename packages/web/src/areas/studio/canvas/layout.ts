@@ -2,6 +2,8 @@ import {
   dockingEndOfAnchor,
   isDockingEnd,
   freeLatticePoint,
+  NODE_HEIGHT,
+  NODE_WIDTH,
   routeThroughWaypoints,
   snapToGrid,
   type DockingEnd,
@@ -41,7 +43,7 @@ export function autoPlaceSteps(
   initialStepId: string | undefined,
   existingLayout: Record<string, unknown>,
 ): Record<string, Point> {
-  const missing = steps.filter((s) => s.id && existingLayout[s.id] === undefined);
+  const missing = steps.filter((s) => s.id && !isPoint(existingLayout[s.id]));
   if (missing.length === 0) return {};
 
   const byId = new Map(steps.filter((s): s is LayoutStep & { id: string } => !!s.id).map((s) => [s.id, s]));
@@ -96,6 +98,11 @@ export function isPoint(value: unknown): value is Point {
   return !!value && typeof (value as Point).x === "number" && typeof (value as Point).y === "number";
 }
 
+/** Whether two node-sized rects share area. Touching edges do not. */
+function overlapsStrictly(a: Point, b: Point): boolean {
+  return a.x < b.x + NODE_WIDTH && a.x + NODE_WIDTH > b.x && a.y < b.y + NODE_HEIGHT && a.y + NODE_HEIGHT > b.y;
+}
+
 /**
  * Every step's drawn position, keyed by step id. This is the position
  * `CanvasView` renders a node at, and the position a placement must test
@@ -118,25 +125,39 @@ export function drawnPositions(
 ): Record<string, Point> {
   const autoPlaced = autoPlaceSteps(steps, initialStepId, layout);
   const drawn: Record<string, Point> = {};
-  // Every stored step is occupied from the start. A computed position that
-  // overlaps an occupied one moves right to the nearest free lattice point, in
-  // step order, and then counts as occupied for the next. A draft that stores
-  // nothing keeps `autoPlaceSteps`'s slots, which never overlap.
+  // Two passes. Every stored step is occupied from the start. An auto-placed
+  // step whose slot overlaps no occupied rect (touching edges do not count)
+  // keeps its slot and counts as occupied. Only the colliding steps then move,
+  // in step order, to the nearest free lattice point on their right, each result
+  // occupied for the next. So a move never displaces a step that collided with
+  // nothing, whatever the order of the steps. A draft that stores nothing keeps
+  // `autoPlaceSteps`'s slots, which never overlap.
   const occupied: NodePosition[] = [];
   for (const s of steps) {
-    if (!s.id) continue;
+    if (!s.id || drawn[s.id]) continue;
     const stored = layout[s.id];
     if (isPoint(stored)) {
       drawn[s.id] = stored;
       occupied.push({ id: s.id, ...stored });
     }
   }
+  const colliding: Array<{ id: string; at: Point }> = [];
   for (const s of steps) {
-    if (!s.id || isPoint(layout[s.id])) continue;
+    if (!s.id || drawn[s.id]) continue;
     const at = autoPlaced[s.id] ?? { x: 0, y: 0 };
-    const placed = occupied.length === 0 ? at : freeLatticePoint(at, occupied);
-    drawn[s.id] = placed;
-    occupied.push({ id: s.id, ...placed });
+    if (occupied.some((n) => overlapsStrictly(at, n))) {
+      colliding.push({ id: s.id, at });
+      // Held so a duplicate id is not placed twice.
+      drawn[s.id] = at;
+    } else {
+      drawn[s.id] = at;
+      occupied.push({ id: s.id, ...at });
+    }
+  }
+  for (const { id, at } of colliding) {
+    const placed = freeLatticePoint(at, occupied);
+    drawn[id] = placed;
+    occupied.push({ id, ...placed });
   }
   return drawn;
 }
