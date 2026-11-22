@@ -394,8 +394,9 @@ depth from `initialStep`. Depth selects the column. Traversal order among the
 steps of one depth selects the row.
 
 A computed position can overlap a step with a stored position. It SHALL then
-move right to the nearest free lattice point. A draft that stores no position
-SHALL draw as it drew before this rule.
+move right until it clears every step. A step that only touches another
+SHALL stay. Every other computed position SHALL stay where it is. A draft that
+stores no position SHALL draw as it drew before this rule.
 
 The computed position SHALL serve rendering only. A save before the step is
 ever dragged SHALL leave `layout` without an entry for that step id. A connect
@@ -424,8 +425,19 @@ drag is the one exception, and its own requirement states what it stores.
 
 - **WHEN** a draft stores a position for "Review" on an automatic slot
 - **AND** a new step's computed position is that same slot
-- **THEN** the new step draws on the nearest free lattice point to its right
+- **THEN** the new step draws to the right of that slot, clear of every step
 - **AND** no two steps occupy the same coordinates
+
+#### Scenario: Only the overlapping step moves
+
+- **WHEN** a stored step sits on the automatic slot of one step in a row
+- **THEN** that one step moves right
+- **AND** every other auto-placed step of the row draws where it drew before
+
+#### Scenario: A touching step stays
+
+- **WHEN** a stored step's edge touches an auto-placed step and overlaps none
+- **THEN** every auto-placed step draws where it drew before
 
 #### Scenario: A draft with no stored position keeps its drawing
 
