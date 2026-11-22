@@ -69,7 +69,7 @@ Declared directly in a `package.json` (root or a `packages/*` workspace).
 | `react` | 19.3.1 | MIT |
 | `react-dom` | 19.3.1 | MIT |
 | `typescript` | 7.0.2 | Apache-2.0 |
-| `vite` | 8.3.5 | MIT |
+| `vite` | 8.3.8 | MIT |
 | `zod` | 4.6.7 | MIT |
 
 `react` and `react-dom` resolve once, at 19.3.1. `packages/web` declares
