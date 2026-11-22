@@ -261,6 +261,11 @@ connect drag between two steps of the seeded draft did that.
 The draft then counts as hand-placed, and Arrange asks before it runs. A way
 out added from the menu or the step page stores no position, as before.
 
+The owner chose this over accepting the jump. A step added later from the
+Steps tab gets a computed position. That could be a stored step's own slot. The computed position therefore moves right to the nearest free lattice
+point, through `freeLatticePoint`. A draft with no stored position draws as
+before, since its slots never collide.
+
 ### Draw order
 
 Docking points draw above the stamps and above every way-out sentence, as the

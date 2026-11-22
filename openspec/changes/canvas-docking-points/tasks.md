@@ -88,6 +88,11 @@ static markup, or by the e2e flow of group 7.
 - [x] 8.5 Add this change to the stage 31 row of `ROADMAP.md`.
 - [x] 8.6 Run the antislop linter on every Markdown file this group touched.
 
+## 9. Places on a connect drag
+
+- [x] 9a.1 Store the drawn position of every step on a connect release. It goes in the layout write that carries the points. Verify with the pure cases and the e2e connect flow.
+- [ ] 9a.2 Move a computed position off a stored step's slot, through `freeLatticePoint`. Verify with both new scenarios of the auto-placement requirement.
+
 ## 9. Verification
 
 - [ ] 9.1 Run `bun run typecheck` and paste its output.

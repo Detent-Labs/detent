@@ -359,8 +359,8 @@ halfway along a side, and the nearer point takes the press. A press deeper
 inside the node SHALL move the step, as it does today. The cursor SHALL read
 as a crosshair, and as not-allowed on an end step.
 
-A press target is smaller than 24px on both axes. The way-out menu and the
-step page SHALL each add a way out with no small target. That is the
+A press target is smaller than 24px on both axes. The way-out menu SHALL add
+a way out from the canvas itself, with no small target. That is the
 equivalent control WCAG 2.5.8 allows for a target under its floor.
 
 #### Scenario: Hovering the handle names the gesture
@@ -385,6 +385,52 @@ equivalent control WCAG 2.5.8 allows for a target under its floor.
 
 - **WHEN** the author presses 10px inside a node's border and drags
 - **THEN** the step moves, and no connect drag starts
+
+### Requirement: A step with no recorded layout position is auto-placed on load, without writing to the draft
+
+A step id absent from the loaded draft's `layout` SHALL get a deterministic
+on-screen position. The canvas computes it from a breadth-first traversal by
+depth from `initialStep`. Depth selects the column. Traversal order among the
+steps of one depth selects the row.
+
+A computed position can overlap a step with a stored position. It SHALL then
+move right to the nearest free lattice point. A draft that stores no position
+SHALL draw as it drew before this rule.
+
+The computed position SHALL serve rendering only. A save before the step is
+ever dragged SHALL leave `layout` without an entry for that step id. A connect
+drag is the one exception, and its own requirement states what it stores.
+
+#### Scenario: An empty layout still renders every step at a distinct position
+
+- **WHEN** an author opens a draft with `layout: {}` and three or more steps
+- **THEN** every step renders at a computed position and no two steps
+  occupy the same coordinates
+
+#### Scenario: An untouched auto-placed step is not persisted
+
+- **WHEN** an author opens a draft with a step absent from `layout`
+- **AND** edits an unrelated field through a panel, and the draft saves
+- **THEN** the saved `layout` still has no entry for that step id
+
+#### Scenario: Dragging an auto-placed step persists only that step
+
+- **WHEN** a draft has two steps absent from `layout`
+- **AND** the author drags only one of them before the save
+- **THEN** the saved `layout` has an entry for the dragged step and still no
+  entry for the other
+
+#### Scenario: An auto-placed step clears a stored one
+
+- **WHEN** a draft stores a position for "Review" on an automatic slot
+- **AND** a new step's computed position is that same slot
+- **THEN** the new step draws on the nearest free lattice point to its right
+- **AND** no two steps occupy the same coordinates
+
+#### Scenario: A draft with no stored position keeps its drawing
+
+- **WHEN** a draft with `layout: {}` opens
+- **THEN** every step draws where it drew before this rule
 
 ## ADDED Requirements
 
