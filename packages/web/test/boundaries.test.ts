@@ -118,6 +118,6 @@ describe("one package, one build", () => {
   it("bakes in no origin of its own, so a reverse proxy stays possible", () => {
     const config = readFileSync(new URL("../vite.config.ts", import.meta.url).pathname, "utf8");
     // No `base` means Vite's default, "/", which is what root-relative needs.
-    expect(config).not.toMatch(/base\s*:/);
+    expect(config).not.toMatch(/\bbase\s*:/);
   });
 });
