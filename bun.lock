@@ -6,7 +6,7 @@
       "name": "workflow-engine",
       "dependencies": {
         "@marcbachmann/cel-js": "8.0.0",
-        "jose": "^6.2.15",
+        "jose": "^6.2.18",
         "zod": "4.6.7",
       },
       "devDependencies": {
@@ -295,7 +295,7 @@
 
     "invariant": ["invariant@2.2.4", "", { "dependencies": { "loose-envify": "^1.0.0" } }, "sha512-phJfQVBuaJM5raOpJjSfkiD6BpbCE4Ns//LaXl6wGYtUBY83nWS6Rf9tXm2e8VaK60JEjYldbPif/A2B1C2gNA=="],
 
-    "jose": ["jose@6.2.15", "", {}, "sha512-qdF6ewcZARtef63fJ9AKKZPgxw+t7USH6HLXYcD4CrdmSvDp79rpJSPFEKc90QBeGS63u1KQtN2MZQHC0yDIzA=="],
+    "jose": ["jose@6.2.18", "", {}, "sha512-doV4thUwgkrycJH4yLeqwTGIIZphHl+pk7CPReuMIhYhncmgzdko85MaCG4YQFTxqMFr1/oEH32tZuKKovcDEg=="],
 
     "js-tokens": ["js-tokens@4.0.0", "", {}, "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="],
 
@@ -397,12 +397,6 @@
 
     "web/form-ui": ["form-ui@file:packages/form-ui", { "dependencies": { "workflow-engine": "file:../.." }, "devDependencies": { "@stylexjs/stylex": "0.19.1", "@types/react": "^19", "@types/react-dom": "^19" }, "peerDependencies": { "@stylexjs/stylex": "0.19.1", "react": "^19", "react-dom": "^19", "zod": "^4.4.3" } }],
 
-    "web/workflow-engine": ["workflow-engine@root:", {}],
-
     "web/form-ui/workflow-engine": ["workflow-engine@file:.", {}],
-
-    "web/workflow-engine/form-ui": ["form-ui@workspace:packages/form-ui"],
-
-    "web/workflow-engine/form-ui/workflow-engine": ["workflow-engine@root:", {}],
   }
 }
