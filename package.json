@@ -35,7 +35,7 @@
     "openspec:task-status": "bun run scripts/openspec-task-status.ts"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.1",
+    "@playwright/test": "^1.65.1",
     "@types/bun": "^1.4.4",
     "oxlint": "1.92.0",
     "typescript": "7.0.2"
