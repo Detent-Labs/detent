@@ -21,7 +21,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@stylexjs/unplugin": "0.19.1",
+    "@stylexjs/unplugin": "0.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6",
